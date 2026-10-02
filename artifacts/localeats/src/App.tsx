@@ -1,13 +1,18 @@
 import { useState } from 'react';
-import { ArrowDown, ArrowRight, Menu, X } from 'lucide-react';
-import { type ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ArrowDown, ArrowRight, Menu, X, UserRound, Store, Bike, MapPin, ShieldCheck, LogOut, CircleAlert, UtensilsCrossed, RefreshCw } from 'lucide-react';
+import { type FormEvent, type ReactNode, useEffect, useRef } from 'react';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { ClerkProvider, SignIn, SignUp, useClerk, useAuth, useUser } from '@clerk/react';
+import { publishableKeyFromHost } from '@clerk/react/internal';
+import { shadcn } from '@clerk/themes';
+import { getGetMyProfileQueryKey, getGetMyDashboardQueryKey, useGetMyProfile, useCreateMyProfile, useGetMyDashboard } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import {
   Route,
+  Redirect,
   Switch,
   useLocation,
   Router as WouterRouter,
@@ -86,7 +91,9 @@ function Home() {
         <nav className="le-nav" aria-label="Main navigation" data-testid="nav-main">
           <a href="#why-local" data-testid="link-why-local">Why local</a>
           <a href="#how-it-starts" data-testid="link-how-it-starts">How it starts</a>
-          <a className="le-header-cta" href="#launch-note" data-testid="link-launch-note">A note on launch</a>
+            <a className="le-header-cta" href="#launch-note" data-testid="link-launch-note">A note on launch</a>
+            <a href={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/sign-in`} data-testid="link-home-sign-in">Sign in</a>
+            <a className="le-header-cta" href={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/sign-up`} data-testid="link-home-sign-up">Create account</a>
         </nav>
         <button className="le-menu" type="button" onClick={() => setMenuOpen((open) => !open)} aria-expanded={menuOpen} aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-controls="mobile-navigation" data-testid="button-mobile-menu">
           {menuOpen ? <X size={21} /> : <Menu size={21} />}
@@ -95,6 +102,8 @@ function Home() {
           <a href="#why-local" onClick={closeMenu} data-testid="link-mobile-why-local">Why local</a>
           <a href="#how-it-starts" onClick={closeMenu} data-testid="link-mobile-how-it-starts">How it starts</a>
           <a href="#launch-note" onClick={closeMenu} data-testid="link-mobile-launch-note">A note on launch</a>
+          <a href={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/sign-in`} onClick={closeMenu} data-testid="link-mobile-sign-in">Sign in</a>
+          <a href={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/sign-up`} onClick={closeMenu} data-testid="link-mobile-sign-up">Create account</a>
         </nav>
       </header>
 
@@ -185,7 +194,7 @@ function Home() {
           <div className="le-section-kicker">A small but important note</div>
           <h2 id="community-title" data-testid="heading-launch-note">We’re not taking orders <em>just yet.</em></h2>
           <p data-testid="text-launch-status">
-            LocalEats is still in development. Restaurant listings, ordering, driver enrollment, accounts, and payments aren’t available yet. We’ll share more as the pieces come together.
+            LocalEats is still in development. Accounts are open for getting started, but restaurant listings, ordering, driver enrollment, and payments aren’t active yet. We’ll share more as the pieces come together.
           </p>
           <div className="le-community-actions">
             <a className="le-community-primary" href="#interest" data-testid="link-whats-next">What brings you here? <ArrowDown size={15} /></a>
@@ -218,15 +227,230 @@ function Home() {
   );
 }
 
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+
+function stripBase(path: string) {
+  return basePath && path.startsWith(basePath) ? path.slice(basePath.length) || '/' : path;
+}
+
+const clerkAppearance = {
+  theme: shadcn,
+  cssLayerName: 'clerk',
+  options: {
+    logoPlacement: 'inside' as const,
+    logoLinkUrl: basePath || '/',
+    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
+  },
+  variables: {
+    colorPrimary: '#31523f',
+    colorForeground: '#294538',
+    colorMutedForeground: '#718074',
+    colorDanger: '#a84432',
+    colorBackground: '#faf6eb',
+    colorInput: '#fffaf0',
+    colorInputForeground: '#294538',
+    colorNeutral: '#d4c8b2',
+    fontFamily: 'DM Sans, sans-serif',
+    borderRadius: '0.75rem',
+  },
+  elements: {
+    rootBox: 'w-full flex justify-center',
+    cardBox: 'bg-[#faf6eb] rounded-2xl w-[440px] max-w-full overflow-hidden border border-[#ddd2bd] shadow-[0_18px_50px_rgba(45,58,42,.08)]',
+    card: '!shadow-none !border-0 !bg-transparent !rounded-none',
+    footer: '!shadow-none !border-0 !bg-transparent !rounded-none',
+    headerTitle: 'text-[#294538] font-semibold',
+    headerSubtitle: 'text-[#718074]',
+    socialButtonsBlockButtonText: 'text-[#294538] font-semibold',
+    formFieldLabel: 'text-[#395244] font-semibold',
+    footerActionLink: 'text-[#a95036] font-semibold',
+    footerActionText: 'text-[#718074]',
+    dividerText: 'text-[#718074]',
+    identityPreviewEditButton: 'text-[#a95036]',
+    formFieldSuccessText: 'text-[#31523f]',
+    alertText: 'text-[#8f392e]',
+    logoBox: 'rounded-xl',
+    logoImage: 'rounded-lg',
+    socialButtonsBlockButton: 'border-[#d4c8b2] bg-[#fffaf0] hover:bg-[#f3eddf]',
+    formButtonPrimary: 'bg-[#31523f] hover:bg-[#203b30] text-[#f8f2e4]',
+    formFieldInput: 'bg-[#fffaf0] border-[#d4c8b2] text-[#294538]',
+    footerAction: 'text-[#718074]',
+    dividerLine: 'bg-[#ded4c1]',
+    alert: 'bg-[#f7e8df] border-[#dfb7a7]',
+    otpCodeFieldInput: 'border-[#d4c8b2] bg-[#fffaf0]',
+    formFieldRow: 'text-[#395244]',
+    main: 'text-[#294538]',
+  },
+};
+
+function BrandLink() {
+  return <a className="portal-brand" href={basePath || '/'} data-testid="link-portal-brand"><img src={`${basePath}/logo.svg`} alt="" />LocalEats</a>;
+}
+
+function PortalHeader({ active }: { active: 'dashboard' | 'account' }) {
+  const { signOut } = useClerk();
+  return <header className="portal-topbar">
+    <BrandLink />
+    <nav className="portal-nav" aria-label="Account navigation" data-testid="nav-account">
+      <a className={active === 'dashboard' ? 'portal-nav-current' : ''} href={`${basePath}/dashboard`} data-testid="link-dashboard">Dashboard</a>
+      <a className={active === 'account' ? 'portal-nav-current' : ''} href={`${basePath}/account`} data-testid="link-account">Account</a>
+      <button type="button" onClick={() => signOut({ redirectUrl: basePath || '/' })} data-testid="button-logout"><LogOut size={14} /> Log out</button>
+    </nav>
+  </header>;
+}
+
+function LoadingView({ label = 'Loading your LocalEats account' }: { label?: string }) {
+  return <main className="portal"><div className="portal-shell"><div className="portal-topbar"><BrandLink /></div><section className="portal-main" aria-label={label} data-testid="status-loading"><div className="portal-skeleton portal-loading-block" style={{ width: 130 }} /><div className="portal-skeleton portal-loading-block" style={{ width: 'min(480px, 90%)', height: 48 }} /><div className="portal-skeleton portal-loading-block" style={{ width: 'min(610px, 95%)' }} /><div className="portal-grid"><div className="portal-panel"><div className="portal-skeleton portal-loading-block" /><div className="portal-skeleton portal-loading-block" /><div className="portal-skeleton portal-loading-block" style={{ height: 140 }} /></div><div className="portal-aside"><div className="portal-skeleton portal-loading-block" /><div className="portal-skeleton portal-loading-block" /></div></div></section></div></main>;
+}
+
+function QueryError({ retry, message = 'We couldn’t load this part of your account.' }: { retry: () => void; message?: string }) {
+  return <div className="portal-empty-error" role="alert" data-testid="status-load-error"><CircleAlert size={17} style={{ verticalAlign: 'middle', marginRight: 8 }} />{message}<div style={{ marginTop: 14 }}><button className="portal-primary" type="button" onClick={retry} data-testid="button-retry"><RefreshCw size={14} /> Try again</button></div></div>;
+}
+
+function useProfileQuery() {
+  const { isSignedIn } = useAuth();
+  return useGetMyProfile({ query: { queryKey: getGetMyProfileQueryKey(), enabled: !!isSignedIn, staleTime: 0, refetchOnMount: 'always', retry: false } });
+}
+
+function isNotFound(error: unknown) {
+  const candidate = error as { status?: number; response?: { status?: number } } | null;
+  return candidate?.status === 404 || candidate?.response?.status === 404;
+}
+
+function HomeRedirect() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const profile = useProfileQuery();
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    if (profile.data) setLocation('/dashboard', { replace: true });
+    else if (profile.isError && isNotFound(profile.error)) setLocation('/account/setup', { replace: true });
+  }, [isLoaded, isSignedIn, profile.data, profile.isError, profile.error, setLocation]);
+  if (!isLoaded) return <LoadingView />;
+  if (isSignedIn && profile.isError && !isNotFound(profile.error)) return <main className="portal"><div className="portal-shell"><div className="portal-topbar"><BrandLink /></div><section className="portal-main"><div className="portal-eyebrow">Your LocalEats account</div><h1 className="portal-title">One moment, <em>neighbor.</em></h1><QueryError retry={() => profile.refetch()} message="We couldn’t check your LocalEats profile." /></section></div></main>;
+  if (isSignedIn) return <LoadingView />;
+  return <Home />;
+}
+
+function Protected({ children }: { children: ReactNode }) {
+  const { isLoaded, isSignedIn } = useAuth();
+  if (!isLoaded) return <LoadingView />;
+  if (!isSignedIn) return <Redirect to="/" />;
+  return <>{children}</>;
+}
+
+function SignInPage() {
+  return <div className="portal-auth-backdrop" data-testid="page-sign-in">
+    <section className="portal-auth-story"><BrandLink /><div className="portal-auth-copy"><div className="portal-eyebrow" style={{ color: '#e8b35e' }}>A neighborly start</div><h1>Good food,<br />closer to <em>home.</em></h1><p>Your LocalEats account is the first step toward a more connected food community in Roane County.</p></div><div className="portal-auth-foot">ROANE COUNTY, TENNESSEE · LOCAL FOOD, LOCAL PEOPLE</div></section>
+    <section className="portal-auth-form"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} /></section>
+  </div>;
+}
+
+function SignUpPage() {
+  return <div className="portal-auth-backdrop" data-testid="page-sign-up">
+    <section className="portal-auth-story"><BrandLink /><div className="portal-auth-copy"><div className="portal-eyebrow" style={{ color: '#e8b35e' }}>Made for Roane County</div><h1>There’s room<br />at the <em>table.</em></h1><p>Create an account, then tell us how you’d like to be part of LocalEats. Ordering and partner operations are not active yet.</p></div><div className="portal-auth-foot">A LOCAL IDEA TAKING SHAPE IN ROANE COUNTY</div></section>
+    <section className="portal-auth-form"><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} /></section>
+  </div>;
+}
+
+function AccountSetup() {
+  const [role, setRole] = useState<'customer' | 'restaurant' | 'driver'>('customer');
+  const [displayName, setDisplayName] = useState('');
+  const [errorText, setErrorText] = useState('');
+  const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+  const profile = useProfileQuery();
+  const createProfile = useCreateMyProfile();
+  useEffect(() => {
+    if (profile.data) setLocation('/dashboard', { replace: true });
+  }, [profile.data, setLocation]);
+  const roles = [
+    { id: 'customer' as const, label: 'Neighbor', detail: 'Here to discover local food', Icon: UserRound },
+    { id: 'restaurant' as const, label: 'Restaurant', detail: 'Part of the local food scene', Icon: Store },
+    { id: 'driver' as const, label: 'Driver', detail: 'Interested in local delivery', Icon: Bike },
+  ];
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const cleanName = displayName.trim();
+    if (!cleanName) { setErrorText('Add a display name to continue.'); return; }
+    setErrorText('');
+    createProfile.mutate({ data: { role, displayName: cleanName } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetMyProfileQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetMyDashboardQueryKey() });
+        setLocation('/dashboard');
+      },
+      onError: () => setErrorText('We couldn’t save your profile just now. Please try again.'),
+    });
+  };
+  if (profile.isLoading || profile.data) return <LoadingView label="Checking your profile" />;
+  return <Protected><main className="portal" data-testid="page-account-setup"><div className="portal-shell"><PortalHeader active="account" /><section className="portal-main">
+    {profile.isError && !isNotFound(profile.error) ? <><div className="portal-eyebrow">Welcome to the neighborhood</div><h1 className="portal-title">Let’s make this <em>yours.</em></h1><div style={{ marginTop: 28 }}><QueryError retry={() => profile.refetch()} /></div></> : <>
+    <div className="portal-eyebrow">Welcome to the neighborhood</div><h1 className="portal-title">Let’s make this <em>yours.</em></h1><p className="portal-lede">Choose the role that best fits you and add a display name. This helps personalize your LocalEats account; it does not enroll you or activate services.</p>
+    <div className="portal-grid"><form className="portal-panel" onSubmit={submit} data-testid="form-account-setup">
+      <h2>Set up your profile</h2><p className="portal-panel-intro">You can only choose a member role here. Admin access is never offered during public setup.</p>
+      <span className="portal-field-label">I’m joining as</span><div className="portal-role-grid" role="group" aria-label="Choose your role" data-testid="group-profile-roles">
+        {roles.map(({ id, label, detail, Icon }) => <button type="button" key={id} className={`portal-role${role === id ? ' selected' : ''}`} aria-pressed={role === id} onClick={() => setRole(id)} data-testid={`button-role-${id}`}><span className="portal-role-icon"><Icon size={16} /></span><strong>{label}</strong><small>{detail}</small></button>)}
+      </div>
+      <label className="portal-field-label" htmlFor="display-name">Display name</label><input id="display-name" className="portal-input" type="text" maxLength={120} autoComplete="name" placeholder="How should we address you?" value={displayName} onChange={(event) => setDisplayName(event.target.value)} data-testid="input-display-name" />
+      {errorText && <p className="portal-error" role="alert" data-testid="text-setup-error">{errorText}</p>}
+      <div className="portal-form-actions"><button className="portal-primary" type="submit" disabled={createProfile.isPending} data-testid="button-save-profile">{createProfile.isPending ? 'Saving profile…' : 'Continue to your dashboard'} <ArrowRight size={15} /></button></div>
+    </form><aside className="portal-aside"><div className="portal-aside-mark"><MapPin size={18} /></div><h3>Local by design.</h3><p>LocalEats is being built for neighbors, restaurants, and drivers across Roane County, Tennessee.</p><div className="portal-aside-rule" /><div className="portal-aside-foot"><ShieldCheck size={15} />Your profile records your display name and role. It does not sign you up for deliveries or business enrollment.</div></aside></div>
+  </>}</section></div></main></Protected>;
+}
+
+function AccountPage() {
+  const { user } = useUser();
+  const [, setLocation] = useLocation();
+  const profile = useProfileQuery();
+  useEffect(() => {
+    if (profile.data) return;
+    if (profile.isError && isNotFound(profile.error)) setLocation('/account/setup', { replace: true });
+  }, [profile.data, profile.isError, profile.error, setLocation]);
+  if (profile.isLoading || !profile.data && profile.isError && isNotFound(profile.error)) return <LoadingView label="Loading profile" />;
+  return <Protected><main className="portal" data-testid="page-account"><div className="portal-shell"><PortalHeader active="account" /><section className="portal-main">
+    <div className="portal-eyebrow">Your LocalEats profile</div><h1 className="portal-title">Account, <em>at a glance.</em></h1><p className="portal-lede">Your account details and how you’re connected to the LocalEats community.</p>
+    {profile.isError ? <div style={{ marginTop: 30 }}><QueryError retry={() => profile.refetch()} /></div> : profile.data && <div className="portal-grid"><section className="portal-panel" data-testid="panel-profile-details"><h2>Profile details</h2><p className="portal-panel-intro">This is the information attached to your LocalEats profile.</p>
+      <div className="portal-profile-row"><span className="portal-profile-label">Display name</span><span className="portal-profile-value" data-testid="text-profile-name">{profile.data.displayName}</span></div>
+      <div className="portal-profile-row"><span className="portal-profile-label">Role</span><span className="portal-profile-value"><span className="portal-role-badge" data-testid="text-profile-role">{profile.data.role}</span></span></div>
+      <div className="portal-profile-row"><span className="portal-profile-label">Account ID</span><span className="portal-profile-value" data-testid="text-profile-id">{profile.data.id}</span></div>
+      <div className="portal-profile-row"><span className="portal-profile-label">Clerk user ID</span><span className="portal-profile-value" data-testid="text-clerk-user-id">{user?.id || 'Not available'}</span></div>
+      <div className="portal-profile-row"><span className="portal-profile-label">Member since</span><span className="portal-profile-value" data-testid="text-profile-created">{new Date(profile.data.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</span></div>
+    </section><aside className="portal-aside"><div className="portal-aside-mark"><UserRound size={18} /></div><h3>Sign-in identity</h3><p>Your authentication is managed securely through LocalEats. Your email address is not shown as a public listing.</p><div className="portal-aside-rule" /><div className="portal-aside-foot" data-testid="text-account-email">{user?.primaryEmailAddress?.emailAddress || 'Email address unavailable'}</div></aside></div>}
+  </section></div></main></Protected>;
+}
+
+function DashboardPage() {
+  const [, setLocation] = useLocation();
+  const profile = useProfileQuery();
+  const dashboard = useGetMyDashboard({ query: { queryKey: getGetMyDashboardQueryKey(), enabled: !!profile.data, staleTime: 0, refetchOnMount: 'always' } });
+  useEffect(() => {
+    if (!profile.data && profile.isError && isNotFound(profile.error)) setLocation('/account/setup', { replace: true });
+  }, [profile.data, profile.isError, profile.error, setLocation]);
+  if (profile.isLoading || !profile.data && profile.isError && isNotFound(profile.error)) return <LoadingView label="Loading your dashboard" />;
+  return <Protected><main className="portal" data-testid="page-dashboard"><div className="portal-shell"><PortalHeader active="dashboard" /><section className="portal-main">
+    {profile.isError && !isNotFound(profile.error) ? <><div className="portal-eyebrow">Your LocalEats home</div><h1 className="portal-title">A place in the <em>community.</em></h1><div style={{ marginTop: 28 }}><QueryError retry={() => profile.refetch()} /></div></> : dashboard.isLoading ? <LoadingView label="Loading dashboard sections" /> : dashboard.isError ? <><div className="portal-eyebrow">Your LocalEats home</div><h1 className="portal-title">A place in the <em>community.</em></h1><div style={{ marginTop: 28 }}><QueryError retry={() => dashboard.refetch()} /></div></> : dashboard.data && <>
+      <div className="portal-eyebrow">{dashboard.data.role} dashboard · Roane County</div><h1 className="portal-title">Welcome, <em>{dashboard.data.displayName}.</em></h1><p className="portal-lede">Your LocalEats space is ready. Here’s what’s part of your {dashboard.data.role} experience.</p>
+      <div className="portal-grid"><section className="portal-panel" data-testid="panel-dashboard-sections"><h2>Your dashboard</h2><p className="portal-panel-intro">Sections are provided for your account role. LocalEats is still preparing its operational services.</p>
+        <div className="portal-section-list" data-testid="list-dashboard-sections">{dashboard.data.sections.map((section, index) => <article className="portal-section-item" key={`${section}-${index}`} data-testid={`item-dashboard-section-${index}`}><span className="portal-section-number">{String(index + 1).padStart(2, '0')}</span><strong>{section}</strong></article>)}</div>
+        {!dashboard.data.sections.length && <div className="portal-empty-error" data-testid="status-no-sections">No dashboard sections are available for this profile yet.</div>}
+        <div className="portal-status-note" data-testid="notice-services-inactive"><CircleAlert size={16} /><span>Not active yet: ordering, payments, restaurant and driver enrollment, dispatch, and GPS tracking. This dashboard does not represent live orders or operational activity.</span></div>
+      </section><aside className="portal-aside"><div className="portal-aside-mark"><UtensilsCrossed size={18} /></div><h3>Built around here.</h3><p>Local food and local people come first. We’re building the pieces carefully before service begins.</p><div className="portal-aside-rule" /><div className="portal-aside-foot"><MapPin size={15} />Roane County, Tennessee</div></aside></div>
+    </>}
+  </section></div></main></Protected>;
+}
+
 function Router() {
-  return (
-    <RoutedErrorBoundary>
-      <Switch>
-        <Route path="/" component={Home} />
-        <Route component={NotFound} />
-      </Switch>
-    </RoutedErrorBoundary>
-  );
+  return <RoutedErrorBoundary><Switch>
+    <Route path="/" component={HomeRedirect} />
+    <Route path="/sign-in/*?" component={SignInPage} />
+    <Route path="/sign-up/*?" component={SignUpPage} />
+    <Route path="/account/setup" component={AccountSetup} />
+    <Route path="/account" component={AccountPage} />
+    <Route path="/dashboard" component={DashboardPage} />
+    <Route component={NotFound} />
+  </Switch></RoutedErrorBoundary>;
 }
 
 function RoutedErrorBoundary({ children }: { children: ReactNode }) {
@@ -234,12 +458,37 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
   return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
 }
 
+function ClerkQueryClientCacheInvalidator() {
+  const { addListener } = useClerk();
+  const queryClient = useQueryClient();
+  const prevUserIdRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    const unsubscribe = addListener(({ user }) => {
+      const userId = user?.id ?? null;
+      if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== userId) queryClient.clear();
+      prevUserIdRef.current = userId;
+    });
+    return unsubscribe;
+  }, [addListener, queryClient]);
+  return null;
+}
+
+function ClerkRoutes() {
+  const [, setLocation] = useLocation();
+  if (!clerkPubKey) throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY');
+  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`}
+    localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your LocalEats account' } }, signUp: { start: { title: 'Find your place here', subtitle: 'Create your LocalEats account' } } }}
+    routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}>
+    <ClerkQueryClientCacheInvalidator /><Router />
+  </ClerkProvider>;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <Router />
+        <WouterRouter base={basePath}>
+          <ClerkRoutes />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

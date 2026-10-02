@@ -10,6 +10,10 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: profiles
+    description: Signed-in user profile and role setup
+  - name: dashboards
+    description: Role-specific dashboard foundation
 paths:
   /healthz:
     get:
@@ -24,6 +28,63 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /profiles/me:
+    get:
+      operationId: getMyProfile
+      tags: [profiles]
+      summary: Get the signed-in user's profile
+      responses:
+        "200":
+          description: The signed-in user's LocalEats profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          description: Sign-in is required
+        "404":
+          description: The signed-in user has not completed profile setup
+    post:
+      operationId: createMyProfile
+      tags: [profiles]
+      summary: Create the signed-in user's profile and initial role
+      description: Public onboarding can create customer, restaurant, or driver profiles. It cannot grant the admin role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileInput"
+      responses:
+        "201":
+          description: The new LocalEats profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          description: Invalid profile details
+        "401":
+          description: Sign-in is required
+        "409":
+          description: A profile already exists for this account
+  /dashboard:
+    get:
+      operationId: getMyDashboard
+      tags: [dashboards]
+      summary: Get the signed-in user's role-specific dashboard sections
+      description: The server derives the role from the signed-in user's saved profile; callers cannot request another role's dashboard.
+      responses:
+        "200":
+          description: Role-specific dashboard headings; operational features are not included yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardView"
+        "401":
+          description: Sign-in is required
+        "404":
+          description: The signed-in user has not completed profile setup
 components:
   schemas:
     HealthStatus:
@@ -33,4 +94,44 @@ components:
           type: string
       required:
         - status
+    UserRole:
+      type: string
+      enum: [customer, restaurant, driver, admin]
+    Profile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          $ref: "#/components/schemas/UserRole"
+        displayName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, role, displayName, createdAt]
+    ProfileInput:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [customer, restaurant, driver]
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+      required: [role, displayName]
+    DashboardView:
+      type: object
+      properties:
+        role:
+          $ref: "#/components/schemas/UserRole"
+        displayName:
+          type: string
+        sections:
+          type: array
+          items:
+            type: string
+      required: [role, displayName, sections]
 
