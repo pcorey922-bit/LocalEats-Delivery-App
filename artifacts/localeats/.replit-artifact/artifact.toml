@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "LocalEats"
+description = "A local food delivery app for Roane County, Tennessee, starting with a customer-facing home page and growing into customer, restaurant, driver, and administrator experiences."
+version = "1.0.0"
+id = "artifacts/localeats"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25035
+
+[services.development]
+run = "pnpm --filter @workspace/localeats run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/localeats", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/localeats/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25035"
+BASE_PATH = "/"

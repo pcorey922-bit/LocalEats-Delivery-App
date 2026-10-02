@@ -1,0 +1,1 @@
+- [Trustworthy marketplace data](trustworthy-marketplace-data.md) — never invent LocalEats restaurant listings or imply real payments were processed.
