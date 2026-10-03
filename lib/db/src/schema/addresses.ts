@@ -1,5 +1,5 @@
 import { createInsertSchema } from "drizzle-zod";
-import { boolean, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 import { profilesTable } from "./profiles";
 
@@ -16,7 +16,9 @@ export const addressesTable = pgTable("addresses", {
   isDefault: boolean("is_default").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, (table) => [
+  index("addresses_profile_idx").on(table.profileId),
+]);
 
 export const insertAddressSchema = createInsertSchema(addressesTable).omit({
   id: true,

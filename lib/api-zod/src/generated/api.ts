@@ -60,3 +60,814 @@ export const GetMyDashboardResponse = zod.object({
 })
 
 
+/**
+ * @summary List approved restaurants
+ */
+export const listRestaurantsQuerySearchMax = 100;
+
+
+
+export const ListRestaurantsQueryParams = zod.object({
+  "search": zod.coerce.string().max(listRestaurantsQuerySearchMax).optional()
+})
+
+export const ListRestaurantsResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "city": zod.string(),
+  "region": zod.string()
+})
+export const ListRestaurantsResponse = zod.array(ListRestaurantsResponseItem)
+
+
+/**
+ * @summary Get an approved restaurant and its public menu
+ */
+export const GetRestaurantParams = zod.object({
+  "restaurantId": zod.coerce.string().uuid()
+})
+
+export const GetRestaurantResponse = zod.object({
+  "id": zod.string().uuid(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "phone": zod.string().nullable(),
+  "street1": zod.string(),
+  "street2": zod.string().nullable(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "postalCode": zod.string(),
+  "categories": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "name": zod.string(),
+  "sortOrder": zod.number().int(),
+  "items": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "categoryId": zod.string().uuid(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "priceCents": zod.number().int(),
+  "isAvailable": zod.boolean()
+}))
+}))
+})
+
+
+/**
+ * @summary Get the signed-in restaurant's business profile
+ */
+export const GetMyRestaurantResponse = zod.object({
+  "id": zod.string().uuid(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "phone": zod.string().nullable(),
+  "street1": zod.string(),
+  "street2": zod.string().nullable(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "postalCode": zod.string(),
+  "status": zod.enum(['pending', 'approved', 'rejected', 'suspended']),
+  "categories": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "name": zod.string(),
+  "sortOrder": zod.number().int(),
+  "items": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "categoryId": zod.string().uuid(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "priceCents": zod.number().int(),
+  "isAvailable": zod.boolean()
+}))
+}))
+})
+
+
+/**
+ * @summary Submit a restaurant for review
+ */
+export const createMyRestaurantBodyNameMin = 2;
+export const createMyRestaurantBodyNameMax = 160;
+
+export const createMyRestaurantBodyDescriptionMax = 2000;
+
+export const createMyRestaurantBodyPhoneMax = 30;
+
+export const createMyRestaurantBodyStreet1Min = 2;
+export const createMyRestaurantBodyStreet1Max = 180;
+
+export const createMyRestaurantBodyStreet2Max = 180;
+
+export const createMyRestaurantBodyCityMin = 2;
+export const createMyRestaurantBodyCityMax = 100;
+
+export const createMyRestaurantBodyRegionMax = 80;
+
+export const createMyRestaurantBodyPostalCodeMin = 3;
+export const createMyRestaurantBodyPostalCodeMax = 20;
+
+
+
+export const CreateMyRestaurantBody = zod.object({
+  "name": zod.string().min(createMyRestaurantBodyNameMin).max(createMyRestaurantBodyNameMax),
+  "description": zod.string().max(createMyRestaurantBodyDescriptionMax).optional(),
+  "phone": zod.string().max(createMyRestaurantBodyPhoneMax).optional(),
+  "street1": zod.string().min(createMyRestaurantBodyStreet1Min).max(createMyRestaurantBodyStreet1Max),
+  "street2": zod.string().max(createMyRestaurantBodyStreet2Max).optional(),
+  "city": zod.string().min(createMyRestaurantBodyCityMin).max(createMyRestaurantBodyCityMax),
+  "region": zod.string().max(createMyRestaurantBodyRegionMax).optional(),
+  "postalCode": zod.string().min(createMyRestaurantBodyPostalCodeMin).max(createMyRestaurantBodyPostalCodeMax)
+})
+
+export const CreateMyRestaurantResponse = zod.object({
+  "id": zod.string().uuid(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "phone": zod.string().nullable(),
+  "street1": zod.string(),
+  "street2": zod.string().nullable(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "postalCode": zod.string(),
+  "status": zod.enum(['pending', 'approved', 'rejected', 'suspended']),
+  "categories": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "name": zod.string(),
+  "sortOrder": zod.number().int(),
+  "items": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "categoryId": zod.string().uuid(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "priceCents": zod.number().int(),
+  "isAvailable": zod.boolean()
+}))
+}))
+})
+
+
+/**
+ * @summary Update the signed-in restaurant's business profile
+ */
+export const updateMyRestaurantBodyNameMin = 2;
+export const updateMyRestaurantBodyNameMax = 160;
+
+export const updateMyRestaurantBodyDescriptionMax = 2000;
+
+export const updateMyRestaurantBodyPhoneMax = 30;
+
+export const updateMyRestaurantBodyStreet1Min = 2;
+export const updateMyRestaurantBodyStreet1Max = 180;
+
+export const updateMyRestaurantBodyStreet2Max = 180;
+
+export const updateMyRestaurantBodyCityMin = 2;
+export const updateMyRestaurantBodyCityMax = 100;
+
+export const updateMyRestaurantBodyRegionMax = 80;
+
+export const updateMyRestaurantBodyPostalCodeMin = 3;
+export const updateMyRestaurantBodyPostalCodeMax = 20;
+
+
+
+export const UpdateMyRestaurantBody = zod.object({
+  "name": zod.string().min(updateMyRestaurantBodyNameMin).max(updateMyRestaurantBodyNameMax).optional(),
+  "description": zod.string().max(updateMyRestaurantBodyDescriptionMax).nullish(),
+  "phone": zod.string().max(updateMyRestaurantBodyPhoneMax).nullish(),
+  "street1": zod.string().min(updateMyRestaurantBodyStreet1Min).max(updateMyRestaurantBodyStreet1Max).optional(),
+  "street2": zod.string().max(updateMyRestaurantBodyStreet2Max).nullish(),
+  "city": zod.string().min(updateMyRestaurantBodyCityMin).max(updateMyRestaurantBodyCityMax).optional(),
+  "region": zod.string().max(updateMyRestaurantBodyRegionMax).optional(),
+  "postalCode": zod.string().min(updateMyRestaurantBodyPostalCodeMin).max(updateMyRestaurantBodyPostalCodeMax).optional()
+})
+
+export const UpdateMyRestaurantResponse = zod.object({
+  "id": zod.string().uuid(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "phone": zod.string().nullable(),
+  "street1": zod.string(),
+  "street2": zod.string().nullable(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "postalCode": zod.string(),
+  "status": zod.enum(['pending', 'approved', 'rejected', 'suspended']),
+  "categories": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "name": zod.string(),
+  "sortOrder": zod.number().int(),
+  "items": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "categoryId": zod.string().uuid(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "priceCents": zod.number().int(),
+  "isAvailable": zod.boolean()
+}))
+}))
+})
+
+
+/**
+ * @summary Add a menu category
+ */
+export const createMyRestaurantCategoryBodyNameMax = 100;
+
+export const createMyRestaurantCategoryBodySortOrderMin = 0;
+
+
+
+export const CreateMyRestaurantCategoryBody = zod.object({
+  "name": zod.string().min(1).max(createMyRestaurantCategoryBodyNameMax),
+  "sortOrder": zod.number().int().min(createMyRestaurantCategoryBodySortOrderMin).optional()
+})
+
+export const CreateMyRestaurantCategoryResponse = zod.object({
+  "id": zod.string().uuid(),
+  "name": zod.string(),
+  "sortOrder": zod.number().int(),
+  "items": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "categoryId": zod.string().uuid(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "priceCents": zod.number().int(),
+  "isAvailable": zod.boolean()
+}))
+})
+
+
+/**
+ * @summary Rename or reorder a menu category
+ */
+export const UpdateMyRestaurantCategoryParams = zod.object({
+  "categoryId": zod.coerce.string().uuid()
+})
+
+export const updateMyRestaurantCategoryBodyNameMax = 100;
+
+export const updateMyRestaurantCategoryBodySortOrderMin = 0;
+
+
+
+export const UpdateMyRestaurantCategoryBody = zod.object({
+  "name": zod.string().min(1).max(updateMyRestaurantCategoryBodyNameMax).optional(),
+  "sortOrder": zod.number().int().min(updateMyRestaurantCategoryBodySortOrderMin).optional()
+})
+
+export const UpdateMyRestaurantCategoryResponse = zod.object({
+  "id": zod.string().uuid(),
+  "name": zod.string(),
+  "sortOrder": zod.number().int(),
+  "items": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "categoryId": zod.string().uuid(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "priceCents": zod.number().int(),
+  "isAvailable": zod.boolean()
+}))
+})
+
+
+/**
+ * @summary Remove a menu category that has no menu items
+ */
+export const DeleteMyRestaurantCategoryParams = zod.object({
+  "categoryId": zod.coerce.string().uuid()
+})
+
+export const DeleteMyRestaurantCategoryResponse = zod.void()
+
+
+/**
+ * @summary Add a menu item
+ */
+export const createMyRestaurantMenuItemBodyNameMax = 140;
+
+export const createMyRestaurantMenuItemBodyDescriptionMax = 2000;
+
+export const createMyRestaurantMenuItemBodyPriceCentsMin = 0;
+export const createMyRestaurantMenuItemBodyPriceCentsMax = 1000000;
+
+
+
+export const CreateMyRestaurantMenuItemBody = zod.object({
+  "categoryId": zod.string().uuid(),
+  "name": zod.string().min(1).max(createMyRestaurantMenuItemBodyNameMax),
+  "description": zod.string().max(createMyRestaurantMenuItemBodyDescriptionMax).optional(),
+  "priceCents": zod.number().int().min(createMyRestaurantMenuItemBodyPriceCentsMin).max(createMyRestaurantMenuItemBodyPriceCentsMax),
+  "isAvailable": zod.boolean().optional()
+})
+
+export const CreateMyRestaurantMenuItemResponse = zod.object({
+  "id": zod.string().uuid(),
+  "categoryId": zod.string().uuid(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "priceCents": zod.number().int(),
+  "isAvailable": zod.boolean()
+})
+
+
+/**
+ * @summary Edit, hide, or show a menu item
+ */
+export const UpdateMyRestaurantMenuItemParams = zod.object({
+  "menuItemId": zod.coerce.string().uuid()
+})
+
+export const updateMyRestaurantMenuItemBodyNameMax = 140;
+
+export const updateMyRestaurantMenuItemBodyDescriptionMax = 2000;
+
+export const updateMyRestaurantMenuItemBodyPriceCentsMin = 0;
+export const updateMyRestaurantMenuItemBodyPriceCentsMax = 1000000;
+
+
+
+export const UpdateMyRestaurantMenuItemBody = zod.object({
+  "categoryId": zod.string().uuid().optional(),
+  "name": zod.string().min(1).max(updateMyRestaurantMenuItemBodyNameMax).optional(),
+  "description": zod.string().max(updateMyRestaurantMenuItemBodyDescriptionMax).nullish(),
+  "priceCents": zod.number().int().min(updateMyRestaurantMenuItemBodyPriceCentsMin).max(updateMyRestaurantMenuItemBodyPriceCentsMax).optional(),
+  "isAvailable": zod.boolean().optional()
+})
+
+export const UpdateMyRestaurantMenuItemResponse = zod.object({
+  "id": zod.string().uuid(),
+  "categoryId": zod.string().uuid(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "priceCents": zod.number().int(),
+  "isAvailable": zod.boolean()
+})
+
+
+/**
+ * @summary Remove a menu item
+ */
+export const DeleteMyRestaurantMenuItemParams = zod.object({
+  "menuItemId": zod.coerce.string().uuid()
+})
+
+export const DeleteMyRestaurantMenuItemResponse = zod.void()
+
+
+/**
+ * @summary List the signed-in customer's saved delivery addresses
+ */
+export const ListMyAddressesResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "label": zod.string(),
+  "street1": zod.string(),
+  "street2": zod.string().nullable(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "postalCode": zod.string(),
+  "deliveryInstructions": zod.string().nullable(),
+  "isDefault": zod.boolean()
+})
+export const ListMyAddressesResponse = zod.array(ListMyAddressesResponseItem)
+
+
+/**
+ * @summary Save a delivery address
+ */
+export const createMyAddressBodyLabelMax = 60;
+
+export const createMyAddressBodyStreet1Min = 2;
+export const createMyAddressBodyStreet1Max = 180;
+
+export const createMyAddressBodyStreet2Max = 180;
+
+export const createMyAddressBodyCityMin = 2;
+export const createMyAddressBodyCityMax = 100;
+
+export const createMyAddressBodyRegionMax = 80;
+
+export const createMyAddressBodyPostalCodeMin = 3;
+export const createMyAddressBodyPostalCodeMax = 20;
+
+export const createMyAddressBodyDeliveryInstructionsMax = 1000;
+
+
+
+export const CreateMyAddressBody = zod.object({
+  "label": zod.string().max(createMyAddressBodyLabelMax).optional(),
+  "street1": zod.string().min(createMyAddressBodyStreet1Min).max(createMyAddressBodyStreet1Max),
+  "street2": zod.string().max(createMyAddressBodyStreet2Max).optional(),
+  "city": zod.string().min(createMyAddressBodyCityMin).max(createMyAddressBodyCityMax),
+  "region": zod.string().max(createMyAddressBodyRegionMax).optional(),
+  "postalCode": zod.string().min(createMyAddressBodyPostalCodeMin).max(createMyAddressBodyPostalCodeMax),
+  "deliveryInstructions": zod.string().max(createMyAddressBodyDeliveryInstructionsMax).optional(),
+  "isDefault": zod.boolean().optional()
+})
+
+export const CreateMyAddressResponse = zod.object({
+  "id": zod.string().uuid(),
+  "label": zod.string(),
+  "street1": zod.string(),
+  "street2": zod.string().nullable(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "postalCode": zod.string(),
+  "deliveryInstructions": zod.string().nullable(),
+  "isDefault": zod.boolean()
+})
+
+
+/**
+ * @summary Update a saved delivery address
+ */
+export const UpdateMyAddressParams = zod.object({
+  "addressId": zod.coerce.string().uuid()
+})
+
+export const updateMyAddressBodyLabelMax = 60;
+
+export const updateMyAddressBodyStreet1Min = 2;
+export const updateMyAddressBodyStreet1Max = 180;
+
+export const updateMyAddressBodyStreet2Max = 180;
+
+export const updateMyAddressBodyCityMin = 2;
+export const updateMyAddressBodyCityMax = 100;
+
+export const updateMyAddressBodyRegionMax = 80;
+
+export const updateMyAddressBodyPostalCodeMin = 3;
+export const updateMyAddressBodyPostalCodeMax = 20;
+
+export const updateMyAddressBodyDeliveryInstructionsMax = 1000;
+
+
+
+export const UpdateMyAddressBody = zod.object({
+  "label": zod.string().max(updateMyAddressBodyLabelMax).optional(),
+  "street1": zod.string().min(updateMyAddressBodyStreet1Min).max(updateMyAddressBodyStreet1Max).optional(),
+  "street2": zod.string().max(updateMyAddressBodyStreet2Max).nullish(),
+  "city": zod.string().min(updateMyAddressBodyCityMin).max(updateMyAddressBodyCityMax).optional(),
+  "region": zod.string().max(updateMyAddressBodyRegionMax).optional(),
+  "postalCode": zod.string().min(updateMyAddressBodyPostalCodeMin).max(updateMyAddressBodyPostalCodeMax).optional(),
+  "deliveryInstructions": zod.string().max(updateMyAddressBodyDeliveryInstructionsMax).nullish(),
+  "isDefault": zod.boolean().optional()
+})
+
+export const UpdateMyAddressResponse = zod.object({
+  "id": zod.string().uuid(),
+  "label": zod.string(),
+  "street1": zod.string(),
+  "street2": zod.string().nullable(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "postalCode": zod.string(),
+  "deliveryInstructions": zod.string().nullable(),
+  "isDefault": zod.boolean()
+})
+
+
+/**
+ * @summary Remove a saved delivery address
+ */
+export const DeleteMyAddressParams = zod.object({
+  "addressId": zod.coerce.string().uuid()
+})
+
+export const DeleteMyAddressResponse = zod.void()
+
+
+/**
+ * @summary Place an order using server-verified menu prices
+ */
+export const createMyOrderBodyItemsItemQuantityMax = 50;
+
+export const createMyOrderBodyItemsItemSpecialInstructionsMax = 500;
+
+export const createMyOrderBodyItemsMax = 50;
+
+
+
+export const CreateMyOrderBody = zod.object({
+  "restaurantId": zod.string().uuid(),
+  "addressId": zod.string().uuid(),
+  "items": zod.array(zod.object({
+  "menuItemId": zod.string().uuid(),
+  "quantity": zod.number().int().min(1).max(createMyOrderBodyItemsItemQuantityMax),
+  "specialInstructions": zod.string().max(createMyOrderBodyItemsItemSpecialInstructionsMax).optional()
+})).min(1).max(createMyOrderBodyItemsMax)
+})
+
+export const CreateMyOrderResponse = zod.object({
+  "id": zod.string().uuid(),
+  "restaurantId": zod.string().uuid(),
+  "restaurantName": zod.string(),
+  "customerProfileId": zod.string().uuid(),
+  "customerName": zod.string(),
+  "status": zod.enum(['cart', 'placed', 'restaurant_received', 'pending', 'accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'cancelled']),
+  "subtotalCents": zod.number().int(),
+  "deliveryFeeCents": zod.number().int(),
+  "serviceFeeCents": zod.number().int(),
+  "taxCents": zod.number().int(),
+  "tipCents": zod.number().int(),
+  "totalCents": zod.number().int(),
+  "paymentStatus": zod.enum(['pending', 'authorized', 'succeeded', 'failed', 'refunded', 'none']),
+  "paymentCollected": zod.boolean(),
+  "deliveryAddress": zod.object({
+  "label": zod.string(),
+  "street1": zod.string(),
+  "street2": zod.string().nullable(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "postalCode": zod.string(),
+  "deliveryInstructions": zod.string().nullable()
+}),
+  "items": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "menuItemId": zod.string().uuid().nullable(),
+  "itemName": zod.string(),
+  "unitPriceCents": zod.number().int(),
+  "quantity": zod.number().int(),
+  "specialInstructions": zod.string().nullable()
+})),
+  "events": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "fromStatus": zod.union([zod.enum(['cart', 'placed', 'restaurant_received', 'pending', 'accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'cancelled']),zod.null()]),
+  "toStatus": zod.enum(['cart', 'placed', 'restaurant_received', 'pending', 'accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'cancelled']),
+  "note": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})),
+  "placedAt": zod.coerce.date()
+})
+
+
+/**
+ * Customers see their orders, restaurant owners see their restaurant's orders, and admins see all orders.
+ * @summary List orders visible to the signed-in role
+ */
+export const ListMyOrdersResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "restaurantId": zod.string().uuid(),
+  "restaurantName": zod.string(),
+  "customerProfileId": zod.string().uuid(),
+  "customerName": zod.string(),
+  "status": zod.enum(['cart', 'placed', 'restaurant_received', 'pending', 'accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'cancelled']),
+  "subtotalCents": zod.number().int(),
+  "deliveryFeeCents": zod.number().int(),
+  "serviceFeeCents": zod.number().int(),
+  "taxCents": zod.number().int(),
+  "tipCents": zod.number().int(),
+  "totalCents": zod.number().int(),
+  "paymentStatus": zod.enum(['pending', 'authorized', 'succeeded', 'failed', 'refunded', 'none']),
+  "paymentCollected": zod.boolean(),
+  "deliveryAddress": zod.object({
+  "label": zod.string(),
+  "street1": zod.string(),
+  "street2": zod.string().nullable(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "postalCode": zod.string(),
+  "deliveryInstructions": zod.string().nullable()
+}),
+  "items": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "menuItemId": zod.string().uuid().nullable(),
+  "itemName": zod.string(),
+  "unitPriceCents": zod.number().int(),
+  "quantity": zod.number().int(),
+  "specialInstructions": zod.string().nullable()
+})),
+  "events": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "fromStatus": zod.union([zod.enum(['cart', 'placed', 'restaurant_received', 'pending', 'accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'cancelled']),zod.null()]),
+  "toStatus": zod.enum(['cart', 'placed', 'restaurant_received', 'pending', 'accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'cancelled']),
+  "note": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})),
+  "placedAt": zod.coerce.date()
+})
+export const ListMyOrdersResponse = zod.array(ListMyOrdersResponseItem)
+
+
+/**
+ * @summary Get an order visible to the signed-in role
+ */
+export const GetMyOrderParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const GetMyOrderResponse = zod.object({
+  "id": zod.string().uuid(),
+  "restaurantId": zod.string().uuid(),
+  "restaurantName": zod.string(),
+  "customerProfileId": zod.string().uuid(),
+  "customerName": zod.string(),
+  "status": zod.enum(['cart', 'placed', 'restaurant_received', 'pending', 'accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'cancelled']),
+  "subtotalCents": zod.number().int(),
+  "deliveryFeeCents": zod.number().int(),
+  "serviceFeeCents": zod.number().int(),
+  "taxCents": zod.number().int(),
+  "tipCents": zod.number().int(),
+  "totalCents": zod.number().int(),
+  "paymentStatus": zod.enum(['pending', 'authorized', 'succeeded', 'failed', 'refunded', 'none']),
+  "paymentCollected": zod.boolean(),
+  "deliveryAddress": zod.object({
+  "label": zod.string(),
+  "street1": zod.string(),
+  "street2": zod.string().nullable(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "postalCode": zod.string(),
+  "deliveryInstructions": zod.string().nullable()
+}),
+  "items": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "menuItemId": zod.string().uuid().nullable(),
+  "itemName": zod.string(),
+  "unitPriceCents": zod.number().int(),
+  "quantity": zod.number().int(),
+  "specialInstructions": zod.string().nullable()
+})),
+  "events": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "fromStatus": zod.union([zod.enum(['cart', 'placed', 'restaurant_received', 'pending', 'accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'cancelled']),zod.null()]),
+  "toStatus": zod.enum(['cart', 'placed', 'restaurant_received', 'pending', 'accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'cancelled']),
+  "note": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})),
+  "placedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update an order status as its restaurant or an admin
+ */
+export const UpdateOrderStatusParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const UpdateOrderStatusBody = zod.object({
+  "status": zod.enum(['cart', 'placed', 'restaurant_received', 'pending', 'accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'cancelled'])
+})
+
+export const UpdateOrderStatusResponse = zod.object({
+  "id": zod.string().uuid(),
+  "restaurantId": zod.string().uuid(),
+  "restaurantName": zod.string(),
+  "customerProfileId": zod.string().uuid(),
+  "customerName": zod.string(),
+  "status": zod.enum(['cart', 'placed', 'restaurant_received', 'pending', 'accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'cancelled']),
+  "subtotalCents": zod.number().int(),
+  "deliveryFeeCents": zod.number().int(),
+  "serviceFeeCents": zod.number().int(),
+  "taxCents": zod.number().int(),
+  "tipCents": zod.number().int(),
+  "totalCents": zod.number().int(),
+  "paymentStatus": zod.enum(['pending', 'authorized', 'succeeded', 'failed', 'refunded', 'none']),
+  "paymentCollected": zod.boolean(),
+  "deliveryAddress": zod.object({
+  "label": zod.string(),
+  "street1": zod.string(),
+  "street2": zod.string().nullable(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "postalCode": zod.string(),
+  "deliveryInstructions": zod.string().nullable()
+}),
+  "items": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "menuItemId": zod.string().uuid().nullable(),
+  "itemName": zod.string(),
+  "unitPriceCents": zod.number().int(),
+  "quantity": zod.number().int(),
+  "specialInstructions": zod.string().nullable()
+})),
+  "events": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "fromStatus": zod.union([zod.enum(['cart', 'placed', 'restaurant_received', 'pending', 'accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'cancelled']),zod.null()]),
+  "toStatus": zod.enum(['cart', 'placed', 'restaurant_received', 'pending', 'accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'cancelled']),
+  "note": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})),
+  "placedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Get operational counts for the admin dashboard
+ */
+export const GetAdminOverviewResponse = zod.object({
+  "totalProfiles": zod.number().int(),
+  "totalCustomers": zod.number().int(),
+  "totalRestaurants": zod.number().int(),
+  "pendingRestaurants": zod.number().int(),
+  "approvedRestaurants": zod.number().int(),
+  "suspendedRestaurants": zod.number().int(),
+  "totalOrders": zod.number().int(),
+  "activeOrders": zod.number().int(),
+  "completedOrders": zod.number().int(),
+  "pendingPayments": zod.number().int()
+})
+
+
+/**
+ * @summary List all restaurant applications and statuses
+ */
+export const ListAdminRestaurantsResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "ownerProfileId": zod.string().uuid(),
+  "ownerName": zod.string(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "phone": zod.string().nullable(),
+  "street1": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "postalCode": zod.string(),
+  "status": zod.enum(['pending', 'approved', 'rejected', 'suspended']),
+  "createdAt": zod.coerce.date()
+})
+export const ListAdminRestaurantsResponse = zod.array(ListAdminRestaurantsResponseItem)
+
+
+/**
+ * @summary Approve, reject, suspend, or reactivate a restaurant
+ */
+export const UpdateAdminRestaurantStatusParams = zod.object({
+  "restaurantId": zod.coerce.string().uuid()
+})
+
+export const UpdateAdminRestaurantStatusBody = zod.object({
+  "status": zod.enum(['pending', 'approved', 'rejected', 'suspended'])
+})
+
+export const UpdateAdminRestaurantStatusResponse = zod.object({
+  "id": zod.string().uuid(),
+  "ownerProfileId": zod.string().uuid(),
+  "ownerName": zod.string(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "phone": zod.string().nullable(),
+  "street1": zod.string(),
+  "city": zod.string(),
+  "region": zod.string(),
+  "postalCode": zod.string(),
+  "status": zod.enum(['pending', 'approved', 'rejected', 'suspended']),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List account roles and activation status
+ */
+export const ListAdminProfilesResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "role": zod.enum(['customer', 'restaurant', 'driver', 'admin']),
+  "displayName": zod.string(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+export const ListAdminProfilesResponse = zod.array(ListAdminProfilesResponseItem)
+
+
+/**
+ * @summary Change a member role or deactivate/reactivate an account
+ */
+export const UpdateAdminProfileParams = zod.object({
+  "profileId": zod.coerce.string().uuid()
+})
+
+export const UpdateAdminProfileBody = zod.object({
+  "role": zod.enum(['customer', 'restaurant', 'driver']).optional(),
+  "isActive": zod.boolean().optional()
+})
+
+export const UpdateAdminProfileResponse = zod.object({
+  "id": zod.string().uuid(),
+  "role": zod.enum(['customer', 'restaurant', 'driver', 'admin']),
+  "displayName": zod.string(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * Values reflect database records only; no payment provider is connected and no customer charge is processed.
+ * @summary Summarize stored payments and payouts
+ */
+export const GetAdminFinanceResponse = zod.object({
+  "paymentProviderConnected": zod.boolean(),
+  "succeededPaymentCount": zod.number().int(),
+  "succeededPaymentCents": zod.number().int(),
+  "pendingPaymentCount": zod.number().int(),
+  "pendingPaymentCents": zod.number().int(),
+  "refundedPaymentCount": zod.number().int(),
+  "refundedPaymentCents": zod.number().int(),
+  "paidOutCents": zod.number().int(),
+  "pendingPayoutCents": zod.number().int(),
+  "failedPayoutCount": zod.number().int()
+})
+
+

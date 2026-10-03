@@ -1,5 +1,5 @@
 import { createInsertSchema } from "drizzle-zod";
-import { boolean, integer, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 import { menuCategoriesTable } from "./menu-categories";
 import { restaurantsTable } from "./restaurants";
@@ -14,7 +14,13 @@ export const menuItemsTable = pgTable("menu_items", {
   isAvailable: boolean("is_available").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, (table) => [
+  index("menu_items_restaurant_category_available_idx").on(
+    table.restaurantId,
+    table.categoryId,
+    table.isAvailable,
+  ),
+]);
 
 export const insertMenuItemSchema = createInsertSchema(menuItemsTable).omit({
   id: true,

@@ -50,3 +50,466 @@ export interface DashboardView {
   sections: string[];
 }
 
+export type RestaurantStatus = typeof RestaurantStatus[keyof typeof RestaurantStatus];
+
+
+export const RestaurantStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+  suspended: 'suspended',
+} as const;
+
+export interface RestaurantSummary {
+  id: string;
+  name: string;
+  /** @nullable */
+  description: string | null;
+  city: string;
+  region: string;
+}
+
+export type RestaurantDirectory = RestaurantSummary[];
+
+export interface MenuItem {
+  id: string;
+  categoryId: string;
+  name: string;
+  /** @nullable */
+  description: string | null;
+  priceCents: number;
+  isAvailable: boolean;
+}
+
+export interface MenuCategory {
+  id: string;
+  name: string;
+  sortOrder: number;
+  items: MenuItem[];
+}
+
+export interface RestaurantMenu {
+  id: string;
+  name: string;
+  /** @nullable */
+  description: string | null;
+  /** @nullable */
+  phone: string | null;
+  street1: string;
+  /** @nullable */
+  street2: string | null;
+  city: string;
+  region: string;
+  postalCode: string;
+  categories: MenuCategory[];
+}
+
+export interface RestaurantOwnerView {
+  id: string;
+  name: string;
+  /** @nullable */
+  description: string | null;
+  /** @nullable */
+  phone: string | null;
+  street1: string;
+  /** @nullable */
+  street2: string | null;
+  city: string;
+  region: string;
+  postalCode: string;
+  status: RestaurantStatus;
+  categories: MenuCategory[];
+}
+
+export interface RestaurantInput {
+  /**
+     * @minLength 2
+     * @maxLength 160
+     */
+  name: string;
+  /** @maxLength 2000 */
+  description?: string;
+  /** @maxLength 30 */
+  phone?: string;
+  /**
+     * @minLength 2
+     * @maxLength 180
+     */
+  street1: string;
+  /** @maxLength 180 */
+  street2?: string;
+  /**
+     * @minLength 2
+     * @maxLength 100
+     */
+  city: string;
+  /** @maxLength 80 */
+  region?: string;
+  /**
+     * @minLength 3
+     * @maxLength 20
+     */
+  postalCode: string;
+}
+
+export interface RestaurantUpdate {
+  /**
+     * @minLength 2
+     * @maxLength 160
+     */
+  name?: string;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  description?: string | null;
+  /**
+     * @maxLength 30
+     * @nullable
+     */
+  phone?: string | null;
+  /**
+     * @minLength 2
+     * @maxLength 180
+     */
+  street1?: string;
+  /**
+     * @maxLength 180
+     * @nullable
+     */
+  street2?: string | null;
+  /**
+     * @minLength 2
+     * @maxLength 100
+     */
+  city?: string;
+  /** @maxLength 80 */
+  region?: string;
+  /**
+     * @minLength 3
+     * @maxLength 20
+     */
+  postalCode?: string;
+}
+
+export interface MenuCategoryInput {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  name: string;
+  /** @minimum 0 */
+  sortOrder?: number;
+}
+
+export interface MenuCategoryUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  name?: string;
+  /** @minimum 0 */
+  sortOrder?: number;
+}
+
+export interface MenuItemInput {
+  categoryId: string;
+  /**
+     * @minLength 1
+     * @maxLength 140
+     */
+  name: string;
+  /** @maxLength 2000 */
+  description?: string;
+  /**
+     * @minimum 0
+     * @maximum 1000000
+     */
+  priceCents: number;
+  isAvailable?: boolean;
+}
+
+export interface MenuItemUpdate {
+  categoryId?: string;
+  /**
+     * @minLength 1
+     * @maxLength 140
+     */
+  name?: string;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  description?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 1000000
+     */
+  priceCents?: number;
+  isAvailable?: boolean;
+}
+
+export interface Address {
+  id: string;
+  label: string;
+  street1: string;
+  /** @nullable */
+  street2: string | null;
+  city: string;
+  region: string;
+  postalCode: string;
+  /** @nullable */
+  deliveryInstructions: string | null;
+  isDefault: boolean;
+}
+
+export type AddressList = Address[];
+
+export interface AddressInput {
+  /** @maxLength 60 */
+  label?: string;
+  /**
+     * @minLength 2
+     * @maxLength 180
+     */
+  street1: string;
+  /** @maxLength 180 */
+  street2?: string;
+  /**
+     * @minLength 2
+     * @maxLength 100
+     */
+  city: string;
+  /** @maxLength 80 */
+  region?: string;
+  /**
+     * @minLength 3
+     * @maxLength 20
+     */
+  postalCode: string;
+  /** @maxLength 1000 */
+  deliveryInstructions?: string;
+  isDefault?: boolean;
+}
+
+export interface AddressUpdate {
+  /** @maxLength 60 */
+  label?: string;
+  /**
+     * @minLength 2
+     * @maxLength 180
+     */
+  street1?: string;
+  /**
+     * @maxLength 180
+     * @nullable
+     */
+  street2?: string | null;
+  /**
+     * @minLength 2
+     * @maxLength 100
+     */
+  city?: string;
+  /** @maxLength 80 */
+  region?: string;
+  /**
+     * @minLength 3
+     * @maxLength 20
+     */
+  postalCode?: string;
+  /**
+     * @maxLength 1000
+     * @nullable
+     */
+  deliveryInstructions?: string | null;
+  isDefault?: boolean;
+}
+
+export type OrderStatus = typeof OrderStatus[keyof typeof OrderStatus];
+
+
+export const OrderStatus = {
+  cart: 'cart',
+  placed: 'placed',
+  restaurant_received: 'restaurant_received',
+  pending: 'pending',
+  accepted: 'accepted',
+  preparing: 'preparing',
+  ready_for_pickup: 'ready_for_pickup',
+  out_for_delivery: 'out_for_delivery',
+  delivered: 'delivered',
+  cancelled: 'cancelled',
+} as const;
+
+export interface PlaceOrderItemInput {
+  menuItemId: string;
+  /**
+     * @minimum 1
+     * @maximum 50
+     */
+  quantity: number;
+  /** @maxLength 500 */
+  specialInstructions?: string;
+}
+
+export interface PlaceOrderInput {
+  restaurantId: string;
+  addressId: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  items: PlaceOrderItemInput[];
+}
+
+export interface OrderItem {
+  id: string;
+  /** @nullable */
+  menuItemId: string | null;
+  itemName: string;
+  unitPriceCents: number;
+  quantity: number;
+  /** @nullable */
+  specialInstructions: string | null;
+}
+
+export interface AddressSnapshot {
+  label: string;
+  street1: string;
+  /** @nullable */
+  street2: string | null;
+  city: string;
+  region: string;
+  postalCode: string;
+  /** @nullable */
+  deliveryInstructions: string | null;
+}
+
+export interface OrderEvent {
+  id: string;
+  fromStatus: OrderStatus | null;
+  toStatus: OrderStatus;
+  /** @nullable */
+  note: string | null;
+  createdAt: string;
+}
+
+export type OrderPaymentStatus = typeof OrderPaymentStatus[keyof typeof OrderPaymentStatus];
+
+
+export const OrderPaymentStatus = {
+  pending: 'pending',
+  authorized: 'authorized',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  refunded: 'refunded',
+  none: 'none',
+} as const;
+
+export interface Order {
+  id: string;
+  restaurantId: string;
+  restaurantName: string;
+  customerProfileId: string;
+  customerName: string;
+  status: OrderStatus;
+  subtotalCents: number;
+  deliveryFeeCents: number;
+  serviceFeeCents: number;
+  taxCents: number;
+  tipCents: number;
+  totalCents: number;
+  paymentStatus: OrderPaymentStatus;
+  paymentCollected: boolean;
+  deliveryAddress: AddressSnapshot;
+  items: OrderItem[];
+  events: OrderEvent[];
+  placedAt: string;
+}
+
+export type OrderList = Order[];
+
+export interface OrderStatusUpdate {
+  status: OrderStatus;
+}
+
+export interface AdminOverview {
+  totalProfiles: number;
+  totalCustomers: number;
+  totalRestaurants: number;
+  pendingRestaurants: number;
+  approvedRestaurants: number;
+  suspendedRestaurants: number;
+  totalOrders: number;
+  activeOrders: number;
+  completedOrders: number;
+  pendingPayments: number;
+}
+
+export interface AdminRestaurant {
+  id: string;
+  ownerProfileId: string;
+  ownerName: string;
+  name: string;
+  /** @nullable */
+  description: string | null;
+  /** @nullable */
+  phone: string | null;
+  street1: string;
+  city: string;
+  region: string;
+  postalCode: string;
+  status: RestaurantStatus;
+  createdAt: string;
+}
+
+export type AdminRestaurantList = AdminRestaurant[];
+
+export interface RestaurantStatusUpdate {
+  status: RestaurantStatus;
+}
+
+export interface AdminProfile {
+  id: string;
+  role: UserRole;
+  displayName: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export type AdminProfileList = AdminProfile[];
+
+export type AdminProfileUpdateRole = typeof AdminProfileUpdateRole[keyof typeof AdminProfileUpdateRole];
+
+
+export const AdminProfileUpdateRole = {
+  customer: 'customer',
+  restaurant: 'restaurant',
+  driver: 'driver',
+} as const;
+
+export interface AdminProfileUpdate {
+  role?: AdminProfileUpdateRole;
+  isActive?: boolean;
+}
+
+export interface AdminFinance {
+  paymentProviderConnected: boolean;
+  succeededPaymentCount: number;
+  succeededPaymentCents: number;
+  pendingPaymentCount: number;
+  pendingPaymentCents: number;
+  refundedPaymentCount: number;
+  refundedPaymentCents: number;
+  paidOutCents: number;
+  pendingPayoutCents: number;
+  failedPayoutCount: number;
+}
+
+export type ListRestaurantsParams = {
+/**
+ * @maxLength 100
+ */
+search?: string;
+};
+

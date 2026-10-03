@@ -10,10 +10,14 @@ export const userRoleEnum = pgEnum("user_role", [
 export const restaurantStatusEnum = pgEnum("restaurant_status", [
   "pending",
   "approved",
+  "rejected",
   "suspended",
 ]);
 
 export const orderStatusEnum = pgEnum("order_status", [
+  "cart",
+  "placed",
+  "restaurant_received",
   "pending",
   "accepted",
   "preparing",

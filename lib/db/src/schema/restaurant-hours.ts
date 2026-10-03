@@ -1,5 +1,5 @@
 import { createInsertSchema } from "drizzle-zod";
-import { boolean, pgTable, smallint, time, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, pgTable, smallint, time, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 import { restaurantsTable } from "./restaurants";
 
@@ -12,7 +12,9 @@ export const restaurantHoursTable = pgTable("restaurant_hours", {
   isClosed: boolean("is_closed").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, (table) => [
+  uniqueIndex("restaurant_hours_restaurant_weekday_uidx").on(table.restaurantId, table.weekday),
+]);
 
 export const insertRestaurantHoursSchema = createInsertSchema(restaurantHoursTable).omit({
   id: true,

@@ -14,6 +14,12 @@ tags:
     description: Signed-in user profile and role setup
   - name: dashboards
     description: Role-specific dashboard foundation
+  - name: restaurants
+    description: Restaurant discovery, onboarding, and menu management
+  - name: orders
+    description: Saved addresses and role-scoped order operations
+  - name: admin
+    description: Protected marketplace and finance administration
 paths:
   /healthz:
     get:
@@ -85,6 +91,543 @@ paths:
           description: Sign-in is required
         "404":
           description: The signed-in user has not completed profile setup
+  /restaurants:
+    get:
+      operationId: listRestaurants
+      tags: [restaurants]
+      summary: List approved restaurants
+      parameters:
+        - in: query
+          name: search
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+      responses:
+        "200":
+          description: Approved restaurants only
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RestaurantDirectory"
+  /restaurants/{restaurantId}:
+    get:
+      operationId: getRestaurant
+      tags: [restaurants]
+      summary: Get an approved restaurant and its public menu
+      parameters:
+        - in: path
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Restaurant details and available menu items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RestaurantMenu"
+        "404":
+          description: Restaurant not found or not approved
+  /restaurants/me:
+    get:
+      operationId: getMyRestaurant
+      tags: [restaurants]
+      summary: Get the signed-in restaurant's business profile
+      responses:
+        "200":
+          description: The restaurant profile and menu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RestaurantOwnerView"
+        "401":
+          description: Sign-in is required
+        "403":
+          description: Restaurant role is required
+        "404":
+          description: Restaurant profile has not been created
+    post:
+      operationId: createMyRestaurant
+      tags: [restaurants]
+      summary: Submit a restaurant for review
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestaurantInput"
+      responses:
+        "201":
+          description: Restaurant submitted with pending status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RestaurantOwnerView"
+        "401":
+          description: Sign-in is required
+        "403":
+          description: Restaurant role is required
+        "409":
+          description: This account already has a restaurant
+    patch:
+      operationId: updateMyRestaurant
+      tags: [restaurants]
+      summary: Update the signed-in restaurant's business profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestaurantUpdate"
+      responses:
+        "200":
+          description: Updated restaurant profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RestaurantOwnerView"
+        "401":
+          description: Sign-in is required
+        "403":
+          description: Restaurant role is required
+        "404":
+          description: Restaurant profile has not been created
+  /restaurants/me/categories:
+    post:
+      operationId: createMyRestaurantCategory
+      tags: [restaurants]
+      summary: Add a menu category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MenuCategoryInput"
+      responses:
+        "201":
+          description: Created menu category
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MenuCategory"
+        "401":
+          description: Sign-in is required
+        "403":
+          description: Restaurant role is required
+  /restaurants/me/categories/{categoryId}:
+    patch:
+      operationId: updateMyRestaurantCategory
+      tags: [restaurants]
+      summary: Rename or reorder a menu category
+      parameters:
+        - in: path
+          name: categoryId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MenuCategoryUpdate"
+      responses:
+        "200":
+          description: Updated menu category
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MenuCategory"
+        "403":
+          description: Restaurant role or category ownership is required
+        "404":
+          description: Category not found
+    delete:
+      operationId: deleteMyRestaurantCategory
+      tags: [restaurants]
+      summary: Remove a menu category that has no menu items
+      parameters:
+        - in: path
+          name: categoryId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Category removed
+        "403":
+          description: Restaurant role or category ownership is required
+        "404":
+          description: Category not found
+        "409":
+          description: Category still contains menu items
+  /restaurants/me/menu-items:
+    post:
+      operationId: createMyRestaurantMenuItem
+      tags: [restaurants]
+      summary: Add a menu item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MenuItemInput"
+      responses:
+        "201":
+          description: Created menu item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MenuItem"
+        "403":
+          description: Restaurant role or category ownership is required
+        "404":
+          description: Restaurant profile or category not found
+  /restaurants/me/menu-items/{menuItemId}:
+    patch:
+      operationId: updateMyRestaurantMenuItem
+      tags: [restaurants]
+      summary: Edit, hide, or show a menu item
+      parameters:
+        - in: path
+          name: menuItemId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MenuItemUpdate"
+      responses:
+        "200":
+          description: Updated menu item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MenuItem"
+        "403":
+          description: Restaurant role or item ownership is required
+        "404":
+          description: Menu item not found
+    delete:
+      operationId: deleteMyRestaurantMenuItem
+      tags: [restaurants]
+      summary: Remove a menu item
+      parameters:
+        - in: path
+          name: menuItemId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Menu item removed
+        "403":
+          description: Restaurant role or item ownership is required
+        "404":
+          description: Menu item not found
+  /addresses/me:
+    get:
+      operationId: listMyAddresses
+      tags: [orders]
+      summary: List the signed-in customer's saved delivery addresses
+      responses:
+        "200":
+          description: Saved addresses for the signed-in customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddressList"
+        "403":
+          description: Customer role is required
+    post:
+      operationId: createMyAddress
+      tags: [orders]
+      summary: Save a delivery address
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddressInput"
+      responses:
+        "201":
+          description: Saved address
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Address"
+        "403":
+          description: Customer role is required
+  /addresses/me/{addressId}:
+    patch:
+      operationId: updateMyAddress
+      tags: [orders]
+      summary: Update a saved delivery address
+      parameters:
+        - in: path
+          name: addressId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddressUpdate"
+      responses:
+        "200":
+          description: Updated address
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Address"
+        "403":
+          description: Customer role or address ownership is required
+        "404":
+          description: Address not found
+    delete:
+      operationId: deleteMyAddress
+      tags: [orders]
+      summary: Remove a saved delivery address
+      parameters:
+        - in: path
+          name: addressId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Address removed
+        "403":
+          description: Customer role or address ownership is required
+        "404":
+          description: Address not found
+  /orders:
+    post:
+      operationId: createMyOrder
+      tags: [orders]
+      summary: Place an order using server-verified menu prices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaceOrderInput"
+      responses:
+        "201":
+          description: Created development order. No payment is collected until a payment provider is connected.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: Invalid order or unavailable menu item
+        "403":
+          description: Customer role is required
+        "404":
+          description: Restaurant or saved delivery address not found
+        "409":
+          description: Restaurant is not approved or an item is unavailable
+  /orders/me:
+    get:
+      operationId: listMyOrders
+      tags: [orders]
+      summary: List orders visible to the signed-in role
+      description: Customers see their orders, restaurant owners see their restaurant's orders, and admins see all orders.
+      responses:
+        "200":
+          description: Orders visible to the signed-in profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderList"
+        "401":
+          description: Sign-in is required
+        "403":
+          description: This role cannot access orders
+  /orders/{orderId}:
+    get:
+      operationId: getMyOrder
+      tags: [orders]
+      summary: Get an order visible to the signed-in role
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Order details and status history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "403":
+          description: This profile cannot access the order
+        "404":
+          description: Order not found
+    patch:
+      operationId: updateOrderStatus
+      tags: [orders]
+      summary: Update an order status as its restaurant or an admin
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderStatusUpdate"
+      responses:
+        "200":
+          description: Updated order with an audit event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: Invalid status transition
+        "403":
+          description: Restaurant ownership or admin role is required
+        "404":
+          description: Order not found
+  /admin/overview:
+    get:
+      operationId: getAdminOverview
+      tags: [admin]
+      summary: Get operational counts for the admin dashboard
+      responses:
+        "200":
+          description: Counts calculated from stored profiles, restaurants, orders, and payment records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOverview"
+        "403":
+          description: Admin role is required
+  /admin/restaurants:
+    get:
+      operationId: listAdminRestaurants
+      tags: [admin]
+      summary: List all restaurant applications and statuses
+      responses:
+        "200":
+          description: Restaurant applications
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRestaurantList"
+        "403":
+          description: Admin role is required
+  /admin/restaurants/{restaurantId}/status:
+    patch:
+      operationId: updateAdminRestaurantStatus
+      tags: [admin]
+      summary: Approve, reject, suspend, or reactivate a restaurant
+      parameters:
+        - in: path
+          name: restaurantId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestaurantStatusUpdate"
+      responses:
+        "200":
+          description: Updated restaurant status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRestaurant"
+        "403":
+          description: Admin role is required
+        "404":
+          description: Restaurant not found
+  /admin/profiles:
+    get:
+      operationId: listAdminProfiles
+      tags: [admin]
+      summary: List account roles and activation status
+      responses:
+        "200":
+          description: Profiles without Clerk identifiers or private credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminProfileList"
+        "403":
+          description: Admin role is required
+  /admin/profiles/{profileId}:
+    patch:
+      operationId: updateAdminProfile
+      tags: [admin]
+      summary: Change a member role or deactivate/reactivate an account
+      parameters:
+        - in: path
+          name: profileId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminProfileUpdate"
+      responses:
+        "200":
+          description: Updated account profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminProfile"
+        "400":
+          description: Admin role cannot be granted through this endpoint
+        "403":
+          description: Admin role is required
+        "404":
+          description: Profile not found
+  /admin/finance:
+    get:
+      operationId: getAdminFinance
+      tags: [admin]
+      summary: Summarize stored payments and payouts
+      description: Values reflect database records only; no payment provider is connected and no customer charge is processed.
+      responses:
+        "200":
+          description: Stored payment and payout totals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminFinance"
+        "403":
+          description: Admin role is required
 components:
   schemas:
     HealthStatus:
@@ -134,4 +677,587 @@ components:
           items:
             type: string
       required: [role, displayName, sections]
+    RestaurantStatus:
+      type: string
+      enum: [pending, approved, rejected, suspended]
+    RestaurantDirectory:
+      type: array
+      items:
+        $ref: "#/components/schemas/RestaurantSummary"
+    RestaurantSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        city:
+          type: string
+        region:
+          type: string
+      required: [id, name, description, city, region]
+    MenuItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        categoryId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        priceCents:
+          type: integer
+        isAvailable:
+          type: boolean
+      required: [id, categoryId, name, description, priceCents, isAvailable]
+    MenuCategory:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        sortOrder:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MenuItem"
+      required: [id, name, sortOrder, items]
+    RestaurantMenu:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        street1:
+          type: string
+        street2:
+          type: ["string", "null"]
+        city:
+          type: string
+        region:
+          type: string
+        postalCode:
+          type: string
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/MenuCategory"
+      required: [id, name, description, phone, street1, street2, city, region, postalCode, categories]
+    RestaurantOwnerView:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        street1:
+          type: string
+        street2:
+          type: ["string", "null"]
+        city:
+          type: string
+        region:
+          type: string
+        postalCode:
+          type: string
+        status:
+          $ref: "#/components/schemas/RestaurantStatus"
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/MenuCategory"
+      required: [id, name, description, phone, street1, street2, city, region, postalCode, status, categories]
+    RestaurantInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 2000
+        phone:
+          type: string
+          maxLength: 30
+        street1:
+          type: string
+          minLength: 2
+          maxLength: 180
+        street2:
+          type: string
+          maxLength: 180
+        city:
+          type: string
+          minLength: 2
+          maxLength: 100
+        region:
+          type: string
+          maxLength: 80
+        postalCode:
+          type: string
+          minLength: 3
+          maxLength: 20
+      required: [name, street1, city, postalCode]
+    RestaurantUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 160
+        description:
+          type: ["string", "null"]
+          maxLength: 2000
+        phone:
+          type: ["string", "null"]
+          maxLength: 30
+        street1:
+          type: string
+          minLength: 2
+          maxLength: 180
+        street2:
+          type: ["string", "null"]
+          maxLength: 180
+        city:
+          type: string
+          minLength: 2
+          maxLength: 100
+        region:
+          type: string
+          maxLength: 80
+        postalCode:
+          type: string
+          minLength: 3
+          maxLength: 20
+    MenuCategoryInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        sortOrder:
+          type: integer
+          minimum: 0
+      required: [name]
+    MenuCategoryUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        sortOrder:
+          type: integer
+          minimum: 0
+    MenuItemInput:
+      type: object
+      properties:
+        categoryId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 140
+        description:
+          type: string
+          maxLength: 2000
+        priceCents:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+        isAvailable:
+          type: boolean
+      required: [categoryId, name, priceCents]
+    MenuItemUpdate:
+      type: object
+      properties:
+        categoryId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 140
+        description:
+          type: ["string", "null"]
+          maxLength: 2000
+        priceCents:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+        isAvailable:
+          type: boolean
+    Address:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        street1:
+          type: string
+        street2:
+          type: ["string", "null"]
+        city:
+          type: string
+        region:
+          type: string
+        postalCode:
+          type: string
+        deliveryInstructions:
+          type: ["string", "null"]
+        isDefault:
+          type: boolean
+      required: [id, label, street1, street2, city, region, postalCode, deliveryInstructions, isDefault]
+    AddressList:
+      type: array
+      items:
+        $ref: "#/components/schemas/Address"
+    AddressInput:
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 60
+        street1:
+          type: string
+          minLength: 2
+          maxLength: 180
+        street2:
+          type: string
+          maxLength: 180
+        city:
+          type: string
+          minLength: 2
+          maxLength: 100
+        region:
+          type: string
+          maxLength: 80
+        postalCode:
+          type: string
+          minLength: 3
+          maxLength: 20
+        deliveryInstructions:
+          type: string
+          maxLength: 1000
+        isDefault:
+          type: boolean
+      required: [street1, city, postalCode]
+    AddressUpdate:
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 60
+        street1:
+          type: string
+          minLength: 2
+          maxLength: 180
+        street2:
+          type: ["string", "null"]
+          maxLength: 180
+        city:
+          type: string
+          minLength: 2
+          maxLength: 100
+        region:
+          type: string
+          maxLength: 80
+        postalCode:
+          type: string
+          minLength: 3
+          maxLength: 20
+        deliveryInstructions:
+          type: ["string", "null"]
+          maxLength: 1000
+        isDefault:
+          type: boolean
+    OrderStatus:
+      type: string
+      enum: [cart, placed, restaurant_received, pending, accepted, preparing, ready_for_pickup, out_for_delivery, delivered, cancelled]
+    PlaceOrderItemInput:
+      type: object
+      properties:
+        menuItemId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 50
+        specialInstructions:
+          type: string
+          maxLength: 500
+      required: [menuItemId, quantity]
+    PlaceOrderInput:
+      type: object
+      properties:
+        restaurantId:
+          type: string
+          format: uuid
+        addressId:
+          type: string
+          format: uuid
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/PlaceOrderItemInput"
+      required: [restaurantId, addressId, items]
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        menuItemId:
+          type: ["string", "null"]
+          format: uuid
+        itemName:
+          type: string
+        unitPriceCents:
+          type: integer
+        quantity:
+          type: integer
+        specialInstructions:
+          type: ["string", "null"]
+      required: [id, menuItemId, itemName, unitPriceCents, quantity, specialInstructions]
+    AddressSnapshot:
+      type: object
+      properties:
+        label:
+          type: string
+        street1:
+          type: string
+        street2:
+          type: ["string", "null"]
+        city:
+          type: string
+        region:
+          type: string
+        postalCode:
+          type: string
+        deliveryInstructions:
+          type: ["string", "null"]
+      required: [label, street1, street2, city, region, postalCode, deliveryInstructions]
+    OrderEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        fromStatus:
+          anyOf:
+            - $ref: "#/components/schemas/OrderStatus"
+            - type: "null"
+        toStatus:
+          $ref: "#/components/schemas/OrderStatus"
+        note:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, fromStatus, toStatus, note, createdAt]
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        restaurantId:
+          type: string
+          format: uuid
+        restaurantName:
+          type: string
+        customerProfileId:
+          type: string
+          format: uuid
+        customerName:
+          type: string
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        subtotalCents:
+          type: integer
+        deliveryFeeCents:
+          type: integer
+        serviceFeeCents:
+          type: integer
+        taxCents:
+          type: integer
+        tipCents:
+          type: integer
+        totalCents:
+          type: integer
+        paymentStatus:
+          type: string
+          enum: [pending, authorized, succeeded, failed, refunded, none]
+        paymentCollected:
+          type: boolean
+        deliveryAddress:
+          $ref: "#/components/schemas/AddressSnapshot"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderEvent"
+        placedAt:
+          type: string
+          format: date-time
+      required: [id, restaurantId, restaurantName, customerProfileId, customerName, status, subtotalCents, deliveryFeeCents, serviceFeeCents, taxCents, tipCents, totalCents, paymentStatus, paymentCollected, deliveryAddress, items, events, placedAt]
+    OrderList:
+      type: array
+      items:
+        $ref: "#/components/schemas/Order"
+    OrderStatusUpdate:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+      required: [status]
+    AdminOverview:
+      type: object
+      properties:
+        totalProfiles:
+          type: integer
+        totalCustomers:
+          type: integer
+        totalRestaurants:
+          type: integer
+        pendingRestaurants:
+          type: integer
+        approvedRestaurants:
+          type: integer
+        suspendedRestaurants:
+          type: integer
+        totalOrders:
+          type: integer
+        activeOrders:
+          type: integer
+        completedOrders:
+          type: integer
+        pendingPayments:
+          type: integer
+      required: [totalProfiles, totalCustomers, totalRestaurants, pendingRestaurants, approvedRestaurants, suspendedRestaurants, totalOrders, activeOrders, completedOrders, pendingPayments]
+    AdminRestaurant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ownerProfileId:
+          type: string
+          format: uuid
+        ownerName:
+          type: string
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        street1:
+          type: string
+        city:
+          type: string
+        region:
+          type: string
+        postalCode:
+          type: string
+        status:
+          $ref: "#/components/schemas/RestaurantStatus"
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, ownerProfileId, ownerName, name, description, phone, street1, city, region, postalCode, status, createdAt]
+    AdminRestaurantList:
+      type: array
+      items:
+        $ref: "#/components/schemas/AdminRestaurant"
+    RestaurantStatusUpdate:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/RestaurantStatus"
+      required: [status]
+    AdminProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          $ref: "#/components/schemas/UserRole"
+        displayName:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, role, displayName, isActive, createdAt]
+    AdminProfileList:
+      type: array
+      items:
+        $ref: "#/components/schemas/AdminProfile"
+    AdminProfileUpdate:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [customer, restaurant, driver]
+        isActive:
+          type: boolean
+    AdminFinance:
+      type: object
+      properties:
+        paymentProviderConnected:
+          type: boolean
+        succeededPaymentCount:
+          type: integer
+        succeededPaymentCents:
+          type: integer
+        pendingPaymentCount:
+          type: integer
+        pendingPaymentCents:
+          type: integer
+        refundedPaymentCount:
+          type: integer
+        refundedPaymentCents:
+          type: integer
+        paidOutCents:
+          type: integer
+        pendingPayoutCents:
+          type: integer
+        failedPayoutCount:
+          type: integer
+      required: [paymentProviderConnected, succeededPaymentCount, succeededPaymentCents, pendingPaymentCount, pendingPaymentCents, refundedPaymentCount, refundedPaymentCents, paidOutCents, pendingPayoutCents, failedPayoutCount]
 

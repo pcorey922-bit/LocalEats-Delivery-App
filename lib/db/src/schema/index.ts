@@ -7,6 +7,7 @@ export * from "./menu-categories";
 export * from "./menu-items";
 export * from "./orders";
 export * from "./order-items";
+export * from "./order-events";
 export * from "./deliveries";
 export * from "./ratings";
 export * from "./payments";

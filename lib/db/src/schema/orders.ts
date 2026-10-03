@@ -1,5 +1,5 @@
 import { createInsertSchema } from "drizzle-zod";
-import { integer, jsonb, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 import { orderStatusEnum } from "./enums";
 import { addressesTable } from "./addresses";
@@ -22,7 +22,14 @@ export const ordersTable = pgTable("orders", {
   placedAt: timestamp("placed_at", { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, (table) => [
+  index("orders_customer_created_idx").on(table.customerProfileId, table.createdAt),
+  index("orders_restaurant_status_created_idx").on(
+    table.restaurantId,
+    table.status,
+    table.createdAt,
+  ),
+]);
 
 export const insertOrderSchema = createInsertSchema(ordersTable).omit({
   id: true,

@@ -10,6 +10,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
+import { AdminPage, CartPage, DiscoveryPage, OrdersPage, RestaurantMenuPage, RestaurantPage } from '@/pages/roco-pages';
 import {
   Route,
   Redirect,
@@ -38,7 +39,7 @@ function Brand({ footer = false }: { footer?: boolean }) {
   return (
     <a className="le-brand" href="#home" data-testid={footer ? 'link-footer-brand' : 'link-home-brand'} aria-label="LocalEats home">
       <BrandMark />
-      <span>LocalEats</span>
+      <span>RoCoEats</span>
     </a>
   );
 }
@@ -244,48 +245,48 @@ const clerkAppearance = {
     logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
   },
   variables: {
-    colorPrimary: '#31523f',
-    colorForeground: '#294538',
-    colorMutedForeground: '#718074',
-    colorDanger: '#a84432',
-    colorBackground: '#faf6eb',
-    colorInput: '#fffaf0',
-    colorInputForeground: '#294538',
-    colorNeutral: '#d4c8b2',
+    colorPrimary: '#efbd68',
+    colorForeground: '#f3f0e7',
+    colorMutedForeground: '#aab8c9',
+    colorDanger: '#d98367',
+    colorBackground: '#172438',
+    colorInput: '#111e30',
+    colorInputForeground: '#f3f0e7',
+    colorNeutral: '#31435b',
     fontFamily: 'DM Sans, sans-serif',
     borderRadius: '0.75rem',
   },
   elements: {
     rootBox: 'w-full flex justify-center',
-    cardBox: 'bg-[#faf6eb] rounded-2xl w-[440px] max-w-full overflow-hidden border border-[#ddd2bd] shadow-[0_18px_50px_rgba(45,58,42,.08)]',
+    cardBox: 'bg-[#172438] rounded-2xl w-[440px] max-w-full overflow-hidden border border-[#31435b]',
     card: '!shadow-none !border-0 !bg-transparent !rounded-none',
     footer: '!shadow-none !border-0 !bg-transparent !rounded-none',
-    headerTitle: 'text-[#294538] font-semibold',
-    headerSubtitle: 'text-[#718074]',
-    socialButtonsBlockButtonText: 'text-[#294538] font-semibold',
-    formFieldLabel: 'text-[#395244] font-semibold',
-    footerActionLink: 'text-[#a95036] font-semibold',
-    footerActionText: 'text-[#718074]',
-    dividerText: 'text-[#718074]',
-    identityPreviewEditButton: 'text-[#a95036]',
-    formFieldSuccessText: 'text-[#31523f]',
-    alertText: 'text-[#8f392e]',
+    headerTitle: 'text-[#f3f0e7] font-semibold',
+    headerSubtitle: 'text-[#aab8c9]',
+    socialButtonsBlockButtonText: 'text-[#f3f0e7] font-semibold',
+    formFieldLabel: 'text-[#d4dfeb] font-semibold',
+    footerActionLink: 'text-[#efbd68] font-semibold',
+    footerActionText: 'text-[#aab8c9]',
+    dividerText: 'text-[#aab8c9]',
+    identityPreviewEditButton: 'text-[#efbd68]',
+    formFieldSuccessText: 'text-[#b5d9bd]',
+    alertText: 'text-[#ffd1c4]',
     logoBox: 'rounded-xl',
     logoImage: 'rounded-lg',
-    socialButtonsBlockButton: 'border-[#d4c8b2] bg-[#fffaf0] hover:bg-[#f3eddf]',
-    formButtonPrimary: 'bg-[#31523f] hover:bg-[#203b30] text-[#f8f2e4]',
-    formFieldInput: 'bg-[#fffaf0] border-[#d4c8b2] text-[#294538]',
+    socialButtonsBlockButton: 'border-[#31435b] bg-[#1d2d43] hover:bg-[#263951]',
+    formButtonPrimary: 'bg-[#efbd68] hover:bg-[#f4ca82] text-[#172235]',
+    formFieldInput: 'bg-[#111e30] border-[#31435b] text-[#f3f0e7]',
     footerAction: 'text-[#718074]',
-    dividerLine: 'bg-[#ded4c1]',
-    alert: 'bg-[#f7e8df] border-[#dfb7a7]',
-    otpCodeFieldInput: 'border-[#d4c8b2] bg-[#fffaf0]',
-    formFieldRow: 'text-[#395244]',
-    main: 'text-[#294538]',
+    dividerLine: 'bg-[#31435b]',
+    alert: 'bg-[#382c27] border-[#784b45]',
+    otpCodeFieldInput: 'border-[#31435b] bg-[#111e30]',
+    formFieldRow: 'text-[#d4dfeb]',
+    main: 'text-[#f3f0e7]',
   },
 };
 
 function BrandLink() {
-  return <a className="portal-brand" href={basePath || '/'} data-testid="link-portal-brand"><img src={`${basePath}/logo.svg`} alt="" />LocalEats</a>;
+  return <a className="portal-brand" href={basePath || '/'} data-testid="link-portal-brand"><img src={`${basePath}/logo.svg`} alt="" />RoCoEats</a>;
 }
 
 function PortalHeader({ active }: { active: 'dashboard' | 'account' }) {
@@ -300,7 +301,7 @@ function PortalHeader({ active }: { active: 'dashboard' | 'account' }) {
   </header>;
 }
 
-function LoadingView({ label = 'Loading your LocalEats account' }: { label?: string }) {
+function LoadingView({ label = 'Loading your RoCoEats account' }: { label?: string }) {
   return <main className="portal"><div className="portal-shell"><div className="portal-topbar"><BrandLink /></div><section className="portal-main" aria-label={label} data-testid="status-loading"><div className="portal-skeleton portal-loading-block" style={{ width: 130 }} /><div className="portal-skeleton portal-loading-block" style={{ width: 'min(480px, 90%)', height: 48 }} /><div className="portal-skeleton portal-loading-block" style={{ width: 'min(610px, 95%)' }} /><div className="portal-grid"><div className="portal-panel"><div className="portal-skeleton portal-loading-block" /><div className="portal-skeleton portal-loading-block" /><div className="portal-skeleton portal-loading-block" style={{ height: 140 }} /></div><div className="portal-aside"><div className="portal-skeleton portal-loading-block" /><div className="portal-skeleton portal-loading-block" /></div></div></section></div></main>;
 }
 
@@ -328,7 +329,7 @@ function HomeRedirect() {
     else if (profile.isError && isNotFound(profile.error)) setLocation('/account/setup', { replace: true });
   }, [isLoaded, isSignedIn, profile.data, profile.isError, profile.error, setLocation]);
   if (!isLoaded) return <LoadingView />;
-  if (isSignedIn && profile.isError && !isNotFound(profile.error)) return <main className="portal"><div className="portal-shell"><div className="portal-topbar"><BrandLink /></div><section className="portal-main"><div className="portal-eyebrow">Your LocalEats account</div><h1 className="portal-title">One moment, <em>neighbor.</em></h1><QueryError retry={() => profile.refetch()} message="We couldn’t check your LocalEats profile." /></section></div></main>;
+  if (isSignedIn && profile.isError && !isNotFound(profile.error)) return <main className="portal"><div className="portal-shell"><div className="portal-topbar"><BrandLink /></div><section className="portal-main"><div className="portal-eyebrow">Your RoCoEats account</div><h1 className="portal-title">One moment, <em>neighbor.</em></h1><QueryError retry={() => profile.refetch()} message="We couldn’t check your RoCoEats profile." /></section></div></main>;
   if (isSignedIn) return <LoadingView />;
   return <Home />;
 }
@@ -342,14 +343,14 @@ function Protected({ children }: { children: ReactNode }) {
 
 function SignInPage() {
   return <div className="portal-auth-backdrop" data-testid="page-sign-in">
-    <section className="portal-auth-story"><BrandLink /><div className="portal-auth-copy"><div className="portal-eyebrow" style={{ color: '#e8b35e' }}>A neighborly start</div><h1>Good food,<br />closer to <em>home.</em></h1><p>Your LocalEats account is the first step toward a more connected food community in Roane County.</p></div><div className="portal-auth-foot">ROANE COUNTY, TENNESSEE · LOCAL FOOD, LOCAL PEOPLE</div></section>
+    <section className="portal-auth-story"><BrandLink /><div className="portal-auth-copy"><div className="portal-eyebrow" style={{ color: '#e8b35e' }}>A neighborly start</div><h1>Good food,<br />closer to <em>home.</em></h1><p>Your RoCoEats account is the first step toward a more connected food community in Roane County.</p></div><div className="portal-auth-foot">ROANE COUNTY, TENNESSEE · LOCAL FOOD, LOCAL PEOPLE</div></section>
     <section className="portal-auth-form"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} /></section>
   </div>;
 }
 
 function SignUpPage() {
   return <div className="portal-auth-backdrop" data-testid="page-sign-up">
-    <section className="portal-auth-story"><BrandLink /><div className="portal-auth-copy"><div className="portal-eyebrow" style={{ color: '#e8b35e' }}>Made for Roane County</div><h1>There’s room<br />at the <em>table.</em></h1><p>Create an account, then tell us how you’d like to be part of LocalEats. Ordering and partner operations are not active yet.</p></div><div className="portal-auth-foot">A LOCAL IDEA TAKING SHAPE IN ROANE COUNTY</div></section>
+    <section className="portal-auth-story"><BrandLink /><div className="portal-auth-copy"><div className="portal-eyebrow" style={{ color: '#e8b35e' }}>Made for Roane County</div><h1>There’s room<br />at the <em>table.</em></h1><p>Create an account, then tell us how you’d like to be part of RoCoEats. Ordering and partner operations are not active yet.</p></div><div className="portal-auth-foot">A LOCAL IDEA TAKING SHAPE IN ROANE COUNTY</div></section>
     <section className="portal-auth-form"><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} /></section>
   </div>;
 }
@@ -443,7 +444,12 @@ function DashboardPage() {
 
 function Router() {
   return <RoutedErrorBoundary><Switch>
-    <Route path="/" component={HomeRedirect} />
+    <Route path="/" component={DiscoveryPage} />
+    <Route path="/restaurants/:restaurantId" component={RestaurantMenuPage} />
+    <Route path="/cart" component={() => <Protected><CartPage /></Protected>} />
+    <Route path="/orders" component={() => <Protected><OrdersPage /></Protected>} />
+    <Route path="/restaurant" component={() => <Protected><RestaurantPage /></Protected>} />
+    <Route path="/admin" component={() => <Protected><AdminPage /></Protected>} />
     <Route path="/sign-in/*?" component={SignInPage} />
     <Route path="/sign-up/*?" component={SignUpPage} />
     <Route path="/account/setup" component={AccountSetup} />
@@ -477,7 +483,7 @@ function ClerkRoutes() {
   const [, setLocation] = useLocation();
   if (!clerkPubKey) throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY');
   return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`}
-    localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your LocalEats account' } }, signUp: { start: { title: 'Find your place here', subtitle: 'Create your LocalEats account' } } }}
+    localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your RoCoEats account' } }, signUp: { start: { title: 'Find your place here', subtitle: 'Create your RoCoEats account' } } }}
     routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}>
     <ClerkQueryClientCacheInvalidator /><Router />
   </ClerkProvider>;
