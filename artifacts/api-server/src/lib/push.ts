@@ -1,8 +1,7 @@
 import { databaseNow } from "./database-clock";
 import { createPrivateKey, sign, randomUUID } from "node:crypto";
 import { connect } from "node:http2";
-import { getApps, initializeApp, cert } from "firebase-admin/app";
-import { getMessaging } from "firebase-admin/messaging";
+import { sendFcm } from "./fcm";
 import {
   and,
   eq,
@@ -96,22 +95,7 @@ async function sendPush(
   notificationId: string,
 ) {
   if (platform === "ios") return sendApns(token, notificationId);
-  if (!getApps().length)
-    initializeApp({
-      credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON!)),
-    });
-  await getMessaging().send({
-    token,
-    notification: {
-      title: "RoCoEats test update",
-      body: "Open RoCoEats to view your notification.",
-    },
-    data: { notificationId },
-    android: {
-      collapseKey: notificationId,
-      notification: { tag: notificationId },
-    },
-  });
+  await sendFcm(token, notificationId);
 }
 // A provider acknowledgement is not proof that a device displayed a message.
 // Push is at-least-once; the durable in-app inbox remains the source of truth.

@@ -1,3 +1,43 @@
+### Security and production transport follow-up
+
+Production dependency audit initially reported 1 critical, 2 high and 3 moderate
+advisories. Upgraded proxy-addr/body-parser/qs and the Zod catalog to patched
+versions, regenerated Zod 4 schemas from Orval with non-coerced string path
+parameters, and removed firebase-admin (the app never used Firestore). Android
+push now uses Google's documented FCM v1 HTTP endpoint with RSA-signed scoped
+OAuth service-account assertions, fixed provider origins, bounded requests,
+shared cached access tokens and explicit provider acknowledgements. No secret
+is persisted in source, logs or job receipts. FCM contract tests verify signature,
+scope/audience, concurrent token reuse, invalid registration, provider/OAuth
+failures and malformed acknowledgements; actual provider/device testing still
+requires the Firebase project. The latest production audit reports zero known
+advisories across 150 production/optional dependencies; this is a dependency
+check, not a penetration test. CI now gates on the production audit.
+
+Local suite now totals 53 tests (including the integration parent). Production
+build/typecheck pass. Built API process smoke verification passed for website
+/order deep links, /livez, hidden-file rejection and expected /readyz 503 without
+services. Fresh GitHub PostgreSQL, container and native checks must be reviewed
+for this final source revision before calling the packaging verified. The
+previous precision revision `cfe3004` has all PostgreSQL/native checks green.
+
+### Deployment packaging and verified precision fix
+
+PostgreSQL CI passed in both runs 42015579784 and 42015572618 on `cfe3004`.
+The SQL clock predicates fixed the immediate-job failure. Native workflow
+42015164945 passed Android debug plus unsigned release APK/AAB/lintRelease and
+iOS simulator plus unsigned device Release compilation on `0c45941`.
+
+Added optional same-origin static website serving to the API, a non-root Docker
+image, hidden-file/API-safe SPA fallback tests and container startup checks in
+CI. Local 50-test suite and production builds pass. Check fresh container CI;
+Docker is unavailable in this execution environment, so no local image run or
+actual hosted deployment is claimed. Hosting is not yet connected. The container
+readiness test intentionally expects 503 without business service configuration.
+
+All remaining engineering and external blockers listed below still apply; no
+live charge/transfer, app-store publication or merge has occurred.
+
 ### Precision follow-up
 
 The first device-delivery CI revision exposed a sub-millisecond eligibility bug:

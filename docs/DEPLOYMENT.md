@@ -198,3 +198,41 @@ Before public release, obtain and verify:
 - Native CI compilation, signed device builds, internal Play/TestFlight testing,
   and business/operational acceptance. No merge, live deployment, live charge,
   real fund movement, or store submission is authorized by passing a unit test.
+
+## Single-origin deployment image
+
+The root Dockerfile builds the API and website together and serves both on port
+3001. Set the frontend Clerk publishable key as a build argument; omit
+VITE_API_ORIGIN for same-origin web requests. Mobile builds still require the
+public HTTPS API origin. Only publishable frontend values belong in build args.
+Runtime secrets belong in the host's secret environment, never in image layers.
+The image runs as the non-root node user and defaults to disabled payments.
+
+The hosting account needs a Node-compatible container service, HTTPS and a
+managed PostgreSQL database; the available Sites Worker/D1 runtime does not run
+this existing PostgreSQL/Node architecture. Configure DATABASE_URL, Clerk keys,
+admin allowlist, PUBLIC_APP_URL, CORS_ORIGINS and Stripe TEST credentials through
+that host. Run `pnpm --filter @workspace/db migrate` as the release command for a
+new empty database; follow the legacy database instructions above for upgrades.
+Do not run migrations independently on each web replica. Enable database backups
+and verify restoration before accepting real business traffic.
+
+`/livez` checks the running process; `/readyz` fails closed until database, auth,
+pricing, test payment configuration and worker progress are ready. The CI
+container smoke test deliberately has no Clerk/Stripe configuration and expects
+readiness 503 while verifying startup, deep-link HTML and hidden-file rejection.
+It is not an authenticated browser/provider E2E test or a production deployment.
+
+Native CI artifacts now include unsigned Android release APK/AAB and unsigned
+iOS device Release app archives. Unconfigured/unsigned artifacts are for build
+verification and cannot be treated as ready for customer distribution. Real API
+origin, Clerk configuration, Google services/APNs entitlements and signing still
+must be supplied and tested on physical devices before store submission.
+
+Android push uses FCM HTTP v1 directly with the Firebase service-account JSON in
+the secret environment. It uses OAuth scope
+`https://www.googleapis.com/auth/firebase.messaging`; Google credential-provided
+URLs are ignored in favor of fixed Google endpoints. Provider messages expire
+after five minutes while offline and contain no customer/order details. Enable
+the FCM HTTP v1 API and grant the service account permission for the project.
+See https://firebase.google.com/docs/cloud-messaging/send/v1-api .

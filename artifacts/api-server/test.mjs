@@ -13,6 +13,8 @@ try {
     ["availability", "src/lib/restaurant-availability.test.ts"],
     ["platform", "tests/platform.test.ts"],
     ["worker-loop", "src/lib/worker-loop.test.ts"],
+    ["web-hosting", "src/lib/web-hosting.test.ts"],
+    ["fcm", "src/lib/fcm.test.ts"],
   ]) {
     const outfile = path.join(outputDirectory, `${name}.mjs`);
     await build({

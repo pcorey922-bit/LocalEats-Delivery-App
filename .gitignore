@@ -65,3 +65,4 @@ Thumbs.db
 *.p8
 
 **/ios/build/
+**/ios/release-build/
