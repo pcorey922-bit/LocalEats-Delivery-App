@@ -1,6 +1,6 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { Router, type IRouter } from "express";
-import { db, deliveriesTable, ordersTable, orderEventsTable } from "@workspace/db";
+import { db, deliveriesTable, ordersTable, orderEventsTable, paymentsTable } from "@workspace/db";
 import { getActiveProfile, requireRole } from "../lib/current-profile";
 import { requireAuth } from "../middlewares/require-auth";
 
@@ -15,7 +15,9 @@ router.get("/driver/offers", requireAuth, async (req, res): Promise<void> => {
     orderId: ordersTable.id,
     restaurantId: ordersTable.restaurantId,
     status: ordersTable.status,
-  }).from(ordersTable).leftJoin(
+  }).from(ordersTable).innerJoin(
+    paymentsTable, and(eq(paymentsTable.orderId, ordersTable.id), eq(paymentsTable.status, "succeeded")),
+  ).leftJoin(
     deliveriesTable, eq(deliveriesTable.orderId, ordersTable.id),
   ).where(and(
     eq(ordersTable.status, "ready_for_pickup"),
@@ -32,7 +34,8 @@ router.post("/driver/orders/:orderId/claim", requireAuth, async (req, res): Prom
     res.status(400).json({ error: "Invalid order ID" }); return;
   }
   const claimed = await db.transaction(async tx => {
-    const [order] = await tx.select().from(ordersTable)
+    const [order] = await tx.select({ id: ordersTable.id }).from(ordersTable)
+      .innerJoin(paymentsTable, and(eq(paymentsTable.orderId, ordersTable.id), eq(paymentsTable.status, "succeeded")))
       .where(and(eq(ordersTable.id, orderId), eq(ordersTable.status, "ready_for_pickup"))).limit(1);
     if (!order) return false;
     await tx.insert(deliveriesTable).values({ orderId, status: "unassigned" })
