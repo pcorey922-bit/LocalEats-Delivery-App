@@ -1,3 +1,11 @@
+### Precision follow-up
+
+The first device-delivery CI revision exposed a sub-millisecond eligibility bug:
+JavaScript truncates PostgreSQL microseconds. Due/expired predicates now compare
+against `clock_timestamp()` inside SQL for webhook, finance, onboarding and push
+claims. Local 49-test suite passes; check fresh PostgreSQL CI. Unsigned iOS device
+Release compilation passed at `0c45941`; Android release lint/build is pending.
+
 ## Current stage: durable device delivery and CI failure recovery
 
 Preserve the notification changes in this revision; they were recovered from the

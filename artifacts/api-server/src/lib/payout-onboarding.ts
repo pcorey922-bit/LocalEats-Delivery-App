@@ -1,6 +1,6 @@
 import { databaseNow } from "./database-clock";
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, lte, or } from "drizzle-orm";
+import { and, asc, eq, lte, or, sql } from "drizzle-orm";
 import {
   db,
   payoutProvisioningTable as jobs,
@@ -71,8 +71,14 @@ export async function processPayoutProvisioning(
       .from(jobs)
       .where(
         or(
-          and(eq(jobs.state, "queued"), lte(jobs.nextAttemptAt, now)),
-          and(eq(jobs.state, "processing"), lte(jobs.leaseExpiresAt, now)),
+          and(
+            eq(jobs.state, "queued"),
+            lte(jobs.nextAttemptAt, sql`clock_timestamp()`),
+          ),
+          and(
+            eq(jobs.state, "processing"),
+            lte(jobs.leaseExpiresAt, sql`clock_timestamp()`),
+          ),
         ),
       )
       .orderBy(asc(jobs.createdAt))

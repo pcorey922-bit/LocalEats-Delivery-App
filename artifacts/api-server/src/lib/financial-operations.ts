@@ -359,7 +359,7 @@ async function claimOperation(): Promise<FinancialOperation | null> {
     .where(
       and(
         inArray(operations.state, ["queued", "processing", "pending"]),
-        lte(operations.nextAttemptAt, now),
+        lte(operations.nextAttemptAt, sql`clock_timestamp()`),
         notExists(
           db
             .select({ id: blocked.id })

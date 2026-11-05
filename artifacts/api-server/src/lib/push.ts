@@ -3,7 +3,18 @@ import { createPrivateKey, sign, randomUUID } from "node:crypto";
 import { connect } from "node:http2";
 import { getApps, initializeApp, cert } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
-import { and, eq, lt, lte, or, inArray, isNull, ne, asc } from "drizzle-orm";
+import {
+  and,
+  eq,
+  lt,
+  lte,
+  or,
+  inArray,
+  isNull,
+  ne,
+  asc,
+  sql,
+} from "drizzle-orm";
 import {
   db,
   notificationsTable,
@@ -113,7 +124,7 @@ export async function fanOutPushNotifications() {
       .where(
         and(
           inArray(notificationsTable.pushState, ["pending", "processing"]),
-          lte(notificationsTable.pushNextAttemptAt, now),
+          lte(notificationsTable.pushNextAttemptAt, sql`clock_timestamp()`),
         ),
       )
       .orderBy(asc(notificationsTable.createdAt), asc(notificationsTable.id))
@@ -207,10 +218,10 @@ export async function processPushDelivery(
         and(
           inArray(deliveries.state, ["pending", "processing"]),
           lt(deliveries.attempts, 5),
-          lte(deliveries.nextAttemptAt, now),
+          lte(deliveries.nextAttemptAt, sql`clock_timestamp()`),
           or(
             isNull(deliveries.leaseExpiresAt),
-            lte(deliveries.leaseExpiresAt, now),
+            lte(deliveries.leaseExpiresAt, sql`clock_timestamp()`),
           ),
           or(
             isNull(notificationDevicesTable.id),

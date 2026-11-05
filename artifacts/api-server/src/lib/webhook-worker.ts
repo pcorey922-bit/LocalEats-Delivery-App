@@ -1,6 +1,6 @@
 import { databaseNow } from "./database-clock";
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, lte, or } from "drizzle-orm";
+import { and, asc, eq, lte, or, sql } from "drizzle-orm";
 import type Stripe from "stripe";
 import { db, webhookInboxTable as inbox } from "@workspace/db";
 import { processStripeEvent } from "../routes/payment-webhook";
@@ -15,8 +15,14 @@ export async function processWebhookInbox(
       .from(inbox)
       .where(
         or(
-          and(eq(inbox.state, "received"), lte(inbox.nextAttemptAt, now)),
-          and(eq(inbox.state, "processing"), lte(inbox.leaseExpiresAt, now)),
+          and(
+            eq(inbox.state, "received"),
+            lte(inbox.nextAttemptAt, sql`clock_timestamp()`),
+          ),
+          and(
+            eq(inbox.state, "processing"),
+            lte(inbox.leaseExpiresAt, sql`clock_timestamp()`),
+          ),
         ),
       )
       .orderBy(asc(inbox.receivedAt))
