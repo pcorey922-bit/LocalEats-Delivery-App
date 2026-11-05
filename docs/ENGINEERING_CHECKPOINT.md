@@ -1,266 +1,154 @@
-### Security and production transport follow-up
+# RoCoEats resumable engineering checkpoint
 
-Production dependency audit initially reported 1 critical, 2 high and 3 moderate
-advisories. Upgraded proxy-addr/body-parser/qs and the Zod catalog to patched
-versions, regenerated Zod 4 schemas from Orval with non-coerced string path
-parameters, and removed firebase-admin (the app never used Firestore). Android
-push now uses Google's documented FCM v1 HTTP endpoint with RSA-signed scoped
-OAuth service-account assertions, fixed provider origins, bounded requests,
-shared cached access tokens and explicit provider acknowledgements. No secret
-is persisted in source, logs or job receipts. FCM contract tests verify signature,
-scope/audience, concurrent token reuse, invalid registration, provider/OAuth
-failures and malformed acknowledgements; actual provider/device testing still
-requires the Firebase project. The latest production audit reports zero known
-advisories across 150 production/optional dependencies; this is a dependency
-check, not a penetration test. CI now gates on the production audit.
+Continue GitHub PR #1 on `feature/rocoeats-launch-readiness`. Do not merge,
+enable live transactions, discard changes or claim launch readiness.
 
-Local suite now totals 53 tests (including the integration parent). Production
-build/typecheck pass. Built API process smoke verification passed for website
-/order deep links, /livez, hidden-file rejection and expected /readyz 503 without
-services. Fresh GitHub PostgreSQL, container and native checks must be reviewed
-for this final source revision before calling the packaging verified. The
-previous precision revision `cfe3004` has all PostgreSQL/native checks green.
+## Saved source and verification
 
-### Deployment packaging and verified precision fix
+Latest implementation revision: `26e4d95f3d5f7c850baf39f18074692e3b34fd79`.
+The local checkout is aligned with the GitHub history and has no unsaved code.
+This checkpoint may be a later documentation-only commit.
 
-PostgreSQL CI passed in both runs 42015579784 and 42015572618 on `cfe3004`.
-The SQL clock predicates fixed the immediate-job failure. Native workflow
-42015164945 passed Android debug plus unsigned release APK/AAB/lintRelease and
-iOS simulator plus unsigned device Release compilation on `0c45941`.
+- 53 automated tests pass locally and in real PostgreSQL CI, including the
+  integration parent. No tests skipped. CI runs `42016933829` and `42016924348`
+  passed the production dependency audit, tests, API/web production builds,
+  Docker build and container startup/website/readiness smoke checks.
+- Production dependency audit reports zero known advisories. This is not a
+  penetration test or a guarantee of security.
+- Native workflow `42016933790` passed Android debug, unsigned release APK/AAB,
+  release lint, iOS simulator and unsigned Release/iphoneos compilation for the
+  same latest implementation revision `26e4d95`.
+- Native artifacts are deliberately named unsigned/unconfigured. They are not
+  signed distribution packages, published apps, or verified physical-device apps.
+- No deployed business website or verified public application URL exists yet.
+  Hosting/database/auth/provider credentials and domain ownership are not connected.
 
-Added optional same-origin static website serving to the API, a non-root Docker
-image, hidden-file/API-safe SPA fallback tests and container startup checks in
-CI. Local 50-test suite and production builds pass. Check fresh container CI;
-Docker is unavailable in this execution environment, so no local image run or
-actual hosted deployment is claimed. Hosting is not yet connected. The container
-readiness test intentionally expects 503 without business service configuration.
+## Completed engineering — preserve and reuse
 
-All remaining engineering and external blockers listed below still apply; no
-live charge/transfer, app-store publication or merge has occurred.
+- Role-scoped customer, restaurant, driver and admin routes and interfaces;
+  server-approved restaurant/driver access; server-calculated quotes and immutable
+  order/menu/address/pricing snapshots; opening hours in America/New_York.
+- Customer checkout, restaurant acceptance/preparation/readiness, driver claim,
+  pickup and delivery, earnings allocation and full-cancellation/refund foundation.
+  Integration tests exercise this HTTP/relational workflow with test identities
+  and injected/test-only financial effects. Actual Clerk/Stripe round trips have
+  not been verified.
+- Stable financial-operation IDs/payloads, provider idempotency keys, committed
+  attempts, leases, backoff, stale-worker fencing and reconciliation holds.
+  Stripe TEST checkout/refund/transfer/reversal I/O occurs outside DB transactions.
+  Unknown writes older than 23 hours are held; known refunds can be read/polled.
+  Cancellation, customer refund confirmation and recipient recovery are separate.
+- Signed durable webhook inbox, monotonic refund events, duplicate handling,
+  mismatch quarantine, dead-letter/backoff and audited administrator retries.
+  Connect account creation is also a durable provisioning job, with readiness
+  confirmed from the provider rather than assumed after creation.
+- Immutable balanced gross operational journals for confirmed payments,
+  allocations, transfers, full refunds and reversals. PostgreSQL deferred triggers
+  enforce balance and reject mutation, truncation and added lines after commit.
+  Historical paid orders without verified ledger baselines are quarantined before
+  financial execution; no invented balances are backfilled.
+- Admin gross trial balance, exact aggregate cents, stable microsecond-safe cursor
+  pages, missing-baseline reporting, financial recovery controls, operational queue
+  health, worker progress, redacted webhook/device recovery and reason-required
+  retry audit records. Reports explicitly exclude unreconciled provider fees,
+  disputes, tax remittances and bank payout outcomes.
+- Driver online heartbeat freshness, unique active assignment per driver,
+  ownership-checked foreground GPS, stale-location rejection/hiding, navigation
+  links, availability/claim/release controls and delivery oversight.
+- Durable in-app notifications plus individual push-device jobs/receipts,
+  attempt/lease recovery, successful-device suppression on retry, invalid-token
+  removal and reassigned-device protection. Missing platform configuration does
+  not consume attempts or starve configured jobs. Push is at-least-once; provider
+  acceptance does not prove on-device display. APNs remains sandbox-only.
+- Android FCM HTTP v1 transport uses scoped RSA-signed service-account OAuth,
+  fixed Google origins, bounded requests, cached access tokens and acknowledged
+  responses. Tests verify signing/scope, token reuse, rejected/invalid responses
+  and failures. Removed unused Firebase/Firestore SDK dependency tree.
+- PostgreSQL-backed mutation rate limits, bounded pool/query/lock waits,
+  independent worker loops with actual batch progress, graceful shutdown,
+  `/livez` and dependency/worker `/readyz` checks.
+- Optional same-origin website serving through the API (`WEB_DIST_DIR`), safe SPA
+  deep links without API interception, hidden-file rejection, asset caching,
+  non-root Docker packaging and CI smoke verification. See `docs/DEPLOYMENT.md`.
+- Patched production dependencies and regenerated Zod 4 schemas via
+  `lib/api-spec/orval.config.ts`; do not revert to vulnerable Zod 3 artifacts.
 
-### Precision follow-up
+## Resolved intermittent CI failure
 
-The first device-delivery CI revision exposed a sub-millisecond eligibility bug:
-JavaScript truncates PostgreSQL microseconds. Due/expired predicates now compare
-against `clock_timestamp()` inside SQL for webhook, finance, onboarding and push
-claims. Local 49-test suite passes; check fresh PostgreSQL CI. Unsigned iOS device
-Release compilation passed at `0c45941`; Android release lint/build is pending.
+`pnpm test` at `21b22db` intermittently failed because freshly received webhook
+jobs were not immediately eligible. Later tests cascaded after provider mode
+was left changed. Due/expired SQL predicates now use PostgreSQL
+`clock_timestamp()` directly, preserving microseconds; lease/retry dates use DB
+time instead of host time. Test fixtures restore provider state after each case.
+Repeated immediate claims and PostgreSQL host-clock-skew checks pass. Do not add
+sleeps to mask this regression. PGlite shares JavaScript time; independent host
+skew injection is intentionally exercised on the real PostgreSQL lane.
 
-## Current stage: durable device delivery and CI failure recovery
+## Remaining engineering launch blockers
 
-Preserve the notification changes in this revision; they were recovered from the
-workspace after the prior interruption. Device-level push jobs now persist
-fan-out, attempts, leases, acceptance timestamps and redacted failure codes.
-Successful devices are not resent when another device fails. Expired leases can
-be taken over, and stale workers cannot overwrite new outcomes. Invalid tokens
-are removed; removed/reassigned devices cannot receive a previous account's
-notification payload. Missing platform configuration does not consume attempts
-or starve configured deliveries. Push remains at-least-once with provider collapse
-keys; provider acceptance is explicitly not proof of device display. In-app
-notifications remain durable. Migration 0010 adds device jobs and queue indexes.
+These are unfinished technology, not merely missing account credentials:
 
-Admin Order operations now integrates queue health, worker progress, webhook
-recovery, redacted device recovery, audited reason-required retries, gross ledger
-reporting and read-only provider financial reconciliation. Worker progress pulses
-occur between completed batch jobs; readiness uses a 90-second freshness window.
-Shutdown stops new claims while draining current work.
+1. Partial refunds with immutable allocation/rounding policy, multiple refund
+   records, cumulative limits, idempotency, concurrent refund safety and recovery.
+   Current `refunds.order_id` is unique and full-refund assumptions exist in
+   finance/ledger/webhook code; changing only the route is unsafe.
+2. External refunds/disputes, payout holds, provider balance/fee/net reconciliation,
+   bank payout status/failure handling and verified financial exception reporting.
+   Connected-balance transfers must never be presented as confirmed bank payouts.
+3. Full customer/restaurant/driver support cases, operator search/pagination,
+   delivery proof and corresponding dispute/support workflows.
+4. Restaurant menu modifiers/customizations, inventory/capacity and explicit
+   acceptance/dispatch timeout handling. Current menu availability is a boolean;
+   orders with no available driver remain visible for manual operations.
+5. Complete required restaurant/driver verification workflows beyond the current
+   approval/profile/Connect foundations. Confirm business-required verification
+   information and service policies before accepting real operators.
+6. Authenticated browser E2E across actual Clerk users, provider sandbox checkout,
+   refunds, transfers/recovery and bank payout events; real physical-device GPS,
+   permission denial, offline/reconnection, notification and return-link testing.
+7. Accessibility/responsive operational UI verification, sustained multi-user load,
+   broader failure recovery/security exercises, monitoring/alert routing and
+   database restore verification.
+8. Configure and deploy the actual web/API/database environment, verify public
+   HTTPS and authenticated operational readiness. Produce configured signed mobile
+   releases and perform store submission/install/distribution checks.
 
-Investigated GitHub `Validate` failure 42003824582 on `21b22db`: a newly received
-webhook was still `received`, then later tests cascaded because the payment mode
-was not restored. Workers now use PostgreSQL's clock for due eligibility, leases
-and retry timing, instead of comparing database timestamps against application
-host time. Integration fixtures reset payment credentials/mode after each case.
-A repeated immediate-webhook test checks DB-time leases, with independent host
-clock skew injected on the real PostgreSQL CI lane (PGlite shares JS time).
+Do not widen scope into unrelated features or redesign working components. Finish
+these integrated launch blockers and meaningful tests before declaring completion.
 
-Local verification: 49 tests pass, no skipped tests; production API/web build and
-typecheck pass. Fresh PostgreSQL CI remains required for this revision. Native CI
-now additionally builds unsigned release Android APK/AAB with release lint and
-unsigned iOS Release/iphoneos, alongside existing debug/simulator checks. Do not
-claim these new release checks passed until reviewing their run results. No
-configured signed or store-distributable release has been produced. No merge.
+## External requirements
 
-Remaining launch blockers include provider-fee/net reconciliation, partial and
-external refunds/disputes and bank payout events; complete support and delivery
-proof workflows; restaurant menu modifiers/inventory and operational capacity;
-authenticated browser E2E, load/security exercises and real device GPS/push.
-Clerk/Stripe test credentials, push services, hosting/database ownership and
-Apple/Google signing remain external requirements. Deployment packaging and full
-end-to-end provider verification are still incomplete. Continue implementation;
-do not treat this checkpoint as completion or a claim of launch readiness.
+- A managed PostgreSQL database and Node/container hosting account, HTTPS domain,
+  secret environment access, backups and alert destination. Available Sites
+  Worker/D1 hosting is incompatible with the existing Node/PostgreSQL backend;
+  do not rewrite the architecture or publish a disconnected frontend there.
+- Clerk instance/publishable and server keys, allowed origins/redirects and admin
+  Clerk user IDs. No runtime test-identity bypass exists.
+- Stripe business/Connect account configured in TEST mode, server test key,
+  webhook signing secret and verified connected test accounts. Owner verification
+  and bank linking occur in Stripe, not in source code. Live keys are rejected.
+- Approved tax/service/commission/driver compensation/cancellation/refund policies.
+  Missing pricing fails closed; there are no default hardcoded business terms.
+- Firebase/Google services configuration and APNs credentials/entitlements with
+  physical devices. No actual push-provider round trip has been certified.
+- Apple Developer/App Store Connect and Google Play ownership, signing material,
+  store identity/privacy information and external approval.
 
-## Latest stage: immutable operational ledger and recovery verification
+## Resume commands and storage
 
-New orders now post balanced journals atomically with confirmed payments,
-delivery earnings allocation, connected-balance transfers, full refunds and
-settlement reversals. Deferred PostgreSQL constraints enforce balancing; triggers
-reject updates, deletion, truncation and new lines on committed journals. Journal
-fingerprints reject conflicting replays. Refund replay remains valid after later
-settlement recovery. Historical paid orders without a verified payment baseline
-are held before provider execution; no invented opening balances are posted.
-Migration 0009 adds the ledger and these protections. Do not skip its custom SQL
-triggers when updating Drizzle snapshots.
+`pnpm install --frozen-lockfile`, `pnpm test`, `pnpm build` and
+`pnpm audit --prod --audit-level=moderate`.
+After a dependency/type-generation change use `pnpm exec tsc --build --force`
+when stale local declarations remain. GitHub CI uses a clean dependency install.
+API test runner uses unique temporary bundles. `TEST_DATABASE_URL` selects real
+PostgreSQL; otherwise PGlite applies the same migrations locally.
 
-`GET /api/admin/ledger` exposes an admin-only, snapshot-consistent trial balance,
-exact integer-cent strings, optional order/date filters and journal cursor pages
-that preserve PostgreSQL microsecond ordering. The Order operations page includes
-balances and expandable journals. Missing payment baselines are surfaced. These
-are gross operational records: provider fees, disputes, tax remittances and bank
-payouts are NOT yet reconciled; the UI/API explicitly state this limitation.
+Migrations `0000`–`0010` are committed. Preserve the custom ledger triggers in
+`0009`; Drizzle schema push alone cannot install those invariants. Existing legacy
+DBs must follow the baseline instructions before migration; never silently delete
+conflicting active assignments or fabricate historical ledger balances.
 
-Local verification: 43 tests pass (including the integration parent), with new
-checks for worker takeover/stale owner suppression, queue fairness across 40 held
-orders, webhook retry backoff/dead-letter recovery, committed-journal append
-rejection, balanced accounting after refund/recovery, role/date/pagination report
-checks, and historical baseline quarantine. Production build/typecheck pass.
-The preceding revision `63fa5c5` passed PostgreSQL CI plus Android debug and iOS
-unsigned simulator compilation. Check fresh CI for this ledger revision before
-claiming it verified on PostgreSQL/native platforms. No live charges or merges.
-
-Immediate remaining engineering: provider-fee/balance reconciliation; partial
-refunds and external disputes/refunds with payout holds; push lease/fan-out crash
-recovery; worker progress/readiness under sustained batches; operator recovery UI;
-restaurant capacity/dispatch timeout policies; support pagination/search; polished
-responsive/accessibility/browser E2E and load/failure exercises. External testing
-still needs actual Clerk/Stripe test/push configuration and physical devices.
-Final signed app-store builds need Apple/Google accounts/signing and approved
-business/tax/service policy. See lower checkpoint sections for broader scope.
-
-## Latest completed stage: operational recovery and durable onboarding
-
-This stage adds durable Connect provisioning outside database transactions,
-financial queue fairness for held orders, bounded webhook backoff/dead-letter
-states, role-scoped webhook recovery endpoints with audit reasons, operational
-queue/worker reporting, readiness/liveness endpoints, PostgreSQL-backed concurrent
-mutation limits, bounded database connection/query/lock waits, independent worker
-loops and graceful draining. Refund events are monotonic across webhook/worker
-races. Local tests now total 37 and pass; typecheck, production builds and native
-asset synchronization pass. Fresh CI results must be checked for the commit.
-
-Added failure checks: cancellation during blocked transfer I/O; customer refund
-remaining confirmed while settlement recovery fails and later recovers; refund
-webhook preceding a worker response; durable Connect timeout replay without a
-held transaction; audited webhook retry permissions; concurrent distributed
-request limits; stopping new claims while draining current worker work.
-
-New migrations: 0007–0008. Current endpoints include `/livez`, `/readyz`,
-`/api/admin/operational-health`, `/api/admin/webhook-inbox` and audited
-`POST /api/admin/webhook-inbox/:eventId/retry` with a reason. All Stripe account
-creation uses persisted provisioning jobs. Completed stage supersedes items 1–3
-below only to the extent described; additional lease-takeover/load tests, operator
-UI integration and outbound alert-provider configuration still need work.
-
-Next priorities: immutable balanced ledger/provider-fee reconciliation; partial
-refunds/disputes; complete support/search/capacity tools; browser/device E2E;
-accessibility/performance; signed releases and external provider verification.
-
-# Resumable engineering checkpoint — production hardening
-
-## Resume rule
-
-Continue PR #1 (`feature/rocoeats-launch-readiness`). Do not discard local work,
-merge the draft, enable live payments, or equate compilation with launch readiness.
-The starting verified GitHub revision for this work was `44881bf`. The interrupted
-run left substantial uncommitted work; it has been preserved and extended here.
-
-## Implemented since that revision
-
-- Durable financial-operation records with immutable request parameters, stable
-  provider idempotency keys, committed attempt timestamps, leases, retries and
-  reconciliation holds. Stripe checkout/refund/settlement/reversal network I/O
-  now runs outside order transactions. Cancellation persists before provider work.
-- Provider results are applied atomically to domain records; ambiguous failures
-  retain their original operation. Unknown writes older than 23 hours are held;
-  known refund objects may continue safe read-only polling. Reconciliation reads
-  provider objects and validates identifiers/amounts before changing local state.
-  It never creates replacement monetary requests on an unknown outcome.
-- Signed webhook receipts are durably stored before HTTP acknowledgement, then
-  processed with leases and idempotent domain updates. Mismatches are retained
-  for reconciliation rather than disappearing on transaction rollback.
-- Metadata links can recover checkout/refund responses lost before local commit.
-  Refund confirmation queues settlement recovery even when a webhook beats the
-  worker response. Recovery remains separate from customer refund confirmation.
-- Explicit pricing configuration is required; missing configuration cannot
-  silently use sample fees, commission, ZIPs or zero tax. Sample policy data is
-  imported by automated tests only. New orders store the entire policy snapshot.
-- Local financial simulation is restricted to NODE_ENV=test. Interactive/provider
-  workflows must use Stripe test credentials; there is no live-mode override.
-- Driver online heartbeats and one-active-delivery database uniqueness prevent
-  overbooking across simultaneous orders. Claims recheck current approval.
-- Assigned-driver location publishing validates ownership, coordinates, timing,
-  freshness and update frequency. Customer tracking hides stale/terminal locations.
-  Location sharing is foreground, explicitly enabled, and uses actual device GPS.
-- Driver availability/location controls, customer tracking, dispatch oversight,
-  financial recovery queues, and labeled pricing-policy fields replace raw pricing
-  JSON and simulator success controls in the application UI.
-
-## Verification at checkpoint
-
-Local tests: 31 Node tests (including the integration parent), all passing.
-`pnpm run typecheck`, `pnpm build`, and native asset sync passed. Fresh GitHub
-PostgreSQL/native compile results must be checked for this revision.
-The integration suite uses PGlite locally and real PostgreSQL 17 in GitHub CI.
-Tests include missing-price fail-closed behavior, concurrent driver claims across
-orders, stale/unauthorized GPS, durable provider-timeout replay, expiry quarantine,
-webhook receipt/replay/mismatch retention, and existing ordering/refund/role tests.
-Provider effects in failure-injection tests are injected test fixtures only; no
-fake transport is used by production HTTP routes or the production worker.
-
-New migrations: 0004–0006. The active-driver unique index intentionally fails if
-legacy data already contains multiple active deliveries for one driver. Audit and
-resolve those real assignments operationally before applying it; do not silently
-cancel orders or reassign custody to make the migration pass.
-
-## Remaining work — do not call this finished
-
-1. Add more crash/failure tests: cancellation during an in-flight transfer, refund
-   webhook before response, lease takeover with two workers, repeated pending
-   refund events, settlement-recovery failure and subsequent reconciliation.
-2. Make Connect account creation durable too: its current onboarding route still
-   calls Stripe while holding a profile transaction. Audit all provider I/O paths.
-3. Add webhook-inbox operational views/retry audit controls, backoff/dead-letter
-   monitoring, queue-age metrics, structured alerts, graceful worker shutdown and
-   health/readiness checks. Address blocked-order queue fairness under load.
-4. Build a balanced immutable financial ledger and reconciliation reporting.
-   Partial refunds, external refunds/disputes, balance recovery obligations,
-   tax-provider integration/registrations and payout holds still need engineering
-   and explicit business policy. Configured manual test tax is not a legal tax
-   determination. Connected-balance transfers do not verify bank payouts.
-5. Provide robust search/pagination/support tooling, restaurant capacity and
-   driver-unavailability escalation. Never invent ETA or delivery availability.
-6. Finish accessibility, responsive visual QA, authenticated multi-role browser
-   E2E, load tests, rate limits, monitoring and operational incident exercises.
-7. Verify native GPS permission behavior and tracking on real Android/iOS devices.
-   Background location is not implemented or certified. Verify checkout return,
-   permission denial, poor GPS/network, sign-out and app lifecycle recovery.
-8. Verify Stripe TEST Checkout/Connect/refund/reversal round-trips and signed
-   events using actual configured services. Clerk/PostgreSQL deployment,
-   Firebase/APNs, signing identities and store accounts are absent here.
-9. Signed release builds, physical-device tests, store assets/privacy/support
-   pages and deletion/retention operations remain release gates. Existing CI
-   produces debug/simulator compile artifacts; those are not store releases.
-
-## File map and commands
-
-- `src/lib/financial-operations.ts`: durable financial requests, worker, reconciliation.
-- `src/lib/finance-queue.ts`: idempotent enqueue and settlement recovery.
-- `src/lib/webhook-worker.ts`, `src/routes/payment-webhook.ts`: durable incoming events.
-- `src/routes/dispatch.ts`, `src/routes/drivers.ts`: availability, claims and GPS.
-- `tests/platform.test.ts`: relational multi-user HTTP and failure-injection checks.
-- Frontend `pages/delivery-tracking.tsx`, `pages/commerce-pages.tsx`: integrated UI.
-
-API paths above are relative to `artifacts/api-server`; schema/migrations live in
-`lib/db`. Run from repository root:
-
-```sh
-pnpm install --frozen-lockfile
-pnpm test
-pnpm build
-pnpm --filter @workspace/localeats exec cap sync
-```
-
-Production setup instructions in DEPLOYMENT.md and COMMERCE_API.md predate this
-hardening stage. Where they mention interactive sandbox mode, fallback example
-pricing, synchronous finance or immediate webhook completion, this checkpoint
-supersedes them. Update those documents before deployment. External configuration
-is required for acceptance testing, but it is not the only remaining work.
+GitHub is the durable code source. Connector commits may initially have different
+SHAs from local commits but are verified to have identical tree hashes. Align only
+when clean and trees match; never reset uncommitted progress. Update this checkpoint
+and commit verified progress before the execution session ends.
