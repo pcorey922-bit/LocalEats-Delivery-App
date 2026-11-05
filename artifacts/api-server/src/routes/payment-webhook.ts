@@ -1,3 +1,4 @@
+import { journalRefund } from "../lib/ledger";
 import { and, eq } from "drizzle-orm";
 import type { Request, Response } from "express";
 import type Stripe from "stripe";
@@ -266,6 +267,7 @@ export async function processStripeEvent(event: Stripe.Event) {
         })
         .where(eq(financialOperationsTable.id, `refund:${payment.orderId}`));
       if (remote.status === "succeeded") {
+        await journalRefund(tx, payment.orderId, payment.amountCents);
         await queueSettlementRecovery(tx, payment.orderId);
         await tx
           .update(financialOperationsTable)

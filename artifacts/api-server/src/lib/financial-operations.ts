@@ -1,4 +1,10 @@
 import { alias } from "drizzle-orm/pg-core";
+import {
+  requirePaymentJournal,
+  journalTransfer,
+  journalRefund,
+  journalReversal,
+} from "./ledger";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, inArray, lte, or, sql, notExists } from "drizzle-orm";
 import {
@@ -425,6 +431,24 @@ async function claimOperation(): Promise<FinancialOperation | null> {
           .where(eq(operations.id, job.id));
         return null;
       }
+      if (["transfer", "refund", "reversal"].includes(job.kind)) {
+        try {
+          await requirePaymentJournal(tx, orderId);
+        } catch (error) {
+          if (!(error instanceof CommerceError) || error.status !== 409)
+            throw error;
+          await tx
+            .update(operations)
+            .set({
+              state: "reconciliation",
+              errorCode: "LEDGER_BASELINE_MISSING",
+              leaseToken: null,
+              leaseExpiresAt: null,
+            })
+            .where(eq(operations.id, job.id));
+          return null;
+        }
+      }
       // Prevent a queued transfer starting after a refund/cancellation request.
       if (job.kind === "transfer" && !job.firstAttemptAt) {
         const [refund] = await tx
@@ -610,6 +634,12 @@ async function applyResult(
       .where(eq(paymentsTable.id, payment.id));
   } else if (job.kind === "transfer") {
     if (!result.id) throw new Error("Provider transfer ID missing");
+    const [payout] = await tx
+      .select()
+      .from(payoutsTable)
+      .where(eq(payoutsTable.id, job.resourceId))
+      .limit(1);
+    await journalTransfer(tx, payout);
     await tx
       .update(payoutsTable)
       .set({
@@ -637,6 +667,7 @@ async function applyResult(
       .set({ providerRefundId: result.id, status: result.status })
       .where(eq(refundsTable.orderId, job.orderId));
     if (result.status === "succeeded") {
+      await journalRefund(tx, job.orderId, payment.amountCents);
       await tx
         .update(paymentsTable)
         .set({ status: "refunded" })
@@ -652,6 +683,12 @@ async function applyResult(
     }
   } else if (job.kind === "reversal") {
     if (!result.id) throw new Error("Provider reversal ID missing");
+    const [payout] = await tx
+      .select()
+      .from(payoutsTable)
+      .where(eq(payoutsTable.id, job.resourceId))
+      .limit(1);
+    await journalReversal(tx, payout);
     await tx
       .update(payoutsTable)
       .set({ status: "reversed", providerReversalId: result.id })

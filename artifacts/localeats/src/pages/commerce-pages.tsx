@@ -1,4 +1,5 @@
 import { OrderTracking, DispatchOperations } from "./delivery-tracking";
+import { LedgerReport } from "./ledger-report";
 import { useEffect, useState, type FormEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -443,6 +444,7 @@ export function OperationsCommerce() {
       <ErrorText error={refunds.error} />
       <ErrorText error={drivers.error} />
       <FinancialOperations />
+      <LedgerReport />
       <DispatchOperations />
       <h2>Driver approval</h2>
       {drivers.data?.map((d) => (

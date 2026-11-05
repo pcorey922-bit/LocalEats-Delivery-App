@@ -1,3 +1,40 @@
+## Latest stage: immutable operational ledger and recovery verification
+
+New orders now post balanced journals atomically with confirmed payments,
+delivery earnings allocation, connected-balance transfers, full refunds and
+settlement reversals. Deferred PostgreSQL constraints enforce balancing; triggers
+reject updates, deletion, truncation and new lines on committed journals. Journal
+fingerprints reject conflicting replays. Refund replay remains valid after later
+settlement recovery. Historical paid orders without a verified payment baseline
+are held before provider execution; no invented opening balances are posted.
+Migration 0009 adds the ledger and these protections. Do not skip its custom SQL
+triggers when updating Drizzle snapshots.
+
+`GET /api/admin/ledger` exposes an admin-only, snapshot-consistent trial balance,
+exact integer-cent strings, optional order/date filters and journal cursor pages
+that preserve PostgreSQL microsecond ordering. The Order operations page includes
+balances and expandable journals. Missing payment baselines are surfaced. These
+are gross operational records: provider fees, disputes, tax remittances and bank
+payouts are NOT yet reconciled; the UI/API explicitly state this limitation.
+
+Local verification: 43 tests pass (including the integration parent), with new
+checks for worker takeover/stale owner suppression, queue fairness across 40 held
+orders, webhook retry backoff/dead-letter recovery, committed-journal append
+rejection, balanced accounting after refund/recovery, role/date/pagination report
+checks, and historical baseline quarantine. Production build/typecheck pass.
+The preceding revision `63fa5c5` passed PostgreSQL CI plus Android debug and iOS
+unsigned simulator compilation. Check fresh CI for this ledger revision before
+claiming it verified on PostgreSQL/native platforms. No live charges or merges.
+
+Immediate remaining engineering: provider-fee/balance reconciliation; partial
+refunds and external disputes/refunds with payout holds; push lease/fan-out crash
+recovery; worker progress/readiness under sustained batches; operator recovery UI;
+restaurant capacity/dispatch timeout policies; support pagination/search; polished
+responsive/accessibility/browser E2E and load/failure exercises. External testing
+still needs actual Clerk/Stripe test/push configuration and physical devices.
+Final signed app-store builds need Apple/Google accounts/signing and approved
+business/tax/service policy. See lower checkpoint sections for broader scope.
+
 ## Latest completed stage: operational recovery and durable onboarding
 
 This stage adds durable Connect provisioning outside database transactions,

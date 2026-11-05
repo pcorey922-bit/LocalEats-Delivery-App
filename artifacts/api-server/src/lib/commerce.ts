@@ -1,3 +1,10 @@
+import {
+  journalPayment,
+  journalAllocation,
+  journalTransfer,
+  journalRefund,
+  journalReversal,
+} from "./ledger";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   db,
@@ -37,7 +44,11 @@ export async function readPricing(tx: Pick<Transaction, "select"> = db) {
     .from(platformSettingsTable)
     .where(eq(platformSettingsTable.settingKey, "test_pricing"))
     .limit(1);
-  if (!setting) throw new CommerceError(503, "Ordering is unavailable until operations configures pricing, tax settings, and service boundaries");
+  if (!setting)
+    throw new CommerceError(
+      503,
+      "Ordering is unavailable until operations configures pricing, tax settings, and service boundaries",
+    );
   return pricingSchema.parse(setting.value);
 }
 export async function audit(
@@ -130,6 +141,7 @@ export async function recordPayment(
       throw new CommerceError(409, "Different payment already recorded");
     return;
   }
+  await journalPayment(tx, orderId, amount);
   await tx
     .update(paymentsTable)
     .set({
@@ -150,7 +162,14 @@ export async function recordPayment(
         reason: "Late payment on cancelled order",
       })
       .onConflictDoNothing();
-    if(payment.provider==='stripe_test')await enqueueFinancialOperation(tx,{id:`refund:${orderId}`,orderId,kind:'refund',resourceId:orderId,payload:{paymentId:providerId,amount,currency:'usd'}});
+    if (payment.provider === "stripe_test")
+      await enqueueFinancialOperation(tx, {
+        id: `refund:${orderId}`,
+        orderId,
+        kind: "refund",
+        resourceId: orderId,
+        payload: { paymentId: providerId, amount, currency: "usd" },
+      });
   }
   await audit(tx, null, "payment.succeeded", orderId, { providerId, amount });
   await notifyOrder(
@@ -193,6 +212,12 @@ export async function createEarnings(tx: Transaction, orderId: string) {
   )
     throw new CommerceError(409, "Paid delivery is required for earnings");
   const { restaurantCents, driverCents } = allocateEarnings(order);
+  await journalAllocation(
+    tx,
+    order,
+    { id: restaurant.ownerProfileId, amount: restaurantCents },
+    { id: delivery.driverProfileId, amount: driverCents },
+  );
   for (const [kind, recipientProfileId, amountCents] of [
     ["restaurant", restaurant.ownerProfileId, restaurantCents],
     ["driver", delivery.driverProfileId, driverCents],
@@ -205,7 +230,11 @@ export async function createEarnings(tx: Transaction, orderId: string) {
   }
 }
 export async function settlePayout(payoutId: string, actor: Profile) {
-  if(paymentMode()==='stripe_test')return (await import('./financial-operations')).requestProviderTransfer(payoutId,actor);
+  if (paymentMode() === "stripe_test")
+    return (await import("./financial-operations")).requestProviderTransfer(
+      payoutId,
+      actor,
+    );
   const [initial] = await db
     .select()
     .from(payoutsTable)
@@ -276,6 +305,7 @@ export async function settlePayout(payoutId: string, actor: Profile) {
       payout.id,
       order.id,
     );
+    await journalTransfer(tx, payout);
     const [updated] = await tx
       .update(payoutsTable)
       .set({ status: "paid", providerTransferId: id, paidAt: new Date() })
@@ -303,7 +333,12 @@ export async function cancelOrRefundOrder(
   actor: Profile,
   reason: string,
 ) {
-  if(paymentMode()==='stripe_test')return (await import('./financial-operations')).requestProviderCancellation(orderId,actor,reason);
+  if (paymentMode() === "stripe_test")
+    return (await import("./financial-operations")).requestProviderCancellation(
+      orderId,
+      actor,
+      reason,
+    );
   return db.transaction(async (tx) => {
     const [order] = await tx
       .select()
@@ -424,6 +459,8 @@ export async function cancelOrRefundOrder(
             payout.providerTransferId && !payout.providerReversalId
               ? await reverseTestTransfer(payout.providerTransferId, payout.id)
               : payout.providerReversalId;
+          if (payout.providerTransferId && !payout.providerReversalId)
+            await journalReversal(tx, payout);
           await tx
             .update(payoutsTable)
             .set({
@@ -441,6 +478,8 @@ export async function cancelOrRefundOrder(
           .update(refundsTable)
           .set({ providerRefundId: result.id, status: result.status })
           .where(eq(refundsTable.id, refund.id));
+        if (result.status === "succeeded")
+          await journalRefund(tx, orderId, payment.amountCents);
         if (result.status === "succeeded")
           await tx
             .update(paymentsTable)

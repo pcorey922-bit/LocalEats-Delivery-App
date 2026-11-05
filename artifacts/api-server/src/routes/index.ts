@@ -12,11 +12,13 @@ import commerceRouter from "./commerce";
 
 import dispatchRouter from "./dispatch";
 import operationalHealthRouter from "./operational-health";
+import ledgerRouter from "./ledger";
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(commerceRouter);
 router.use(operationalHealthRouter);
+router.use(ledgerRouter);
 router.use(dispatchRouter);
 router.use(profilesRouter);
 router.use(dashboardRouter);

@@ -4,7 +4,7 @@ import type Stripe from "stripe";
 import { db, webhookInboxTable as inbox } from "@workspace/db";
 import { processStripeEvent } from "../routes/payment-webhook";
 import { CommerceError } from "./commerce-policy";
-export async function processWebhookInbox() {
+export async function processWebhookInbox(process:typeof processStripeEvent=processStripeEvent) {
   const now = new Date();
   const job = await db.transaction(async (tx) => {
     const [row] = await tx
@@ -34,7 +34,7 @@ export async function processWebhookInbox() {
   });
   if (!job) return false;
   try {
-    await processStripeEvent(job.payload as unknown as Stripe.Event);
+    await process(job.payload as unknown as Stripe.Event);
     await db
       .update(inbox)
       .set({

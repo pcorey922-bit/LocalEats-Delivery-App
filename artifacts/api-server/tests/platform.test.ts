@@ -3,7 +3,7 @@ import { before, after, test } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import Stripe from "stripe";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import app from "../src/app";
 import {
   engine,
@@ -26,11 +26,14 @@ import {
   webhookInboxTable,
   connectedAccountsTable,
   payoutProvisioningTable,
+  ledgerTransactionsTable,
+  ledgerLinesTable,
 } from "./database";
 import { testPricing } from "../src/lib/testing/pricing";
 import { processWebhookInbox } from "../src/lib/webhook-worker";
 import { processPayoutProvisioning } from "../src/lib/payout-onboarding";
 import { processFinancialOperation } from "../src/lib/financial-operations";
+import { postJournal, journalRefund } from "../src/lib/ledger";
 const ids = {
   customer: randomUUID(),
   other: randomUUID(),
@@ -1086,6 +1089,21 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
           .from(payoutsTable)
           .where(eq(payoutsTable.id, restaurant.id));
         assert.equal(paid.status, "reversed");
+        await db.transaction((tx) =>
+          journalRefund(tx, order.id, order.totalCents),
+        );
+        const report = await api(
+          `/admin/ledger?orderId=${order.id}`,
+          ids.admin,
+        );
+        assert.equal(report.status, 200, JSON.stringify(report.data));
+        assert.equal(report.data.balanced, true);
+        assert.ok(
+          report.data.balances.every(
+            (row: { balanceCents: string }) => row.balanceCents === "0",
+          ),
+          JSON.stringify(report.data.balances),
+        );
       } finally {
         release?.();
         process.env.PAYMENT_PROVIDER = "sandbox";
@@ -1182,14 +1200,12 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     "Connect provisioning survives a timeout without holding a database transaction",
     async () => {
       const profileId = randomUUID();
-      await db
-        .insert(profilesTable)
-        .values({
-          id: profileId,
-          clerkUserId: profileId,
-          role: "restaurant",
-          displayName: "Provisioning test fixture",
-        });
+      await db.insert(profilesTable).values({
+        id: profileId,
+        clerkUserId: profileId,
+        role: "restaurant",
+        displayName: "Provisioning test fixture",
+      });
       process.env.PAYMENT_PROVIDER = "stripe_test";
       process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
       try {
@@ -1291,14 +1307,12 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     "distributed mutation limits apply atomically across concurrent requests",
     async () => {
       const actor = randomUUID();
-      await db
-        .insert(profilesTable)
-        .values({
-          id: actor,
-          clerkUserId: actor,
-          role: "customer",
-          displayName: "Rate-limit test fixture",
-        });
+      await db.insert(profilesTable).values({
+        id: actor,
+        clerkUserId: actor,
+        role: "customer",
+        displayName: "Rate-limit test fixture",
+      });
       process.env.API_MUTATION_LIMIT_PER_MINUTE = "2";
       try {
         const responses = await Promise.all(
@@ -1312,6 +1326,382 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
         );
       } finally {
         process.env.API_MUTATION_LIMIT_PER_MINUTE = "10000";
+      }
+    },
+  );
+  await t.test(
+    "competing workers respect leases and stale owners cannot overwrite takeover results",
+    async () => {
+      const order = await create();
+      await db
+        .update(paymentsTable)
+        .set({ provider: "stripe_test" })
+        .where(eq(paymentsTable.orderId, order.id));
+      process.env.PAYMENT_PROVIDER = "stripe_test";
+      process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
+      let release!: () => void;
+      let began!: () => void;
+      const gate = new Promise<void>((r) => (release = r));
+      const started = new Promise<void>((r) => (began = r));
+      try {
+        const queued = await api(
+          `/orders/${order.id}/checkout`,
+          ids.customer,
+          "POST",
+        );
+        const id = queued.data.operationId;
+        let firstToken: string | null = null;
+        const first = processFinancialOperation(async (job) => {
+          firstToken = job.leaseToken;
+          began();
+          await gate;
+          return { id: "cs_original_worker", status: "open" };
+        });
+        await started;
+        let duplicateCalls = 0;
+        assert.equal(
+          await processFinancialOperation(async () => {
+            duplicateCalls++;
+            throw new Error("A current lease must not be taken");
+          }),
+          false,
+        );
+        assert.equal(duplicateCalls, 0);
+        await db
+          .update(financialOperationsTable)
+          .set({ leaseExpiresAt: new Date(0), nextAttemptAt: new Date(0) })
+          .where(eq(financialOperationsTable.id, id));
+        await processFinancialOperation(async (job) => {
+          assert.notEqual(job.leaseToken, firstToken);
+          assert.equal(job.id, id);
+          return { id: "cs_takeover_receipt", status: "open" };
+        });
+        release();
+        await first;
+        const [saved] = await db
+          .select()
+          .from(paymentsTable)
+          .where(eq(paymentsTable.orderId, order.id));
+        const [op] = await db
+          .select()
+          .from(financialOperationsTable)
+          .where(eq(financialOperationsTable.id, id));
+        assert.equal(saved.checkoutSessionId, "cs_takeover_receipt");
+        assert.equal(op.state, "succeeded");
+        assert.equal(op.attempts, 2);
+      } finally {
+        release?.();
+        process.env.PAYMENT_PROVIDER = "sandbox";
+        delete process.env.STRIPE_SECRET_KEY;
+      }
+    },
+  );
+  await t.test(
+    "held orders cannot starve executable financial work",
+    async () => {
+      const order = await create();
+      const [template] = await db
+        .select()
+        .from(ordersTable)
+        .where(eq(ordersTable.id, order.id));
+      const heldIds = Array.from({ length: 40 }, () => randomUUID());
+      await db
+        .insert(ordersTable)
+        .values(
+          heldIds.map((id) => ({
+            ...template,
+            id,
+            requestKey: null,
+            requestHash: null,
+            createdAt: new Date(0),
+          })),
+        );
+      await db.insert(financialOperationsTable).values(
+        heldIds.flatMap((id) => [
+          {
+            id: `held:${id}`,
+            orderId: id,
+            kind: "refund",
+            resourceId: id,
+            provider: "stripe_test",
+            payload: {},
+            state: "reconciliation",
+            createdAt: new Date(0),
+          },
+          {
+            id: `queued:${id}`,
+            orderId: id,
+            kind: "checkout",
+            resourceId: id,
+            provider: "stripe_test",
+            payload: {},
+            state: "queued",
+            createdAt: new Date(0),
+          },
+        ]),
+      );
+      await db
+        .update(paymentsTable)
+        .set({ provider: "stripe_test" })
+        .where(eq(paymentsTable.orderId, order.id));
+      process.env.PAYMENT_PROVIDER = "stripe_test";
+      process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
+      try {
+        const queued = await api(
+          `/orders/${order.id}/checkout`,
+          ids.customer,
+          "POST",
+        );
+        let called = 0;
+        await processFinancialOperation(async (job) => {
+          called++;
+          assert.equal(job.id, queued.data.operationId);
+          return { id: "cs_fair_queue", status: "open" };
+        });
+        assert.equal(called, 1);
+      } finally {
+        process.env.PAYMENT_PROVIDER = "sandbox";
+        delete process.env.STRIPE_SECRET_KEY;
+      }
+    },
+  );
+  await t.test(
+    "transient webhook failures back off and dead-letter rather than spinning",
+    async () => {
+      const id = `evt_backoff_${randomUUID()}`;
+      await db
+        .insert(webhookInboxTable)
+        .values({
+          id,
+          eventType: "test.fixture",
+          payload: {
+            id,
+            type: "test.fixture",
+            livemode: false,
+            data: { object: {} },
+          },
+        });
+      let calls = 0;
+      const failing = async () => {
+        calls++;
+        throw new Error("Transient processing failure");
+      };
+      await processWebhookInbox(failing);
+      assert.equal(calls, 1);
+      assert.equal(await processWebhookInbox(failing), false);
+      await db
+        .update(webhookInboxTable)
+        .set({ attempts: 9, nextAttemptAt: new Date(0) })
+        .where(eq(webhookInboxTable.id, id));
+      await processWebhookInbox(failing);
+      const [held] = await db
+        .select()
+        .from(webhookInboxTable)
+        .where(eq(webhookInboxTable.id, id));
+      assert.equal(held.state, "dead_letter");
+      assert.equal(held.attempts, 10);
+      await api(`/admin/webhook-inbox/${id}/retry`, ids.admin, "POST", {
+        reason: "Processing dependency repaired; safe event replay",
+      });
+      await processWebhookInbox();
+      const [recovered] = await db
+        .select()
+        .from(webhookInboxTable)
+        .where(eq(webhookInboxTable.id, id));
+      assert.equal(recovered.state, "processed");
+    },
+  );
+  await t.test(
+    "ledger writes are balanced, idempotent and protected by database constraints",
+    async () => {
+      const order = await create();
+      const event = {
+        id: `ledger_test:${order.id}`,
+        orderId: order.id,
+        kind: "test_fixture",
+        lines: [
+          { account: "platform_cash" as const, amountCents: 25 },
+          { account: "customer_funds" as const, amountCents: -25 },
+        ],
+      };
+      await db.transaction((tx) => postJournal(tx, event));
+      await db.transaction((tx) => postJournal(tx, event));
+      assert.equal(
+        (
+          await db
+            .select()
+            .from(ledgerTransactionsTable)
+            .where(eq(ledgerTransactionsTable.id, event.id))
+        ).length,
+        1,
+      );
+      await assert.rejects(
+        db.transaction((tx) =>
+          postJournal(tx, {
+            ...event,
+            lines: [
+              { account: "platform_cash", amountCents: 26 },
+              { account: "customer_funds", amountCents: -26 },
+            ],
+          }),
+        ),
+      );
+      await assert.rejects(
+        db
+          .update(ledgerTransactionsTable)
+          .set({ kind: "tampered" })
+          .where(eq(ledgerTransactionsTable.id, event.id)),
+      );
+      await assert.rejects(
+        db
+          .delete(ledgerLinesTable)
+          .where(eq(ledgerLinesTable.transactionId, event.id)),
+      );
+      await assert.rejects(
+        db.transaction((tx) =>
+          tx
+            .insert(ledgerLinesTable)
+            .values(
+              event.lines.map((line) => ({ ...line, transactionId: event.id })),
+            ),
+        ),
+      );
+      await assert.rejects(
+        db.transaction(async (tx) => {
+          const id = `unbalanced:${order.id}`;
+          await tx
+            .insert(ledgerTransactionsTable)
+            .values({
+              id,
+              orderId: order.id,
+              kind: "invalid_fixture",
+              fingerprint: "invalid_fixture",
+            });
+          await tx.insert(ledgerLinesTable).values([
+            { transactionId: id, account: "platform_cash", amountCents: 10 },
+            { transactionId: id, account: "customer_funds", amountCents: -9 },
+          ]);
+        }),
+      );
+      const bad = await db
+        .select({
+          id: ledgerLinesTable.transactionId,
+          balance: sql<string>`sum(${ledgerLinesTable.amountCents})`,
+        })
+        .from(ledgerLinesTable)
+        .groupBy(ledgerLinesTable.transactionId)
+        .having(sql`sum(${ledgerLinesTable.amountCents})<>0`);
+      assert.equal(bad.length, 0);
+    },
+  );
+
+  await t.test(
+    "ledger reports enforce roles, exact totals, scoped dates and stable journal pagination",
+    async () => {
+      assert.equal((await api("/admin/ledger", null)).status, 401);
+      for (const role of [ids.customer, ids.restaurant, ids.driver])
+        assert.equal((await api("/admin/ledger", role)).status, 403);
+      assert.equal(
+        (await api("/admin/ledger?cursor=invalid", ids.admin)).status,
+        400,
+      );
+      assert.equal(
+        (
+          await api(
+            "/admin/ledger?from=2030-01-01T00:00:00Z&to=2020-01-01T00:00:00Z",
+            ids.admin,
+          )
+        ).status,
+        400,
+      );
+      const order = await create();
+      await db.transaction(async (tx) => {
+        for (let i = 0; i < 3; i++)
+          await postJournal(tx, {
+            id: `report:${order.id}:${i}`,
+            orderId: order.id,
+            kind: "test_fixture",
+            lines: [
+              { account: "platform_cash", amountCents: 100 + i },
+              { account: "customer_funds", amountCents: -100 - i },
+            ],
+          });
+      });
+      const first = await api(
+        `/admin/ledger?orderId=${order.id}&limit=1`,
+        ids.admin,
+      );
+      assert.equal(first.status, 200, JSON.stringify(first.data));
+      assert.equal(first.data.balanced, true);
+      assert.equal(
+        first.data.balances.find(
+          (b: { account: string }) => b.account === "platform_cash",
+        ).balanceCents,
+        "303",
+      );
+      const seen = [first.data.journals[0].id];
+      let cursor = first.data.nextCursor;
+      while (cursor) {
+        const page = await api(
+          `/admin/ledger?orderId=${order.id}&limit=1&cursor=${encodeURIComponent(cursor)}`,
+          ids.admin,
+        );
+        assert.equal(page.status, 200, JSON.stringify(page.data));
+        seen.push(...page.data.journals.map((j: { id: string }) => j.id));
+        cursor = page.data.nextCursor;
+      }
+      assert.equal(seen.length, 3);
+      assert.equal(new Set(seen).size, 3);
+      const none = await api(
+        `/admin/ledger?orderId=${order.id}&to=2000-01-01T00:00:00Z`,
+        ids.admin,
+      );
+      assert.equal(none.data.journals.length, 0);
+      assert.equal(none.data.balances.length, 0);
+    },
+  );
+  await t.test(
+    "historical paid orders without a verified baseline cannot execute financial writes",
+    async () => {
+      const order = await create();
+      await db
+        .update(paymentsTable)
+        .set({
+          provider: "stripe_test",
+          status: "succeeded",
+          providerPaymentId: `pi_legacy_${order.id}`,
+        })
+        .where(eq(paymentsTable.orderId, order.id));
+      process.env.PAYMENT_PROVIDER = "stripe_test";
+      process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
+      try {
+        const canceled = await api(
+          `/orders/${order.id}/cancel`,
+          ids.customer,
+          "POST",
+          { reason: "Legacy verified baseline is required" },
+        );
+        assert.equal(canceled.status, 200, JSON.stringify(canceled.data));
+        let calls = 0;
+        await processFinancialOperation(async () => {
+          calls++;
+          throw new Error("Unverified baseline must block financial execution");
+        });
+        assert.equal(calls, 0);
+        const [op] = await db
+          .select()
+          .from(financialOperationsTable)
+          .where(eq(financialOperationsTable.orderId, order.id));
+        assert.equal(op.state, "reconciliation");
+        assert.equal(op.errorCode, "LEDGER_BASELINE_MISSING");
+        const report = await api(
+          `/admin/ledger?orderId=${order.id}`,
+          ids.admin,
+        );
+        assert.equal(report.data.missingPaymentBaselines, "1");
+      } finally {
+        process.env.PAYMENT_PROVIDER = "sandbox";
+        delete process.env.STRIPE_SECRET_KEY;
       }
     },
   );
