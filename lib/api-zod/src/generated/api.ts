@@ -542,6 +542,11 @@ export const DeleteMyAddressResponse = zod.void()
 /**
  * @summary Place an order using server-verified menu prices
  */
+export const createMyOrderBodyTipCentsDefault = 0;
+export const createMyOrderBodyTipCentsMin = 0;
+export const createMyOrderBodyTipCentsMax = 100000;
+
+
 export const createMyOrderBodyItemsItemQuantityMax = 50;
 
 export const createMyOrderBodyItemsItemSpecialInstructionsMax = 500;
@@ -553,6 +558,8 @@ export const createMyOrderBodyItemsMax = 50;
 export const CreateMyOrderBody = zod.object({
   "restaurantId": zod.string().uuid(),
   "addressId": zod.string().uuid(),
+  "tipCents": zod.number().int().min(createMyOrderBodyTipCentsMin).max(createMyOrderBodyTipCentsMax).default(createMyOrderBodyTipCentsDefault),
+  "expectedTotalCents": zod.number().int().min(1).optional(),
   "items": zod.array(zod.object({
   "menuItemId": zod.string().uuid(),
   "quantity": zod.number().int().min(1).max(createMyOrderBodyItemsItemQuantityMax),

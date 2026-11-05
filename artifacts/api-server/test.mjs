@@ -1,12 +1,62 @@
-import { build } from 'esbuild';
-import { spawnSync } from 'node:child_process';
-import { mkdir, rm } from 'node:fs/promises';
-await mkdir('dist/tests', { recursive: true });
+import { build } from "esbuild";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+await mkdir("tmp", { recursive: true });
+const outputDirectory = await mkdtemp("tmp/tests-");
 try {
-  for (const [name, entry] of [['dashboard-sections', 'src/lib/dashboard-sections.test.ts'], ['order-lifecycle', 'src/lib/order-lifecycle.test.ts'], ['mobile-api', 'tests/mobile-api.test.ts']]) {
-    const outfile = `dist/tests/${name}.mjs`;
-    await build({ entryPoints: [entry], outfile, bundle: true, platform: 'node', format: 'esm' });
-    const result = spawnSync(process.execPath, ['--test', outfile], { stdio: 'inherit' });
+  for (const [name, entry] of [
+    ["dashboard-sections", "src/lib/dashboard-sections.test.ts"],
+    ["order-lifecycle", "src/lib/order-lifecycle.test.ts"],
+    ["mobile-api", "tests/mobile-api.test.ts"],
+    ["commerce-policy", "src/lib/commerce-policy.test.ts"],
+    ["availability", "src/lib/restaurant-availability.test.ts"],
+    ["platform", "tests/platform.test.ts"],
+  ]) {
+    const outfile = path.join(outputDirectory, `${name}.mjs`);
+    await build({
+      entryPoints: [entry],
+      outfile,
+      bundle: true,
+      platform: "node",
+      format: "esm",
+      external: [
+        "@electric-sql/pglite",
+        "stripe",
+        "express",
+        "pg",
+        "cors",
+        "pino",
+        "pino-http",
+        "http-proxy-middleware",
+        "@clerk/shared/*",
+        "firebase-admin/*",
+      ],
+      plugins:
+        name === "platform"
+          ? [
+              {
+                name: "test-only-services",
+                setup(b) {
+                  b.onResolve({ filter: /^@workspace\/db$/ }, () => ({
+                    path: path.resolve("tests/database.ts"),
+                  }));
+                  b.onResolve({ filter: /^@clerk\/express$/ }, () => ({
+                    path: path.resolve("tests/clerk.ts"),
+                  }));
+                },
+              },
+            ]
+          : [],
+    });
+    const result = spawnSync(process.execPath, ["--test", outfile], {
+      stdio: "inherit",
+      timeout: 120000,
+      killSignal: "SIGKILL",
+      env: { ...process.env, LOG_LEVEL: "silent", NODE_ENV: "test" },
+    });
     if (result.status !== 0) process.exitCode = 1;
   }
-} finally { await rm('dist/tests', { recursive: true, force: true }); }
+} finally {
+  await rm(outputDirectory, { recursive: true, force: true });
+}

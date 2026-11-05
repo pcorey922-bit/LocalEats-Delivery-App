@@ -164,3 +164,5 @@ overrides:
 allowBuilds:
   '@clerk/shared': false
   esbuild: true
+  '@firebase/util': false
+  protobufjs: false

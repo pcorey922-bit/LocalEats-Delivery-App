@@ -1,3 +1,5 @@
+import { NotificationsPage, EarningsPage, OperationsCommerce, DeletionRequest } from './pages/commerce-pages';
+import { MobileLifecycle, unregisterPush } from './lib/mobile';
 import { useState } from 'react';
 import { ArrowDown, ArrowRight, Menu, X, UserRound, Store, Bike, MapPin, ShieldCheck, LogOut, CircleAlert, UtensilsCrossed, RefreshCw } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useRef } from 'react';
@@ -296,7 +298,7 @@ function PortalHeader({ active }: { active: 'dashboard' | 'account' }) {
     <nav className="portal-nav" aria-label="Account navigation" data-testid="nav-account">
       <a className={active === 'dashboard' ? 'portal-nav-current' : ''} href={`${basePath}/dashboard`} data-testid="link-dashboard">Dashboard</a>
       <a className={active === 'account' ? 'portal-nav-current' : ''} href={`${basePath}/account`} data-testid="link-account">Account</a>
-      <button type="button" onClick={() => signOut({ redirectUrl: basePath || '/' })} data-testid="button-logout"><LogOut size={14} /> Log out</button>
+      <button type="button" onClick={async () => { await unregisterPush().catch(()=>{}); await signOut({ redirectUrl: basePath || '/' }); }} data-testid="button-logout"><LogOut size={14} /> Log out</button>
     </nav>
   </header>;
 }
@@ -449,6 +451,10 @@ function Router() {
     <Route path="/cart" component={() => <Protected><CartPage /></Protected>} />
     <Route path="/orders" component={() => <Protected><OrdersPage /></Protected>} />
     <Route path="/restaurant" component={() => <Protected><RestaurantPage /></Protected>} />
+    <Route path="/account/delete" component={() => <Protected><DeletionRequest /></Protected>} />
+    <Route path="/notifications" component={() => <Protected><NotificationsPage /></Protected>} />
+    <Route path="/earnings" component={() => <Protected><EarningsPage /></Protected>} />
+    <Route path="/operations" component={() => <Protected><OperationsCommerce /></Protected>} />
     <Route path="/driver" component={() => <Protected><DriverPage /></Protected>} />
     <Route path="/admin" component={() => <Protected><AdminPage /></Protected>} />
     <Route path="/sign-in/*?" component={SignInPage} />
@@ -496,7 +502,7 @@ function ClerkRoutes() {
   return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`}
     localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your RoCoEats account' } }, signUp: { start: { title: 'Find your place here', subtitle: 'Create your RoCoEats account' } } }}
     routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}>
-    <ApiAuthentication /><ClerkQueryClientCacheInvalidator /><Router />
+    <ApiAuthentication /><MobileLifecycle /><ClerkQueryClientCacheInvalidator /><Router />
   </ClerkProvider>;
 }
 

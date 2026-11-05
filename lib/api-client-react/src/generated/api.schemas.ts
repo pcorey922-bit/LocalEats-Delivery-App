@@ -356,6 +356,13 @@ export interface PlaceOrderInput {
   restaurantId: string;
   addressId: string;
   /**
+     * @minimum 0
+     * @maximum 100000
+     */
+  tipCents?: number;
+  /** @minimum 1 */
+  expectedTotalCents?: number;
+  /**
      * @minItems 1
      * @maxItems 50
      */

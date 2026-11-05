@@ -1,0 +1,49 @@
+name: Native compile validation (unsigned)
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @workspace/localeats mobile:sync
+      - run: ./gradlew assembleDebug --no-daemon
+        working-directory: artifacts/localeats/android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RoCoEats-Android-debug-unconfigured
+          path: artifacts/localeats/android/app/build/outputs/apk/debug/app-debug.apk
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: xcodebuild -version
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @workspace/localeats mobile:sync
+      - run: xcodebuild -project App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+        working-directory: artifacts/localeats/ios
+      - run: ditto -c -k --keepParent artifacts/localeats/ios/build/Build/Products/Debug-iphonesimulator/App.app "$RUNNER_TEMP/RoCoEats-iOS-simulator.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RoCoEats-iOS-simulator-unconfigured
+          path: ${{ runner.temp }}/RoCoEats-iOS-simulator.zip

@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type ErrorRequestHandler } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
@@ -11,6 +11,9 @@ import {
   getClerkProxyHost,
 } from "./middlewares/clerkProxyMiddleware";
 
+import { stripeWebhook } from "./routes/payment-webhook";
+import { CommerceError } from "./lib/commerce-policy";
+import { ZodError } from "zod";
 const app: Express = express();
 
 app.use(
@@ -35,9 +38,22 @@ app.use(
 
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
-const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean);
-app.use(cors({ credentials: true, origin: process.env.NODE_ENV === 'production' ? allowedOrigins : true }));
-app.use(express.json());
+const allowedOrigins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+app.use(
+  cors({
+    credentials: true,
+    origin: process.env.NODE_ENV === "production" ? allowedOrigins : true,
+  }),
+);
+app.post(
+  "/api/webhooks/stripe",
+  express.raw({ type: "application/json", limit: "256kb" }),
+  stripeWebhook,
+);
+app.use(express.json({ limit: "256kb" }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use(
@@ -50,6 +66,57 @@ app.use(
   })),
 );
 
+app.use("/api", (req, res, next) => {
+  if (
+    !["GET", "HEAD", "OPTIONS"].includes(req.method) &&
+    req.headers.cookie &&
+    !req.headers.authorization
+  ) {
+    const origin = req.get("origin");
+    const trusted = new Set(
+      [
+        ...allowedOrigins,
+        process.env.PUBLIC_APP_URL,
+        `${req.protocol}://${req.get("host")}`,
+      ].filter(Boolean),
+    );
+    if (!origin || !trusted.has(origin)) {
+      res.status(403).json({ error: "Untrusted request origin" });
+      return;
+    }
+  }
+  next();
+});
 app.use("/api", router);
 
+const errors: ErrorRequestHandler = (error, _req, res, _next) => {
+  if (error instanceof CommerceError) {
+    res.status(error.status).json({ error: error.message });
+    return;
+  }
+  if (error instanceof ZodError) {
+    res.status(400).json({
+      error: "Review the supplied fields",
+      issues: error.issues.map((issue) => ({
+        path: issue.path,
+        message: issue.message,
+      })),
+    });
+    return;
+  }
+  if (error?.type === "entity.parse.failed") {
+    res.status(400).json({ error: "Invalid JSON body" });
+    return;
+  }
+  if (error?.type === "entity.too.large") {
+    res.status(413).json({ error: "Request body is too large" });
+    return;
+  }
+  // Never return provider payloads, SQL errors, tokens, or stack traces.
+  logger.error({ errorType: error?.name ?? "Error" }, "Request failed");
+  res.status(500).json({
+    error: "The request could not be completed. Retry or contact support.",
+  });
+};
+app.use(errors);
 export default app;

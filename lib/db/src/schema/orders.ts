@@ -1,5 +1,5 @@
 import { createInsertSchema } from "drizzle-zod";
-import { index, integer, jsonb, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, timestamp, uuid, text } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 import { orderStatusEnum } from "./enums";
 import { addressesTable } from "./addresses";
@@ -12,6 +12,9 @@ export const ordersTable = pgTable("orders", {
   restaurantId: uuid("restaurant_id").notNull().references(() => restaurantsTable.id, { onDelete: "restrict" }),
   deliveryAddressId: uuid("delivery_address_id").references(() => addressesTable.id, { onDelete: "set null" }),
   addressSnapshot: jsonb("address_snapshot").$type<Record<string, string | null>>(),
+  requestKey: text("request_key").unique(),
+  requestHash: text("request_hash"),
+  pricingSnapshot: jsonb("pricing_snapshot").$type<{ restaurantCommissionBps: number; driverShareBps: number; taxBps: number; testMode: true }>(),
   status: orderStatusEnum("status").notNull().default("pending"),
   subtotalCents: integer("subtotal_cents").notNull(),
   deliveryFeeCents: integer("delivery_fee_cents").notNull().default(0),

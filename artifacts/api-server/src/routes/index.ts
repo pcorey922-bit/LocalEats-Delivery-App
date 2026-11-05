@@ -8,9 +8,12 @@ import ordersRouter from "./orders";
 import adminRouter from "./admin";
 import driversRouter from "./drivers";
 
+import commerceRouter from "./commerce";
+
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(commerceRouter);
 router.use(profilesRouter);
 router.use(dashboardRouter);
 router.use(restaurantsRouter);

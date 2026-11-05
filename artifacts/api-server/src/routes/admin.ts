@@ -1,3 +1,4 @@
+import { paymentMode } from "../lib/commerce-policy";
 import { and, count, desc, eq, inArray, sum } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
@@ -311,7 +312,7 @@ router.get("/admin/finance", requireAuth, async (req, res): Promise<void> => {
   const cents = (value: string | null | undefined) => Number(value ?? 0);
   res.json(
     GetAdminFinanceResponse.parse({
-      paymentProviderConnected: false,
+      paymentProviderConnected: paymentMode() !== "disabled",
       succeededPaymentCount: Number(succeeded[0]?.count ?? 0),
       succeededPaymentCents: cents(succeeded[0]?.amount),
       pendingPaymentCount: Number(pending[0]?.count ?? 0),

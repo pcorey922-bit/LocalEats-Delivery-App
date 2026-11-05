@@ -59,3 +59,9 @@ Thumbs.db
 **/android/local.properties
 **/android/**/build/
 **/ios/App/Pods/
+
+**/google-services.json
+**/GoogleService-Info.plist
+*.p8
+
+**/ios/build/

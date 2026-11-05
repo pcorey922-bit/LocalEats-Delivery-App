@@ -1,4 +1,20 @@
 import app from "./app";
+import { drainPushBatch } from "./lib/push";
+import { paymentMode } from "./lib/commerce-policy";
+paymentMode(); // Refuse live payment keys at startup.
+let pushRunning = false;
+const pushTimer = setInterval(async () => {
+  if (pushRunning) return;
+  pushRunning = true;
+  try {
+    await drainPushBatch();
+  } catch {
+    logger.warn("Notification worker deferred");
+  } finally {
+    pushRunning = false;
+  }
+}, 15000);
+pushTimer.unref();
 import { logger } from "./lib/logger";
 
 const rawPort = process.env["PORT"];

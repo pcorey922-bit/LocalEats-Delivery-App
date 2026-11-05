@@ -1,5 +1,5 @@
 import { createInsertSchema } from "drizzle-zod";
-import { index, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 import { restaurantStatusEnum } from "./enums";
 import { profilesTable } from "./profiles";
@@ -15,6 +15,7 @@ export const restaurantsTable = pgTable("restaurants", {
   city: varchar("city", { length: 100 }).notNull(),
   region: varchar("region", { length: 80 }).notNull().default("Tennessee"),
   postalCode: varchar("postal_code", { length: 20 }).notNull(),
+  acceptingOrders: boolean("accepting_orders").notNull().default(false),
   status: restaurantStatusEnum("status").notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
