@@ -1,3 +1,4 @@
+import { DriverAvailability, DriverLocationControl } from './delivery-tracking';
 import { useEffect, useState, type FormEvent } from 'react';
 import { unregisterPush } from '../lib/mobile';
 import { CommerceBanner, OrderActions, CheckoutPanel, RestaurantAvailability } from './commerce-pages';
@@ -187,11 +188,12 @@ export function DriverPage() {
     {d.deliveryAddress && <><p>Deliver to: {d.deliveryAddress.street1} {d.deliveryAddress.street2}, {d.deliveryAddress.city}, {d.deliveryAddress.region} {d.deliveryAddress.postalCode}</p><p>{d.deliveryAddress.deliveryInstructions}</p></>}
     <a className="roco-button" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(d.status==='picked_up'&&d.deliveryAddress?`${d.deliveryAddress.street1}, ${d.deliveryAddress.city}, ${d.deliveryAddress.region} ${d.deliveryAddress.postalCode}`:`${d.pickupStreet}, ${d.pickupCity}, TN`)}`} target="_blank" rel="noreferrer">Open directions</a>
     {d.status==='assigned'&&<button className="roco-button" disabled={update.isPending} onClick={()=>{if(window.confirm('Release this delivery before pickup?'))update.mutate({orderId:d.orderId,action:'release'});}}>Release delivery</button>}
+    {!offer&&['assigned','picked_up'].includes(d.status)&&<DriverLocationControl orderId={d.orderId}/>}
     {(offer || (d.status === 'assigned' && d.orderStatus === 'ready_for_pickup') || (d.status === 'picked_up' && d.orderStatus === 'out_for_delivery')) && <button className="roco-button primary" disabled={update.isPending} onClick={() => update.mutate({ orderId: d.orderId, action: offer ? 'claim' : d.status === 'assigned' ? 'pickup' : 'deliver' })}>{offer ? 'Claim delivery' : d.status === 'assigned' ? 'Confirm pickup' : 'Confirm delivered'}</button>}
   </article>;
   return <Shell><main className="roco-main"><PageIntro eyebrow="Driver" title="Local deliveries.">Paid orders ready for pickup appear here. Customer addresses are available after you claim a delivery.</PageIntro>
     {update.isError && <p className="roco-alert" role="alert">{update.error.message}</p>}
-    <h2>My deliveries</h2>{deliveries.isPending ? <Loading/> : deliveries.isError ? <LoadError retry={() => void deliveries.refetch()} message={deliveries.error.message}/> : <div className="roco-list">{deliveries.data?.length ? deliveries.data.map(d => card(d, false)) : <p>No assigned deliveries.</p>}</div>}
+    <DriverAvailability/><h2>My deliveries</h2>{deliveries.isPending ? <Loading/> : deliveries.isError ? <LoadError retry={() => void deliveries.refetch()} message={deliveries.error.message}/> : <div className="roco-list">{deliveries.data?.length ? deliveries.data.map(d => card(d, false)) : <p>No assigned deliveries.</p>}</div>}
     <h2>Available offers</h2>{offers.isPending ? <Loading/> : offers.isError ? <LoadError retry={() => void offers.refetch()} message={offers.error.message}/> : <div className="roco-list">{offers.data?.length ? offers.data.map(d => card(d, true)) : <p>No paid deliveries available right now.</p>}</div>}
   </main></Shell>;
 }

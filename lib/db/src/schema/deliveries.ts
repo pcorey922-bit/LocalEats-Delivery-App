@@ -1,5 +1,6 @@
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
-import { integer, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, pgTable, timestamp, uuid, uniqueIndex } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 import { deliveryStatusEnum } from "./enums";
 import { ordersTable } from "./orders";
@@ -17,7 +18,7 @@ export const deliveriesTable = pgTable("deliveries", {
   deliveredAt: timestamp("delivered_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, t=>[uniqueIndex("deliveries_one_active_per_driver").on(t.driverProfileId).where(sql`${t.status} in ('assigned','picked_up')`)]);
 
 export const insertDeliverySchema = createInsertSchema(deliveriesTable).omit({
   id: true,

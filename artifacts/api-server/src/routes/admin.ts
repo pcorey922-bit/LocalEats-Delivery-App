@@ -298,7 +298,7 @@ router.get("/admin/finance", requireAuth, async (req, res): Promise<void> => {
     db
       .select({ amount: sum(payoutsTable.amountCents) })
       .from(payoutsTable)
-      .where(eq(payoutsTable.status, "paid")),
+      .where(inArray(payoutsTable.status, ["paid","reversal_pending"])),
     db
       .select({ amount: sum(payoutsTable.amountCents) })
       .from(payoutsTable)

@@ -1,6 +1,7 @@
 import { CommerceError } from "../lib/commerce-policy";
 import { notifyOrder, createEarnings, audit } from "../lib/commerce";
-import { and, eq, isNull, desc } from "drizzle-orm";
+import { driverDispatchState, presenceFreshMs } from "./dispatch";
+import { and, eq, isNull, desc, inArray } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import {
   db,
@@ -9,6 +10,9 @@ import {
   orderEventsTable,
   paymentsTable,
   restaurantsTable,
+  profilesTable,
+  driverPresenceTable,
+  deliveryLocationsTable,
 } from "@workspace/db";
 import { getActiveProfile, requireRole } from "../lib/current-profile";
 import { requireAuth } from "../middlewares/require-auth";
@@ -25,6 +29,13 @@ router.get("/driver/offers", requireAuth, async (req, res): Promise<void> => {
       403,
       "Driver approval is required before accessing deliveries",
     );
+  const state = await driverDispatchState(profile.id);
+  if (!state.online)
+    throw new CommerceError(409, "Go online to receive delivery offers");
+  if (state.activeOrderId) {
+    res.json([]);
+    return;
+  }
   const offers = await db
     .select({
       orderId: ordersTable.id,
@@ -115,6 +126,47 @@ router.post(
       return;
     }
     const claimed = await db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(profilesTable)
+        .where(eq(profilesTable.id, profile.id))
+        .for("update")
+        .limit(1);
+      if (
+        !current?.driverApproved ||
+        !current.isActive ||
+        current.role !== "driver"
+      )
+        throw new CommerceError(403, "Driver approval is required");
+      const [presence] = await tx
+        .select()
+        .from(driverPresenceTable)
+        .where(eq(driverPresenceTable.profileId, profile.id))
+        .limit(1);
+      if (
+        !presence?.available ||
+        Date.now() - presence.heartbeatAt.getTime() > presenceFreshMs
+      )
+        throw new CommerceError(409, "Go online before claiming a delivery");
+      const [active] = await tx
+        .select()
+        .from(deliveriesTable)
+        .where(
+          and(
+            eq(deliveriesTable.driverProfileId, profile.id),
+            inArray(deliveriesTable.status, ["assigned", "picked_up"]),
+          ),
+        )
+        .limit(1);
+      if (active) {
+        if (active.orderId === orderId && active.status === "assigned")
+          return true;
+        throw new CommerceError(
+          409,
+          "Finish or release the current delivery before claiming another",
+        );
+      }
+
       await tx
         .select()
         .from(ordersTable)
@@ -328,7 +380,12 @@ router.post(
         toStatus: toOrder,
         note: "Driver delivery update",
       });
-      if (action === "deliver") await createEarnings(tx, orderId);
+      if (action === "deliver") {
+        await createEarnings(tx, orderId);
+        await tx
+          .delete(deliveryLocationsTable)
+          .where(eq(deliveryLocationsTable.deliveryId, delivery.id));
+      }
       await notifyOrder(
         tx,
         orderId,

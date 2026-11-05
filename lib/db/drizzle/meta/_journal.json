@@ -29,6 +29,27 @@
       "when": 1793862936442,
       "tag": "0003_payout_reversal_states",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793867542192,
+      "tag": "0004_durable_finance_and_dispatch",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793867991253,
+      "tag": "0005_durable_webhook_inbox",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793868076972,
+      "tag": "0006_settlement_recovery_state",
+      "breakpoints": true
     }
   ]
 }

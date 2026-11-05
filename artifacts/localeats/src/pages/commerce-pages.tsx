@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from "react";
+import { OrderTracking, DispatchOperations } from "./delivery-tracking";
+import { useEffect, useState, type FormEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
@@ -27,7 +28,7 @@ export type CommerceConfig = {
   mode: "sandbox" | "stripe_test" | "disabled";
   testMode: true;
   liveChargesEnabled: false;
-  pricing: Pricing;
+  pricing: Pricing | null;
   taxNotice: string;
 };
 export function useCommerce() {
@@ -72,71 +73,74 @@ export function CommerceBanner() {
 }
 export function CheckoutPanel({
   orderId,
-  onDone,
 }: {
   orderId: string;
   onDone?: () => void;
 }) {
-  const client = useQueryClient();
-  const [sandbox, setSandbox] = useState(false);
+  const [operationId, setOperationId] = useState<string | null>(null);
   const checkout = useMutation({
     mutationFn: () =>
-      customFetch<{ url: string | null; mode: string }>(
+      customFetch<{ mode: string; operationId: string; url: string | null }>(
         `/api/orders/${orderId}/checkout`,
         { method: "POST" },
       ),
-    onSuccess: async (result) => {
-      if (result.url) await openExternal(result.url);
-      else setSandbox(result.mode === "sandbox");
+    onSuccess: (result) => {
+      setOperationId(result.operationId);
     },
   });
-  const pay = useMutation({
-    mutationFn: (outcome: "succeeded" | "declined") =>
-      customFetch(`/api/orders/${orderId}/sandbox-payment`, {
-        method: "POST",
-        body: JSON.stringify({ outcome }),
-      }),
-    onSuccess: () => {
-      setSandbox(false);
-      void client.invalidateQueries({ queryKey: getListMyOrdersQueryKey() });
-      void client.invalidateQueries({ queryKey: ["payment", orderId] });
-      onDone?.();
-    },
+  const operations = useQuery({
+    queryKey: ["financial-operations", orderId],
+    queryFn: () =>
+      customFetch<
+        Array<{
+          id: string;
+          state: string;
+          result: { url?: string | null } | null;
+          errorCode: string | null;
+        }>
+      >(`/api/orders/${orderId}/financial-operations`),
+    enabled: Boolean(operationId),
+    refetchInterval: 2000,
   });
+  const operation = operations.data?.find((op) => op.id === operationId);
+  const url = operation?.state === "succeeded" ? operation.result?.url : null;
+  const waiting = Boolean(
+    operationId &&
+    (!operation ||
+      ["queued", "processing", "pending"].includes(operation.state)),
+  );
   return (
-    <div>
+    <section aria-label="Secure payment">
       <button
         className="roco-button primary"
-        disabled={checkout.isPending}
+        disabled={checkout.isPending || waiting}
         onClick={() => checkout.mutate()}
       >
-        Continue to test payment
+        {waiting ? "Preparing secure checkout…" : "Prepare secure test payment"}
       </button>
       <ErrorText error={checkout.error} />
-      {sandbox && (
-        <div className="roco-notice">
-          <p>
-            Local payment simulation. No card information or real money is
-            involved.
-          </p>
-          <button
-            className="roco-button primary"
-            disabled={pay.isPending}
-            onClick={() => pay.mutate("succeeded")}
-          >
-            Simulate successful payment
-          </button>{" "}
-          <button
-            className="roco-button"
-            disabled={pay.isPending}
-            onClick={() => pay.mutate("declined")}
-          >
-            Simulate declined card
-          </button>
-        </div>
+      <ErrorText error={operations.error} />
+      {waiting && (
+        <p role="status">
+          Your checkout request is saved. You can safely refresh if the
+          connection drops.
+        </p>
       )}
-      <ErrorText error={pay.error} />
-    </div>
+      {url && (
+        <button
+          className="roco-button primary"
+          onClick={() => void openExternal(url)}
+        >
+          Open Stripe test checkout
+        </button>
+      )}
+      {operation && ["failed", "reconciliation"].includes(operation.state) && (
+        <p className="roco-alert" role="alert">
+          Payment setup needs support review. Reference: {operation.id}. No
+          payment confirmation has been received.
+        </p>
+      )}
+    </section>
   );
 }
 export function OrderActions({ order }: { order: Order }) {
@@ -204,6 +208,9 @@ export function OrderActions({ order }: { order: Order }) {
           <p>
             {order.deliveryAddress.street1}, {order.deliveryAddress.city}
           </p>
+          {["ready_for_pickup", "out_for_delivery"].includes(order.status) && (
+            <OrderTracking orderId={order.id} />
+          )}
           <ol>
             {order.events.map((event) => (
               <li key={event.id}>
@@ -420,16 +427,6 @@ export function OperationsCommerce() {
         <h1>Administrator access required</h1>
       </main>
     );
-  const savePricing = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    try {
-      const value = JSON.parse(String(data.get("pricing")));
-      change.mutate({ path: "/api/admin/pricing", method: "PUT", data: value });
-    } catch {
-      setError("Enter valid pricing JSON.");
-    }
-  };
   return (
     <main className="roco-main">
       <Link href="/admin">← Operations overview</Link>
@@ -444,6 +441,8 @@ export function OperationsCommerce() {
       <ErrorText error={payouts.error} />
       <ErrorText error={refunds.error} />
       <ErrorText error={drivers.error} />
+      <FinancialOperations />
+      <DispatchOperations />
       <h2>Driver approval</h2>
       {drivers.data?.map((d) => (
         <article className="roco-card" key={d.id}>
@@ -522,25 +521,7 @@ export function OperationsCommerce() {
           )}
         </article>
       ))}
-      <h2>Illustrative test pricing</h2>
-      <p>
-        Amounts are cents and rates are basis points (100 basis points = 1%).
-        These settings are not approved production rates.
-      </p>
-      {config.data && (
-        <form onSubmit={savePricing}>
-          <textarea
-            aria-label="Test pricing settings JSON"
-            name="pricing"
-            className="roco-textarea"
-            rows={15}
-            defaultValue={JSON.stringify(config.data.pricing, null, 2)}
-          />
-          <button className="roco-button primary" disabled={change.isPending}>
-            Save test pricing
-          </button>
-        </form>
-      )}
+      <PricingSettings current={config.data?.pricing ?? null} />
     </main>
   );
 }
@@ -557,9 +538,7 @@ function PushEnrollment() {
         Enable mobile push notifications
       </button>
       <p>
-        {enroll.isSuccess
-          ? "Device registered for test push updates."
-          : ""}
+        {enroll.isSuccess ? "Device registered for test push updates." : ""}
       </p>
       <ErrorText error={enroll.error} />
     </div>
@@ -701,6 +680,161 @@ export function DeletionRequest() {
       </button>
       <ErrorText error={request.error} />
       {request.isSuccess && <p>{request.data.message}</p>}
+    </section>
+  );
+}
+
+function FinancialOperations() {
+  const query = useQuery({
+    queryKey: ["admin-financial-operations"],
+    queryFn: () =>
+      customFetch<
+        Array<{
+          id: string;
+          orderId: string;
+          kind: string;
+          state: string;
+          attempts: number;
+          errorCode: string | null;
+        }>
+      >("/api/admin/financial-operations"),
+    refetchInterval: 5000,
+  });
+  return (
+    <section>
+      <h2>Financial recovery queue</h2>
+      <p>
+        Provider outcomes are confirmed separately from requests. Reconciliation
+        items require review before another monetary operation is attempted.
+      </p>
+      <ErrorText error={query.error} />
+      {query.data
+        ?.filter((op) => !["succeeded", "cancelled"].includes(op.state))
+        .map((op) => (
+          <article key={op.id} className="roco-card">
+            <h3>
+              {op.kind} · {op.state}
+            </h3>
+            <p>{op.id}</p>
+            <p>
+              Attempts: {op.attempts} ·{" "}
+              {op.errorCode ?? "Awaiting provider confirmation"}
+            </p>
+          </article>
+        ))}
+    </section>
+  );
+}
+
+function PricingSettings({ current }: { current: Pricing | null }) {
+  const client = useQueryClient();
+  const save = useMutation({
+    mutationFn: (policy: Pricing) =>
+      customFetch("/api/admin/pricing", {
+        method: "PUT",
+        body: JSON.stringify(policy),
+      }),
+    onSuccess: () =>
+      void client.invalidateQueries({ queryKey: ["commerce-config"] }),
+  });
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const rate = (key: string) => Math.round(Number(form.get(key)) * 100);
+    save.mutate({
+      deliveryFeeCents: rate("delivery"),
+      serviceFeeBps: rate("service"),
+      taxBps: rate("tax"),
+      restaurantCommissionBps: rate("commission"),
+      driverShareBps: rate("driver"),
+      taxDeliveryAndService: form.get("taxBase") === "all",
+      allowedPostalCodes: String(form.get("zips"))
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean),
+      testMode: true,
+    });
+  };
+  return (
+    <section className="roco-card">
+      <h2>Pricing and service policy</h2>
+      <p>
+        No orders can be quoted until these settings are saved. Tax entries must
+        come from your approved tax configuration; test mode does not establish
+        the correct tax rate.
+      </p>
+      <form
+        onSubmit={submit}
+        key={JSON.stringify(current)}
+        className="roco-form-grid"
+      >
+        {(
+          [
+            ["delivery", "Delivery fee ($)", current?.deliveryFeeCents, 100],
+            ["service", "Service fee (%)", current?.serviceFeeBps, 30],
+            ["tax", "Configured tax rate (%)", current?.taxBps, 30],
+            [
+              "commission",
+              "Restaurant commission (%)",
+              current?.restaurantCommissionBps,
+              30,
+            ],
+            [
+              "driver",
+              "Driver share of delivery fee (%)",
+              current?.driverShareBps,
+              100,
+            ],
+          ] as const
+        ).map(([name, label, value, max]) => (
+          <label className="roco-field" key={name}>
+            {label}
+            <input
+              className="roco-input"
+              type="number"
+              name={name}
+              min="0"
+              max={max}
+              step="0.01"
+              required
+              defaultValue={value === undefined ? "" : value / 100}
+            />
+          </label>
+        ))}
+        <label className="roco-field">
+          Taxable charges
+          <select
+            className="roco-select"
+            name="taxBase"
+            required
+            defaultValue={
+              current ? (current.taxDeliveryAndService ? "all" : "food") : ""
+            }
+          >
+            <option value="">Choose the approved tax base</option>
+            <option value="food">Food subtotal</option>
+            <option value="all">Food, delivery and service fees</option>
+          </select>
+        </label>
+        <label className="roco-field full">
+          Delivery ZIP codes, separated by commas
+          <input
+            className="roco-input"
+            name="zips"
+            required
+            defaultValue={current?.allowedPostalCodes.join(", ") ?? ""}
+          />
+        </label>
+        <button className="roco-button primary" disabled={save.isPending}>
+          Save pricing policy for provider testing
+        </button>
+      </form>
+      <ErrorText error={save.error} />
+      {save.isSuccess && (
+        <p role="status">
+          Policy saved. Existing orders retain their original pricing.
+        </p>
+      )}
     </section>
   );
 }

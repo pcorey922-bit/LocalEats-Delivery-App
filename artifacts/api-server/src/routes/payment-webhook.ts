@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Request, Response } from "express";
 import type Stripe from "stripe";
 import {
@@ -7,7 +7,10 @@ import {
   paymentsTable,
   providerEventsTable,
   refundsTable,
+  financialOperationsTable,
+  webhookInboxTable,
 } from "@workspace/db";
+import { queueSettlementRecovery } from "../lib/finance-queue";
 import { audit, notifyOrder, recordPayment } from "../lib/commerce";
 import { CommerceError } from "../lib/commerce-policy";
 import { stripeTest } from "../lib/payment-provider";
@@ -42,6 +45,39 @@ export async function processStripeEvent(event: Stripe.Event) {
         .where(eq(paymentsTable.orderId, orderId))
         .limit(1);
       if (
+        payment &&
+        !payment.checkoutSessionId &&
+        session.metadata?.operationId
+      ) {
+        const [operation] = await tx
+          .select()
+          .from(financialOperationsTable)
+          .where(eq(financialOperationsTable.id, session.metadata.operationId))
+          .limit(1);
+        if (
+          operation?.kind === "checkout" &&
+          operation.orderId === orderId &&
+          operation.firstAttemptAt &&
+          Number(operation.payload.attempt) === payment.checkoutAttempt
+        ) {
+          await tx
+            .update(paymentsTable)
+            .set({ checkoutSessionId: session.id })
+            .where(eq(paymentsTable.id, payment.id));
+          payment.checkoutSessionId = session.id;
+          await tx
+            .update(financialOperationsTable)
+            .set({
+              state: "succeeded",
+              result: { id: session.id, status: "complete", url: null },
+              completedAt: new Date(),
+              leaseToken: null,
+              leaseExpiresAt: null,
+            })
+            .where(eq(financialOperationsTable.id, operation.id));
+        }
+      }
+      if (
         payment?.checkoutSessionId !== session.id ||
         payment.provider !== "stripe_test" ||
         session.client_reference_id !== orderId
@@ -57,6 +93,45 @@ export async function processStripeEvent(event: Stripe.Event) {
         session.amount_total ?? -1,
         session.currency ?? "",
       );
+    } else if (event.type === "checkout.session.expired") {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const orderId = session.metadata?.orderId;
+      if (!orderId) return;
+      await tx
+        .select()
+        .from(ordersTable)
+        .where(eq(ordersTable.id, orderId))
+        .for("update");
+      const [payment] = await tx
+        .select()
+        .from(paymentsTable)
+        .where(eq(paymentsTable.orderId, orderId))
+        .limit(1);
+      if (
+        payment?.provider === "stripe_test" &&
+        payment.checkoutSessionId === session.id &&
+        payment.status === "pending"
+      ) {
+        await tx
+          .update(paymentsTable)
+          .set({ status: "failed" })
+          .where(eq(paymentsTable.id, payment.id));
+        await tx
+          .update(financialOperationsTable)
+          .set({
+            state: "succeeded",
+            result: { id: session.id, status: "expired", url: null },
+            leaseToken: null,
+            leaseExpiresAt: null,
+            completedAt: new Date(),
+          })
+          .where(
+            eq(
+              financialOperationsTable.id,
+              `checkout:${orderId}:${payment.checkoutAttempt}`,
+            ),
+          );
+      }
     } else if (event.type === "checkout.session.async_payment_failed") {
       const session = event.data.object as Stripe.Checkout.Session;
       const orderId = session.metadata?.orderId;
@@ -117,6 +192,29 @@ export async function processStripeEvent(event: Stripe.Event) {
         .where(eq(refundsTable.orderId, payment.orderId))
         .limit(1);
       if (
+        refund &&
+        !refund.providerRefundId &&
+        remote.metadata?.operationId === `refund:${payment.orderId}`
+      ) {
+        const [operation] = await tx
+          .select()
+          .from(financialOperationsTable)
+          .where(eq(financialOperationsTable.id, remote.metadata.operationId))
+          .limit(1);
+        if (
+          operation?.firstAttemptAt &&
+          operation.kind === "refund" &&
+          operation.orderId === payment.orderId &&
+          Number(operation.payload.amount) === remote.amount
+        ) {
+          await tx
+            .update(refundsTable)
+            .set({ providerRefundId: remote.id })
+            .where(eq(refundsTable.id, refund.id));
+          refund.providerRefundId = remote.id;
+        }
+      }
+      if (
         !refund ||
         refund.providerRefundId !== remote.id ||
         remote.amount !== payment.amountCents ||
@@ -141,6 +239,18 @@ export async function processStripeEvent(event: Stripe.Event) {
         .set({ status: remote.status ?? "pending" })
         .where(eq(refundsTable.id, refund.id));
       if (remote.status === "succeeded") {
+        await queueSettlementRecovery(tx, payment.orderId);
+        await tx
+          .update(financialOperationsTable)
+          .set({
+            state: "succeeded",
+            result: { id: remote.id, status: "succeeded" },
+            completedAt: new Date(),
+            leaseToken: null,
+            leaseExpiresAt: null,
+          })
+          .where(eq(financialOperationsTable.id, `refund:${payment.orderId}`));
+
         await tx
           .update(paymentsTable)
           .set({ status: "refunded" })
@@ -169,6 +279,15 @@ export async function stripeWebhook(req: Request, res: Response) {
   } catch {
     throw new CommerceError(400, "Invalid webhook signature");
   }
-  await processStripeEvent(event);
-  res.json({ received: true });
+  if (event.livemode)
+    throw new CommerceError(400, "Live webhook events are rejected");
+  await db
+    .insert(webhookInboxTable)
+    .values({
+      id: event.id,
+      eventType: event.type,
+      payload: event as unknown as Record<string, unknown>,
+    })
+    .onConflictDoNothing();
+  res.status(202).json({ received: true });
 }

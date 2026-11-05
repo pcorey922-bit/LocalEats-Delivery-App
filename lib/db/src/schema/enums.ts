@@ -50,6 +50,7 @@ export const payoutStatusEnum = pgEnum("payout_status", [
   "failed",
   "cancelled",
   "reversed",
+  "reversal_pending",
 ]);
 
 export const ratingSubjectTypeEnum = pgEnum("rating_subject_type", [

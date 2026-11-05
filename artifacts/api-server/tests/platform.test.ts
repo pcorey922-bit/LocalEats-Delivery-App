@@ -19,7 +19,15 @@ import {
   notificationsTable,
   payoutsTable,
   refundsTable,
+  platformSettingsTable,
+  financialOperationsTable,
+  driverPresenceTable,
+  deliveryLocationsTable,
+  webhookInboxTable,
 } from "./database";
+import { testPricing } from "../src/lib/testing/pricing";
+import { processWebhookInbox } from "../src/lib/webhook-worker";
+import { processFinancialOperation } from "../src/lib/financial-operations";
 const ids = {
   customer: randomUUID(),
   other: randomUUID(),
@@ -102,6 +110,9 @@ before(async () => {
     .filter((f) => f.endsWith(".sql"))
     .sort())
     await engine.exec(await readFile(`../../lib/db/drizzle/${file}`, "utf8"));
+  await db
+    .insert(platformSettingsTable)
+    .values({ settingKey: "test_pricing", value: testPricing });
   for (const role of [
     "customer",
     "other",
@@ -123,6 +134,8 @@ before(async () => {
             : role,
       driverApproved: role === "driver" || role === "driver2",
     });
+  for (const profileId of [ids.driver, ids.driver2, ids.unapproved])
+    await db.insert(driverPresenceTable).values({ profileId, available: true });
   await db.insert(restaurantsTable).values({
     id: ids.business,
     ownerProfileId: ids.restaurant,
@@ -651,7 +664,7 @@ test("real relational HTTP platform flows", { timeout: 30000 }, async (t) => {
       const stripe = new Stripe("sk_test_fixture");
       const send = async (event: any) => {
         const payload = JSON.stringify(event);
-        return fetch(`${origin}/api/webhooks/stripe`, {
+        const response = await fetch(`${origin}/api/webhooks/stripe`, {
           method: "POST",
           headers: {
             "content-type": "application/json",
@@ -662,6 +675,8 @@ test("real relational HTTP platform flows", { timeout: 30000 }, async (t) => {
           },
           body: payload,
         });
+        if (response.status === 202) await processWebhookInbox();
+        return response;
       };
       const event = {
         id: "evt_fixture",
@@ -700,7 +715,7 @@ test("real relational HTTP platform flows", { timeout: 30000 }, async (t) => {
             },
           })
         ).status,
-        200,
+        202,
       );
       const [beforePaid] = await db
         .select()
@@ -718,7 +733,7 @@ test("real relational HTTP platform flows", { timeout: 30000 }, async (t) => {
             },
           })
         ).status,
-        200,
+        202,
       );
       const [failedPayment] = await db
         .select()
@@ -734,14 +749,19 @@ test("real relational HTTP platform flows", { timeout: 30000 }, async (t) => {
             data: { object: { ...event.data.object, amount_total: 1 } },
           })
         ).status,
-        409,
+        202,
       );
+      const [mismatch] = await db
+        .select()
+        .from(webhookInboxTable)
+        .where(eq(webhookInboxTable.id, "evt_mismatch"));
+      assert.equal(mismatch.state, "reconciliation");
       assert.equal(
         (await send({ ...event, id: "evt_live", livemode: true })).status,
         400,
       );
-      assert.equal((await send(event)).status, 200);
-      assert.equal((await send(event)).status, 200);
+      assert.equal((await send(event)).status, 202);
+      assert.equal((await send(event)).status, 202);
       const [payment] = await db
         .select()
         .from(paymentsTable)
@@ -755,6 +775,208 @@ test("real relational HTTP platform flows", { timeout: 30000 }, async (t) => {
       assert.equal(unsigned.status, 400);
       process.env.PAYMENT_PROVIDER = "sandbox";
       delete process.env.STRIPE_SECRET_KEY;
+    },
+  );
+  await t.test(
+    "missing pricing fails closed instead of using example fees",
+    async () => {
+      await db
+        .delete(platformSettingsTable)
+        .where(eq(platformSettingsTable.settingKey, "test_pricing"));
+      try {
+        const config = await api("/commerce/config", null);
+        assert.equal(config.data.configurationRequired, true);
+        assert.equal(config.data.pricing, null);
+        assert.equal(
+          (await api("/orders/quote", ids.customer, "POST", input())).status,
+          503,
+        );
+      } finally {
+        await db
+          .insert(platformSettingsTable)
+          .values({ settingKey: "test_pricing", value: testPricing });
+      }
+    },
+  );
+  await t.test(
+    "one driver cannot claim simultaneous orders and stale GPS is rejected",
+    async () => {
+      const first = await create();
+      const second = await create();
+      await ready(first.id);
+      await ready(second.id);
+      const claims = await Promise.all([
+        api(`/driver/orders/${first.id}/claim`, ids.driver, "POST"),
+        api(`/driver/orders/${second.id}/claim`, ids.driver, "POST"),
+      ]);
+      assert.deepEqual(claims.map((r) => r.status).sort(), [201, 409]);
+      const active = claims[0].status === 201 ? first : second;
+      assert.equal(
+        (
+          await api(
+            `/driver/orders/${active.id}/location`,
+            ids.driver2,
+            "POST",
+            {
+              latitude: 35,
+              longitude: -84,
+              accuracyMeters: 10,
+              observedAt: new Date().toISOString(),
+            },
+          )
+        ).status,
+        403,
+      );
+      assert.equal(
+        (
+          await api(
+            `/driver/orders/${active.id}/location`,
+            ids.driver,
+            "POST",
+            {
+              latitude: 35,
+              longitude: -84,
+              accuracyMeters: 10,
+              observedAt: new Date(Date.now() - 300000).toISOString(),
+            },
+          )
+        ).status,
+        400,
+      );
+      assert.equal(
+        (
+          await api(
+            `/driver/orders/${active.id}/location`,
+            ids.driver,
+            "POST",
+            {
+              latitude: 35,
+              longitude: -84,
+              accuracyMeters: 10,
+              observedAt: new Date().toISOString(),
+            },
+          )
+        ).status,
+        202,
+      );
+      assert.equal(
+        (await api(`/orders/${active.id}/tracking`, ids.other)).status,
+        403,
+      );
+      assert.equal(
+        (await api(`/orders/${active.id}/tracking`, ids.customer)).data
+          .locationStatus,
+        "current",
+      );
+      await api(`/orders/${first.id}/cancel`, ids.admin, "POST", {
+        reason: "End dispatch concurrency check",
+      });
+      await api(`/orders/${second.id}/cancel`, ids.admin, "POST", {
+        reason: "End dispatch concurrency check",
+      });
+    },
+  );
+  await t.test(
+    "a provider timeout retains its operation and retries the same request",
+    async () => {
+      const order = await create();
+      await db
+        .update(paymentsTable)
+        .set({ provider: "stripe_test" })
+        .where(eq(paymentsTable.orderId, order.id));
+      process.env.PAYMENT_PROVIDER = "stripe_test";
+      process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
+      try {
+        const queued = await api(
+          `/orders/${order.id}/checkout`,
+          ids.customer,
+          "POST",
+        );
+        assert.equal(queued.status, 202);
+        const id = queued.data.operationId;
+        const receipts = new Map();
+        let calls = 0;
+        const provider = async (job: any) => {
+          assert.equal(job.id, id);
+          calls++;
+          if (!receipts.has(job.id))
+            receipts.set(job.id, {
+              id: "cs_recovered_fixture",
+              status: "open",
+              url: "https://checkout.stripe.com/test-fixture",
+            });
+          if (calls === 1)
+            throw new Error("Timeout after provider created session");
+          return receipts.get(job.id);
+        };
+        await processFinancialOperation(provider);
+        const [lost] = await db
+          .select()
+          .from(financialOperationsTable)
+          .where(eq(financialOperationsTable.id, id));
+        assert.equal(lost.state, "queued");
+        assert.ok(lost.firstAttemptAt);
+        assert.equal(lost.attempts, 1);
+        await db
+          .update(financialOperationsTable)
+          .set({ nextAttemptAt: new Date(0) })
+          .where(eq(financialOperationsTable.id, id));
+        await processFinancialOperation(provider);
+        const [recovered] = await db
+          .select()
+          .from(financialOperationsTable)
+          .where(eq(financialOperationsTable.id, id));
+        assert.equal(recovered.state, "succeeded");
+        assert.equal(recovered.attempts, 2);
+        assert.equal(receipts.size, 1);
+        const [payment] = await db
+          .select()
+          .from(paymentsTable)
+          .where(eq(paymentsTable.orderId, order.id));
+        assert.equal(payment.checkoutSessionId, "cs_recovered_fixture");
+        assert.equal(
+          payment.status,
+          "pending",
+          "Preparing checkout must not invent payment success",
+        );
+        assert.equal(
+          (await api(`/orders/${order.id}/financial-operations`, ids.other))
+            .status,
+          403,
+        );
+        await db
+          .update(financialOperationsTable)
+          .set({
+            state: "queued",
+            firstAttemptAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+            nextAttemptAt: new Date(0),
+          })
+          .where(eq(financialOperationsTable.id, id));
+        let unsafeCalls = 0;
+        await processFinancialOperation(async () => {
+          unsafeCalls++;
+          throw new Error("Must not call provider");
+        });
+        assert.equal(unsafeCalls, 0);
+        const [held] = await db
+          .select()
+          .from(financialOperationsTable)
+          .where(eq(financialOperationsTable.id, id));
+        assert.equal(held.state, "reconciliation");
+        assert.equal(
+          (
+            await api(
+              `/admin/financial-operations/${encodeURIComponent(id)}/reconcile`,
+              ids.customer,
+              "POST",
+            )
+          ).status,
+          403,
+        );
+      } finally {
+        process.env.PAYMENT_PROVIDER = "sandbox";
+        delete process.env.STRIPE_SECRET_KEY;
+      }
     },
   );
 });

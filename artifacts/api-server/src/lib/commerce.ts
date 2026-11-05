@@ -19,7 +19,6 @@ import {
   CommerceError,
   paymentMode,
   pricingSchema,
-  testPricing,
 } from "./commerce-policy";
 import {
   refundTestPayment,
@@ -29,6 +28,7 @@ import {
   stripeTest,
   transferTestEarnings,
 } from "./payment-provider";
+import { enqueueFinancialOperation } from "./finance-queue";
 export type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export async function readPricing(tx: Pick<Transaction, "select"> = db) {
@@ -37,7 +37,8 @@ export async function readPricing(tx: Pick<Transaction, "select"> = db) {
     .from(platformSettingsTable)
     .where(eq(platformSettingsTable.settingKey, "test_pricing"))
     .limit(1);
-  return setting ? pricingSchema.parse(setting.value) : testPricing;
+  if (!setting) throw new CommerceError(503, "Ordering is unavailable until operations configures pricing, tax settings, and service boundaries");
+  return pricingSchema.parse(setting.value);
 }
 export async function audit(
   tx: Transaction,
@@ -149,6 +150,7 @@ export async function recordPayment(
         reason: "Late payment on cancelled order",
       })
       .onConflictDoNothing();
+    if(payment.provider==='stripe_test')await enqueueFinancialOperation(tx,{id:`refund:${orderId}`,orderId,kind:'refund',resourceId:orderId,payload:{paymentId:providerId,amount,currency:'usd'}});
   }
   await audit(tx, null, "payment.succeeded", orderId, { providerId, amount });
   await notifyOrder(
@@ -203,6 +205,7 @@ export async function createEarnings(tx: Transaction, orderId: string) {
   }
 }
 export async function settlePayout(payoutId: string, actor: Profile) {
+  if(paymentMode()==='stripe_test')return (await import('./financial-operations')).requestProviderTransfer(payoutId,actor);
   const [initial] = await db
     .select()
     .from(payoutsTable)
@@ -300,6 +303,7 @@ export async function cancelOrRefundOrder(
   actor: Profile,
   reason: string,
 ) {
+  if(paymentMode()==='stripe_test')return (await import('./financial-operations')).requestProviderCancellation(orderId,actor,reason);
   return db.transaction(async (tx) => {
     const [order] = await tx
       .select()

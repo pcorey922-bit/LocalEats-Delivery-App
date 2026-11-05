@@ -1,10 +1,11 @@
+import { testPricing } from "./testing/pricing";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   allocateEarnings,
   calculatePrice,
   paymentMode,
-  testPricing,
+
 } from "./commerce-policy";
 test("fees, tax, and tip use integer cents and immutable allocation inputs", () => {
   const price = calculatePrice(1999, 300, {

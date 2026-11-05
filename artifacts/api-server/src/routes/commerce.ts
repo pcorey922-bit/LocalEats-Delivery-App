@@ -16,6 +16,7 @@ import {
   notificationDevicesTable,
   restaurantHoursTable,
   accountDeletionRequestsTable,
+  financialOperationsTable,
 } from "@workspace/db";
 import { getActiveProfile, requireRole } from "../lib/current-profile";
 import { requireAuth } from "../middlewares/require-auth";
@@ -57,19 +58,36 @@ async function ownedOrder(req: Request, res: Response) {
   return { profile, order };
 }
 router.get("/commerce/config", async (_req, res) => {
+  let pricing = null;
+  try {
+    pricing = await readPricing();
+  } catch (error) {
+    if (!(error instanceof CommerceError && error.status === 503)) throw error;
+  }
   res.json({
     mode: paymentMode(),
     testMode: true,
     liveChargesEnabled: false,
-    pricing: await readPricing(),
+    pricing,
+    configurationRequired: pricing === null,
     taxNotice:
-      "Illustrative test tax settings; production tax configuration has not been approved.",
+      "Pricing and tax policy must be explicitly configured. Provider test mode does not certify production tax accuracy.",
   });
 });
 router.post("/orders/:orderId/checkout", requireAuth, async (req, res) => {
   const owned = await ownedOrder(req, res);
   if (!owned) return;
   const mode = requirePaymentProvider();
+  if (mode === "stripe_test") {
+    res
+      .status(202)
+      .json(
+        await (
+          await import("../lib/financial-operations")
+        ).requestProviderCheckout(owned.order.id, owned.profile),
+      );
+    return;
+  }
   const result = await db.transaction(async (tx) => {
     const [order] = await tx
       .select()
@@ -102,24 +120,7 @@ router.post("/orders/:orderId/checkout", requireAuth, async (req, res) => {
     if (restaurant?.status !== "approved")
       throw new CommerceError(409, "Restaurant is no longer accepting orders");
     await ensureAccepting(restaurant, tx);
-    requireFreshOperation(payment.createdAt);
-    if (payment.checkoutSessionId && mode === "stripe_test") {
-      const session = await stripeTest().checkout.sessions.retrieve(
-        payment.checkoutSessionId,
-      );
-      if (session.status === "open")
-        return {
-          mode,
-          sessionId: session.id,
-          url: session.url,
-          testMode: true,
-        };
-      if (session.status === "complete" && payment.status !== "failed")
-        throw new CommerceError(
-          409,
-          "Payment is processing; wait for confirmation",
-        );
-    } else if (payment.checkoutSessionId)
+    if (payment.checkoutSessionId)
       return {
         mode,
         sessionId: payment.checkoutSessionId,
@@ -412,6 +413,71 @@ router.get("/admin/drivers", requireAuth, async (req, res) => {
       .limit(500),
   );
 });
+router.get(
+  "/orders/:orderId/financial-operations",
+  requireAuth,
+  async (req, res) => {
+    const owned = await ownedOrder(req, res);
+    if (!owned) return;
+    const rows = await db
+      .select({
+        id: financialOperationsTable.id,
+        kind: financialOperationsTable.kind,
+        state: financialOperationsTable.state,
+        attempts: financialOperationsTable.attempts,
+        errorCode: financialOperationsTable.errorCode,
+        result: financialOperationsTable.result,
+        createdAt: financialOperationsTable.createdAt,
+      })
+      .from(financialOperationsTable)
+      .where(eq(financialOperationsTable.orderId, owned.order.id))
+      .orderBy(desc(financialOperationsTable.createdAt))
+      .limit(30);
+    res.json(
+      rows.map((row) => ({
+        ...row,
+        result:
+          row.kind === "checkout" && owned.order.status !== "placed"
+            ? { ...row.result, url: null }
+            : row.result,
+      })),
+    );
+  },
+);
+router.post(
+  "/admin/financial-operations/:operationId/reconcile",
+  requireAuth,
+  async (req, res) => {
+    const profile = await getActiveProfile(req, res);
+    if (!profile || !requireRole(profile, ["admin"], res)) return;
+    const id = z.string().min(1).max(200).parse(req.params.operationId);
+    res.json(
+      await (
+        await import("../lib/financial-operations")
+      ).reconcileFinancialOperation(id, profile),
+    );
+  },
+);
+router.get("/admin/financial-operations", requireAuth, async (req, res) => {
+  const profile = await getActiveProfile(req, res);
+  if (!profile || !requireRole(profile, ["admin"], res)) return;
+  res.json(
+    await db
+      .select({
+        id: financialOperationsTable.id,
+        orderId: financialOperationsTable.orderId,
+        kind: financialOperationsTable.kind,
+        state: financialOperationsTable.state,
+        attempts: financialOperationsTable.attempts,
+        errorCode: financialOperationsTable.errorCode,
+        firstAttemptAt: financialOperationsTable.firstAttemptAt,
+        createdAt: financialOperationsTable.createdAt,
+      })
+      .from(financialOperationsTable)
+      .orderBy(desc(financialOperationsTable.createdAt))
+      .limit(200),
+  );
+});
 router.get("/notifications", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
   if (!profile) return;
@@ -562,7 +628,9 @@ router.post(
   async (req, res) => {
     const profile = await getActiveProfile(req, res);
     if (!profile || !requireRole(profile, ["admin"], res)) return;
-    res.json(await settlePayout(uuid.parse(req.params.payoutId), profile));
+    res
+      .status(paymentMode() === "stripe_test" ? 202 : 200)
+      .json(await settlePayout(uuid.parse(req.params.payoutId), profile));
   },
 );
 router.get("/admin/refunds", requireAuth, async (req, res) => {

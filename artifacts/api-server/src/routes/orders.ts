@@ -298,12 +298,7 @@ router.post(
         .values({
           requestKey,
           requestHash,
-          pricingSnapshot: {
-            restaurantCommissionBps: pricing.restaurantCommissionBps,
-            driverShareBps: pricing.driverShareBps,
-            taxBps: pricing.taxBps,
-            testMode: true,
-          },
+          pricingSnapshot: {...pricing},
           customerProfileId: profile.id,
           restaurantId: restaurant.id,
           deliveryAddressId: address.id,

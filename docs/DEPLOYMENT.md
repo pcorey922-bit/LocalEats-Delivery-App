@@ -1,3 +1,5 @@
+> Current hardening status and changed contracts: see [ENGINEERING_CHECKPOINT.md](ENGINEERING_CHECKPOINT.md). Interactive simulation and fallback business pricing are no longer supported.
+
 # RoCoEats test deployment and release preparation
 
 **Live charges are deliberately disabled in code. This branch is not approved for public launch.**

@@ -10,10 +10,12 @@ import driversRouter from "./drivers";
 
 import commerceRouter from "./commerce";
 
+import dispatchRouter from "./dispatch";
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(commerceRouter);
+router.use(dispatchRouter);
 router.use(profilesRouter);
 router.use(dashboardRouter);
 router.use(restaurantsRouter);

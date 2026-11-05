@@ -23,17 +23,6 @@ export const pricingSchema = z
   })
   .strict();
 export type Pricing = z.infer<typeof pricingSchema>;
-// Illustrative test configuration, not an approved tax rate or business policy.
-export const testPricing: Pricing = {
-  deliveryFeeCents: 499,
-  serviceFeeBps: 500,
-  taxBps: 0,
-  taxDeliveryAndService: false,
-  restaurantCommissionBps: 1000,
-  driverShareBps: 8000,
-  allowedPostalCodes: ["37854", "37748", "37763"],
-  testMode: true,
-};
 export function calculatePrice(
   subtotalCents: number,
   tipCents: number,
@@ -110,10 +99,10 @@ export function paymentMode(
     return "stripe_test";
   }
   if (env.PAYMENT_PROVIDER === "sandbox") {
-    if (env.NODE_ENV === "production")
+    if (env.NODE_ENV !== "test")
       throw new CommerceError(
         503,
-        "The local payment simulator is disabled in production",
+        "The local payment simulator is restricted to automated tests",
       );
     return "sandbox";
   }
