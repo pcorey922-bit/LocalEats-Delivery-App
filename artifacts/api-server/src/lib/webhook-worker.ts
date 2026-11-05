@@ -1,11 +1,14 @@
+import { databaseNow } from "./database-clock";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, lte, or } from "drizzle-orm";
 import type Stripe from "stripe";
 import { db, webhookInboxTable as inbox } from "@workspace/db";
 import { processStripeEvent } from "../routes/payment-webhook";
 import { CommerceError } from "./commerce-policy";
-export async function processWebhookInbox(process:typeof processStripeEvent=processStripeEvent) {
-  const now = new Date();
+export async function processWebhookInbox(
+  process: typeof processStripeEvent = processStripeEvent,
+) {
+  const now = await databaseNow();
   const job = await db.transaction(async (tx) => {
     const [row] = await tx
       .select()
@@ -26,7 +29,7 @@ export async function processWebhookInbox(process:typeof processStripeEvent=proc
         state: "processing",
         attempts: row.attempts + 1,
         leaseToken: randomUUID(),
-        leaseExpiresAt: new Date(Date.now() + 60000),
+        leaseExpiresAt: new Date(now.getTime() + 60000),
       })
       .where(eq(inbox.id, row.id))
       .returning();
@@ -56,7 +59,7 @@ export async function processWebhookInbox(process:typeof processStripeEvent=proc
               ? "dead_letter"
               : "received",
         nextAttemptAt: new Date(
-          Date.now() +
+          (await databaseNow()).getTime() +
             Math.min(3600000, 1000 * 2 ** Math.min(job.attempts, 12)),
         ),
         errorCode:

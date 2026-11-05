@@ -71,6 +71,13 @@
       "when": 1793870477503,
       "tag": "0009_immutable_operational_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793871661620,
+      "tag": "0010_push_device_recovery",
+      "breakpoints": true
     }
   ]
 }

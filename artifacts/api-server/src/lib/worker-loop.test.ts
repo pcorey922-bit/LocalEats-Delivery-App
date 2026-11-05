@@ -28,3 +28,33 @@ test("shutdown stops new claims and waits for current work", async () => {
   assert.equal(runs, 1);
   assert.equal(stopped, true);
 });
+test("long batches report completed progress without starting overlapping work", async () => {
+  let release!: () => void, started!: () => void;
+  let runs = 0,
+    pulses = 0;
+  const gate = new Promise<void>((r) => (release = r)),
+    began = new Promise<void>((r) => (started = r));
+  const loop = startWorkerLoop({
+    intervalMs: 5,
+    onError: () => {},
+    onSuccess: async () => {
+      pulses++;
+    },
+    run: async (_stopping, progress) => {
+      runs++;
+      await progress();
+      await progress();
+      started();
+      await gate;
+    },
+  });
+  await began;
+  await new Promise((r) => setTimeout(r, 15));
+  assert.equal(runs, 1);
+  assert.equal(pulses, 2);
+  const stopped = loop.stop();
+  release();
+  await stopped;
+  assert.equal(pulses, 3);
+  assert.equal(runs, 1);
+});

@@ -1,5 +1,7 @@
 import {
   boolean,
+  index,
+  check,
   integer,
   jsonb,
   pgTable,
@@ -9,6 +11,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { profilesTable } from "./profiles";
 import { ordersTable } from "./orders";
 
@@ -64,6 +67,7 @@ export const notificationsTable = pgTable(
       t.eventKey,
       t.profileId,
     ),
+    index("notifications_push_due_idx").on(t.pushState, t.pushNextAttemptAt),
   ],
 );
 export const providerEventsTable = pgTable("provider_events", {
@@ -94,6 +98,42 @@ export const notificationDevicesTable = pgTable("notification_devices", {
     .defaultNow()
     .notNull(),
 });
+
+export const pushDeliveriesTable = pgTable(
+  "push_deliveries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    notificationId: uuid("notification_id")
+      .notNull()
+      .references(() => notificationsTable.id),
+    // Retain the outcome after device removal, without retaining its token.
+    deviceId: uuid("device_id").notNull(),
+    state: text("state").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    leaseToken: uuid("lease_token"),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    errorCode: text("error_code"),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("push_delivery_notification_device_key").on(
+      t.notificationId,
+      t.deviceId,
+    ),
+    index("push_delivery_due_idx").on(t.state, t.nextAttemptAt),
+    check(
+      "push_delivery_state_valid",
+      sql`${t.state} in ('pending','processing','provider_accepted','unregistered','invalid_token','failed')`,
+    ),
+    check("push_delivery_attempts_valid", sql`${t.attempts} between 0 and 5`),
+  ],
+);
 
 export const accountDeletionRequestsTable = pgTable(
   "account_deletion_requests",

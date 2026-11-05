@@ -1,3 +1,46 @@
+## Current stage: durable device delivery and CI failure recovery
+
+Preserve the notification changes in this revision; they were recovered from the
+workspace after the prior interruption. Device-level push jobs now persist
+fan-out, attempts, leases, acceptance timestamps and redacted failure codes.
+Successful devices are not resent when another device fails. Expired leases can
+be taken over, and stale workers cannot overwrite new outcomes. Invalid tokens
+are removed; removed/reassigned devices cannot receive a previous account's
+notification payload. Missing platform configuration does not consume attempts
+or starve configured deliveries. Push remains at-least-once with provider collapse
+keys; provider acceptance is explicitly not proof of device display. In-app
+notifications remain durable. Migration 0010 adds device jobs and queue indexes.
+
+Admin Order operations now integrates queue health, worker progress, webhook
+recovery, redacted device recovery, audited reason-required retries, gross ledger
+reporting and read-only provider financial reconciliation. Worker progress pulses
+occur between completed batch jobs; readiness uses a 90-second freshness window.
+Shutdown stops new claims while draining current work.
+
+Investigated GitHub `Validate` failure 42003824582 on `21b22db`: a newly received
+webhook was still `received`, then later tests cascaded because the payment mode
+was not restored. Workers now use PostgreSQL's clock for due eligibility, leases
+and retry timing, instead of comparing database timestamps against application
+host time. Integration fixtures reset payment credentials/mode after each case.
+A repeated immediate-webhook test checks DB-time leases, with independent host
+clock skew injected on the real PostgreSQL CI lane (PGlite shares JS time).
+
+Local verification: 49 tests pass, no skipped tests; production API/web build and
+typecheck pass. Fresh PostgreSQL CI remains required for this revision. Native CI
+now additionally builds unsigned release Android APK/AAB with release lint and
+unsigned iOS Release/iphoneos, alongside existing debug/simulator checks. Do not
+claim these new release checks passed until reviewing their run results. No
+configured signed or store-distributable release has been produced. No merge.
+
+Remaining launch blockers include provider-fee/net reconciliation, partial and
+external refunds/disputes and bank payout events; complete support and delivery
+proof workflows; restaurant menu modifiers/inventory and operational capacity;
+authenticated browser E2E, load/security exercises and real device GPS/push.
+Clerk/Stripe test credentials, push services, hosting/database ownership and
+Apple/Google signing remain external requirements. Deployment packaging and full
+end-to-end provider verification are still incomplete. Continue implementation;
+do not treat this checkpoint as completion or a claim of launch readiness.
+
 ## Latest stage: immutable operational ledger and recovery verification
 
 New orders now post balanced journals atomically with confirmed payments,

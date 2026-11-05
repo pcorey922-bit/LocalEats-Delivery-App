@@ -1,5 +1,6 @@
 import { OrderTracking, DispatchOperations } from "./delivery-tracking";
 import { LedgerReport } from "./ledger-report";
+import { OperationalConsole } from "./operational-console";
 import { useEffect, useState, type FormEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -444,6 +445,7 @@ export function OperationsCommerce() {
       <ErrorText error={refunds.error} />
       <ErrorText error={drivers.error} />
       <FinancialOperations />
+      <OperationalConsole />
       <LedgerReport />
       <DispatchOperations />
       <h2>Driver approval</h2>
@@ -688,6 +690,20 @@ export function DeletionRequest() {
 }
 
 function FinancialOperations() {
+  const client = useQueryClient();
+  const reconcile = useMutation({
+    mutationFn: (id: string) =>
+      customFetch(
+        `/api/admin/financial-operations/${encodeURIComponent(id)}/reconcile`,
+        { method: "POST" },
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({
+        queryKey: ["admin-financial-operations"],
+      });
+      void client.invalidateQueries({ queryKey: ["admin-ledger"] });
+    },
+  });
   const query = useQuery({
     queryKey: ["admin-financial-operations"],
     queryFn: () =>
@@ -711,6 +727,12 @@ function FinancialOperations() {
         items require review before another monetary operation is attempted.
       </p>
       <ErrorText error={query.error} />
+      <ErrorText error={reconcile.error} />
+      {reconcile.isSuccess && (
+        <p role="status">
+          Provider reconciliation completed. Review the updated operation state.
+        </p>
+      )}
       {query.data
         ?.filter((op) => !["succeeded", "cancelled"].includes(op.state))
         .map((op) => (
@@ -723,6 +745,15 @@ function FinancialOperations() {
               Attempts: {op.attempts} ·{" "}
               {op.errorCode ?? "Awaiting provider confirmation"}
             </p>
+            {["reconciliation", "failed"].includes(op.state) && (
+              <button
+                className="roco-button"
+                disabled={reconcile.isPending}
+                onClick={() => reconcile.mutate(op.id)}
+              >
+                Check saved request against provider records
+              </button>
+            )}
           </article>
         ))}
     </section>

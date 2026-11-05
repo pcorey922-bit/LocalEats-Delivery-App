@@ -22,7 +22,10 @@ const instanceId = randomUUID();
 function worker(
   component: string,
   intervalMs: number,
-  run: (stopping: () => boolean) => Promise<void>,
+  run: (
+    stopping: () => boolean,
+    progress: () => Promise<void>,
+  ) => Promise<void>,
 ) {
   return startWorkerLoop({
     intervalMs,
@@ -45,27 +48,32 @@ function worker(
   });
 }
 const loops = [
-  worker("webhooks", 2000, async (stopping) => {
+  worker("webhooks", 2000, async (stopping, progress) => {
     if (paymentMode() !== "stripe_test") return;
-    for (let i = 0; i < 20 && !stopping(); i++)
+    for (let i = 0; i < 20 && !stopping(); i++) {
       if (!(await processWebhookInbox())) break;
+      await progress();
+    }
   }),
-  worker("finance", 2000, async (stopping) => {
+  worker("finance", 2000, async (stopping, progress) => {
     if (paymentMode() !== "stripe_test") return;
     for (let i = 0; i < 3 && !stopping(); i++) {
       const work = await Promise.all(
         Array.from({ length: 4 }, () => processFinancialOperation()),
       );
       if (!work.some(Boolean)) break;
+      await progress();
     }
   }),
-  worker("onboarding", 2000, async (stopping) => {
+  worker("onboarding", 2000, async (stopping, progress) => {
     if (paymentMode() !== "stripe_test") return;
-    for (let i = 0; i < 5 && !stopping(); i++)
+    for (let i = 0; i < 5 && !stopping(); i++) {
       if (!(await processPayoutProvisioning())) break;
+      await progress();
+    }
   }),
-  worker("push", 15000, async () => {
-    await drainPushBatch();
+  worker("push", 15000, async (stopping, progress) => {
+    await drainPushBatch(stopping, progress);
   }),
   worker("maintenance", 60000, async () => {
     await db

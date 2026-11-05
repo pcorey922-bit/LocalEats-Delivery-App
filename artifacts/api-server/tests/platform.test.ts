@@ -28,8 +28,11 @@ import {
   payoutProvisioningTable,
   ledgerTransactionsTable,
   ledgerLinesTable,
+  notificationDevicesTable,
+  pushDeliveriesTable,
 } from "./database";
 import { testPricing } from "../src/lib/testing/pricing";
+import { fanOutPushNotifications, processPushDelivery } from "../src/lib/push";
 import { processWebhookInbox } from "../src/lib/webhook-worker";
 import { processPayoutProvisioning } from "../src/lib/payout-onboarding";
 import { processFinancialOperation } from "../src/lib/financial-operations";
@@ -192,6 +195,12 @@ after(async () => {
   await engine.close();
 });
 test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
+  t.afterEach(() => {
+    process.env.PAYMENT_PROVIDER = "sandbox";
+    delete process.env.STRIPE_SECRET_KEY;
+    delete process.env.STRIPE_WEBHOOK_SECRET;
+    process.env.API_MUTATION_LIMIT_PER_MINUTE = "10000";
+  });
   await t.test("anonymous and wrong-role requests are rejected", async () => {
     assert.equal((await api("/driver/offers", null)).status, 401);
     assert.equal(
@@ -1405,17 +1414,15 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
         .from(ordersTable)
         .where(eq(ordersTable.id, order.id));
       const heldIds = Array.from({ length: 40 }, () => randomUUID());
-      await db
-        .insert(ordersTable)
-        .values(
-          heldIds.map((id) => ({
-            ...template,
-            id,
-            requestKey: null,
-            requestHash: null,
-            createdAt: new Date(0),
-          })),
-        );
+      await db.insert(ordersTable).values(
+        heldIds.map((id) => ({
+          ...template,
+          id,
+          requestKey: null,
+          requestHash: null,
+          createdAt: new Date(0),
+        })),
+      );
       await db.insert(financialOperationsTable).values(
         heldIds.flatMap((id) => [
           {
@@ -1469,18 +1476,16 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     "transient webhook failures back off and dead-letter rather than spinning",
     async () => {
       const id = `evt_backoff_${randomUUID()}`;
-      await db
-        .insert(webhookInboxTable)
-        .values({
+      await db.insert(webhookInboxTable).values({
+        id,
+        eventType: "test.fixture",
+        payload: {
           id,
-          eventType: "test.fixture",
-          payload: {
-            id,
-            type: "test.fixture",
-            livemode: false,
-            data: { object: {} },
-          },
-        });
+          type: "test.fixture",
+          livemode: false,
+          data: { object: {} },
+        },
+      });
       let calls = 0;
       const failing = async () => {
         calls++;
@@ -1569,14 +1574,12 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       await assert.rejects(
         db.transaction(async (tx) => {
           const id = `unbalanced:${order.id}`;
-          await tx
-            .insert(ledgerTransactionsTable)
-            .values({
-              id,
-              orderId: order.id,
-              kind: "invalid_fixture",
-              fingerprint: "invalid_fixture",
-            });
+          await tx.insert(ledgerTransactionsTable).values({
+            id,
+            orderId: order.id,
+            kind: "invalid_fixture",
+            fingerprint: "invalid_fixture",
+          });
           await tx.insert(ledgerLinesTable).values([
             { transactionId: id, account: "platform_cash", amountCents: 10 },
             { transactionId: id, account: "customer_funds", amountCents: -9 },
@@ -1702,6 +1705,401 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       } finally {
         process.env.PAYMENT_PROVIDER = "sandbox";
         delete process.env.STRIPE_SECRET_KEY;
+      }
+    },
+  );
+  await t.test(
+    "push fan-out retains individual receipts and retries only unsuccessful devices",
+    async () => {
+      // Existing order fixtures have not enrolled for delivery in this test window.
+      await db
+        .update(notificationsTable)
+        .set({ pushNextAttemptAt: new Date(Date.now() + 86400000) })
+        .where(eq(notificationsTable.pushState, "pending"));
+      const owner = randomUUID();
+      await db.insert(profilesTable).values({
+        id: owner,
+        clerkUserId: owner,
+        role: "customer",
+        displayName: "Push test fixture",
+      });
+      const [notification] = await db
+        .insert(notificationsTable)
+        .values({
+          profileId: owner,
+          eventKey: randomUUID(),
+          title: "Test notification",
+          body: "Test fixture",
+        })
+        .returning();
+      for (const token of [
+        "push_good_fixture_token",
+        "push_retry_fixture_token",
+      ])
+        await db
+          .insert(notificationDevicesTable)
+          .values({ profileId: owner, platform: "android", token });
+      assert.equal(await fanOutPushNotifications(), 1);
+      assert.equal(await fanOutPushNotifications(), 0);
+      const counts = new Map<string, number>();
+      const send = async (_platform: string, token: string) => {
+        counts.set(token, (counts.get(token) ?? 0) + 1);
+        if (token.includes("retry"))
+          throw new Error("Provider temporarily unavailable");
+      };
+      while (
+        await processPushDelivery(send, {
+          android: true,
+          ios: false,
+          testMode: true,
+        })
+      ) {}
+      assert.equal(counts.get("push_good_fixture_token"), 1);
+      assert.equal(counts.get("push_retry_fixture_token"), 1);
+      const [queued] = await db
+        .select()
+        .from(notificationsTable)
+        .where(eq(notificationsTable.id, notification.id));
+      assert.equal(queued.pushState, "queued");
+      const tasks = await db
+        .select()
+        .from(pushDeliveriesTable)
+        .where(eq(pushDeliveriesTable.notificationId, notification.id));
+      assert.equal(tasks.length, 2);
+      const pending = tasks.find((task) => task.state === "pending")!;
+      assert.equal(pending.attempts, 1);
+      await db
+        .update(pushDeliveriesTable)
+        .set({ nextAttemptAt: new Date(0) })
+        .where(eq(pushDeliveriesTable.id, pending.id));
+      await processPushDelivery(
+        async (_platform, token) => {
+          counts.set(token, (counts.get(token) ?? 0) + 1);
+        },
+        { android: true, ios: false, testMode: true },
+      );
+      assert.equal(counts.get("push_good_fixture_token"), 1);
+      assert.equal(counts.get("push_retry_fixture_token"), 2);
+      const [accepted] = await db
+        .select()
+        .from(notificationsTable)
+        .where(eq(notificationsTable.id, notification.id));
+      assert.equal(accepted.pushState, "provider_accepted");
+    },
+  );
+  await t.test(
+    "push lease takeover fences stale results and invalid tokens stop retrying",
+    async () => {
+      const owner = randomUUID();
+      await db.insert(profilesTable).values({
+        id: owner,
+        clerkUserId: owner,
+        role: "customer",
+        displayName: "Push lease fixture",
+      });
+      const [notification] = await db
+        .insert(notificationsTable)
+        .values({
+          profileId: owner,
+          eventKey: randomUUID(),
+          title: "Test notification",
+          body: "Test fixture",
+        })
+        .returning();
+      const [device] = await db
+        .insert(notificationDevicesTable)
+        .values({
+          profileId: owner,
+          platform: "android",
+          token: "push_lease_fixture_token",
+        })
+        .returning();
+      await fanOutPushNotifications();
+      let release!: () => void, began!: () => void;
+      const gate = new Promise<void>((r) => (release = r)),
+        started = new Promise<void>((r) => (began = r));
+      const config = { android: true, ios: false, testMode: true as const };
+      const first = processPushDelivery(async () => {
+        began();
+        await gate;
+      }, config);
+      await started;
+      try {
+        assert.equal(
+          await processPushDelivery(async () => {
+            throw new Error("Current lease cannot be claimed");
+          }, config),
+          false,
+        );
+        const [task] = await db
+          .select()
+          .from(pushDeliveriesTable)
+          .where(eq(pushDeliveriesTable.notificationId, notification.id));
+        await db
+          .update(pushDeliveriesTable)
+          .set({ leaseExpiresAt: new Date(0) })
+          .where(eq(pushDeliveriesTable.id, task.id));
+        await processPushDelivery(async () => {
+          throw Object.assign(new Error("Invalid token fixture"), {
+            code: "messaging/registration-token-not-registered",
+          });
+        }, config);
+        release();
+        await first;
+        const [saved] = await db
+          .select()
+          .from(pushDeliveriesTable)
+          .where(eq(pushDeliveriesTable.id, task.id));
+        assert.equal(saved.state, "invalid_token");
+        assert.equal(saved.acceptedAt, null);
+        assert.equal(saved.attempts, 2);
+        assert.equal(
+          (
+            await db
+              .select()
+              .from(notificationDevicesTable)
+              .where(eq(notificationDevicesTable.id, device.id))
+          ).length,
+          0,
+        );
+        assert.equal(
+          await processPushDelivery(async () => {
+            throw new Error("Permanent failure cannot resend");
+          }, config),
+          false,
+        );
+      } finally {
+        release?.();
+        await first;
+      }
+    },
+  );
+  await t.test(
+    "missing push configuration does not consume attempts or block configured devices",
+    async () => {
+      const owners = [randomUUID(), randomUUID()];
+      for (const owner of owners)
+        await db.insert(profilesTable).values({
+          id: owner,
+          clerkUserId: owner,
+          role: "customer",
+          displayName: "Push configuration fixture",
+        });
+      const notices = [];
+      for (const owner of owners) {
+        const [n] = await db
+          .insert(notificationsTable)
+          .values({
+            profileId: owner,
+            eventKey: randomUUID(),
+            title: "Test notification",
+            body: "Test fixture",
+          })
+          .returning();
+        notices.push(n);
+      }
+      const [ios] = await db
+        .insert(notificationDevicesTable)
+        .values({
+          profileId: owners[0],
+          platform: "ios",
+          token: "a".repeat(64),
+        })
+        .returning();
+      await db.insert(notificationDevicesTable).values({
+        profileId: owners[1],
+        platform: "android",
+        token: "push_configured_fixture_token",
+      });
+      await fanOutPushNotifications();
+      let called = 0;
+      assert.equal(
+        await processPushDelivery(
+          async () => {
+            called++;
+          },
+          { android: false, ios: false, testMode: true },
+        ),
+        false,
+      );
+      assert.equal(called, 0);
+      assert.equal(
+        await processPushDelivery(
+          async (platform) => {
+            called++;
+            assert.equal(platform, "android");
+          },
+          { android: true, ios: false, testMode: true },
+        ),
+        true,
+      );
+      assert.equal(called, 1);
+      const [waiting] = await db
+        .select()
+        .from(pushDeliveriesTable)
+        .where(eq(pushDeliveriesTable.notificationId, notices[0].id));
+      assert.equal(waiting.attempts, 0);
+      assert.equal(waiting.state, "pending");
+      await db
+        .update(notificationDevicesTable)
+        .set({ profileId: owners[1] })
+        .where(eq(notificationDevicesTable.id, ios.id));
+      await processPushDelivery(
+        async () => {
+          throw new Error(
+            "Reassigned device must not receive old account notification",
+          );
+        },
+        { android: true, ios: false, testMode: true },
+      );
+      const [removed] = await db
+        .select()
+        .from(pushDeliveriesTable)
+        .where(eq(pushDeliveriesTable.id, waiting.id));
+      assert.equal(removed.state, "unregistered");
+    },
+  );
+  await t.test(
+    "exhausted push retries require an audited admin recovery without exposing device tokens",
+    async () => {
+      const owner = randomUUID();
+      await db.insert(profilesTable).values({
+        id: owner,
+        clerkUserId: owner,
+        role: "customer",
+        displayName: "Push exhaustion fixture",
+      });
+      const [notification] = await db
+        .insert(notificationsTable)
+        .values({
+          profileId: owner,
+          eventKey: randomUUID(),
+          title: "Test notification",
+          body: "Test fixture",
+        })
+        .returning();
+      const token = "push_exhaustion_fixture_secret";
+      await db
+        .insert(notificationDevicesTable)
+        .values({ profileId: owner, platform: "android", token });
+      await fanOutPushNotifications();
+      const [task] = await db
+        .select()
+        .from(pushDeliveriesTable)
+        .where(eq(pushDeliveriesTable.notificationId, notification.id));
+      await db
+        .update(pushDeliveriesTable)
+        .set({ attempts: 4 })
+        .where(eq(pushDeliveriesTable.id, task.id));
+      await processPushDelivery(
+        async () => {
+          throw new Error("Provider unavailable fixture");
+        },
+        { android: true, ios: false, testMode: true },
+      );
+      const listing = await api(
+        "/admin/push-deliveries?state=failed",
+        ids.admin,
+      );
+      assert.equal(listing.status, 200);
+      assert.equal(
+        listing.data.find((row: { id: string }) => row.id === task.id).attempts,
+        5,
+      );
+      assert.ok(!JSON.stringify(listing.data).includes(token));
+      const path = `/admin/push-deliveries/${task.id}/retry`;
+      assert.equal(
+        (await api("/admin/push-deliveries", ids.driver)).status,
+        403,
+      );
+      assert.equal(
+        (
+          await api(path, ids.customer, "POST", {
+            reason: "Retry repaired provider connection",
+          })
+        ).status,
+        403,
+      );
+      assert.equal(
+        (await api(path, ids.admin, "POST", { reason: "short" })).status,
+        400,
+      );
+      assert.equal(
+        (
+          await api(path, ids.admin, "POST", {
+            reason: "Retry repaired provider connection",
+          })
+        ).status,
+        202,
+      );
+      await processPushDelivery(async () => {}, {
+        android: true,
+        ios: false,
+        testMode: true,
+      });
+      const [saved] = await db
+        .select()
+        .from(pushDeliveriesTable)
+        .where(eq(pushDeliveriesTable.id, task.id));
+      assert.equal(saved.state, "provider_accepted");
+      assert.equal(saved.attempts, 1);
+      assert.equal(
+        (
+          await api(path, ids.admin, "POST", {
+            reason: "Must not repeat accepted delivery",
+          })
+        ).status,
+        409,
+      );
+      const audit = await db.execute(
+        sql`select action,details from audit_logs where resource_id=${task.id}`,
+      );
+      assert.equal(audit.rows.length, 1);
+      assert.equal(audit.rows[0].action, "push.retry_requested");
+    },
+  );
+  await t.test(
+    "database clock controls job eligibility and leases despite application clock skew",
+    async () => {
+      const originalNow = Date.now;
+      // PGlite's WASM clock is implemented by the same JavaScript runtime.
+      // Independent host/database skew is exercised by the PostgreSQL CI lane.
+      Date.now = process.env.TEST_DATABASE_URL
+        ? () => originalNow() + 3600000
+        : originalNow;
+      try {
+        for (let i = 0; i < 10; i++) {
+          const id = `evt_clock_${randomUUID()}`;
+          await db.insert(webhookInboxTable).values({
+            id,
+            eventType: "clock.fixture",
+            payload: {
+              id,
+              type: "clock.fixture",
+              livemode: false,
+              data: { object: {} },
+            },
+          });
+          const processed = await processWebhookInbox(async () => {
+            const [saved] = await db
+              .select()
+              .from(webhookInboxTable)
+              .where(eq(webhookInboxTable.id, id));
+            const difference = saved.leaseExpiresAt!.getTime() - originalNow();
+            assert.ok(
+              difference > 45000 && difference < 75000,
+              `Lease skewed by ${difference}ms`,
+            );
+          });
+          assert.equal(processed, true);
+          const [saved] = await db
+            .select()
+            .from(webhookInboxTable)
+            .where(eq(webhookInboxTable.id, id));
+          assert.equal(saved.state, "processed");
+        }
+      } finally {
+        Date.now = originalNow;
       }
     },
   );

@@ -1,6 +1,9 @@
 export function startWorkerLoop(options: {
   intervalMs: number;
-  run: (stopping: () => boolean) => Promise<void>;
+  run: (
+    stopping: () => boolean,
+    progress: () => Promise<void>,
+  ) => Promise<void>;
   onError: (error: unknown) => void;
   onSuccess?: () => Promise<void>;
 }) {
@@ -11,7 +14,12 @@ export function startWorkerLoop(options: {
     current = Promise.resolve()
       .then(async () => {
         if (stopping) return;
-        await options.run(() => stopping);
+        await options.run(
+          () => stopping,
+          async () => {
+            await options.onSuccess?.();
+          },
+        );
         await options.onSuccess?.();
       })
       .catch(options.onError)

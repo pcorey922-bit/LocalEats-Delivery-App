@@ -44,17 +44,13 @@ pnpm build
 ```
 
 Copy `.env.example` settings into the API process environment and put Vite values
-in `artifacts/localeats/.env.local`. Never commit real secrets. Default test pricing
-is illustrative: 499-cent delivery, 500-basis-point service fee, zero configured
-test tax, 1,000-basis-point restaurant commission, 8,000-basis-point driver delivery
-share, all tips to the driver, and ZIPs 37854/37748/37763. These are **not approved
-business terms or a determination of Tennessee tax obligations**. Administrators
-can change the test settings. Existing order allocations retain their snapshots.
-
-Set `PAYMENT_PROVIDER=sandbox` and `NODE_ENV=development` to exercise the entire
-local order/refund/settlement flow with no payment credentials. A real Clerk
-instance and local/staging database are still needed for interactive signed-in use.
-The automated tests replace authentication only inside their test bundle.
+in `artifacts/localeats/.env.local`. Never commit real secrets. Pricing is not
+preconfigured. An administrator must save approved delivery/service fees,
+commission, driver share, tax rate/base and service ZIP codes before quoting.
+Existing orders retain immutable pricing snapshots. Configure Stripe test keys
+and Clerk for interactive staging use. The `sandbox` payment provider and test
+identity headers are restricted to the automated test bundle; they cannot be
+used to operate an interactive development or production site.
 
 ```sh
 pnpm --filter @workspace/api-server dev

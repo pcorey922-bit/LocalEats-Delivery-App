@@ -1,3 +1,4 @@
+import { databaseNow } from "./database-clock";
 import { alias } from "drizzle-orm/pg-core";
 import {
   requirePaymentJournal,
@@ -350,7 +351,7 @@ export async function requestProviderCancellation(
 }
 
 async function claimOperation(): Promise<FinancialOperation | null> {
-  const now = new Date();
+  const now = await databaseNow();
   const blocked = alias(operations, "blocked_operations");
   const candidates = await db
     .select({ orderId: operations.orderId })
@@ -752,7 +753,7 @@ export async function processFinancialOperation(
           errorCode: failed ? "PROVIDER_REJECTED" : null,
           leaseToken: null,
           leaseExpiresAt: null,
-          nextAttemptAt: new Date(Date.now() + 30000),
+          nextAttemptAt: new Date((await databaseNow(tx)).getTime() + 30000),
           completedAt: pending ? null : new Date(),
         })
         .where(eq(operations.id, job.id));
@@ -777,7 +778,7 @@ export async function processFinancialOperation(
         leaseToken: null,
         leaseExpiresAt: null,
         nextAttemptAt: new Date(
-          Date.now() +
+          (await databaseNow()).getTime() +
             Math.min(3600000, 1000 * 2 ** Math.min(job.attempts, 12)),
         ),
       })
@@ -923,7 +924,7 @@ export async function reconcileFinancialOperation(id: string, actor: Profile) {
         leaseToken: null,
         leaseExpiresAt: null,
         completedAt: receipt.status === "pending" ? null : new Date(),
-        nextAttemptAt: new Date(Date.now() + 30000),
+        nextAttemptAt: new Date((await databaseNow(tx)).getTime() + 30000),
       })
       .where(eq(operations.id, id))
       .returning();

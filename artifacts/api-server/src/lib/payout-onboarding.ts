@@ -1,3 +1,4 @@
+import { databaseNow } from "./database-clock";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, lte, or } from "drizzle-orm";
 import {
@@ -63,7 +64,7 @@ export async function processPayoutProvisioning(
       )
     ).id,
 ) {
-  const now = new Date();
+  const now = await databaseNow();
   const job = await db.transaction(async (tx) => {
     const [row] = await tx
       .select()
@@ -100,7 +101,7 @@ export async function processPayoutProvisioning(
         attempts: row.attempts + 1,
         firstAttemptAt: row.firstAttemptAt ?? now,
         leaseToken: randomUUID(),
-        leaseExpiresAt: new Date(Date.now() + 120000),
+        leaseExpiresAt: new Date(now.getTime() + 120000),
       })
       .where(eq(jobs.profileId, row.profileId))
       .returning();
@@ -165,7 +166,7 @@ export async function processPayoutProvisioning(
             : "queued",
         errorCode: "PROVISIONING_UNCONFIRMED",
         nextAttemptAt: new Date(
-          Date.now() +
+          (await databaseNow()).getTime() +
             Math.min(3600000, 1000 * 2 ** Math.min(job.attempts, 12)),
         ),
         leaseToken: null,
