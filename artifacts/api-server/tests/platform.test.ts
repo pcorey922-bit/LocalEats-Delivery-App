@@ -174,6 +174,17 @@ after(async () => {
 test("real relational HTTP platform flows", { timeout: 30000 }, async (t) => {
   await t.test("anonymous and wrong-role requests are rejected", async () => {
     assert.equal((await api("/driver/offers", null)).status, 401);
+    assert.equal(
+      (
+        await api(
+          `/driver/orders/${"-".repeat(36)}/release`,
+          ids.driver,
+          "POST",
+        )
+      ).status,
+      400,
+    );
+
     assert.equal((await api("/driver/offers", ids.customer)).status, 403);
     assert.equal((await api("/driver/offers", ids.unapproved)).status, 403);
     assert.equal((await api("/admin/payouts", ids.customer)).status, 403);

@@ -81,14 +81,18 @@ export function registerPush(): Promise<void> {
 }
 export async function unregisterPush() {
   const token = localStorage.getItem("rocoeats-push-token");
-  if (token)
+  // A device that was never enrolled may have no Firebase app configuration.
+  if (!token) return;
+  try {
     await customFetch("/api/notification-devices", {
       method: "DELETE",
       body: JSON.stringify({ token }),
     });
-  localStorage.removeItem("rocoeats-push-token");
-  if (Capacitor.isNativePlatform())
-    await PushNotifications.unregister().catch(() => {});
+  } finally {
+    localStorage.removeItem("rocoeats-push-token");
+    if (Capacitor.isNativePlatform())
+      await PushNotifications.unregister().catch(() => {});
+  }
 }
 export function MobileLifecycle() {
   const [, navigate] = useLocation();

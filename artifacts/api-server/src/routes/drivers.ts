@@ -189,7 +189,12 @@ router.post(
     if (!profile.driverApproved)
       throw new CommerceError(403, "Driver approval is required");
     const orderId = req.params.orderId;
-    if (typeof orderId !== "string" || !/^[0-9a-f-]{36}$/i.test(orderId))
+    if (
+      typeof orderId !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        orderId,
+      )
+    )
       throw new CommerceError(400, "Invalid order ID");
     await db.transaction(async (tx) => {
       const [order] = await tx
