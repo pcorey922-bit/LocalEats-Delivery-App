@@ -35,12 +35,14 @@ app.use(
 
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
-app.use(cors({ credentials: true, origin: true }));
+const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean);
+app.use(cors({ credentials: true, origin: process.env.NODE_ENV === 'production' ? allowedOrigins : true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use(
   clerkMiddleware((req) => ({
+    secretKey: process.env.CLERK_SECRET_KEY,
     publishableKey: publishableKeyFromHost(
       getClerkProxyHost(req) ?? "",
       process.env.CLERK_PUBLISHABLE_KEY,

@@ -11,7 +11,7 @@ export const ordersTable = pgTable("orders", {
   customerProfileId: uuid("customer_profile_id").notNull().references(() => profilesTable.id, { onDelete: "restrict" }),
   restaurantId: uuid("restaurant_id").notNull().references(() => restaurantsTable.id, { onDelete: "restrict" }),
   deliveryAddressId: uuid("delivery_address_id").references(() => addressesTable.id, { onDelete: "set null" }),
-  addressSnapshot: jsonb("address_snapshot").$type<Record<string, string>>(),
+  addressSnapshot: jsonb("address_snapshot").$type<Record<string, string | null>>(),
   status: orderStatusEnum("status").notNull().default("pending"),
   subtotalCents: integer("subtotal_cents").notNull(),
   deliveryFeeCents: integer("delivery_fee_cents").notNull().default(0),

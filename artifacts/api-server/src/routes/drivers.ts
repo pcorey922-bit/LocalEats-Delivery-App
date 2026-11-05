@@ -1,6 +1,6 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { Router, type IRouter } from "express";
-import { db, deliveriesTable, ordersTable, orderEventsTable, paymentsTable } from "@workspace/db";
+import { db, deliveriesTable, ordersTable, orderEventsTable, paymentsTable, restaurantsTable } from "@workspace/db";
 import { getActiveProfile, requireRole } from "../lib/current-profile";
 import { requireAuth } from "../middlewares/require-auth";
 
@@ -15,7 +15,10 @@ router.get("/driver/offers", requireAuth, async (req, res): Promise<void> => {
     orderId: ordersTable.id,
     restaurantId: ordersTable.restaurantId,
     status: ordersTable.status,
-  }).from(ordersTable).innerJoin(
+    restaurantName: restaurantsTable.name,
+    pickupStreet: restaurantsTable.street1,
+    pickupCity: restaurantsTable.city,
+  }).from(ordersTable).innerJoin(restaurantsTable, eq(restaurantsTable.id, ordersTable.restaurantId)).innerJoin(
     paymentsTable, and(eq(paymentsTable.orderId, ordersTable.id), eq(paymentsTable.status, "succeeded")),
   ).leftJoin(
     deliveriesTable, eq(deliveriesTable.orderId, ordersTable.id),
@@ -26,11 +29,26 @@ router.get("/driver/offers", requireAuth, async (req, res): Promise<void> => {
   res.json(offers);
 });
 
+router.get("/driver/deliveries", requireAuth, async (req, res): Promise<void> => {
+  const profile = await getActiveProfile(req, res);
+  if (!profile || !requireRole(profile, ["driver"], res)) return;
+  const deliveries = await db.select({
+    orderId: ordersTable.id, status: deliveriesTable.status,
+    orderStatus: ordersTable.status, restaurantName: restaurantsTable.name,
+    pickupStreet: restaurantsTable.street1, pickupCity: restaurantsTable.city,
+    deliveryAddress: ordersTable.addressSnapshot,
+  }).from(deliveriesTable)
+    .innerJoin(ordersTable, eq(ordersTable.id, deliveriesTable.orderId))
+    .innerJoin(restaurantsTable, eq(restaurantsTable.id, ordersTable.restaurantId))
+    .where(eq(deliveriesTable.driverProfileId, profile.id)).limit(100);
+  res.json(deliveries);
+});
+
 router.post("/driver/orders/:orderId/claim", requireAuth, async (req, res): Promise<void> => {
   const profile = await getActiveProfile(req, res);
   if (!profile || !requireRole(profile, ["driver"], res)) return;
   const { orderId } = req.params;
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)) {
+  if (typeof orderId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)) {
     res.status(400).json({ error: "Invalid order ID" }); return;
   }
   const claimed = await db.transaction(async tx => {
@@ -57,8 +75,8 @@ router.post("/driver/orders/:orderId/:action", requireAuth, async (req, res): Pr
   const profile = await getActiveProfile(req, res);
   if (!profile || !requireRole(profile, ["driver"], res)) return;
   const { orderId, action } = req.params;
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)
-      || !["pickup", "deliver"].includes(action)) {
+  if (typeof orderId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)
+      || typeof action !== "string" || !["pickup", "deliver"].includes(action)) {
     res.status(400).json({ error: "Invalid delivery action" }); return;
   }
   const fromDelivery = action === "pickup" ? "assigned" : "picked_up";

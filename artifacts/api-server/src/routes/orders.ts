@@ -338,6 +338,11 @@ router.patch(
       return;
     }
     const nextStatus = parsed.data.status as OrderStatus;
+    if (["out_for_delivery", "delivered"].includes(nextStatus)) {
+      res.status(403).json({ error: "Only the assigned driver can record pickup and delivery" });
+      return;
+    }
+
     if (nextStatus === "cart" || nextStatus === "pending") {
       res.status(400).json({ error: "This order status cannot be set manually" });
       return;
@@ -381,6 +386,19 @@ router.patch(
         error: `Order cannot move from ${order.status} to ${nextStatus}`,
       });
       return;
+    }
+
+    // Dispatch must never advance a development order that has not been paid.
+    if (nextStatus !== "cancelled") {
+      const [payment] = await db.select().from(paymentsTable).where(and(
+        eq(paymentsTable.orderId, order.id), eq(paymentsTable.status, "succeeded"),
+      )).limit(1);
+      if (!payment) { res.status(409).json({ error: "Payment must be collected before fulfillment" }); return; }
+    } else {
+      const [payment] = await db.select().from(paymentsTable).where(and(
+        eq(paymentsTable.orderId, order.id), eq(paymentsTable.status, "succeeded"),
+      )).limit(1);
+      if (payment) { res.status(409).json({ error: "Paid cancellation requires a refund workflow; contact support" }); return; }
     }
 
     const updated = await db.transaction(async (tx) => {

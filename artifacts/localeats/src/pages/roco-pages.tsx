@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
 import { useAuth, useClerk } from '@clerk/react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, ClipboardList, MapPin, Plus, RefreshCw, ShieldCheck, ShoppingBag, Utensils } from 'lucide-react';
 import {
   getGetAdminFinanceQueryKey, getGetAdminOverviewQueryKey, getGetMyOrderQueryKey, getGetMyRestaurantQueryKey, getGetRestaurantQueryKey,
@@ -16,6 +16,8 @@ import {
   type Address, type RestaurantInput, type Order, type OrderStatus,
 } from '@workspace/api-client-react';
 
+import { customFetch } from '../../../../lib/api-client-react/src/custom-fetch';
+
 type CartEntry = { menuItemId: string; name: string; priceCents: number; quantity: number; restaurantId: string; restaurantName: string };
 const CART_KEY = 'rocoeats-cart';
 const money = (cents: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
@@ -27,7 +29,7 @@ function Logo() { return <Link className="roco-logo" href="/"><span className="r
 function Shell({ children }: { children: React.ReactNode }) {
   const { isSignedIn } = useAuth(); const { signOut } = useClerk();
   return <div className="roco-page"><header className="roco-header roco-wrap"><Logo/><nav className="roco-nav" aria-label="Main navigation">
-    <Link href="/">Find food</Link>{isSignedIn && <><Link href="/orders">Orders</Link><Link href="/restaurant">Restaurant</Link><Link href="/account">Account</Link><Link href="/admin">Operations</Link><button onClick={() => signOut({ redirectUrl: '/' })}>Sign out</button></>}
+    <Link href="/">Find food</Link>{isSignedIn && <><Link href="/orders">Orders</Link><Link href="/restaurant">Restaurant</Link><Link href="/driver">Driver</Link><Link href="/account">Account</Link><Link href="/admin">Operations</Link><button onClick={() => signOut({ redirectUrl: '/' })}>Sign out</button></>}
     {!isSignedIn && <><Link href="/sign-in">Sign in</Link><Link href="/sign-up">Create account</Link></>}
   </nav></header>{children}</div>;
 }
@@ -126,8 +128,8 @@ export function RestaurantPage() {
   </main></Shell>;
 }
 function OrderControls({ order, onStatus }: { order: Order; onStatus: (status: OrderStatus) => void }) {
-  const next: Partial<Record<OrderStatus, OrderStatus>> = { placed: 'accepted', restaurant_received: 'accepted', pending: 'accepted', accepted: 'preparing', preparing: 'ready_for_pickup', ready_for_pickup: 'out_for_delivery' };
-  return <article className="roco-card"><div className="roco-row"><div><div className="roco-meta">{new Date(order.placedAt).toLocaleString()} · {order.customerName}</div><h2 style={{ marginTop: 7 }}>Order {order.id.slice(0, 8)}</h2></div><span className="roco-badge">{statusText(order.status)}</span></div>{order.items.map(i => <p key={i.id}>{i.quantity} × {i.itemName}</p>)}<div className="roco-row"><span>{money(order.totalCents)} · payment {statusText(order.paymentStatus)}</span>{next[order.status] && <button className="roco-button primary" onClick={() => onStatus(next[order.status]!)}>Mark {statusText(next[order.status]!)}</button>}</div></article>;
+  const next: Partial<Record<OrderStatus, OrderStatus>> = { placed: 'accepted', restaurant_received: 'accepted', pending: 'accepted', accepted: 'preparing', preparing: 'ready_for_pickup' };
+  return <article className="roco-card"><div className="roco-row"><div><div className="roco-meta">{new Date(order.placedAt).toLocaleString()} · {order.customerName}</div><h2 style={{ marginTop: 7 }}>Order {order.id.slice(0, 8)}</h2></div><span className="roco-badge">{statusText(order.status)}</span></div>{order.items.map(i => <p key={i.id}>{i.quantity} × {i.itemName}</p>)}<div className="roco-row"><span>{money(order.totalCents)} · payment {statusText(order.paymentStatus)}</span>{order.paymentCollected && next[order.status] && <button className="roco-button primary" onClick={() => onStatus(next[order.status]!)}>Mark {statusText(next[order.status]!)}</button>}</div></article>;
 }
 
 export function AdminPage() {
@@ -149,5 +151,33 @@ export function AdminPage() {
     {tab === 'accounts' && (profiles.isLoading ? <Loading/> : profiles.isError ? <LoadError retry={() => void profiles.refetch()} message="Account records could not be loaded."/> : profiles.data?.length ? <div className="roco-table-wrap"><table className="roco-table"><thead><tr><th>Member</th><th>Role</th><th>Activation</th><th>Actions</th></tr></thead><tbody>{profiles.data.map(p => <tr key={p.id}><td>{p.displayName}<div className="roco-meta">{p.id}</div></td><td><select className="roco-select" value={p.role} onChange={e => changeProfile.mutate({ profileId:p.id,data:{ role:e.target.value as 'customer'|'restaurant'|'driver' } },{onSuccess:refresh})}><option value="customer">Customer</option><option value="restaurant">Restaurant</option><option value="driver">Driver</option><option value="admin" disabled>Administrator</option></select></td><td><span className={`roco-badge ${p.isActive?'approved':'pending'}`}>{p.isActive?'active':'inactive'}</span></td><td><button className="roco-button" onClick={() => changeProfile.mutate({ profileId:p.id,data:{isActive:!p.isActive} },{onSuccess:refresh})}>{p.isActive?'Deactivate':'Activate'}</button></td></tr>)}</tbody></table></div> : <div className="roco-empty"><h2>No profiles found</h2><p>There are no member profiles in the operations record.</p></div>)}
     {tab === 'finance' && (finance.isLoading ? <Loading/> : finance.isError ? <LoadError retry={() => void finance.refetch()} message="Finance summaries are unavailable or restricted."/> : finance.data && <><div className="roco-row" style={{ marginBottom: 14 }}><h2>Payment provider</h2><span className="roco-badge">{finance.data.paymentProviderConnected?'connected':'not connected'}</span></div><div className="roco-stats">{stat('Succeeded payments',finance.data.succeededPaymentCount)}{stat('Succeeded volume',money(finance.data.succeededPaymentCents))}{stat('Pending payments',finance.data.pendingPaymentCount)}{stat('Pending volume',money(finance.data.pendingPaymentCents))}{stat('Refunded count',finance.data.refundedPaymentCount)}{stat('Refunded volume',money(finance.data.refundedPaymentCents))}{stat('Paid out',money(finance.data.paidOutCents))}{stat('Pending payout',money(finance.data.pendingPayoutCents))}{stat('Failed payouts',finance.data.failedPayoutCount)}</div><div className="roco-notice">Finance values are read-only summaries from the API. This interface does not collect, refund, or pay out money.</div></>)}
     <div className="roco-notice" style={{ marginTop: 24 }}><ShieldCheck size={14} style={{ verticalAlign:'middle',marginRight:8 }}/>Administrator operations are protected by server role checks. A failed request may indicate insufficient permission; no client-side role change grants admin access.</div>
+  </main></Shell>;
+}
+
+type DriverDelivery = {
+  orderId: string; status: string; orderStatus?: string; restaurantName: string;
+  pickupStreet: string; pickupCity: string;
+  deliveryAddress?: { street1: string; street2?: string | null; city: string; region: string; postalCode: string; deliveryInstructions?: string | null };
+};
+export function DriverPage() {
+  const profile = useMyProfile();
+  const client = useQueryClient();
+  const enabled = profile.data?.role === 'driver';
+  const offers = useQuery({ queryKey: ['driver-offers'], queryFn: () => customFetch<DriverDelivery[]>('/api/driver/offers'), enabled, refetchInterval: 15000 });
+  const deliveries = useQuery({ queryKey: ['driver-deliveries'], queryFn: () => customFetch<DriverDelivery[]>('/api/driver/deliveries'), enabled, refetchInterval: 15000 });
+  const update = useMutation({
+    mutationFn: ({ orderId, action }: { orderId: string; action: string }) => customFetch(`/api/driver/orders/${orderId}/${action}`, { method: 'POST' }),
+    onSuccess: () => { void client.invalidateQueries({ queryKey: ['driver-offers'] }); void client.invalidateQueries({ queryKey: ['driver-deliveries'] }); },
+  });
+  if (!enabled) return <Shell><main className="roco-main"><PageIntro eyebrow="Driver access" title="Your delivery workspace.">Sign in with an active driver profile to view deliveries.</PageIntro></main></Shell>;
+  const card = (d: DriverDelivery, offer: boolean) => <article className="roco-card" key={d.orderId}>
+    <h3>{d.restaurantName}</h3><p>Pickup: {d.pickupStreet}, {d.pickupCity}</p><p className="roco-meta">Order {d.orderId} · {statusText(d.status)}</p>
+    {d.deliveryAddress && <><p>Deliver to: {d.deliveryAddress.street1} {d.deliveryAddress.street2}, {d.deliveryAddress.city}, {d.deliveryAddress.region} {d.deliveryAddress.postalCode}</p><p>{d.deliveryAddress.deliveryInstructions}</p></>}
+    {(offer || (d.status === 'assigned' && d.orderStatus === 'ready_for_pickup') || (d.status === 'picked_up' && d.orderStatus === 'out_for_delivery')) && <button className="roco-button primary" disabled={update.isPending} onClick={() => update.mutate({ orderId: d.orderId, action: offer ? 'claim' : d.status === 'assigned' ? 'pickup' : 'deliver' })}>{offer ? 'Claim delivery' : d.status === 'assigned' ? 'Confirm pickup' : 'Confirm delivered'}</button>}
+  </article>;
+  return <Shell><main className="roco-main"><PageIntro eyebrow="Driver" title="Local deliveries.">Paid orders ready for pickup appear here. Customer addresses are available after you claim a delivery.</PageIntro>
+    {update.isError && <p className="roco-alert" role="alert">{update.error.message}</p>}
+    <h2>My deliveries</h2>{deliveries.isPending ? <Loading/> : deliveries.isError ? <LoadError retry={() => void deliveries.refetch()}/> : <div className="roco-list">{deliveries.data?.length ? deliveries.data.map(d => card(d, false)) : <p>No assigned deliveries.</p>}</div>}
+    <h2>Available offers</h2>{offers.isPending ? <Loading/> : offers.isError ? <LoadError retry={() => void offers.refetch()}/> : <div className="roco-list">{offers.data?.length ? offers.data.map(d => card(d, true)) : <p>No paid deliveries available right now.</p>}</div>}
   </main></Shell>;
 }
