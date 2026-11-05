@@ -50,6 +50,20 @@
       "when": 1793868076972,
       "tag": "0006_settlement_recovery_state",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793869532035,
+      "tag": "0007_operational_recovery_and_onboarding",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793869853228,
+      "tag": "0008_distributed_request_limits",
+      "breakpoints": true
     }
   ]
 }

@@ -1,3 +1,31 @@
+## Latest completed stage: operational recovery and durable onboarding
+
+This stage adds durable Connect provisioning outside database transactions,
+financial queue fairness for held orders, bounded webhook backoff/dead-letter
+states, role-scoped webhook recovery endpoints with audit reasons, operational
+queue/worker reporting, readiness/liveness endpoints, PostgreSQL-backed concurrent
+mutation limits, bounded database connection/query/lock waits, independent worker
+loops and graceful draining. Refund events are monotonic across webhook/worker
+races. Local tests now total 37 and pass; typecheck, production builds and native
+asset synchronization pass. Fresh CI results must be checked for the commit.
+
+Added failure checks: cancellation during blocked transfer I/O; customer refund
+remaining confirmed while settlement recovery fails and later recovers; refund
+webhook preceding a worker response; durable Connect timeout replay without a
+held transaction; audited webhook retry permissions; concurrent distributed
+request limits; stopping new claims while draining current worker work.
+
+New migrations: 0007–0008. Current endpoints include `/livez`, `/readyz`,
+`/api/admin/operational-health`, `/api/admin/webhook-inbox` and audited
+`POST /api/admin/webhook-inbox/:eventId/retry` with a reason. All Stripe account
+creation uses persisted provisioning jobs. Completed stage supersedes items 1–3
+below only to the extent described; additional lease-takeover/load tests, operator
+UI integration and outbound alert-provider configuration still need work.
+
+Next priorities: immutable balanced ledger/provider-fee reconciliation; partial
+refunds/disputes; complete support/search/capacity tools; browser/device E2E;
+accessibility/performance; signed releases and external provider verification.
+
 # Resumable engineering checkpoint — production hardening
 
 ## Resume rule

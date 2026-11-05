@@ -234,10 +234,37 @@ export async function processStripeEvent(event: Stripe.Event) {
       }
       // Ignore stale pending/failed events after a confirmed full refund.
       if (refund.status === "succeeded") return;
+      if (
+        ["failed", "canceled"].includes(refund.status) &&
+        !["succeeded", "failed", "canceled"].includes(
+          remote.status ?? "pending",
+        )
+      )
+        return;
       await tx
         .update(refundsTable)
         .set({ status: remote.status ?? "pending" })
         .where(eq(refundsTable.id, refund.id));
+      await tx
+        .update(financialOperationsTable)
+        .set({
+          state:
+            remote.status === "succeeded"
+              ? "succeeded"
+              : ["failed", "canceled"].includes(remote.status ?? "")
+                ? "failed"
+                : "pending",
+          result: { id: remote.id, status: remote.status ?? "pending" },
+          leaseToken: null,
+          leaseExpiresAt: null,
+          nextAttemptAt: new Date(Date.now() + 30000),
+          completedAt: ["succeeded", "failed", "canceled"].includes(
+            remote.status ?? "",
+          )
+            ? new Date()
+            : null,
+        })
+        .where(eq(financialOperationsTable.id, `refund:${payment.orderId}`));
       if (remote.status === "succeeded") {
         await queueSettlementRecovery(tx, payment.orderId);
         await tx

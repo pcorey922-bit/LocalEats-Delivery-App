@@ -295,6 +295,7 @@ export function EarningsPage() {
   });
   const account = useQuery({
     queryKey: ["payout-account"],
+    refetchInterval: 5000,
     queryFn: () =>
       customFetch<{ account: { ready: boolean } | null }>(
         "/api/payout-account",

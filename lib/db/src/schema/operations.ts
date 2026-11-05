@@ -79,6 +79,9 @@ export const deliveryLocationsTable = pgTable(
     longitude: doublePrecision("longitude").notNull(),
     accuracyMeters: doublePrecision("accuracy_meters").notNull(),
     observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     receivedAt: timestamp("received_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -101,10 +104,57 @@ export const webhookInboxTable = pgTable(
     leaseToken: uuid("lease_token"),
     leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
     errorCode: text("error_code"),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     receivedAt: timestamp("received_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
     processedAt: timestamp("processed_at", { withTimezone: true }),
   },
   (t) => [index("webhook_inbox_state_received_idx").on(t.state, t.receivedAt)],
+);
+export const payoutProvisioningTable = pgTable(
+  "payout_provisioning",
+  {
+    profileId: uuid("profile_id")
+      .primaryKey()
+      .references(() => profilesTable.id),
+    state: text("state").notNull().default("queued"),
+    attempts: integer("attempts").notNull().default(0),
+    firstAttemptAt: timestamp("first_attempt_at", { withTimezone: true }),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    leaseToken: uuid("lease_token"),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+    providerAccountId: text("provider_account_id").unique(),
+    errorCode: text("error_code"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("payout_provisioning_due_idx").on(t.state, t.nextAttemptAt)],
+);
+export const workerHeartbeatsTable = pgTable(
+  "worker_heartbeats",
+  {
+    workerId: text("worker_id").primaryKey(),
+    component: text("component").notNull(),
+    lastSuccessAt: timestamp("last_success_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("worker_heartbeats_component_idx").on(t.component, t.lastSuccessAt),
+  ],
+);
+export const requestLimitsTable = pgTable(
+  "request_limits",
+  {
+    bucketKey: text("bucket_key").primaryKey(),
+    requests: integer("requests").notNull().default(1),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("request_limits_expiry_idx").on(t.expiresAt)],
 );

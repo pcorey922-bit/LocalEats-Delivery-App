@@ -1,5 +1,6 @@
+import { alias } from "drizzle-orm/pg-core";
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, lte, or } from "drizzle-orm";
+import { and, asc, eq, inArray, lte, or, sql, notExists } from "drizzle-orm";
 import {
   db,
   financialOperationsTable as operations,
@@ -183,6 +184,11 @@ export async function requestProviderTransfer(
         accountId: account.providerAccountId,
       },
     });
+    if (["failed", "reconciliation", "cancelled"].includes(operation.state))
+      throw new CommerceError(
+        409,
+        "Settlement operation is held for review; it cannot be blindly resubmitted",
+      );
     await tx
       .update(payoutsTable)
       .set({ status: "processing" })
@@ -279,15 +285,13 @@ export async function requestProviderCancellation(
         .update(deliveriesTable)
         .set({ status: "cancelled" })
         .where(eq(deliveriesTable.orderId, orderId));
-      await tx
-        .insert(orderEventsTable)
-        .values({
-          orderId,
-          actorProfileId: actor.id,
-          fromStatus: order.status,
-          toStatus: "cancelled",
-          note: reason,
-        });
+      await tx.insert(orderEventsTable).values({
+        orderId,
+        actorProfileId: actor.id,
+        fromStatus: order.status,
+        toStatus: "cancelled",
+        note: reason,
+      });
       await notifyOrder(
         tx,
         orderId,
@@ -324,7 +328,7 @@ export async function requestProviderCancellation(
         orderId,
         kind: "expire_checkout",
         resourceId: payment.id,
-        payload: { reason },
+        payload: {},
       });
     await audit(tx, actor.id, "cancellation.requested", orderId, { reason });
     return {
@@ -341,6 +345,7 @@ export async function requestProviderCancellation(
 
 async function claimOperation(): Promise<FinancialOperation | null> {
   const now = new Date();
+  const blocked = alias(operations, "blocked_operations");
   const candidates = await db
     .select({ orderId: operations.orderId })
     .from(operations)
@@ -348,10 +353,22 @@ async function claimOperation(): Promise<FinancialOperation | null> {
       and(
         inArray(operations.state, ["queued", "processing", "pending"]),
         lte(operations.nextAttemptAt, now),
+        notExists(
+          db
+            .select({ id: blocked.id })
+            .from(blocked)
+            .where(
+              and(
+                eq(blocked.orderId, operations.orderId),
+                eq(blocked.state, "reconciliation"),
+              ),
+            ),
+        ),
       ),
     )
-    .orderBy(asc(operations.createdAt))
-    .limit(30);
+    .groupBy(operations.orderId)
+    .orderBy(sql`min(${operations.createdAt})`)
+    .limit(100);
   for (const { orderId } of candidates) {
     const claimed = await db.transaction(async (tx) => {
       const [order] = await tx

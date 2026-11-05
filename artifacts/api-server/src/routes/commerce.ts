@@ -17,6 +17,7 @@ import {
   restaurantHoursTable,
   accountDeletionRequestsTable,
   financialOperationsTable,
+  payoutProvisioningTable,
 } from "@workspace/db";
 import { getActiveProfile, requireRole } from "../lib/current-profile";
 import { requireAuth } from "../middlewares/require-auth";
@@ -548,68 +549,44 @@ router.get("/payout-account", requireAuth, async (req, res) => {
         .where(eq(connectedAccountsTable.profileId, profile.id));
     }
   }
-  res.json({ testMode: true, account: account ?? null });
+  const [provisioning] = await db
+    .select({ state: payoutProvisioningTable.state })
+    .from(payoutProvisioningTable)
+    .where(eq(payoutProvisioningTable.profileId, profile.id))
+    .limit(1);
+  res.json({
+    testMode: true,
+    account: account ?? null,
+    provisioningState: provisioning?.state ?? null,
+  });
 });
 router.post("/payout-account/onboard", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
   if (!profile || !requireRole(profile, ["restaurant", "driver"], res)) return;
   const mode = requirePaymentProvider();
-  // Lock profile to serialize account creation; the provider key remains stable
-  // if a timeout happens after remote creation but before the local commit.
-  const result = await db.transaction(async (tx) => {
-    await tx
-      .select()
-      .from(profilesTable)
-      .where(eq(profilesTable.id, profile.id))
-      .for("update");
-    let [account] = await tx
-      .select()
-      .from(connectedAccountsTable)
-      .where(eq(connectedAccountsTable.profileId, profile.id))
-      .limit(1);
-    if (account && account.provider !== mode)
-      throw new CommerceError(
-        409,
-        "Payout account belongs to another test provider",
-      );
-    if (!account) {
-      const id =
-        mode === "sandbox"
-          ? `sandbox_account_${profile.id}`
-          : (
-              await stripeTest().accounts.create(
-                {
-                  type: "express",
-                  country: "US",
-                  capabilities: { transfers: { requested: true } },
-                  metadata: { profileId: profile.id },
-                },
-                { idempotencyKey: `account:${profile.id}` },
-              )
-            ).id;
-      [account] = await tx
-        .insert(connectedAccountsTable)
-        .values({
-          profileId: profile.id,
-          provider: mode,
-          providerAccountId: id,
-          ready: mode === "sandbox",
-        })
-        .returning();
-    }
-    let url: string | null = null;
-    if (mode === "stripe_test")
-      url = (
-        await stripeTest().accountLinks.create({
-          account: account.providerAccountId,
-          type: "account_onboarding",
-          refresh_url: `${checkoutOrigin()}/earnings`,
-          return_url: `${checkoutOrigin()}/earnings`,
-        })
-      ).url;
-    return { account, url, testMode: true };
-  });
-  res.json(result);
+  if (mode === "stripe_test") {
+    const result = await (
+      await import("../lib/payout-onboarding")
+    ).requestPayoutOnboarding(profile);
+    res.status(result.account ? 200 : 202).json(result);
+    return;
+  }
+  // This path is unreachable outside NODE_ENV=test (enforced by paymentMode).
+  await db
+    .insert(connectedAccountsTable)
+    .values({
+      profileId: profile.id,
+      provider: "sandbox",
+      providerAccountId: `sandbox_account_${profile.id}`,
+      ready: true,
+    })
+    .onConflictDoNothing();
+  const [account] = await db
+    .select()
+    .from(connectedAccountsTable)
+    .where(eq(connectedAccountsTable.profileId, profile.id))
+    .limit(1);
+  res.json({ account, url: null, testMode: true });
 });
 router.get("/admin/payouts", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);

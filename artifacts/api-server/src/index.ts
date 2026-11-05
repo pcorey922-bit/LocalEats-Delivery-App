@@ -1,52 +1,118 @@
+import { randomUUID } from "node:crypto";
+import { lt } from "drizzle-orm";
+import {
+  db,
+  pool,
+  workerHeartbeatsTable,
+  requestLimitsTable,
+} from "@workspace/db";
 import app from "./app";
 import { processWebhookInbox } from "./lib/webhook-worker";
 import { processFinancialOperation } from "./lib/financial-operations";
+import { processPayoutProvisioning } from "./lib/payout-onboarding";
 import { drainPushBatch } from "./lib/push";
 import { paymentMode } from "./lib/commerce-policy";
-paymentMode(); // Refuse live payment keys at startup.
-let financeRunning=false;
-const financeTimer=setInterval(async()=>{
- if(financeRunning||paymentMode()!=='stripe_test')return;
- financeRunning=true;
- try{for(let i=0;i<20;i++)if(!await processWebhookInbox())break;for(let i=0;i<10;i++)if(!await processFinancialOperation())break;}
- catch{logger.error('Financial worker failed; durable operations remain pending');}
- finally{financeRunning=false;}
-},2000);
-financeTimer.unref();
-let pushRunning = false;
-const pushTimer = setInterval(async () => {
-  if (pushRunning) return;
-  pushRunning = true;
-  try {
-    await drainPushBatch();
-  } catch {
-    logger.warn("Notification worker deferred");
-  } finally {
-    pushRunning = false;
-  }
-}, 15000);
-pushTimer.unref();
+import { startWorkerLoop } from "./lib/worker-loop";
 import { logger } from "./lib/logger";
-
-const rawPort = process.env["PORT"];
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
+paymentMode();
+const port = Number(process.env.PORT);
+if (!Number.isInteger(port) || port < 1 || port > 65535)
+  throw new Error("PORT must be an integer from 1 to 65535");
+const instanceId = randomUUID();
+function worker(
+  component: string,
+  intervalMs: number,
+  run: (stopping: () => boolean) => Promise<void>,
+) {
+  return startWorkerLoop({
+    intervalMs,
+    run,
+    onError: () =>
+      logger.error(
+        { component },
+        "Worker failed; saved jobs remain recoverable",
+      ),
+    onSuccess: async () => {
+      const workerId = `${instanceId}:${component}`;
+      await db
+        .insert(workerHeartbeatsTable)
+        .values({ workerId, component })
+        .onConflictDoUpdate({
+          target: workerHeartbeatsTable.workerId,
+          set: { lastSuccessAt: new Date() },
+        });
+    },
+  });
 }
-
-const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
-
-app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
+const loops = [
+  worker("webhooks", 2000, async (stopping) => {
+    if (paymentMode() !== "stripe_test") return;
+    for (let i = 0; i < 20 && !stopping(); i++)
+      if (!(await processWebhookInbox())) break;
+  }),
+  worker("finance", 2000, async (stopping) => {
+    if (paymentMode() !== "stripe_test") return;
+    for (let i = 0; i < 3 && !stopping(); i++) {
+      const work = await Promise.all(
+        Array.from({ length: 4 }, () => processFinancialOperation()),
+      );
+      if (!work.some(Boolean)) break;
+    }
+  }),
+  worker("onboarding", 2000, async (stopping) => {
+    if (paymentMode() !== "stripe_test") return;
+    for (let i = 0; i < 5 && !stopping(); i++)
+      if (!(await processPayoutProvisioning())) break;
+  }),
+  worker("push", 15000, async () => {
+    await drainPushBatch();
+  }),
+  worker("maintenance", 60000, async () => {
+    await db
+      .delete(requestLimitsTable)
+      .where(lt(requestLimitsTable.expiresAt, new Date()));
+    await db
+      .delete(workerHeartbeatsTable)
+      .where(
+        lt(
+          workerHeartbeatsTable.lastSuccessAt,
+          new Date(Date.now() - 86400000),
+        ),
+      );
+  }),
+];
+const server = app.listen(port, () =>
+  logger.info({ port }, "Server listening"),
+);
+let shuttingDown = false;
+async function shutdown(signal: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  process.env.ROCOEATS_DRAINING = "1";
+  logger.info({ signal }, "Draining requests and workers");
+  const deadline = setTimeout(() => {
+    server.closeAllConnections();
+    logger.error(
+      "Drain deadline reached; unconfirmed jobs retain recovery leases",
+    );
+    process.exit(1);
+  }, 45000);
+  deadline.unref();
+  try {
+    await Promise.all([
+      new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      ),
+      ...loops.map((loop) => loop.stop()),
+    ]);
+    await pool.end();
+    clearTimeout(deadline);
+    process.exit(0);
+  } catch {
+    clearTimeout(deadline);
+    logger.error("Shutdown failed; saved job leases remain recoverable");
     process.exit(1);
   }
-
-  logger.info({ port }, "Server listening");
-});
+}
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));

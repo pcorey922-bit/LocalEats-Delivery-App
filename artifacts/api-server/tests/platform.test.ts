@@ -24,9 +24,12 @@ import {
   driverPresenceTable,
   deliveryLocationsTable,
   webhookInboxTable,
+  connectedAccountsTable,
+  payoutProvisioningTable,
 } from "./database";
 import { testPricing } from "../src/lib/testing/pricing";
 import { processWebhookInbox } from "../src/lib/webhook-worker";
+import { processPayoutProvisioning } from "../src/lib/payout-onboarding";
 import { processFinancialOperation } from "../src/lib/financial-operations";
 const ids = {
   customer: randomUUID(),
@@ -105,6 +108,7 @@ async function ready(id: string) {
 before(async () => {
   process.env.PAYMENT_PROVIDER = "sandbox";
   process.env.NODE_ENV = "test";
+  process.env.API_MUTATION_LIMIT_PER_MINUTE = "10000";
   delete process.env.STRIPE_SECRET_KEY;
   for (const file of (await readdir("../../lib/db/drizzle"))
     .filter((f) => f.endsWith(".sql"))
@@ -184,7 +188,7 @@ after(async () => {
     );
   await engine.close();
 });
-test("real relational HTTP platform flows", { timeout: 30000 }, async (t) => {
+test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
   await t.test("anonymous and wrong-role requests are rejected", async () => {
     assert.equal((await api("/driver/offers", null)).status, 401);
     assert.equal(
@@ -976,6 +980,338 @@ test("real relational HTTP platform flows", { timeout: 30000 }, async (t) => {
       } finally {
         process.env.PAYMENT_PROVIDER = "sandbox";
         delete process.env.STRIPE_SECRET_KEY;
+      }
+    },
+  );
+  await t.test(
+    "cancellation persists while transfer I/O is blocked; refund and recovery remain separate",
+    async () => {
+      const order = await create();
+      await ready(order.id);
+      await api(`/driver/orders/${order.id}/claim`, ids.driver, "POST");
+      await api(`/driver/orders/${order.id}/pickup`, ids.driver, "POST");
+      await api(`/driver/orders/${order.id}/deliver`, ids.driver, "POST");
+      await db
+        .update(paymentsTable)
+        .set({ provider: "stripe_test", providerPaymentId: `pi_${order.id}` })
+        .where(eq(paymentsTable.orderId, order.id));
+      await db
+        .insert(connectedAccountsTable)
+        .values({
+          profileId: ids.restaurant,
+          provider: "stripe_test",
+          providerAccountId: "acct_test_recovery",
+          ready: true,
+        })
+        .onConflictDoUpdate({
+          target: connectedAccountsTable.profileId,
+          set: {
+            provider: "stripe_test",
+            providerAccountId: "acct_test_recovery",
+            ready: true,
+          },
+        });
+      process.env.PAYMENT_PROVIDER = "stripe_test";
+      process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
+      let release!: () => void;
+      let began!: () => void;
+      const gate = new Promise<void>((r) => (release = r));
+      const started = new Promise<void>((r) => (began = r));
+      try {
+        const payouts = await db
+          .select()
+          .from(payoutsTable)
+          .where(eq(payoutsTable.orderId, order.id));
+        const restaurant = payouts.find((p) => p.kind === "restaurant")!;
+        const queued = await api(
+          `/admin/payouts/${restaurant.id}/transfer`,
+          ids.admin,
+          "POST",
+        );
+        assert.equal(queued.status, 202);
+        const worker = processFinancialOperation(async (job) => {
+          assert.equal(job.id, `transfer:${restaurant.id}`);
+          began();
+          await gate;
+          return { id: "tr_inflight_fixture", status: "succeeded" };
+        });
+        await started;
+        const cancel = await api(
+          `/orders/${order.id}/cancel`,
+          ids.admin,
+          "POST",
+          { reason: "Restaurant support cancellation during transfer" },
+        );
+        assert.equal(cancel.status, 200);
+        const [savedRefund] = await db
+          .select()
+          .from(refundsTable)
+          .where(eq(refundsTable.orderId, order.id));
+        assert.equal(savedRefund.status, "pending");
+        release();
+        await worker;
+        await processFinancialOperation(async (job) => {
+          assert.equal(job.kind, "refund");
+          return { id: "re_inflight_fixture", status: "succeeded" };
+        });
+        const [refunded] = await db
+          .select()
+          .from(paymentsTable)
+          .where(eq(paymentsTable.orderId, order.id));
+        assert.equal(refunded.status, "refunded");
+        await processFinancialOperation(async (job) => {
+          assert.equal(job.kind, "reversal");
+          throw new Error("Recipient recovery temporarily unavailable");
+        });
+        const [stillRefunded] = await db
+          .select()
+          .from(paymentsTable)
+          .where(eq(paymentsTable.orderId, order.id));
+        assert.equal(stillRefunded.status, "refunded");
+        const [recovery] = await db
+          .select()
+          .from(financialOperationsTable)
+          .where(eq(financialOperationsTable.id, `reversal:${restaurant.id}`));
+        assert.equal(recovery.state, "queued");
+        await db
+          .update(financialOperationsTable)
+          .set({ nextAttemptAt: new Date(0) })
+          .where(eq(financialOperationsTable.id, recovery.id));
+        await processFinancialOperation(async () => ({
+          id: "trr_recovered_fixture",
+          status: "succeeded",
+        }));
+        const [paid] = await db
+          .select()
+          .from(payoutsTable)
+          .where(eq(payoutsTable.id, restaurant.id));
+        assert.equal(paid.status, "reversed");
+      } finally {
+        release?.();
+        process.env.PAYMENT_PROVIDER = "sandbox";
+        delete process.env.STRIPE_SECRET_KEY;
+      }
+    },
+  );
+  await t.test(
+    "a refund webhook arriving before the worker response is monotonic and replay-safe",
+    async () => {
+      const order = await create();
+      await pay(order.id);
+      await db
+        .update(paymentsTable)
+        .set({ provider: "stripe_test", providerPaymentId: `pi_${order.id}` })
+        .where(eq(paymentsTable.orderId, order.id));
+      process.env.PAYMENT_PROVIDER = "stripe_test";
+      process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_fixture";
+      let release!: () => void;
+      let began!: () => void;
+      const gate = new Promise<void>((r) => (release = r));
+      const started = new Promise<void>((r) => (began = r));
+      try {
+        await api(`/orders/${order.id}/cancel`, ids.customer, "POST", {
+          reason: "Refund webhook race check",
+        });
+        const worker = processFinancialOperation(async (job) => {
+          assert.equal(job.kind, "refund");
+          began();
+          await gate;
+          return { id: "re_webhook_race", status: "pending" };
+        });
+        await started;
+        const stripe = new Stripe("sk_test_fixture");
+        const send = async (status: string, id: string) => {
+          const payload = JSON.stringify({
+            id,
+            type: "refund.updated",
+            livemode: false,
+            data: {
+              object: {
+                id: "re_webhook_race",
+                payment_intent: `pi_${order.id}`,
+                amount: order.totalCents,
+                currency: "usd",
+                status,
+                metadata: { operationId: `refund:${order.id}` },
+              },
+            },
+          });
+          const response = await fetch(`${origin}/api/webhooks/stripe`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              "stripe-signature": stripe.webhooks.generateTestHeaderString({
+                payload,
+                secret: "whsec_fixture",
+              }),
+            },
+            body: payload,
+          });
+          assert.equal(response.status, 202);
+          await processWebhookInbox();
+        };
+        await send("succeeded", "evt_refund_before_response");
+        release();
+        await worker;
+        await send("pending", "evt_refund_old_pending");
+        await send("succeeded", "evt_refund_before_response");
+        const [payment] = await db
+          .select()
+          .from(paymentsTable)
+          .where(eq(paymentsTable.orderId, order.id));
+        const [refund] = await db
+          .select()
+          .from(refundsTable)
+          .where(eq(refundsTable.orderId, order.id));
+        const [op] = await db
+          .select()
+          .from(financialOperationsTable)
+          .where(eq(financialOperationsTable.id, `refund:${order.id}`));
+        assert.equal(payment.status, "refunded");
+        assert.equal(refund.status, "succeeded");
+        assert.equal(op.state, "succeeded");
+      } finally {
+        release?.();
+        process.env.PAYMENT_PROVIDER = "sandbox";
+        delete process.env.STRIPE_SECRET_KEY;
+      }
+    },
+  );
+  await t.test(
+    "Connect provisioning survives a timeout without holding a database transaction",
+    async () => {
+      const profileId = randomUUID();
+      await db
+        .insert(profilesTable)
+        .values({
+          id: profileId,
+          clerkUserId: profileId,
+          role: "restaurant",
+          displayName: "Provisioning test fixture",
+        });
+      process.env.PAYMENT_PROVIDER = "stripe_test";
+      process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
+      try {
+        assert.equal(
+          (await api("/payout-account/onboard", profileId, "POST")).status,
+          202,
+        );
+        assert.equal(
+          (await api("/payout-account/onboard", profileId, "POST")).status,
+          202,
+        );
+        const receipts = new Map();
+        let calls = 0;
+        const provider = async (id: string) => {
+          assert.equal(id, profileId);
+          await db.select().from(profilesTable).where(eq(profilesTable.id, id));
+          calls++;
+          if (!receipts.has(id)) receipts.set(id, "acct_provisioned_fixture");
+          if (calls === 1)
+            throw new Error("Provider created account but response was lost");
+          return receipts.get(id);
+        };
+        await processPayoutProvisioning(provider);
+        const [first] = await db
+          .select()
+          .from(payoutProvisioningTable)
+          .where(eq(payoutProvisioningTable.profileId, profileId));
+        assert.equal(first.state, "queued");
+        assert.ok(first.firstAttemptAt);
+        await db
+          .update(payoutProvisioningTable)
+          .set({ nextAttemptAt: new Date(0) })
+          .where(eq(payoutProvisioningTable.profileId, profileId));
+        await processPayoutProvisioning(provider);
+        const [account] = await db
+          .select()
+          .from(connectedAccountsTable)
+          .where(eq(connectedAccountsTable.profileId, profileId));
+        assert.equal(account.providerAccountId, "acct_provisioned_fixture");
+        assert.equal(account.ready, false);
+        assert.equal(receipts.size, 1);
+      } finally {
+        process.env.PAYMENT_PROVIDER = "sandbox";
+        delete process.env.STRIPE_SECRET_KEY;
+      }
+    },
+  );
+  await t.test(
+    "webhook recovery is restricted, audited and does not expose signed payloads",
+    async () => {
+      assert.equal(
+        (await api("/admin/webhook-inbox", ids.customer)).status,
+        403,
+      );
+      const events = await api("/admin/webhook-inbox", ids.admin);
+      assert.equal(events.status, 200);
+      assert.equal(JSON.stringify(events.data).includes("payload"), false);
+      const held = events.data.find((e: any) => e.id === "evt_mismatch");
+      assert.equal(held.state, "reconciliation");
+      assert.equal(
+        (
+          await api(
+            "/admin/webhook-inbox/evt_mismatch/retry",
+            ids.customer,
+            "POST",
+            { reason: "Investigating provider amount mismatch" },
+          )
+        ).status,
+        403,
+      );
+      assert.equal(
+        (
+          await api(
+            "/admin/webhook-inbox/evt_mismatch/retry",
+            ids.admin,
+            "POST",
+            { reason: "Investigating provider amount mismatch" },
+          )
+        ).status,
+        202,
+      );
+      process.env.PAYMENT_PROVIDER = "stripe_test";
+      process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
+      await processWebhookInbox();
+      process.env.PAYMENT_PROVIDER = "sandbox";
+      delete process.env.STRIPE_SECRET_KEY;
+      const [again] = await db
+        .select()
+        .from(webhookInboxTable)
+        .where(eq(webhookInboxTable.id, "evt_mismatch"));
+      assert.equal(again.state, "reconciliation");
+      assert.equal(
+        (await api("/admin/operational-health", ids.admin)).status,
+        200,
+      );
+    },
+  );
+  await t.test(
+    "distributed mutation limits apply atomically across concurrent requests",
+    async () => {
+      const actor = randomUUID();
+      await db
+        .insert(profilesTable)
+        .values({
+          id: actor,
+          clerkUserId: actor,
+          role: "customer",
+          displayName: "Rate-limit test fixture",
+        });
+      process.env.API_MUTATION_LIMIT_PER_MINUTE = "2";
+      try {
+        const responses = await Promise.all(
+          Array.from({ length: 3 }, () =>
+            api("/account/deletion-request", actor, "POST"),
+          ),
+        );
+        assert.deepEqual(
+          responses.map((r) => r.status).sort(),
+          [202, 202, 429],
+        );
+      } finally {
+        process.env.API_MUTATION_LIMIT_PER_MINUTE = "10000";
       }
     },
   );

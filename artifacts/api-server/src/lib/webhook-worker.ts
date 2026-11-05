@@ -12,7 +12,7 @@ export async function processWebhookInbox() {
       .from(inbox)
       .where(
         or(
-          eq(inbox.state, "received"),
+          and(eq(inbox.state, "received"), lte(inbox.nextAttemptAt, now)),
           and(eq(inbox.state, "processing"), lte(inbox.leaseExpiresAt, now)),
         ),
       )
@@ -49,7 +49,16 @@ export async function processWebhookInbox() {
     await db
       .update(inbox)
       .set({
-        state: error instanceof CommerceError ? "reconciliation" : "received",
+        state:
+          error instanceof CommerceError
+            ? "reconciliation"
+            : job.attempts >= 10
+              ? "dead_letter"
+              : "received",
+        nextAttemptAt: new Date(
+          Date.now() +
+            Math.min(3600000, 1000 * 2 ** Math.min(job.attempts, 12)),
+        ),
         errorCode:
           error instanceof CommerceError
             ? "EVENT_STATE_MISMATCH"

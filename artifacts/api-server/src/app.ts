@@ -14,6 +14,9 @@ import {
 import { stripeWebhook } from "./routes/payment-webhook";
 import { CommerceError } from "./lib/commerce-policy";
 import { ZodError } from "zod";
+import {readiness} from "./routes/operational-health";
+import {limitMutations} from "./lib/request-limits";
+import {randomUUID} from "node:crypto";
 const app: Express = express();
 
 app.use(
@@ -36,6 +39,9 @@ app.use(
   }),
 );
 
+app.use((_req,res,next)=>{res.setHeader('X-Request-ID',randomUUID());res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');res.setHeader('X-Frame-Options','DENY');next();});
+app.get('/livez',(_req,res)=>res.json({alive:true}));
+app.get('/readyz',readiness);
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
 const allowedOrigins = (process.env.CORS_ORIGINS || "")
@@ -87,6 +93,7 @@ app.use("/api", (req, res, next) => {
   }
   next();
 });
+app.use("/api", limitMutations);
 app.use("/api", router);
 
 const errors: ErrorRequestHandler = (error, _req, res, _next) => {

@@ -12,6 +12,7 @@ try {
     ["commerce-policy", "src/lib/commerce-policy.test.ts"],
     ["availability", "src/lib/restaurant-availability.test.ts"],
     ["platform", "tests/platform.test.ts"],
+    ["worker-loop", "src/lib/worker-loop.test.ts"],
   ]) {
     const outfile = path.join(outputDirectory, `${name}.mjs`);
     await build({
