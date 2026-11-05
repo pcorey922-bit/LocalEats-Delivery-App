@@ -291,6 +291,7 @@ router.post(
       deliveryInstructions: address.deliveryInstructions,
     };
 
+    let createdNewOrder = true;
     const createdOrderId = await db.transaction(async (tx) => {
       const [order] = await tx
         .insert(ordersTable)
@@ -313,6 +314,7 @@ router.post(
         .onConflictDoNothing({ target: ordersTable.requestKey })
         .returning({ id: ordersTable.id });
       if (!order) {
+        createdNewOrder = false;
         const [existing] = await tx
           .select()
           .from(ordersTable)
@@ -359,7 +361,9 @@ router.post(
     });
 
     const [orderView] = await readOrders([createdOrderId]);
-    res.status(201).json(CreateMyOrderResponse.parse(orderView));
+    res
+      .status(createdNewOrder ? 201 : 200)
+      .json(CreateMyOrderResponse.parse(orderView));
   },
 );
 
@@ -457,11 +461,9 @@ router.patch(
     }
     const nextStatus = parsed.data.status as OrderStatus;
     if (["out_for_delivery", "delivered"].includes(nextStatus)) {
-      res
-        .status(403)
-        .json({
-          error: "Only the assigned driver can record pickup and delivery",
-        });
+      res.status(403).json({
+        error: "Only the assigned driver can record pickup and delivery",
+      });
       return;
     }
 
