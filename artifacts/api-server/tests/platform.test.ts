@@ -15,6 +15,7 @@ import {
   addressesTable,
   restaurantHoursTable,
   ordersTable,
+  orderItemsTable,
   paymentsTable,
   notificationsTable,
   payoutsTable,
@@ -200,6 +201,26 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     delete process.env.STRIPE_SECRET_KEY;
     delete process.env.STRIPE_WEBHOOK_SECRET;
     process.env.API_MUTATION_LIMIT_PER_MINUTE = "10000";
+  });
+  await t.test("owners manage modifiers; checkout validates choices and snapshots server pricing", async () => {
+    const groups=[{id:"size",name:"Size",minSelections:1,maxSelections:1,options:[{id:"large",name:"Large",priceCents:250},{id:"small",name:"Small",priceCents:0}]},{id:"extras",name:"Extras",minSelections:0,maxSelections:2,options:[{id:"cheese",name:"Cheese",priceCents:100},{id:"sauce",name:"Sauce",priceCents:50}]}];
+    const path=`/restaurants/me/menu-items/${ids.item}`;
+    assert.equal((await api(path,ids.customer,"PATCH",{modifierGroups:groups})).status,403);
+    assert.equal((await api(path,ids.restaurant,"PATCH",{modifierGroups:[{...groups[0],minSelections:3}]})).status,400);
+    assert.equal((await api(path,ids.restaurant,"PATCH",{modifierGroups:groups})).status,200);
+    const body={...input(),items:[{menuItemId:ids.item,quantity:2,modifiers:{size:["large"],extras:["cheese"]},priceCents:1}]};
+    for(const modifiers of [{},{size:["large","small"]},{size:["large","large"]},{size:["bogus"]},{size:["large"],foreign:["cheese"]}]) {
+      assert.equal((await api("/orders/quote",ids.customer,"POST",{...body,items:[{...body.items[0],modifiers}]})).status,400);
+    }
+    const quote=await api("/orders/quote",ids.customer,"POST",body);
+    assert.equal(quote.status,200,JSON.stringify(quote.data));assert.equal(quote.data.subtotalCents,2700);
+    const created=await api("/orders",ids.customer,"POST",{...body,expectedTotalCents:quote.data.totalCents},randomUUID());
+    assert.equal(created.status,201,JSON.stringify(created.data));
+    const [line]=await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId,created.data.id));
+    assert.equal(line.unitPriceCents,1350);assert.deepEqual(line.modifierSnapshot,[{group:"Size",option:"Large",priceCents:250},{group:"Extras",option:"Cheese",priceCents:100}]);
+    await api(path,ids.restaurant,"PATCH",{modifierGroups:[]});
+    const [preserved]=await db.select().from(orderItemsTable).where(eq(orderItemsTable.id,line.id));
+    assert.deepEqual(preserved.modifierSnapshot,line.modifierSnapshot);
   });
   await t.test("anonymous and wrong-role requests are rejected", async () => {
     assert.equal((await api("/driver/offers", null)).status, 401);

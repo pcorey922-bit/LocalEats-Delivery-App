@@ -1,5 +1,5 @@
 import { createInsertSchema } from "drizzle-zod";
-import { boolean, index, integer, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, jsonb, index, integer, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 import { menuCategoriesTable } from "./menu-categories";
 import { restaurantsTable } from "./restaurants";
@@ -11,6 +11,7 @@ export const menuItemsTable = pgTable("menu_items", {
   name: varchar("name", { length: 140 }).notNull(),
   description: text("description"),
   priceCents: integer("price_cents").notNull(),
+  modifierGroups: jsonb("modifier_groups").$type<{id:string;name:string;minSelections:number;maxSelections:number;options:{id:string;name:string;priceCents:number}[]}[]>().notNull().default([]),
   isAvailable: boolean("is_available").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

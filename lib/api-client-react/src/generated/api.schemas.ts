@@ -78,6 +78,7 @@ export interface MenuItem {
   /** @nullable */
   description: string | null;
   priceCents: number;
+  modifierGroups?: {id:string;name:string;minSelections:number;maxSelections:number;options:{id:string;name:string;priceCents:number}[]}[];
   isAvailable: boolean;
 }
 
@@ -226,6 +227,7 @@ export interface MenuItemInput {
      * @maximum 1000000
      */
   priceCents: number;
+  modifierGroups?: {id:string;name:string;minSelections:number;maxSelections:number;options:{id:string;name:string;priceCents:number}[]}[];
   isAvailable?: boolean;
 }
 
@@ -374,6 +376,7 @@ export interface OrderItem {
   /** @nullable */
   menuItemId: string | null;
   itemName: string;
+  modifierSnapshot?: {group:string;option:string;priceCents:number}[];
   unitPriceCents: number;
   quantity: number;
   /** @nullable */

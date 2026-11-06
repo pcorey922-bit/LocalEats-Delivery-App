@@ -465,6 +465,7 @@ router.post(
         description: parsed.data.description?.trim() || null,
         priceCents: parsed.data.priceCents,
         isAvailable: parsed.data.isAvailable ?? true,
+        modifierGroups: parsed.data.modifierGroups,
       })
       .returning();
     res.status(201).json(CreateMyRestaurantMenuItemResponse.parse(item));
@@ -515,6 +516,7 @@ router.patch(
     const [item] = await db
       .update(menuItemsTable)
       .set({
+        ...(parsed.data.modifierGroups !== undefined && { modifierGroups: parsed.data.modifierGroups }),
         ...(parsed.data.categoryId !== undefined && { categoryId: parsed.data.categoryId }),
         ...(parsed.data.name !== undefined && { name: parsed.data.name.trim() }),
         ...(parsed.data.description !== undefined && {

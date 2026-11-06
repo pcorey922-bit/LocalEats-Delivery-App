@@ -1,3 +1,4 @@
+import { customize } from "../../../../lib/api-zod/src/modifiers";
 import { ensureAccepting } from "../lib/restaurant-availability";
 import { createHash } from "node:crypto";
 import { z } from "zod";
@@ -123,6 +124,7 @@ async function readOrders(orderIds: string[]) {
         id: item.id,
         menuItemId: item.menuItemId,
         itemName: item.itemNameSnapshot,
+        modifierSnapshot: item.modifierSnapshot,
         unitPriceCents: item.unitPriceCents,
         quantity: item.quantity,
         specialInstructions: item.specialInstructions,
@@ -233,9 +235,13 @@ router.post(
     }
 
     const itemsById = new Map(availableItems.map((item) => [item.id, item]));
-    const subtotalCents = parsed.data.items.reduce((sum, line) => {
+    const customizations = parsed.data.items.map(line => {
+      try { return customize(itemsById.get(line.menuItemId)!.modifierGroups, line.modifiers); }
+      catch(error) { throw new CommerceError(400, error instanceof Error ? error.message : "Invalid modifiers"); }
+    });
+    const subtotalCents = parsed.data.items.reduce((sum, line, index) => {
       const menuItem = itemsById.get(line.menuItemId);
-      return sum + (menuItem?.priceCents ?? 0) * line.quantity;
+      return sum + ((menuItem?.priceCents ?? 0) + customizations[index].extraCents) * line.quantity;
     }, 0);
     if (!Number.isSafeInteger(subtotalCents) || subtotalCents > 2_147_483_647) {
       res
@@ -324,14 +330,15 @@ router.post(
       }
 
       await tx.insert(orderItemsTable).values(
-        parsed.data.items.map((line) => {
+        parsed.data.items.map((line, index) => {
           const menuItem = itemsById.get(line.menuItemId)!;
           return {
             orderId: order.id,
             menuItemId: menuItem.id,
             itemNameSnapshot: menuItem.name,
             itemDescriptionSnapshot: menuItem.description,
-            unitPriceCents: menuItem.priceCents,
+            unitPriceCents: menuItem.priceCents + customizations[index].extraCents,
+            modifierSnapshot: customizations[index].snapshot,
             quantity: line.quantity,
             specialInstructions: line.specialInstructions?.trim() || null,
           };

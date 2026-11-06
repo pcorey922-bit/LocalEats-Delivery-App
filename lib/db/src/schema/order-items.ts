@@ -1,5 +1,5 @@
 import { createInsertSchema } from "drizzle-zod";
-import { index, integer, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { index, jsonb, integer, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 import { menuItemsTable } from "./menu-items";
 import { ordersTable } from "./orders";
@@ -11,6 +11,7 @@ export const orderItemsTable = pgTable("order_items", {
   itemNameSnapshot: varchar("item_name_snapshot", { length: 140 }).notNull(),
   itemDescriptionSnapshot: text("item_description_snapshot"),
   unitPriceCents: integer("unit_price_cents").notNull(),
+  modifierSnapshot: jsonb("modifier_snapshot").$type<{group:string;option:string;priceCents:number}[]>().notNull().default([]),
   quantity: integer("quantity").notNull(),
   specialInstructions: text("special_instructions"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
