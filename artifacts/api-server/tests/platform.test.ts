@@ -381,7 +381,9 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
   await t.test("checkout rejects inputs changed between price calculation and transaction commit",async()=>{
     const [originalItem]=await db.select().from(menuItemsTable).where(eq(menuItemsTable.id,ids.item));
     const [originalAddress]=await db.select().from(addressesTable).where(eq(addressesTable.id,ids.address));
+    const [originalSetting]=await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.settingKey,'test_pricing'));
     const scenarios=[
+      {change:()=>db.update(platformSettingsTable).set({value:{...originalSetting.value,deliveryFeeCents:799}}).where(eq(platformSettingsTable.settingKey,'test_pricing')),reset:()=>db.update(platformSettingsTable).set({value:originalSetting.value}).where(eq(platformSettingsTable.settingKey,'test_pricing'))},
       {change:()=>db.update(menuItemsTable).set({priceCents:originalItem.priceCents+100}).where(eq(menuItemsTable.id,ids.item)),reset:()=>db.update(menuItemsTable).set({priceCents:originalItem.priceCents}).where(eq(menuItemsTable.id,ids.item))},
       {change:()=>db.update(menuItemsTable).set({isAvailable:false}).where(eq(menuItemsTable.id,ids.item)),reset:()=>db.update(menuItemsTable).set({isAvailable:true}).where(eq(menuItemsTable.id,ids.item))},
       {change:()=>db.update(addressesTable).set({deliveryInstructions:'Changed after price calculation'}).where(eq(addressesTable.id,ids.address)),reset:()=>db.update(addressesTable).set({deliveryInstructions:originalAddress.deliveryInstructions}).where(eq(addressesTable.id,ids.address))},

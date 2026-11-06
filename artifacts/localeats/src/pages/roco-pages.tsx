@@ -1,3 +1,4 @@
+import { useCustomerCart } from "../hooks/use-customer-cart";
 import { cartLineKey } from "../lib/cart-line";
 import { SupportDesk } from "./support-desk";
 import { CustomerHandoff, DriverHandoff } from "./delivery-handoff";
@@ -26,10 +27,7 @@ import {
 
 import { customFetch } from '../../../../lib/api-client-react/src/custom-fetch';
 
-type CartEntry = { specialInstructions?:string; lineId?: string; modifiers?: Record<string,string[]>; customization?: string; menuItemId: string; name: string; priceCents: number; quantity: number; restaurantId: string; restaurantName: string };
-const CART_KEY = 'rocoeats-cart';
 const money = (cents: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
-const readCart = (): CartEntry[] => { try { return JSON.parse(localStorage.getItem(CART_KEY) || '[]') as CartEntry[]; } catch { return []; } };
 const invalidate = (client: ReturnType<typeof useQueryClient>, ...keys: ReadonlyArray<readonly unknown[]>) => keys.forEach(queryKey => { void client.invalidateQueries({ queryKey }); });
 const statusText = (s: string) => s.replaceAll('_', ' ');
 
@@ -68,9 +66,9 @@ export function DiscoveryPage() {
 }
 export function RestaurantMenuPage() {
   const { restaurantId = '' } = useParams<{ restaurantId: string }>();
+  const {userId}=useAuth();
   const menu = useGetRestaurant(restaurantId, { query: { queryKey: getGetRestaurantQueryKey(restaurantId), enabled: !!restaurantId } });
-  const [cart, setCart] = useState<CartEntry[]>(readCart);
-  useEffect(() => { localStorage.setItem(CART_KEY, JSON.stringify(cart)); }, [cart]);
+  const [cart, setCart, cartWarning] = useCustomerCart();
   const add = (item: { id: string; name: string; priceCents: number }, modifiers:Record<string,string[]>={},extra=0,customization="",specialInstructions="") => {
     if (cart.some(i => i.restaurantId !== restaurantId)) { window.alert('Your cart can include items from one restaurant at a time. Clear the cart before switching restaurants.'); return; }
     const lineId=cartLineKey(item.id,modifiers,specialInstructions);
@@ -79,8 +77,8 @@ export function RestaurantMenuPage() {
   if (menu.isLoading) return <Shell><Loading label="Loading restaurant menu"/></Shell>;
   if (menu.isError || !menu.data) return <Shell><main className="roco-main"><LoadError retry={() => void menu.refetch()} message="This approved restaurant menu could not be found."/></main></Shell>;
   return <Shell><main className="roco-main"><PageIntro eyebrow={`${menu.data.city}, ${menu.data.region} · approved restaurant`} title={menu.data.name}>{menu.data.description || 'Browse the current menu from this Roane County restaurant.'}</PageIntro>
-    <div className="roco-toolbar"><div className="roco-meta">{menu.data.street1} · {menu.data.city}, {menu.data.region} {menu.data.postalCode}</div><Link className="roco-button primary" href="/cart"><ShoppingBag size={15}/> Cart ({cart.reduce((n, i) => n + i.quantity, 0)})</Link></div>
-    {menu.data.categories.length ? <div className="roco-two-col"><section className="roco-list">{menu.data.categories.map(cat => <div className="roco-card" key={cat.id}><div className="roco-row"><h2>{cat.name}</h2><span className="roco-meta">Menu section</span></div>{cat.items.length ? cat.items.map(item => <div className="roco-menu-item" key={item.id}><div><strong>{item.name}</strong><p style={{ margin: '5px 0 0' }}>{item.description}</p>{!item.isAvailable && <span className="roco-meta">Currently unavailable</span>}</div><div style={{ display: 'grid', gap: 10, justifyItems: 'end' }}><span className="roco-price">{money(item.priceCents)}</span>{item.isAvailable && <CustomizedAdd item={item} onAdd={(selected,extra,label,instructions)=>add(item,selected,extra,label,instructions)}/>}</div></div>) : <p>No menu items listed in this section.</p>}</div>)}</section><aside className="roco-card"><div className="roco-kicker">Ordering status</div><h2 style={{ marginTop: 13 }}>Development checkout</h2><p>Submitting an order saves an order record using server-verified totals. It does not charge money. Payments and delivery are not active services.</p><div className="roco-rule"/><Link className="roco-button primary" href="/cart">Review your cart <ArrowRight size={14}/></Link></aside></div> : <div className="roco-empty"><h2>Menu not published yet</h2><p>This approved restaurant has not added menu categories yet.</p></div>}
+    <div className="roco-toolbar">{cartWarning&&<p role="alert">{cartWarning}</p>}<div className="roco-meta">{menu.data.street1} · {menu.data.city}, {menu.data.region} {menu.data.postalCode}</div><Link className="roco-button primary" href="/cart"><ShoppingBag size={15}/> Cart ({cart.reduce((n, i) => n + i.quantity, 0)})</Link></div>
+    {menu.data.categories.length ? <div className="roco-two-col"><section className="roco-list">{menu.data.categories.map(cat => <div className="roco-card" key={cat.id}><div className="roco-row"><h2>{cat.name}</h2><span className="roco-meta">Menu section</span></div>{cat.items.length ? cat.items.map(item => <div className="roco-menu-item" key={item.id}><div><strong>{item.name}</strong><p style={{ margin: '5px 0 0' }}>{item.description}</p>{!item.isAvailable && <span className="roco-meta">Currently unavailable</span>}</div><div style={{ display: 'grid', gap: 10, justifyItems: 'end' }}><span className="roco-price">{money(item.priceCents)}</span>{item.isAvailable && <CustomizedAdd key={`${item.id}:${userId}`} item={item} onAdd={(selected,extra,label,instructions)=>add(item,selected,extra,label,instructions)}/>}</div></div>) : <p>No menu items listed in this section.</p>}</div>)}</section><aside className="roco-card"><div className="roco-kicker">Ordering status</div><h2 style={{ marginTop: 13 }}>Development checkout</h2><p>Submitting an order saves an order record using server-verified totals. It does not charge money. Payments and delivery are not active services.</p><div className="roco-rule"/><Link className="roco-button primary" href="/cart">Review your cart <ArrowRight size={14}/></Link></aside></div> : <div className="roco-empty"><h2>Menu not published yet</h2><p>This approved restaurant has not added menu categories yet.</p></div>}
   </main></Shell>;
 }
 
@@ -91,7 +89,7 @@ function AddressForm({ onCreated }: { onCreated: (a: Address) => void }) {
 }
 export function CartPage() {
   const client = useQueryClient();
-  const [cart, setCart] = useState<CartEntry[]>(readCart);
+  const [cart, setCart, cartWarning] = useCustomerCart();
   const [addressId, setAddressId] = useState(''); const [showAddress, setShowAddress] = useState(false);
   const [tipCents, setTipCents] = useState(0); const [placed, setPlaced] = useState<Order | null>(null);
   type Quote = {subtotalCents:number;deliveryFeeCents:number;serviceFeeCents:number;taxCents:number;tipCents:number;totalCents:number};
@@ -99,12 +97,12 @@ export function CartPage() {
   const addresses = useListMyAddresses({ query: { queryKey: getListMyAddressesQueryKey(), retry:false } });
   const input = () => ({restaurantId:cart[0]?.restaurantId,addressId,tipCents,items:cart.map(i=>({menuItemId:i.menuItemId,quantity:i.quantity,modifiers:i.modifiers??{},specialInstructions:i.specialInstructions}))});
   const quote = useMutation({mutationFn:()=>customFetch<Quote>('/api/orders/quote',{method:'POST',body:JSON.stringify(input())}),onSuccess:q=>setReview({quote:q,key:crypto.randomUUID()})});
-  const order = useMutation({mutationFn:()=>customFetch<Order>('/api/orders',{method:'POST',headers:{'Idempotency-Key':review!.key},body:JSON.stringify({...input(),expectedTotalCents:review!.quote.totalCents})}),onSuccess:result=>{setPlaced(result);setCart([]);localStorage.removeItem(CART_KEY);invalidate(client,getListMyOrdersQueryKey());}});
-  const save=(next:CartEntry[])=>{setReview(null);setCart(next);localStorage.setItem(CART_KEY,JSON.stringify(next));};
+  const order = useMutation({mutationFn:()=>customFetch<Order>('/api/orders',{method:'POST',headers:{'Idempotency-Key':review!.key},body:JSON.stringify({...input(),expectedTotalCents:review!.quote.totalCents})}),onSuccess:result=>{setPlaced(result);setCart([]);invalidate(client,getListMyOrdersQueryKey());}});
+  const save=(next:typeof cart)=>{setReview(null);setCart(next);};
   useEffect(()=>{setReview(null);},[addressId,tipCents]);
   const totals=(q:Quote)=><dl>{([['Food',q.subtotalCents],['Delivery',q.deliveryFeeCents],['Service',q.serviceFeeCents],['Illustrative test tax',q.taxCents],['Tip',q.tipCents],['Total',q.totalCents]] as const).map(([label,value])=><div className="roco-row" key={label}><dt>{label}</dt><dd>{money(value)}</dd></div>)}</dl>;
   return <Shell><main className="roco-main"><PageIntro eyebrow="Customer · test checkout" title={placed?'Order saved. Complete test payment.':'Review your delivery.'}>All checkout and settlement activity is test mode. Live charges are disabled.</PageIntro>
-    {placed?<section className="roco-card">{totals(placed)}<CheckoutPanel orderId={placed.id}/><Link href="/orders" className="roco-button">Track order</Link></section>:<div className="roco-two-col"><section className="roco-card"><h2>Your items</h2>{cart.length?cart.map(i=><div className="roco-menu-item" key={i.lineId??i.menuItemId}><div><strong>{i.name}</strong><p>{i.customization}</p><p>{i.specialInstructions}</p><p>{i.restaurantName} · {money(i.priceCents*i.quantity)}</p></div><div><button className="roco-button" aria-label={`Remove one ${i.name}`} onClick={()=>save(i.quantity>1?cart.map(x=>(x.lineId??x.menuItemId)===(i.lineId??i.menuItemId)?{...x,quantity:x.quantity-1}:x):cart.filter(x=>(x.lineId??x.menuItemId)!==(i.lineId??i.menuItemId)))}>−</button> {i.quantity} <button className="roco-button" aria-label={`Add one ${i.name}`} onClick={()=>save(cart.map(x=>(x.lineId??x.menuItemId)===(i.lineId??i.menuItemId)?{...x,quantity:x.quantity+1}:x))}>+</button></div></div>):<p>Your cart is empty. <Link href="/">Find food</Link></p>}</section>
+    {cartWarning&&<p role="alert">{cartWarning}</p>}{placed?<section className="roco-card">{totals(placed)}<CheckoutPanel orderId={placed.id}/><Link href="/orders" className="roco-button">Track order</Link></section>:<div className="roco-two-col"><section className="roco-card"><h2>Your items</h2>{cart.length?cart.map(i=><div className="roco-menu-item" key={i.lineId??i.menuItemId}><div><strong>{i.name}</strong><p>{i.customization}</p><p>{i.specialInstructions}</p><p>{i.restaurantName} · {money(i.priceCents*i.quantity)}</p></div><div><button className="roco-button" aria-label={`Remove one ${i.name}`} onClick={()=>save(i.quantity>1?cart.map(x=>(x.lineId??x.menuItemId)===(i.lineId??i.menuItemId)?{...x,quantity:x.quantity-1}:x):cart.filter(x=>(x.lineId??x.menuItemId)!==(i.lineId??i.menuItemId)))}>−</button> {i.quantity} <button className="roco-button" aria-label={`Add one ${i.name}`} onClick={()=>save(cart.map(x=>(x.lineId??x.menuItemId)===(i.lineId??i.menuItemId)?{...x,quantity:x.quantity+1}:x))}>+</button></div></div>):<p>Your cart is empty. <Link href="/">Find food</Link></p>}</section>
       <section className="roco-card"><h2>Delivery address</h2>{addresses.isError?<LoadError retry={()=>void addresses.refetch()}/>:<select aria-label="Delivery address" className="roco-select" value={addressId} onChange={e=>setAddressId(e.target.value)}><option value="">Choose a saved address</option>{addresses.data?.map(a=><option key={a.id} value={a.id}>{a.street1}, {a.city}</option>)}</select>}
       <button className="roco-button" onClick={()=>setShowAddress(!showAddress)}>Add address</button>{showAddress&&<AddressForm onCreated={a=>{setAddressId(a.id);setShowAddress(false);}}/>}
       <label className="roco-field">Driver tip (dollars)<input className="roco-input" type="number" min="0" max="1000" step="0.01" value={(tipCents/100).toString()} onChange={e=>setTipCents(Math.round(Number(e.target.value)*100))}/></label>

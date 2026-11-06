@@ -230,3 +230,24 @@ address or restaurant state, and verify conflict responses with no persisted ord
 Separate instruction lines and address snapshot preservation are tested through HTTP.
 Local full suite and production build passed with PGlite/test-only identity/providers.
 Authenticated real-provider browser/device verification still requires configuration.
+
+## Account-scoped cart storage — November 6
+
+Customer carts use `rocoeats-cart:v2:<Clerk user ID>` with a fresh external-store
+instance on account changes. Unscoped legacy carts are deliberately not imported
+because ownership cannot be determined. Users must rebuild those old carts once.
+Malformed saved data no longer crashes cart rendering; invalid quantities/mixed
+restaurants are rejected, and quota failures retain the current in-memory cart with
+an actionable warning. Cross-tab storage changes refresh the current account only.
+Customization controls remount on account change to clear prior preparation notes.
+Tests cover account isolation, legacy data, malformed storage, invalid updates,
+quota errors, subscriptions and cross-tab refresh. Browser verification used the real
+modifier component and cart hook in an isolated fixture with simulated account IDs;
+required choices, separate notes, account switching, restoration and form reset passed.
+No live Clerk session or provider-backed authenticated E2E is claimed. Reproduce with
+`node artifacts/api-server/tests/build-cart-browser.mjs /absolute/qa-output` and serve
+that directory with supported preview tooling; the fixture is not a production route.
+Checkout revision 628b7ae28b86923f2bac35f283cbed2cc0d89599 passed PostgreSQL CI
+(run 42178396335) and unsigned Android/iOS compilation (run 42178396125).
+Final cart changes passed the full local test suite and production build; checkout
+race tests also cover changes to delivery pricing before transaction entry.
