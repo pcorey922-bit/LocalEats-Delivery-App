@@ -92,6 +92,13 @@
       "when": 1793930000000,
       "tag": "0012_driver_applications",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793931000000,
+      "tag": "0013_delivery_handoff",
+      "breakpoints": true
     }
   ]
 }

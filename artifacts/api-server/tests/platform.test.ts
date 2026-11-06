@@ -15,6 +15,7 @@ import {
   addressesTable,
   restaurantHoursTable,
   ordersTable,
+  orderEventsTable,
   orderItemsTable,
   paymentsTable,
   notificationsTable,
@@ -24,6 +25,7 @@ import {
   financialOperationsTable,
   driverPresenceTable,
   deliveryLocationsTable,
+  deliveriesTable,
   webhookInboxTable,
   connectedAccountsTable,
   payoutProvisioningTable,
@@ -458,6 +460,38 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       );
     },
   );
+  await t.test("handoff proof is private, rate limited, atomic and safe under concurrent retries",async()=>{
+    const order=await create();await ready(order.id);
+    assert.equal((await api(`/driver/orders/${order.id}/claim`,ids.driver,'POST')).status,201);
+    assert.equal((await api(`/orders/${order.id}/delivery-code`,ids.customer,'POST')).status,409);
+    assert.equal((await api(`/driver/orders/${order.id}/pickup`,ids.driver,'POST')).status,200);
+    assert.equal((await api(`/driver/orders/${order.id}/pickup`,ids.driver,'POST')).status,200);
+    const codePath=`/orders/${order.id}/delivery-code`,deliverPath=`/driver/orders/${order.id}/deliver`;
+    assert.equal((await api(codePath,ids.driver,'POST')).status,403);
+    assert.equal((await api(codePath,ids.other,'POST')).status,404);
+    assert.equal((await api(`/orders/${order.id}/delivery-proof`,ids.other)).status,404);
+    const first=await api(codePath,ids.customer,'POST');assert.equal(first.status,200);
+    const wrong=first.data.code==='000000'?'000001':'000000';
+    for(let i=0;i<5;i++)assert.equal((await api(deliverPath,ids.driver,'POST',{code:wrong})).status,400);
+    assert.equal((await api(deliverPath,ids.driver,'POST',{code:first.data.code})).status,400);
+    const expired=await api(codePath,ids.customer,'POST');
+    await db.update(deliveriesTable).set({handoffExpiresAt:new Date(Date.now()-1000)}).where(eq(deliveriesTable.orderId,order.id));
+    assert.equal((await api(deliverPath,ids.driver,'POST',{code:expired.data.code})).status,400);
+    const fresh=await api(codePath,ids.customer,'POST');assert.equal(fresh.status,200);
+    await engine.exec("CREATE FUNCTION test_fail_delivery_earnings() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected settlement failure'; END $$; CREATE TRIGGER test_delivery_failure BEFORE INSERT ON payouts FOR EACH ROW EXECUTE FUNCTION test_fail_delivery_earnings();");
+    try {assert.equal((await api(deliverPath,ids.driver,'POST',{code:fresh.data.code})).status,500);}finally{await engine.exec('DROP TRIGGER test_delivery_failure ON payouts; DROP FUNCTION test_fail_delivery_earnings();');}
+    const [pending]=await db.select().from(deliveriesTable).where(eq(deliveriesTable.orderId,order.id));assert.equal(pending.status,'picked_up');assert.equal(pending.proofConfirmedAt,null);assert.ok(pending.handoffHash);
+    assert.equal((await db.select().from(payoutsTable).where(eq(payoutsTable.orderId,order.id))).length,0);
+    const results=await Promise.all([api(deliverPath,ids.driver,'POST',{code:fresh.data.code}),api(deliverPath,ids.driver,'POST',{code:fresh.data.code})]);assert.deepEqual(results.map(x=>x.status),[200,200]);
+    const [delivered]=await db.select().from(deliveriesTable).where(eq(deliveriesTable.orderId,order.id));assert.equal(delivered.status,'delivered');assert.ok(delivered.proofConfirmedAt);assert.equal(delivered.handoffHash,null);
+    const proof=await api(`/orders/${order.id}/delivery-proof`,ids.customer);assert.equal(proof.data.method,'customer_code');assert.equal(JSON.stringify(proof.data).includes(fresh.data.code),false);
+    assert.equal((await db.select().from(payoutsTable).where(eq(payoutsTable.orderId,order.id))).length,2);
+    const [saved]=await db.select().from(ordersTable).where(eq(ordersTable.id,order.id));assert.equal(saved.status,'delivered');
+    const events=await db.select().from(orderEventsTable).where(eq(orderEventsTable.orderId,order.id));assert.equal(events.filter(e=>e.toStatus==='delivered').length,1);
+    const notices=await db.select().from(notificationsTable).where(eq(notificationsTable.orderId,order.id));assert.equal(notices.filter(n=>n.eventKey===`${order.id}:delivered`).length,3);
+    const journals=await db.select().from(ledgerTransactionsTable).where(eq(ledgerTransactionsTable.orderId,order.id));assert.equal(journals.filter(j=>j.kind==='allocation').length,1);
+    const lines=await db.select().from(ledgerLinesTable).where(eq(ledgerLinesTable.transactionId,`allocation:${order.id}`));assert.equal(lines.reduce((n,l)=>n+l.amountCents,0),0);
+  });
   await t.test(
     "paid offers protect customer addresses and concurrent claim has one winner",
     async () => {
@@ -498,15 +532,17 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
         (await api(`/driver/orders/${order.id}/pickup`, winner, "POST")).status,
         200,
       );
+      const handoff=await api(`/orders/${order.id}/delivery-code`,ids.customer,"POST");assert.equal(handoff.status,200);
+
       assert.equal(
-        (await api(`/driver/orders/${order.id}/deliver`, winner, "POST"))
+        (await api(`/driver/orders/${order.id}/deliver`, winner, "POST", {code:handoff.data.code}))
           .status,
         200,
       );
       assert.equal(
-        (await api(`/driver/orders/${order.id}/deliver`, winner, "POST"))
+        (await api(`/driver/orders/${order.id}/deliver`, winner, "POST", {code:handoff.data.code}))
           .status,
-        409,
+        200,
       );
       const earnings = await db
         .select()
@@ -1046,7 +1082,8 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       await ready(order.id);
       await api(`/driver/orders/${order.id}/claim`, ids.driver, "POST");
       await api(`/driver/orders/${order.id}/pickup`, ids.driver, "POST");
-      await api(`/driver/orders/${order.id}/deliver`, ids.driver, "POST");
+      const handoff=await api(`/orders/${order.id}/delivery-code`,ids.customer,"POST");
+      await api(`/driver/orders/${order.id}/deliver`, ids.driver, "POST",{code:handoff.data.code});
       await db
         .update(paymentsTable)
         .set({ provider: "stripe_test", providerPaymentId: `pi_${order.id}` })

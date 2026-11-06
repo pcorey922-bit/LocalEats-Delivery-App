@@ -1,3 +1,9 @@
+import {
+  randomInt,
+  randomUUID,
+  createHash,
+  timingSafeEqual,
+} from "node:crypto";
 import { CommerceError } from "../lib/commerce-policy";
 import { notifyOrder, createEarnings, audit } from "../lib/commerce";
 import { driverDispatchState, presenceFreshMs } from "./dispatch";
@@ -18,6 +24,82 @@ import { getActiveProfile, requireRole } from "../lib/current-profile";
 import { requireAuth } from "../middlewares/require-auth";
 
 const router: IRouter = Router();
+
+// Codes are returned only to the order's customer, never to drivers or notifications.
+const handoffDigest = (orderId: string, salt: string, code: string) =>
+  createHash("sha256").update(`${orderId}:${salt}:${code}`).digest("hex");
+router.post("/orders/:orderId/delivery-code", requireAuth, async (req, res) => {
+  const profile = await getActiveProfile(req, res);
+  if (!profile || !requireRole(profile, ["customer"], res)) return;
+  const orderId = String(req.params.orderId);
+  if (!/^[0-9a-f-]{36}$/i.test(orderId))
+    throw new CommerceError(400, "Invalid order");
+  const code = String(randomInt(0, 1000000)).padStart(6, "0");
+  const salt = randomUUID();
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+  await db.transaction(async (tx) => {
+    const [order] = await tx
+      .select()
+      .from(ordersTable)
+      .where(
+        and(
+          eq(ordersTable.id, orderId),
+          eq(ordersTable.customerProfileId, profile.id),
+        ),
+      )
+      .for("update");
+    if (!order) throw new CommerceError(404, "Order not found");
+    const [delivery] = await tx
+      .select()
+      .from(deliveriesTable)
+      .where(eq(deliveriesTable.orderId, orderId));
+    if (order.status !== "out_for_delivery" || delivery?.status !== "picked_up")
+      throw new CommerceError(
+        409,
+        "A handoff code is available after driver pickup",
+      );
+    await tx
+      .update(deliveriesTable)
+      .set({
+        handoffHash: salt + ":" + handoffDigest(orderId, salt, code),
+        handoffExpiresAt: expiresAt,
+        handoffAttempts: 0,
+      })
+      .where(eq(deliveriesTable.id, delivery.id));
+    await audit(tx, profile.id, "delivery.handoff_code.issued", orderId);
+  });
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ code, expiresAt });
+});
+router.get("/orders/:orderId/delivery-proof", requireAuth, async (req, res) => {
+  const profile = await getActiveProfile(req, res);
+  if (!profile) return;
+  const orderId = String(req.params.orderId);
+  if (!/^[0-9a-f-]{36}$/i.test(orderId))
+    throw new CommerceError(400, "Invalid order");
+  const [record] = await db
+    .select({
+      customerId: ordersTable.customerProfileId,
+      driverId: deliveriesTable.driverProfileId,
+      confirmedAt: deliveriesTable.proofConfirmedAt,
+    })
+    .from(ordersTable)
+    .innerJoin(deliveriesTable, eq(deliveriesTable.orderId, ordersTable.id))
+    .where(eq(ordersTable.id, orderId));
+  if (
+    !record ||
+    (profile.role !== "admin" &&
+      record.customerId !== profile.id &&
+      record.driverId !== profile.id)
+  )
+    throw new CommerceError(404, "Delivery proof not found");
+  res.setHeader("Cache-Control", "no-store");
+  res.json(
+    record.confirmedAt
+      ? { method: "customer_code", confirmedAt: record.confirmedAt }
+      : null,
+  );
+});
 
 // Drivers can see orders ready for pickup without seeing customer addresses
 // until they have successfully claimed a delivery.
@@ -342,11 +424,42 @@ router.post(
           and(
             eq(deliveriesTable.orderId, orderId),
             eq(deliveriesTable.driverProfileId, profile.id),
-            eq(deliveriesTable.status, fromDelivery),
           ),
         )
         .limit(1);
       if (!delivery) return false;
+      // A lost response can be retried without repeating the transition or earnings.
+      if (delivery.status === "delivered" && delivery.proofConfirmedAt)
+        return "delivered";
+      if (action === "pickup" && delivery.status === "picked_up")
+        return "picked_up";
+      if (delivery.status !== fromDelivery) return false;
+      if (action === "deliver") {
+        const code = req.body?.code;
+        if (typeof code !== "string" || !/^\d{6}$/.test(code))
+          return "invalid_proof";
+        if (
+          !delivery.handoffHash ||
+          !delivery.handoffExpiresAt ||
+          delivery.handoffExpiresAt.getTime() <= Date.now() ||
+          delivery.handoffAttempts >= 5
+        )
+          return "invalid_proof";
+        const [salt, digest] = delivery.handoffHash.split(":");
+        const valid =
+          digest &&
+          timingSafeEqual(
+            Buffer.from(handoffDigest(orderId, salt, code), "hex"),
+            Buffer.from(digest, "hex"),
+          );
+        if (!valid) {
+          await tx
+            .update(deliveriesTable)
+            .set({ handoffAttempts: delivery.handoffAttempts + 1 })
+            .where(eq(deliveriesTable.id, delivery.id));
+          return "invalid_proof";
+        }
+      }
       const [order] = await tx
         .update(ordersTable)
         .set({ status: toOrder })
@@ -361,7 +474,12 @@ router.post(
           status: toDelivery,
           ...(action === "pickup"
             ? { pickedUpAt: new Date() }
-            : { deliveredAt: new Date() }),
+            : {
+                deliveredAt: new Date(),
+                proofConfirmedAt: new Date(),
+                handoffHash: null,
+                handoffExpiresAt: null,
+              }),
         })
         .where(
           and(
@@ -394,13 +512,22 @@ router.post(
         "Your delivery status has changed.",
       );
       await audit(tx, profile.id, `delivery.${action}`, orderId);
-      return true;
+      return toDelivery;
     });
+    if (result === "invalid_proof") {
+      res
+        .status(400)
+        .json({
+          error:
+            "Enter the customer’s valid handoff code. After five failed attempts or expiry, ask the customer to generate a new code.",
+        });
+      return;
+    }
     if (!result) {
       res.status(409).json({ error: "Delivery cannot be updated" });
       return;
     }
-    res.json({ orderId, status: toDelivery });
+    res.json({ orderId, status: result });
   },
 );
 

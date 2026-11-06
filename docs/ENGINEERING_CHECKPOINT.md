@@ -175,3 +175,23 @@ new hosted backend deployment was completed. Existing interactive demo is preser
 Next: authenticated browser verification of onboarding, expiration/active-delivery
 edge tests, then proof-of-delivery and support workflows. Remaining financial,
 provider, deployment and release blockers listed above still apply.
+
+## Customer-code delivery proof — November 6
+
+Migration 0013 stores salted code hashes, expiry, failed attempts and confirmation
+time. Customers generate a six-digit code after pickup at POST
+`/orders/:orderId/delivery-code`; the code expires after 15 minutes and five failed
+attempts require reissue. Drivers submit `{code}` on the existing deliver endpoint.
+Proof, order/delivery status, balanced earning allocation, location cleanup and
+three recipient notifications commit atomically. Repeated pickup/completion requests
+from the assigned driver acknowledge the completed transition without duplicate effects.
+GET `/orders/:orderId/delivery-proof` is scoped to the customer, assigned driver or admin.
+The customer order history and driver delivery screen have connected handoff controls.
+The approved standalone visual demo is unchanged and remains explicitly simulated.
+
+Tests passed locally with PGlite/test-only identity/provider adapters, including
+concurrent completions, expiration, attempt exhaustion, ownership, pickup retries,
+injected earnings DB failure/rollback/recovery, one delivery event, exactly three
+notification rows, two earnings rows and one balanced allocation journal. No actual
+Stripe/bank reconciliation, push-provider/device round trip or browser test of the
+new authenticated forms is claimed. Next: support-case escalation for failed handoffs.
