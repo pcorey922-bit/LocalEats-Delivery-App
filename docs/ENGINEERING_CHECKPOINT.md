@@ -301,3 +301,19 @@ that one constraint with equivalent explicit bounds and keeps full schema compar
 enabled. Invalid latitude/longitude/accuracy regression tests were added. Diagnostic
 commit d08696a printed the exact fixture DDL difference; next Validate must establish
 that the full pg_dump/pg_restore rehearsal and ledger guards pass after normalization.
+
+### Verified recovery result and next executable step
+
+Implementation revision 2c2f25dcbeaa204ed7b8c13d36076fbb71dba7db passed full PostgreSQL
+17 validation, real pg_dump/pg_restore rehearsal, restored ledger guards, production
+build, dependency audit, Docker build and HTTP/dependency smoke checks in GitHub run
+42182600095. The timestamp precision and GPS DDL differences above are resolved.
+Unsigned native validation for that revision was still running when this note was
+written (42182606619); gate revision 8808103 had already passed unsigned native checks.
+No production backup service, public transactional deployment, live provider/device
+E2E or owner administrator identity has been configured/certified. Live money remains
+disabled and new ordering defaults closed. Exact continuation: inspect native run
+42182606619, then implement the remaining financial partial-refund/dispute/reconciliation
+requirements while keeping the existing durable queue and immutable ledger invariants.
+Obtain external configuration through supported secure interfaces when accessible;
+do not request payment, bank or identity secrets in chat or source code.
