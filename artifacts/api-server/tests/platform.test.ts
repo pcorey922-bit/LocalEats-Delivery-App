@@ -2278,6 +2278,12 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       }
     },
   );
+  await t.test("restorable GPS constraints still reject invalid coordinates and accuracy",async()=>{
+    const [delivery]=await db.select().from(deliveriesTable).limit(1);assert.ok(delivery);
+    for(const invalid of [{latitude:91,longitude:0,accuracyMeters:1},{latitude:0,longitude:181,accuracyMeters:1},{latitude:0,longitude:0,accuracyMeters:-1}]){
+      await assert.rejects(()=>db.insert(deliveryLocationsTable).values({deliveryId:delivery.id,driverProfileId:ids.driver,observedAt:new Date(),...invalid}).onConflictDoNothing());
+    }
+  });
   await t.test("recovery fingerprint is deterministic and detects changed database contents",async()=>{
     const script=await readFile('../../scripts/recovery-fingerprint.sql','utf8');
     async function fingerprint(mutation=''){const raw=await engine.exec(script.replace('BEGIN;\n','BEGIN;\n'+mutation+'\n'));const chunks=Array.isArray(raw)?raw:[raw];const rows=chunks.flatMap((c:any)=>c.rows??[]).filter((r:any)=>typeof r.fingerprint==='string');assert.equal(rows.length,1);assert.match(rows[0].fingerprint,/^[a-f0-9]{32}$/);return rows[0].fingerprint;}

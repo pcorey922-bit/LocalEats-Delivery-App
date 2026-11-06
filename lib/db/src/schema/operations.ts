@@ -89,7 +89,7 @@ export const deliveryLocationsTable = pgTable(
   (t) => [
     check(
       "delivery_locations_valid_coordinates",
-      sql`${t.latitude} between -90 and 90 and ${t.longitude} between -180 and 180 and ${t.accuracyMeters} >= 0`,
+      sql`${t.latitude} >= -90 and ${t.latitude} <= 90 and ${t.longitude} >= -180 and ${t.longitude} <= 180 and ${t.accuracyMeters} >= 0`,
     ),
   ],
 );

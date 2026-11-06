@@ -294,3 +294,10 @@ its mutation probe now rolls back inside PostgreSQL rather than rewriting timest
 The prior recovery commit's CI failure was a test precision issue; the full restore
 exercise still requires the next Validate run. The launch gate commit 8808103 passed
 PostgreSQL validation and unsigned native compilation. Local suite and build pass.
+
+Recovery CI restored identical rows and sequences but found a DDL-only GPS constraint
+parenthesization difference from PostgreSQL BETWEEN expansion. Migration 0015 replaces
+that one constraint with equivalent explicit bounds and keeps full schema comparison
+enabled. Invalid latitude/longitude/accuracy regression tests were added. Diagnostic
+commit d08696a printed the exact fixture DDL difference; next Validate must establish
+that the full pg_dump/pg_restore rehearsal and ledger guards pass after normalization.
