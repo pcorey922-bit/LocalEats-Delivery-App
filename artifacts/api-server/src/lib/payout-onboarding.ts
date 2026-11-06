@@ -12,7 +12,7 @@ import { audit } from "./commerce";
 import { CommerceError, checkoutOrigin } from "./commerce-policy";
 import { stripeTest } from "./payment-provider";
 export async function requestPayoutOnboarding(profile: Profile) {
-  if (!["restaurant", "driver"].includes(profile.role))
+  if (!["restaurant", "driver"].includes(profile.role) && !(profile.role==="admin"&&profile.driverApproved))
     throw new CommerceError(403, "Partner account required");
   const [account] = await db
     .select()

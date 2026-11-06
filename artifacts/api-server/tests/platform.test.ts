@@ -250,6 +250,28 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     assert.equal((await api(`/orders/${order.id}/cancel`,ids.customer,'POST',{reason:'End role-change safety check'})).status,200);
     assert.equal((await api(`/admin/profiles/${ids.admin}`,ids.admin,'PATCH',{isActive:false})).status,403);
   });
+  await t.test("owner can onboard and deliver without losing admin access or granting admin to drivers",async()=>{
+    assert.equal((await api('/driver/offers',ids.admin)).status,403);
+    const application={phone:'+1 865 555 0199',vehicleMake:'Toyota',vehicleModel:'Corolla',vehicleYear:2022,licenseState:'TN',licenseExpiresOn:'2030-12-31',eligibilityAttested:true,insuranceAttested:true};
+    const applied=await api('/driver/application',ids.admin,'PUT',application);assert.equal(applied.status,200);
+    assert.equal((await api('/admin/profiles',ids.admin)).status,200);
+    assert.equal((await api('/driver/availability',ids.admin,'PUT',{available:true})).status,403);
+    const reviewed=await api(`/admin/driver-applications/${ids.admin}/review`,ids.admin,'POST',{version:applied.data.version,approved:true,identityChecked:true,screeningChecked:true,insuranceChecked:true,note:'Owner external verification evidence TEST-OWNER'});assert.equal(reviewed.status,200);
+    assert.equal((await api('/driver/availability',ids.admin,'PUT',{available:true})).status,200);
+    const order=await create();await ready(order.id);
+    assert.equal((await api(`/driver/orders/${order.id}/claim`,ids.admin,'POST')).status,201);
+    assert.equal((await api('/admin/dispatch',ids.admin)).data.drivers.some((d:any)=>d.profileId===ids.admin),true);
+    assert.equal((await api(`/driver/orders/${order.id}/pickup`,ids.admin,'POST')).status,200);
+    const code=await api(`/orders/${order.id}/delivery-code`,ids.customer,'POST');
+    assert.equal((await api(`/driver/orders/${order.id}/deliver`,ids.admin,'POST',{code:code.data.code})).status,200);
+    const earnings=await db.select().from(payoutsTable).where(eq(payoutsTable.orderId,order.id));assert.equal(earnings.find(p=>p.kind==='driver')?.recipientProfileId,ids.admin);
+    assert.equal((await api('/profiles/me',ids.admin)).data.role,'admin');
+    assert.equal((await api('/admin/profiles',ids.driver)).status,403);
+    assert.equal((await api('/payouts/me',ids.admin)).status,200);
+    assert.equal((await api('/driver/availability',ids.admin,'PUT',{available:false})).status,200);
+    assert.equal((await api(`/admin/drivers/${ids.admin}/approval`,ids.admin,'PATCH',{approved:false})).status,200);
+    assert.equal((await api('/admin/profiles',ids.admin)).status,200);
+  });
   await t.test("owners manage modifiers; checkout validates choices and snapshots server pricing", async () => {
     const groups=[{id:"size",name:"Size",minSelections:1,maxSelections:1,options:[{id:"large",name:"Large",priceCents:250},{id:"small",name:"Small",priceCents:0}]},{id:"extras",name:"Extras",minSelections:0,maxSelections:2,options:[{id:"cheese",name:"Cheese",priceCents:100},{id:"sauce",name:"Sauce",priceCents:50}]}];
     const path=`/restaurants/me/menu-items/${ids.item}`;

@@ -105,7 +105,7 @@ router.get("/orders/:orderId/delivery-proof", requireAuth, async (req, res) => {
 // until they have successfully claimed a delivery.
 router.get("/driver/offers", requireAuth, async (req, res): Promise<void> => {
   const profile = await getActiveProfile(req, res);
-  if (!profile || !requireRole(profile, ["driver"], res)) return;
+  if (!profile || !requireRole(profile, ["driver", "admin"], res)) return;
   if (!profile.driverApproved)
     throw new CommerceError(
       403,
@@ -126,6 +126,8 @@ router.get("/driver/offers", requireAuth, async (req, res): Promise<void> => {
       restaurantName: restaurantsTable.name,
       pickupStreet: restaurantsTable.street1,
       pickupCity: restaurantsTable.city,
+      pickupRegion: restaurantsTable.region,
+      pickupPostalCode: restaurantsTable.postalCode,
       deliveryFeeCents: ordersTable.deliveryFeeCents,
       tipCents: ordersTable.tipCents,
     })
@@ -157,7 +159,7 @@ router.get(
   requireAuth,
   async (req, res): Promise<void> => {
     const profile = await getActiveProfile(req, res);
-    if (!profile || !requireRole(profile, ["driver"], res)) return;
+    if (!profile || !requireRole(profile, ["driver", "admin"], res)) return;
     if (!profile.driverApproved)
       throw new CommerceError(
         403,
@@ -171,6 +173,8 @@ router.get(
         restaurantName: restaurantsTable.name,
         pickupStreet: restaurantsTable.street1,
         pickupCity: restaurantsTable.city,
+      pickupRegion: restaurantsTable.region,
+      pickupPostalCode: restaurantsTable.postalCode,
         deliveryAddress: ordersTable.addressSnapshot,
       })
       .from(deliveriesTable)
@@ -191,7 +195,7 @@ router.post(
   requireAuth,
   async (req, res): Promise<void> => {
     const profile = await getActiveProfile(req, res);
-    if (!profile || !requireRole(profile, ["driver"], res)) return;
+    if (!profile || !requireRole(profile, ["driver", "admin"], res)) return;
     if (!profile.driverApproved)
       throw new CommerceError(
         403,
@@ -217,7 +221,7 @@ router.post(
       if (
         !current?.driverApproved ||
         !current.isActive ||
-        current.role !== "driver"
+        !["driver","admin"].includes(current.role)
       )
         throw new CommerceError(403, "Driver approval is required");
       const [presence] = await tx
@@ -319,7 +323,7 @@ router.post(
   requireAuth,
   async (req, res) => {
     const profile = await getActiveProfile(req, res);
-    if (!profile || !requireRole(profile, ["driver"], res)) return;
+    if (!profile || !requireRole(profile, ["driver", "admin"], res)) return;
     if (!profile.driverApproved)
       throw new CommerceError(403, "Driver approval is required");
     const orderId = req.params.orderId;
@@ -376,7 +380,7 @@ router.post(
   requireAuth,
   async (req, res): Promise<void> => {
     const profile = await getActiveProfile(req, res);
-    if (!profile || !requireRole(profile, ["driver"], res)) return;
+    if (!profile || !requireRole(profile, ["driver", "admin"], res)) return;
     if (!profile.driverApproved)
       throw new CommerceError(
         403,

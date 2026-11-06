@@ -1,6 +1,6 @@
 import { orderingEnabled, requireOrderingEnabled } from "../lib/commerce-policy";
 import { driverApplicationsTable } from "@workspace/db";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { z } from "zod";
 import {
@@ -415,7 +415,7 @@ router.get("/admin/drivers", requireAuth, async (req, res) => {
         isActive: profilesTable.isActive,
       })
       .from(profilesTable)
-      .where(eq(profilesTable.role, "driver"))
+      .where(inArray(profilesTable.role, ["driver","admin"]))
       .limit(500),
   );
 });
@@ -518,7 +518,7 @@ router.post(
 );
 router.get("/payouts/me", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
-  if (!profile || !requireRole(profile, ["restaurant", "driver"], res)) return;
+  if (!profile || !requireRole(profile, ["restaurant", "driver", "admin"], res)) return;
   res.json(
     await db
       .select()
@@ -530,7 +530,7 @@ router.get("/payouts/me", requireAuth, async (req, res) => {
 });
 router.get("/payout-account", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
-  if (!profile || !requireRole(profile, ["restaurant", "driver"], res)) return;
+  if (!profile || !requireRole(profile, ["restaurant", "driver", "admin"], res)) return;
   const [account] = await db
     .select()
     .from(connectedAccountsTable)
@@ -567,7 +567,8 @@ router.get("/payout-account", requireAuth, async (req, res) => {
 });
 router.post("/payout-account/onboard", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
-  if (!profile || !requireRole(profile, ["restaurant", "driver"], res)) return;
+  if (!profile || !requireRole(profile, ["restaurant", "driver", "admin"], res)) return;
+  if(profile.role==="admin"&&!profile.driverApproved)throw new CommerceError(403,"Complete driver approval before payout onboarding");
   const mode = requirePaymentProvider();
   if (mode === "stripe_test") {
     const result = await (
@@ -674,7 +675,7 @@ router.patch(
       const [driver] = await tx
         .update(profilesTable)
         .set({ driverApproved: approved })
-        .where(and(eq(profilesTable.id, id), eq(profilesTable.role, "driver")))
+        .where(and(eq(profilesTable.id, id), inArray(profilesTable.role, ["driver","admin"])))
         .returning();
       if (!driver) throw new CommerceError(404, "Driver not found");
       await audit(tx, profile.id, "driver.approval", id, { approved });

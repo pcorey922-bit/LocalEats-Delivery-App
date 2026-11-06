@@ -43,7 +43,7 @@ export async function driverDispatchState(profileId: string) {
 }
 router.get("/driver/availability", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
-  if (!profile || !requireRole(profile, ["driver"], res)) return;
+  if (!profile || !requireRole(profile, ["driver", "admin"], res)) return;
   res.json({
     approved: profile.driverApproved,
     ...(await driverDispatchState(profile.id)),
@@ -51,7 +51,7 @@ router.get("/driver/availability", requireAuth, async (req, res) => {
 });
 router.put("/driver/availability", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
-  if (!profile || !requireRole(profile, ["driver"], res)) return;
+  if (!profile || !requireRole(profile, ["driver", "admin"], res)) return;
   const { available } = z
     .object({ available: z.boolean() })
     .strict()
@@ -68,7 +68,7 @@ router.put("/driver/availability", requireAuth, async (req, res) => {
       available &&
       (!current.driverApproved ||
         !current.isActive ||
-        current.role !== "driver")
+        !["driver","admin"].includes(current.role))
     )
       throw new CommerceError(403, "Driver approval is required to go online");
     await tx
@@ -86,7 +86,7 @@ router.post(
   requireAuth,
   async (req, res) => {
     const profile = await getActiveProfile(req, res);
-    if (!profile || !requireRole(profile, ["driver"], res)) return;
+    if (!profile || !requireRole(profile, ["driver", "admin"], res)) return;
     const orderId = uuid.parse(req.params.orderId);
     const position = z
       .object({
@@ -265,7 +265,7 @@ router.get("/admin/dispatch", requireAuth, async (req, res) => {
       driverPresenceTable,
       eq(driverPresenceTable.profileId, profilesTable.id),
     )
-    .where(eq(profilesTable.role, "driver"))
+    .where(inArray(profilesTable.role, ["driver","admin"]))
     .limit(200);
   res.json({
     orders: orders.map((o) => ({

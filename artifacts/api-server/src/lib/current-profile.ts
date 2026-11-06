@@ -24,7 +24,7 @@ export async function getActiveProfile(
     return null;
   }
 
-  if(profile.role === "driver" && profile.driverApproved){
+  if(["driver","admin"].includes(profile.role) && profile.driverApproved){
     const [application]=await db.select().from(driverApplicationsTable).where(eq(driverApplicationsTable.profileId,profile.id));
     if(application && (application.status !== "approved" || application.licenseExpiresOn < new Date().toISOString().slice(0,10))) profile.driverApproved=false;
   }

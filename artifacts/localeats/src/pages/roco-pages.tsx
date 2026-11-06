@@ -1,3 +1,4 @@
+import { NavigationActions } from "./navigation-actions";
 import { useCustomerCart } from "../hooks/use-customer-cart";
 import { cartLineKey } from "../lib/cart-line";
 import { SupportDesk } from "./support-desk";
@@ -174,13 +175,13 @@ export function AdminPage() {
 
 type DriverDelivery = {
   orderId: string; status: string; orderStatus?: string; restaurantName: string;
-  pickupStreet: string; pickupCity: string;
+  pickupStreet: string; pickupCity: string; pickupRegion?:string; pickupPostalCode?:string;
   deliveryAddress?: { street1: string; street2?: string | null; city: string; region: string; postalCode: string; deliveryInstructions?: string | null };
 };
 export function DriverPage() {
   const profile = useMyProfile();
   const client = useQueryClient();
-  const enabled = profile.data?.role === 'driver';
+  const enabled = ['driver','admin'].includes(profile.data?.role??'');
   const offers = useQuery({ queryKey: ['driver-offers'], queryFn: () => customFetch<DriverDelivery[]>('/api/driver/offers'), enabled, refetchInterval: 15000 });
   const deliveries = useQuery({ queryKey: ['driver-deliveries'], queryFn: () => customFetch<DriverDelivery[]>('/api/driver/deliveries'), enabled, refetchInterval: 15000 });
   const update = useMutation({
@@ -192,14 +193,16 @@ export function DriverPage() {
     {d.status==='picked_up'&&d.orderStatus==='out_for_delivery'&&<DriverHandoff orderId={d.orderId} onCompleted={()=>{void client.invalidateQueries({queryKey:['driver-deliveries']});void client.invalidateQueries({queryKey:['driver-offers']});}}/>}
     {!offer&&<SupportDesk orderId={d.orderId}/>}<h3>{d.restaurantName}</h3><p>Pickup: {d.pickupStreet}, {d.pickupCity}</p><p className="roco-meta">Order {d.orderId} · {statusText(d.status)}</p>
     {d.deliveryAddress && <><p>Deliver to: {d.deliveryAddress.street1} {d.deliveryAddress.street2}, {d.deliveryAddress.city}, {d.deliveryAddress.region} {d.deliveryAddress.postalCode}</p><p>{d.deliveryAddress.deliveryInstructions}</p></>}
-    <a className="roco-button" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(d.status==='picked_up'&&d.deliveryAddress?`${d.deliveryAddress.street1}, ${d.deliveryAddress.city}, ${d.deliveryAddress.region} ${d.deliveryAddress.postalCode}`:`${d.pickupStreet}, ${d.pickupCity}, TN`)}`} target="_blank" rel="noreferrer">Open directions</a>
+    <NavigationActions label="Navigate to Restaurant" address={{street1:d.pickupStreet,city:d.pickupCity,region:d.pickupRegion,postalCode:d.pickupPostalCode}}/>
+    {!offer&&d.deliveryAddress&&<NavigationActions label="Navigate to Customer" address={d.deliveryAddress}/>}
+
     {d.status==='assigned'&&<button className="roco-button" disabled={update.isPending} onClick={()=>{if(window.confirm('Release this delivery before pickup?'))update.mutate({orderId:d.orderId,action:'release'});}}>Release delivery</button>}
     {!offer&&['assigned','picked_up'].includes(d.status)&&<DriverLocationControl orderId={d.orderId}/>}
     {(offer || (d.status === 'assigned' && d.orderStatus === 'ready_for_pickup')) && <button className="roco-button primary" disabled={update.isPending} onClick={() => update.mutate({ orderId: d.orderId, action: offer ? 'claim' : d.status === 'assigned' ? 'pickup' : 'deliver' })}>{offer ? 'Claim delivery' : d.status === 'assigned' ? 'Confirm pickup' : 'Confirm delivered'}</button>}
   </article>;
   return <Shell><main className="roco-main"><PageIntro eyebrow="Driver" title="Local deliveries.">Paid orders ready for pickup appear here. Customer addresses are available after you claim a delivery.</PageIntro>
     {update.isError && <p className="roco-alert" role="alert">{update.error.message}</p>}
-    <DriverApplication/><SupportDesk/><DriverAvailability/><h2>My deliveries</h2>{deliveries.isPending ? <Loading/> : deliveries.isError ? <LoadError retry={() => void deliveries.refetch()} message={deliveries.error.message}/> : <div className="roco-list">{deliveries.data?.length ? deliveries.data.map(d => card(d, false)) : <p>No assigned deliveries.</p>}</div>}
+    {profile.data?.role==='admin'&&<p className="roco-notice">Owner delivery workspace · Your administrator access stays active. Driver approval is required to receive offers. <Link href="/admin">Return to owner dashboard</Link></p>}<DriverApplication/><SupportDesk/><DriverAvailability/><h2>My deliveries</h2>{deliveries.isPending ? <Loading/> : deliveries.isError ? <LoadError retry={() => void deliveries.refetch()} message={deliveries.error.message}/> : <div className="roco-list">{deliveries.data?.length ? deliveries.data.map(d => card(d, false)) : <p>No assigned deliveries.</p>}</div>}
     <h2>Available offers</h2>{offers.isPending ? <Loading/> : offers.isError ? <LoadError retry={() => void offers.refetch()} message={offers.error.message}/> : <div className="roco-list">{offers.data?.length ? offers.data.map(d => card(d, true)) : <p>No paid deliveries available right now.</p>}</div>}
   </main></Shell>;
 }

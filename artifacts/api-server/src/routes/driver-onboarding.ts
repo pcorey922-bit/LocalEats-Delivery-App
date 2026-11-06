@@ -45,7 +45,7 @@ const application = z
   .strict();
 router.get("/driver/application", requireAuth, async (req, res) => {
   const p = await getActiveProfile(req, res);
-  if (!p || !requireRole(p, ["driver"], res)) return;
+  if (!p || !requireRole(p, ["driver", "admin"], res)) return;
   const [row] = await db
     .select()
     .from(driverApplicationsTable)
@@ -54,7 +54,7 @@ router.get("/driver/application", requireAuth, async (req, res) => {
 });
 router.put("/driver/application", requireAuth, async (req, res) => {
   const p = await getActiveProfile(req, res);
-  if (!p || !requireRole(p, ["driver"], res)) return;
+  if (!p || !requireRole(p, ["driver", "admin"], res)) return;
   const value = application.safeParse(req.body);
   if (!value.success) {
     res
@@ -183,7 +183,7 @@ router.post(
         .from(profilesTable)
         .where(eq(profilesTable.id, id))
         .for("update");
-      if (!driver || driver.role !== "driver" || !driver.isActive)
+      if (!driver || !["driver","admin"].includes(driver.role) || !driver.isActive)
         throw new CommerceError(404, "Active driver not found");
       const [current] = await tx
         .select()

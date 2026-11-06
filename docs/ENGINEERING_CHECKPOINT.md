@@ -317,3 +317,30 @@ disabled and new ordering defaults closed. Exact continuation: inspect native ru
 requirements while keeping the existing durable queue and immutable ledger invariants.
 Obtain external configuration through supported secure interfaces when accessible;
 do not request payment, bank or identity secrets in chat or source code.
+
+## Owner-driver identity and driver navigation — November 6
+
+Trusted administrator profiles can use driver application/availability/delivery APIs
+without changing their administrator role. Operational actions still require independent
+driver approval; application submission resets only driver approval, not admin access.
+Review, approval/revocation, dispatch lists and self payout onboarding support these
+identities. Driver earnings remain attributed to that same profile in the ledger.
+Ordinary drivers still cannot access administrator APIs or grant administrator roles.
+The driver workspace gives owners a direct return link to their owner dashboard.
+
+Driver API destinations now include pickup region/postal code. Restaurant and customer
+navigation controls use full, validated addresses, explicit Google Maps links and
+Apple Maps links on iOS, plus copy/manual fallback. No address notes are sent to maps.
+Incomplete/oversized/control-character destinations fail closed. No new mapping key
+or proprietary routing engine is needed for these user-initiated external links.
+Official references: https://developers.google.com/maps/documentation/urls/get-started
+and https://developer.apple.com/documentation/mapkit/unified-map-urls (new unified
+paths require iOS 18.4; the app uses the established HTTPS daddr link for older systems).
+
+Local suite and production build passed, including administrator application/approval,
+dispatch/claim/pickup/code proof/delivery/earnings/revocation with preserved admin role,
+ordinary-driver authorization rejection, and navigation URL/fallback validation.
+These are test-only identity/provider integrations; actual Clerk identities, real-device
+map-app handoff and background GPS remain unverified. Existing demo is preserved.
+Next: latest-location telemetry for on-duty unassigned drivers, secure dispatch status,
+stale/disconnected warnings and explicit foreground/background tracking limitations.
