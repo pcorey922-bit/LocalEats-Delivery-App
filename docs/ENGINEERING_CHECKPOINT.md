@@ -275,3 +275,22 @@ build passed. The actual pg_dump/pg_restore exercise must be verified in this co
 GitHub Validate job because local Docker is unavailable. Production backup/PITR remains
 external infrastructure configuration. Next: inspect recovery CI, fix failures, then
 continue partial refunds/disputes and deployment/provider/device requirements above.
+
+## Administrative suspension and recovery-test correction — November 6
+
+Account updates and restaurant status changes now lock their target rows and write
+atomic audit records. Suspending/removing a restaurant owner pauses their restaurant;
+reactivation/reapproval does not automatically reopen ordering. Driver suspension or
+role removal clears dispatch approval and online presence. Role changes are rejected
+while the account has active customer orders, restaurant orders or assigned deliveries.
+Quotes/payment availability check the restaurant owner's active role, and checkout
+holds a shared lock on that owner until the order commits, preventing suspension/role
+races from creating stranded new orders. Existing management controls display server
+errors; the approved demo remains unchanged.
+Tests cover authorization, protected admin accounts, suspension side effects, safe
+reactivation, audits and concurrent owner suspension at checkout. The recovery SQL test
+was corrected after real PostgreSQL CI exposed JS Date truncation of microseconds:
+its mutation probe now rolls back inside PostgreSQL rather than rewriting timestamps.
+The prior recovery commit's CI failure was a test precision issue; the full restore
+exercise still requires the next Validate run. The launch gate commit 8808103 passed
+PostgreSQL validation and unsigned native compilation. Local suite and build pass.

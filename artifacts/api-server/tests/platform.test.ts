@@ -19,6 +19,7 @@ import {
   orderItemsTable,
   paymentsTable,
   notificationsTable,
+  auditLogsTable,
   payoutsTable,
   refundsTable,
   platformSettingsTable,
@@ -221,6 +222,34 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     assert.equal((await api(`/orders/${order.id}/cancel`,ids.customer,'POST',{reason:'Ordering is closed'})).status,200);
     }finally{process.env.ROCOEATS_ORDERING_ENABLED='true';}
   });
+  await t.test("account suspension pauses restaurants and audited role changes cannot strand orders",async()=>{
+    const path=`/admin/profiles/${ids.restaurant}`;
+    assert.equal((await api(path,ids.customer,'PATCH',{isActive:false})).status,403);
+    try{assert.equal((await api(path,ids.admin,'PATCH',{isActive:false})).status,200);
+      const [restaurant]=await db.select().from(restaurantsTable).where(eq(restaurantsTable.id,ids.business));assert.equal(restaurant.acceptingOrders,false);
+      assert.equal((await api('/orders/quote',ids.customer,'POST',input())).status,409);
+      assert.equal((await api(path,ids.admin,'PATCH',{isActive:true})).status,200);
+      const [stillPaused]=await db.select().from(restaurantsTable).where(eq(restaurantsTable.id,ids.business));assert.equal(stillPaused.acceptingOrders,false);
+      const audits=await db.select().from(auditLogsTable).where(eq(auditLogsTable.resourceId,ids.restaurant));assert.ok(audits.filter(a=>a.action==='profile.updated').length>=2);
+    }finally{await db.update(profilesTable).set({isActive:true}).where(eq(profilesTable.id,ids.restaurant));await db.update(restaurantsTable).set({acceptingOrders:true}).where(eq(restaurantsTable.id,ids.business));}
+    try{
+      const driverPath=`/admin/profiles/${ids.driver}`;
+      assert.equal((await api(driverPath,ids.admin,'PATCH',{isActive:false})).status,200);
+      const [presence]=await db.select().from(driverPresenceTable).where(eq(driverPresenceTable.profileId,ids.driver));assert.equal(presence.available,false);
+      assert.equal((await api('/driver/offers',ids.driver)).status,403);
+      assert.equal((await api(driverPath,ids.admin,'PATCH',{isActive:true})).status,200);
+      const [reactivated]=await db.select().from(profilesTable).where(eq(profilesTable.id,ids.driver));assert.equal(reactivated.driverApproved,false);
+      const statusPath=`/admin/restaurants/${ids.business}/status`;
+      assert.equal((await api(statusPath,ids.admin,'PATCH',{status:'suspended'})).status,200);
+      assert.equal((await api(statusPath,ids.admin,'PATCH',{status:'approved'})).status,200);
+      const [paused]=await db.select().from(restaurantsTable).where(eq(restaurantsTable.id,ids.business));assert.equal(paused.acceptingOrders,false);
+      const audit=await db.select().from(auditLogsTable).where(eq(auditLogsTable.resourceId,ids.business));assert.ok(audit.some(a=>a.action==='restaurant.status.updated'));
+    }finally{await db.update(profilesTable).set({isActive:true,driverApproved:true}).where(eq(profilesTable.id,ids.driver));await db.update(driverPresenceTable).set({available:true,heartbeatAt:new Date()}).where(eq(driverPresenceTable.profileId,ids.driver));await db.update(restaurantsTable).set({status:'approved',acceptingOrders:true}).where(eq(restaurantsTable.id,ids.business));}
+    const order=await create();
+    assert.equal((await api(`/admin/profiles/${ids.customer}`,ids.admin,'PATCH',{role:'driver'})).status,409);
+    assert.equal((await api(`/orders/${order.id}/cancel`,ids.customer,'POST',{reason:'End role-change safety check'})).status,200);
+    assert.equal((await api(`/admin/profiles/${ids.admin}`,ids.admin,'PATCH',{isActive:false})).status,403);
+  });
   await t.test("owners manage modifiers; checkout validates choices and snapshots server pricing", async () => {
     const groups=[{id:"size",name:"Size",minSelections:1,maxSelections:1,options:[{id:"large",name:"Large",priceCents:250},{id:"small",name:"Small",priceCents:0}]},{id:"extras",name:"Extras",minSelections:0,maxSelections:2,options:[{id:"cheese",name:"Cheese",priceCents:100},{id:"sauce",name:"Sauce",priceCents:50}]}];
     const path=`/restaurants/me/menu-items/${ids.item}`;
@@ -400,6 +429,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     const [originalAddress]=await db.select().from(addressesTable).where(eq(addressesTable.id,ids.address));
     const [originalSetting]=await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.settingKey,'test_pricing'));
     const scenarios=[
+      {change:()=>db.update(profilesTable).set({isActive:false}).where(eq(profilesTable.id,ids.restaurant)),reset:()=>db.update(profilesTable).set({isActive:true}).where(eq(profilesTable.id,ids.restaurant))},
       {change:()=>db.update(platformSettingsTable).set({value:{...originalSetting.value,deliveryFeeCents:799}}).where(eq(platformSettingsTable.settingKey,'test_pricing')),reset:()=>db.update(platformSettingsTable).set({value:originalSetting.value}).where(eq(platformSettingsTable.settingKey,'test_pricing'))},
       {change:()=>db.update(menuItemsTable).set({priceCents:originalItem.priceCents+100}).where(eq(menuItemsTable.id,ids.item)),reset:()=>db.update(menuItemsTable).set({priceCents:originalItem.priceCents}).where(eq(menuItemsTable.id,ids.item))},
       {change:()=>db.update(menuItemsTable).set({isAvailable:false}).where(eq(menuItemsTable.id,ids.item)),reset:()=>db.update(menuItemsTable).set({isAvailable:true}).where(eq(menuItemsTable.id,ids.item))},
@@ -2250,11 +2280,11 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
   );
   await t.test("recovery fingerprint is deterministic and detects changed database contents",async()=>{
     const script=await readFile('../../scripts/recovery-fingerprint.sql','utf8');
-    async function fingerprint(){const raw=await engine.exec(script);const chunks=Array.isArray(raw)?raw:[raw];const rows=chunks.flatMap((c:any)=>c.rows??[]).filter((r:any)=>typeof r.fingerprint==='string');assert.equal(rows.length,1);assert.match(rows[0].fingerprint,/^[a-f0-9]{32}$/);return rows[0].fingerprint;}
+    async function fingerprint(mutation=''){const raw=await engine.exec(script.replace('BEGIN;\n','BEGIN;\n'+mutation+'\n'));const chunks=Array.isArray(raw)?raw:[raw];const rows=chunks.flatMap((c:any)=>c.rows??[]).filter((r:any)=>typeof r.fingerprint==='string');assert.equal(rows.length,1);assert.match(rows[0].fingerprint,/^[a-f0-9]{32}$/);return rows[0].fingerprint;}
     const before=await fingerprint();assert.equal(await fingerprint(),before);
-    const [profile]=await db.select().from(profilesTable).where(eq(profilesTable.id,ids.other));
-    try{await db.update(profilesTable).set({displayName:'Recovery fingerprint changed fixture'}).where(eq(profilesTable.id,ids.other));assert.notEqual(await fingerprint(),before);}
-    finally{await db.update(profilesTable).set({displayName:profile.displayName,updatedAt:profile.updatedAt}).where(eq(profilesTable.id,ids.other));}
+    // Roll back the probe inside PostgreSQL; restoring JS Dates would truncate
+    // native timestamp microseconds and invalidate a legitimate byte-level check.
+    assert.notEqual(await fingerprint(`UPDATE profiles SET display_name='Recovery fingerprint probe' WHERE id='${ids.other}';`),before);
     assert.equal(await fingerprint(),before);
   });
 

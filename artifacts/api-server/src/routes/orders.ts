@@ -326,6 +326,8 @@ router.post(
         .for("share");
       if (!lockedCustomer?.isActive || lockedCustomer.role !== "customer")
         throw new CommerceError(403, "Customer account is no longer active");
+      const [lockedOwner]=await tx.select().from(profilesTable).where(eq(profilesTable.id,restaurant.ownerProfileId)).for("share");
+      if(!lockedOwner?.isActive||lockedOwner.role!=="restaurant")throw new CommerceError(409,"Restaurant account is not available for ordering");
       const [lockedRestaurant] = await tx
         .select()
         .from(restaurantsTable)
