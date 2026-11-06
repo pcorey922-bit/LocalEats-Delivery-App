@@ -14,6 +14,7 @@ try {
     ["commerce-policy", "src/lib/commerce-policy.test.ts"],
     ["availability", "src/lib/restaurant-availability.test.ts"],
     ["platform", "tests/platform.test.ts"],
+    ["recovery-safety", "tests/recovery-safety.test.ts"],
     ["worker-loop", "src/lib/worker-loop.test.ts"],
     ["web-hosting", "src/lib/web-hosting.test.ts"],
     ["fcm", "src/lib/fcm.test.ts"],

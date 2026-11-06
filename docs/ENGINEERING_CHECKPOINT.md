@@ -261,3 +261,17 @@ Commerce configuration and checkout controls reflect the gate. This authorizes o
 ordering in the separately enforced test provider mode, never live financial activity.
 Tests exercise unset/malformed/false values, blocked writes and recovery while closed.
 The hosted visual demo is unchanged. Next: PostgreSQL backup/restore rehearsal in CI.
+
+## PostgreSQL recovery rehearsal — November 6
+
+CI now dumps/restores its disposable PostgreSQL 17 fixture database and compares all
+public/drizzle table contents, sequence state and schema, then checks immutable ledger
+updates and deferred journal-balance protection in the restored database. The script
+refuses production names and existing restore targets; dump files and the new target
+are cleaned up, and cleanup failure fails validation. Local shell safety tests use a
+fake Docker executable only to test refusal/cleanup boundaries. Fingerprint SQL passed
+against PGlite with determinism and changed-content detection; full local suite and
+build passed. The actual pg_dump/pg_restore exercise must be verified in this commit's
+GitHub Validate job because local Docker is unavailable. Production backup/PITR remains
+external infrastructure configuration. Next: inspect recovery CI, fix failures, then
+continue partial refunds/disputes and deployment/provider/device requirements above.

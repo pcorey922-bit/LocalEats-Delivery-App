@@ -31,6 +31,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm audit --prod --audit-level=moderate
       - run: pnpm test
+      - name: Rehearse PostgreSQL backup and restore with ledger guards
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+          PGUSER: rocoeats
+          PGPASSWORD: rocoeats_test_only
+        run: bash scripts/verify-postgres-recovery.sh
       - run: pnpm build
       - name: Build deployable website and API container
         run: docker build --tag rocoeats:ci .

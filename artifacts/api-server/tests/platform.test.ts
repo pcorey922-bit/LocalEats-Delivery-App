@@ -2248,4 +2248,14 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       }
     },
   );
+  await t.test("recovery fingerprint is deterministic and detects changed database contents",async()=>{
+    const script=await readFile('../../scripts/recovery-fingerprint.sql','utf8');
+    async function fingerprint(){const raw=await engine.exec(script);const chunks=Array.isArray(raw)?raw:[raw];const rows=chunks.flatMap((c:any)=>c.rows??[]).filter((r:any)=>typeof r.fingerprint==='string');assert.equal(rows.length,1);assert.match(rows[0].fingerprint,/^[a-f0-9]{32}$/);return rows[0].fingerprint;}
+    const before=await fingerprint();assert.equal(await fingerprint(),before);
+    const [profile]=await db.select().from(profilesTable).where(eq(profilesTable.id,ids.other));
+    try{await db.update(profilesTable).set({displayName:'Recovery fingerprint changed fixture'}).where(eq(profilesTable.id,ids.other));assert.notEqual(await fingerprint(),before);}
+    finally{await db.update(profilesTable).set({displayName:profile.displayName,updatedAt:profile.updatedAt}).where(eq(profilesTable.id,ids.other));}
+    assert.equal(await fingerprint(),before);
+  });
+
 });

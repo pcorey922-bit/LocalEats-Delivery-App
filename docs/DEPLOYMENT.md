@@ -249,3 +249,16 @@ those orders. The gate never enables live charges: payment-provider test restric
 remain enforced independently. Leave it unset/false on public prelaunch deployments.
 Change it through the hosting account's secure environment configuration only after
 owner authorization. Test fixtures explicitly opt in; browser clients cannot toggle it.
+
+### Tested recovery procedure for the CI database
+
+The validation workflow runs `scripts/verify-postgres-recovery.sh` after PostgreSQL
+functional tests. It uses PostgreSQL 17 tools inside the existing service container,
+a restrictive temporary dump file, and a newly created disposable restore database.
+It compares row/sequence fingerprints and restored schema, then exercises immutable
+and deferred-balance ledger guards. Source names other than `rocoeats_test` and target
+names outside `rocoeats_recovery_*` are refused; an existing target is never overwritten.
+Cleanup errors fail validation. Raw dumps and case/customer contents are not uploaded.
+This is a recovery rehearsal against fixtures, not a configured production backup
+service. Production still requires owner-controlled managed backups/PITR, retention,
+encrypted storage, access controls and a recovery exercise on configured infrastructure.
