@@ -1,3 +1,4 @@
+import { driverDutyLocationsTable } from "@workspace/db";
 import { audit } from "../lib/commerce";
 import { deliveriesTable, driverPresenceTable } from "@workspace/db";
 import { CommerceError, paymentMode } from "../lib/commerce-policy";
@@ -349,6 +350,7 @@ router.patch(
           .update(driverPresenceTable)
           .set({ available: false })
           .where(eq(driverPresenceTable.profileId, target.id));
+      if(!nextActive||nextRole!=="driver")await tx.delete(driverDutyLocationsTable).where(eq(driverDutyLocationsTable.profileId,target.id));
       await audit(tx, actor.id, "profile.updated", target.id, {
         fromRole: target.role,
         toRole: saved.role,

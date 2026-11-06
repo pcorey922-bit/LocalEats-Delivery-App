@@ -5,7 +5,10 @@ export type NavigationAddress = {
   region?: string | null;
   postalCode?: string | null;
 };
-export function navigationDestination(address: NavigationAddress) {
+export function navigationDestination(
+  address: NavigationAddress | null | undefined,
+) {
+  if (!address || typeof address !== "object") return null;
   const required = [
     address.street1,
     address.city,
@@ -24,7 +27,7 @@ export function navigationDestination(address: NavigationAddress) {
     return null;
   return [...parts.map((p) => p.trim().replace(/\s+/g, " ")), "USA"].join(", ");
 }
-export function navigationLinks(address: NavigationAddress) {
+export function navigationLinks(address: NavigationAddress | null | undefined) {
   const destination = navigationDestination(address);
   if (!destination) return null;
   const google = new URL("https://www.google.com/maps/dir/");

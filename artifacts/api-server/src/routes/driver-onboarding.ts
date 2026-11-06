@@ -1,3 +1,4 @@
+import { driverDutyLocationsTable } from "@workspace/db";
 import { Router } from "express";
 import { z } from "zod";
 import { eq, desc, and, inArray } from "drizzle-orm";
@@ -115,6 +116,7 @@ router.put("/driver/application", requireAuth, async (req, res) => {
       .update(driverPresenceTable)
       .set({ available: false })
       .where(eq(driverPresenceTable.profileId, p.id));
+    await tx.delete(driverDutyLocationsTable).where(eq(driverDutyLocationsTable.profileId,p.id));
     await audit(tx, p.id, "driver.application.submitted", p.id, {
       version: saved.version,
     });

@@ -6,7 +6,7 @@ export function NavigationActions({
   address,
 }: {
   label: string;
-  address: NavigationAddress;
+  address: NavigationAddress | null | undefined;
 }) {
   const [message, setMessage] = useState("");
   const links = navigationLinks(address);

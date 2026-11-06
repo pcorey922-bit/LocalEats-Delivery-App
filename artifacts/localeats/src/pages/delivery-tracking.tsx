@@ -1,11 +1,19 @@
+import { useDutyIntent } from "../hooks/use-duty-intent";
+import { dutyIntent } from "../lib/duty-intent";
+import { NavigationActions } from "./navigation-actions";
+import type { NavigationAddress } from "../lib/navigation";
+import { useAuth } from "@clerk/react";
+import { DispatchMap, type DispatchDriver } from "./dispatch-map";
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Geolocation } from "@capacitor/geolocation";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 export function DriverAvailability() {
+  const { userId } = useAuth();
+  const intent = useDutyIntent(userId ?? null);
   const client = useQueryClient();
   const state = useQuery({
-    queryKey: ["driver-availability"],
+    queryKey: ["driver-availability", userId],
     queryFn: () =>
       customFetch<{
         approved: boolean;
@@ -17,33 +25,30 @@ export function DriverAvailability() {
   });
   const [error, setError] = useState("");
   const update = useMutation({
-    mutationFn: (available: boolean) =>
-      customFetch("/api/driver/availability", {
+    mutationFn: (available: boolean) => {
+      if (!available && userId) dutyIntent.set(userId, false);
+      return customFetch("/api/driver/availability", {
         method: "PUT",
         body: JSON.stringify({ available }),
-      }),
-    onSuccess: () => {
+      });
+    },
+    onSuccess: (_data, available) => {
+      if (userId) dutyIntent.set(userId, available);
       setError("");
       void client.invalidateQueries({ queryKey: ["driver-availability"] });
       void client.invalidateQueries({ queryKey: ["driver-offers"] });
     },
     onError: (e) => setError(e.message),
   });
-  useEffect(() => {
-    if (!state.data?.available) return;
-    const timer = setInterval(() => {
-      void customFetch("/api/driver/availability", {
-        method: "PUT",
-        body: JSON.stringify({ available: true }),
-      }).catch(() =>
-        setError("Connection lost. Offers pause until you reconnect."),
-      );
-    }, 30000);
-    return () => clearInterval(timer);
-  }, [state.data?.available]);
   return (
     <section className="roco-card">
       <h2>Your availability</h2>
+      <p>
+        Going online shares your current location with authorized dispatch while
+        the driver workspace is active. Going offline stops routine sharing and
+        clears the dispatch position.
+      </p>
+
       <p>
         {state.data?.online
           ? "Online — ready for offers"
@@ -56,11 +61,26 @@ export function DriverAvailability() {
       </p>
       <button
         className="roco-button primary"
-        disabled={update.isPending || !state.data?.approved}
-        onClick={() => update.mutate(!state.data?.available)}
+        disabled={
+          update.isPending || (!state.data?.approved && !state.data?.available)
+        }
+        onClick={() => update.mutate(!(state.data?.online && intent))}
       >
-        {state.data?.available ? "Go offline" : "Go online"}
+        {state.data?.online && intent
+          ? "Go offline"
+          : state.data?.available
+            ? "Reconnect on this device"
+            : "Go online"}
       </button>
+      {state.data?.available && !(state.data?.online && intent) && (
+        <button
+          className="roco-button"
+          disabled={update.isPending}
+          onClick={() => update.mutate(false)}
+        >
+          Go offline everywhere
+        </button>
+      )}
       {error && (
         <p role="alert" className="roco-alert">
           {error}
@@ -220,19 +240,20 @@ export function DispatchOperations() {
           restaurantName: string;
           driverProfileId: string | null;
           waitingMinutes: number;
+          pickupStreet: string;
+          pickupCity: string;
+          pickupRegion: string;
+          pickupPostalCode: string;
+          deliveryAddress: NavigationAddress;
         }>;
-        drivers: Array<{
-          profileId: string;
-          displayName: string;
-          online: boolean;
-          approved: boolean;
-        }>;
+        drivers: DispatchDriver[];
       }>("/api/admin/dispatch"),
     refetchInterval: 10000,
   });
   return (
     <section>
       <h2>Dispatch oversight</h2>
+      {dispatch.data && <DispatchMap drivers={dispatch.data.drivers} />}
       {dispatch.error && (
         <p role="alert" className="roco-alert">
           {dispatch.error.message}
@@ -245,6 +266,19 @@ export function DispatchOperations() {
       {dispatch.data?.orders.map((order) => (
         <article key={order.orderId} className="roco-card">
           <h3>{order.restaurantName}</h3>
+          <NavigationActions
+            label="Pickup destination"
+            address={{
+              street1: order.pickupStreet,
+              city: order.pickupCity,
+              region: order.pickupRegion,
+              postalCode: order.pickupPostalCode,
+            }}
+          />
+          <NavigationActions
+            label="Delivery destination"
+            address={order.deliveryAddress}
+          />
           <p>
             {order.status.replaceAll("_", " ")} · placed {order.waitingMinutes}{" "}
             minutes ago ·{" "}

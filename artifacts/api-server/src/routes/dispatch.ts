@@ -1,3 +1,8 @@
+import { audit } from "../lib/commerce";
+import {
+  driverDutyLocationsTable,
+  driverApplicationsTable,
+} from "@workspace/db";
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import { z } from "zod";
@@ -56,7 +61,11 @@ router.put("/driver/availability", requireAuth, async (req, res) => {
     .object({ available: z.boolean() })
     .strict()
     .parse(req.body);
-  if (available && !profile.driverApproved) throw new CommerceError(403, "Driver approval and an unexpired license are required");
+  if (available && !profile.driverApproved)
+    throw new CommerceError(
+      403,
+      "Driver approval and an unexpired license are required",
+    );
   await db.transaction(async (tx) => {
     const [current] = await tx
       .select()
@@ -68,9 +77,21 @@ router.put("/driver/availability", requireAuth, async (req, res) => {
       available &&
       (!current.driverApproved ||
         !current.isActive ||
-        !["driver","admin"].includes(current.role))
+        !["driver", "admin"].includes(current.role))
     )
       throw new CommerceError(403, "Driver approval is required to go online");
+    const [previous] = await tx
+      .select()
+      .from(driverPresenceTable)
+      .where(eq(driverPresenceTable.profileId, profile.id));
+    if (!available)
+      await tx
+        .delete(driverDutyLocationsTable)
+        .where(eq(driverDutyLocationsTable.profileId, profile.id));
+    if (previous?.available !== available)
+      await audit(tx, profile.id, "driver.availability.updated", profile.id, {
+        available,
+      });
     await tx
       .insert(driverPresenceTable)
       .values({ profileId: profile.id, available })
@@ -81,6 +102,95 @@ router.put("/driver/availability", requireAuth, async (req, res) => {
   });
   res.json(await driverDispatchState(profile.id));
 });
+router.post("/driver/heartbeat", requireAuth, async (req, res) => {
+  const profile = await getActiveProfile(req, res);
+  if (!profile || !requireRole(profile, ["driver", "admin"], res)) return;
+  if (!profile.driverApproved)
+    throw new CommerceError(403, "Driver approval is required");
+  await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(profilesTable)
+      .where(eq(profilesTable.id, profile.id))
+      .for("update");
+    const [presence] = await tx
+      .select()
+      .from(driverPresenceTable)
+      .where(eq(driverPresenceTable.profileId, profile.id));
+    if (
+      !current?.isActive ||
+      !current.driverApproved ||
+      !presence?.available ||
+      Date.now() - presence.heartbeatAt.getTime() >= presenceFreshMs
+    )
+      throw new CommerceError(
+        409,
+        "Reconnect explicitly before returning on duty",
+      );
+    await tx
+      .update(driverPresenceTable)
+      .set({ heartbeatAt: new Date() })
+      .where(eq(driverPresenceTable.profileId, profile.id));
+  });
+  res.json({ online: true });
+});
+
+router.post("/driver/location", requireAuth, async (req, res) => {
+  const profile = await getActiveProfile(req, res);
+  if (!profile || !requireRole(profile, ["driver", "admin"], res)) return;
+  if (!profile.driverApproved)
+    throw new CommerceError(403, "Driver approval is required");
+  const position = z
+    .object({
+      latitude: z.number().finite().min(-90).max(90),
+      longitude: z.number().finite().min(-180).max(180),
+      accuracyMeters: z.number().finite().min(0).max(10000),
+      observedAt: z.coerce.date(),
+    })
+    .strict()
+    .parse(req.body);
+  const age = Date.now() - position.observedAt.getTime();
+  if (age > 120000 || age < -30000)
+    throw new CommerceError(
+      400,
+      "Location timestamp is stale or in the future",
+    );
+  const accepted = await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(profilesTable)
+      .where(eq(profilesTable.id, profile.id))
+      .for("update");
+    const [presence] = await tx
+      .select()
+      .from(driverPresenceTable)
+      .where(eq(driverPresenceTable.profileId, profile.id));
+    if (
+      !current?.isActive ||
+      !current.driverApproved ||
+      !["driver", "admin"].includes(current.role) ||
+      !presence?.available ||
+      Date.now() - presence.heartbeatAt.getTime() >= presenceFreshMs
+    )
+      throw new CommerceError(409, "Go online before sharing duty location");
+    const [previous] = await tx
+      .select()
+      .from(driverDutyLocationsTable)
+      .where(eq(driverDutyLocationsTable.profileId, profile.id));
+    if (previous && position.observedAt <= previous.observedAt) return false;
+    await tx
+      .insert(driverDutyLocationsTable)
+      .values({ profileId: profile.id, ...position })
+      .onConflictDoUpdate({
+        target: driverDutyLocationsTable.profileId,
+        set: { ...position, receivedAt: new Date() },
+      });
+    return true;
+  });
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ accepted });
+});
+
 router.post(
   "/driver/orders/:orderId/location",
   requireAuth,
@@ -232,6 +342,11 @@ router.get("/admin/dispatch", requireAuth, async (req, res) => {
       status: ordersTable.status,
       placedAt: ordersTable.placedAt,
       restaurantName: restaurantsTable.name,
+      pickupStreet: restaurantsTable.street1,
+      pickupCity: restaurantsTable.city,
+      pickupRegion: restaurantsTable.region,
+      pickupPostalCode: restaurantsTable.postalCode,
+      deliveryAddress: ordersTable.addressSnapshot,
       driverProfileId: deliveriesTable.driverProfileId,
       assignedAt: deliveriesTable.assignedAt,
     })
@@ -259,29 +374,106 @@ router.get("/admin/dispatch", requireAuth, async (req, res) => {
       isActive: profilesTable.isActive,
       available: driverPresenceTable.available,
       heartbeatAt: driverPresenceTable.heartbeatAt,
+      dutyLocation: driverDutyLocationsTable,
+      applicationStatus: driverApplicationsTable.status,
+      licenseExpiresOn: driverApplicationsTable.licenseExpiresOn,
     })
     .from(profilesTable)
     .leftJoin(
       driverPresenceTable,
       eq(driverPresenceTable.profileId, profilesTable.id),
     )
-    .where(inArray(profilesTable.role, ["driver","admin"]))
+    .leftJoin(
+      driverDutyLocationsTable,
+      eq(driverDutyLocationsTable.profileId, profilesTable.id),
+    )
+    .leftJoin(
+      driverApplicationsTable,
+      eq(driverApplicationsTable.profileId, profilesTable.id),
+    )
+    .where(inArray(profilesTable.role, ["driver", "admin"]))
     .limit(200);
+  const activeAssignments = drivers.length
+    ? await db
+        .select({
+          driverProfileId: deliveriesTable.driverProfileId,
+          orderId: deliveriesTable.orderId,
+        })
+        .from(deliveriesTable)
+        .where(
+          and(
+            inArray(
+              deliveriesTable.driverProfileId,
+              drivers.map((d) => d.profileId),
+            ),
+            inArray(deliveriesTable.status, ["assigned", "picked_up"]),
+          ),
+        )
+    : [];
+  res.setHeader("Cache-Control", "no-store");
   res.json({
     orders: orders.map((o) => ({
       ...o,
       waitingMinutes: Math.floor((Date.now() - o.placedAt.getTime()) / 60000),
     })),
-    drivers: drivers.map((d) => ({
-      ...d,
-      online: Boolean(
-        d.isActive &&
-        d.approved &&
-        d.available &&
-        d.heartbeatAt &&
-        Date.now() - d.heartbeatAt.getTime() < presenceFreshMs,
-      ),
-    })),
+    drivers: drivers.map(
+      ({ dutyLocation, applicationStatus, licenseExpiresOn, ...d }) => {
+        const approved = Boolean(
+          d.approved &&
+          (!applicationStatus ||
+            (applicationStatus === "approved" &&
+              licenseExpiresOn &&
+              licenseExpiresOn >= new Date().toISOString().slice(0, 10))),
+        );
+        const online = Boolean(
+          d.isActive &&
+          approved &&
+          d.available &&
+          d.heartbeatAt &&
+          Date.now() - d.heartbeatAt.getTime() < presenceFreshMs,
+        );
+        const activeOrder = activeAssignments.find(
+          (o) => o.driverProfileId === d.profileId,
+        );
+        const location =
+          online &&
+          dutyLocation &&
+          Date.now() - dutyLocation.receivedAt.getTime() < 15 * 60 * 1000
+            ? {
+                latitude: dutyLocation.latitude,
+                longitude: dutyLocation.longitude,
+                accuracyMeters: dutyLocation.accuracyMeters,
+                observedAt: dutyLocation.observedAt,
+                receivedAt: dutyLocation.receivedAt,
+              }
+            : null;
+        return {
+          ...d,
+          approved,
+          online,
+          activeOrderId: activeOrder?.orderId ?? null,
+          status: !d.isActive
+            ? "suspended"
+            : !approved
+              ? "unapproved"
+              : !d.available
+                ? "offline"
+                : !online
+                  ? "disconnected"
+                  : activeOrder
+                    ? "delivering"
+                    : "available",
+          location,
+          locationStatus: !online
+            ? "not_sharing"
+            : !location
+              ? "missing"
+              : Date.now() - location.observedAt.getTime() > 120000
+                ? "stale"
+                : "fresh",
+        };
+      },
+    ),
   });
 });
 export default router;

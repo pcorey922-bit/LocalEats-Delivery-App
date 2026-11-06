@@ -1,3 +1,5 @@
+import { NavigationActions } from "../src/pages/navigation-actions";
+import { DispatchMap } from "../src/pages/dispatch-map";
 // Browser-only fixture: never imported by the production entry or router.
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -26,7 +28,7 @@ function Fixture() {
   };
   return (
     <main>
-      <h1>RoCoEats cart component verification</h1>
+      <h1>RoCoEats cart and dispatch component verification</h1>
       <p>
         Isolated fixture · simulated account IDs · no backend or live payments
       </p>
@@ -77,6 +79,36 @@ function Fixture() {
         ))}
       </ul>
       <button onClick={() => setCart([])}>Clear fixture cart</button>
+      <h2>Navigation and dispatch fixture (simulated GPS)</h2>
+      <NavigationActions
+        label="Navigate to Restaurant"
+        address={{
+          street1: "123 Sample Street",
+          city: "Rockwood",
+          region: "TN",
+          postalCode: "37854",
+        }}
+      />
+      <NavigationActions label="Navigate to Customer" address={null} />
+      <DispatchMap
+        drivers={[
+          {
+            profileId: "qa-driver",
+            displayName: "Fixture driver",
+            online: true,
+            approved: true,
+            status: "delivering",
+            activeOrderId: "qa-order",
+            locationStatus: "stale",
+            location: {
+              latitude: 35.88,
+              longitude: -84.69,
+              accuracyMeters: 8,
+              observedAt: new Date(Date.now() - 180000).toISOString(),
+            },
+          },
+        ]}
+      />
     </main>
   );
 }

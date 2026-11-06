@@ -1,3 +1,4 @@
+import { dutyIntent } from "../lib/duty-intent";
 import { NavigationActions } from "./navigation-actions";
 import { useCustomerCart } from "../hooks/use-customer-cart";
 import { cartLineKey } from "../lib/cart-line";
@@ -34,9 +35,9 @@ const statusText = (s: string) => s.replaceAll('_', ' ');
 
 function Logo() { return <Link className="roco-logo" href="/"><span className="roco-logo-mark"><Utensils size={18} /></span><span>RoCoEats</span></Link>; }
 function Shell({ children }: { children: React.ReactNode }) {
-  const { isSignedIn } = useAuth(); const { signOut } = useClerk();
+  const { isSignedIn, userId } = useAuth(); const { signOut } = useClerk();
   return <div className="roco-page"><header className="roco-header roco-wrap"><Logo/><nav className="roco-nav" aria-label="Main navigation">
-    <Link href="/">Find food</Link>{isSignedIn && <><Link href="/orders">Orders</Link><Link href="/restaurant">Restaurant</Link><Link href="/driver">Driver</Link><Link href="/account">Account</Link><Link href="/admin">Operations</Link><button onClick={async () => { await unregisterPush().catch(()=>{}); await signOut({ redirectUrl: '/' }); }}>Sign out</button></>}
+    <Link href="/">Find food</Link>{isSignedIn && <><Link href="/orders">Orders</Link><Link href="/restaurant">Restaurant</Link><Link href="/driver">Driver</Link><Link href="/account">Account</Link><Link href="/admin">Operations</Link><button onClick={async () => { if(userId)dutyIntent.set(userId,false); await customFetch('/api/driver/availability',{method:'PUT',body:JSON.stringify({available:false})}).catch(()=>{}); await unregisterPush().catch(()=>{}); await signOut({ redirectUrl: '/' }); }}>Sign out</button></>}
     {!isSignedIn && <><Link href="/sign-in">Sign in</Link><Link href="/sign-up">Create account</Link></>}
   </nav></header><CommerceBanner/>{children}</div>;
 }
@@ -186,11 +187,11 @@ export function DriverPage() {
   const deliveries = useQuery({ queryKey: ['driver-deliveries'], queryFn: () => customFetch<DriverDelivery[]>('/api/driver/deliveries'), enabled, refetchInterval: 15000 });
   const update = useMutation({
     mutationFn: ({ orderId, action }: { orderId: string; action: string }) => customFetch(`/api/driver/orders/${orderId}/${action}`, { method: 'POST' }),
-    onSuccess: () => { void client.invalidateQueries({ queryKey: ['driver-offers'] }); void client.invalidateQueries({ queryKey: ['driver-deliveries'] }); },
+    onSuccess: () => { void client.invalidateQueries({queryKey:['driver-availability']}); void client.invalidateQueries({ queryKey: ['driver-offers'] }); void client.invalidateQueries({ queryKey: ['driver-deliveries'] }); },
   });
   if (!enabled) return <Shell><main className="roco-main"><PageIntro eyebrow="Driver access" title="Your delivery workspace.">Sign in with an active, administrator-approved driver profile to view deliveries.</PageIntro></main></Shell>;
   const card = (d: DriverDelivery, offer: boolean) => <article className="roco-card" key={d.orderId}>
-    {d.status==='picked_up'&&d.orderStatus==='out_for_delivery'&&<DriverHandoff orderId={d.orderId} onCompleted={()=>{void client.invalidateQueries({queryKey:['driver-deliveries']});void client.invalidateQueries({queryKey:['driver-offers']});}}/>}
+    {d.status==='picked_up'&&d.orderStatus==='out_for_delivery'&&<DriverHandoff orderId={d.orderId} onCompleted={()=>{void client.invalidateQueries({queryKey:['driver-availability']});void client.invalidateQueries({queryKey:['driver-deliveries']});void client.invalidateQueries({queryKey:['driver-offers']});}}/>}
     {!offer&&<SupportDesk orderId={d.orderId}/>}<h3>{d.restaurantName}</h3><p>Pickup: {d.pickupStreet}, {d.pickupCity}</p><p className="roco-meta">Order {d.orderId} · {statusText(d.status)}</p>
     {d.deliveryAddress && <><p>Deliver to: {d.deliveryAddress.street1} {d.deliveryAddress.street2}, {d.deliveryAddress.city}, {d.deliveryAddress.region} {d.deliveryAddress.postalCode}</p><p>{d.deliveryAddress.deliveryInstructions}</p></>}
     <NavigationActions label="Navigate to Restaurant" address={{street1:d.pickupStreet,city:d.pickupCity,region:d.pickupRegion,postalCode:d.pickupPostalCode}}/>

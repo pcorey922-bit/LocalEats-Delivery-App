@@ -10,6 +10,7 @@ try {
     ["order-lifecycle", "src/lib/order-lifecycle.test.ts"],
     ["customer-cart", "tests/customer-cart.test.ts"],
     ["cart-line", "tests/cart-line.test.ts"],
+    ["duty-intent", "tests/duty-intent.test.ts"],
     ["navigation", "tests/navigation.test.ts"],
     ["mobile-api", "tests/mobile-api.test.ts"],
     ["commerce-policy", "src/lib/commerce-policy.test.ts"],

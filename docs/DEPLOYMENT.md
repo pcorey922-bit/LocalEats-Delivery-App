@@ -262,3 +262,26 @@ Cleanup errors fail validation. Raw dumps and case/customer contents are not upl
 This is a recovery rehearsal against fixtures, not a configured production backup
 service. Production still requires owner-controlled managed backups/PITR, retention,
 encrypted storage, access controls and a recovery exercise on configured infrastructure.
+
+### Dispatch location and map configuration
+
+Migration 0016 stores only the latest on-duty position per profile. Explicit offline,
+approval revocation, application resubmission and account suspension clear it.
+Disconnected positions are hidden, and maintenance purges old rows after about 15
+minutes (plus the maintenance interval). Do not disable maintenance in deployments.
+`/driver/heartbeat` only renews a fresh online session; stale sessions must reconnect
+through an explicit availability action. Foreground sharing requires device-local
+intent and stops on sign-out/offline or backgrounding. New processes require reconnect.
+This release does NOT implement certified Android/iOS background location services.
+Keep foreground-only disclosure until native services, OS permissions, store review
+requirements and physical-device tests are completed. Existing assigned-order location
+sharing remains an explicitly controlled, narrowly scoped alternative.
+
+Live map rendering is optional until configured: use an owner-controlled Google Maps
+project, enable Maps JavaScript API, configure a map ID and API/referrer restrictions,
+quotas and billing approvals. Set only the public browser key in
+`VITE_GOOGLE_MAPS_API_KEY` and public map ID in `VITE_GOOGLE_MAPS_MAP_ID` before building.
+Never put Stripe secrets, bank details or server credentials in VITE variables.
+No map SDK loads while these settings are missing; authenticated dispatch status and
+coordinate lists remain available. Map provider/real-device rendering is not certified
+by mocked or fixture tests. External navigation uses provider-hosted HTTPS links.

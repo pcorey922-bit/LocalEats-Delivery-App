@@ -1,3 +1,4 @@
+import { pruneDutyLocations } from "../src/lib/duty-location";
 import assert from "node:assert/strict";
 import { before, after, test } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
@@ -25,6 +26,7 @@ import {
   platformSettingsTable,
   financialOperationsTable,
   driverPresenceTable,
+  driverDutyLocationsTable,
   deliveryLocationsTable,
   deliveriesTable,
   webhookInboxTable,
@@ -260,6 +262,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     assert.equal((await api('/driver/availability',ids.admin,'PUT',{available:true})).status,200);
     const order=await create();await ready(order.id);
     assert.equal((await api(`/driver/orders/${order.id}/claim`,ids.admin,'POST')).status,201);
+    const ownDelivery=(await api('/driver/deliveries',ids.admin)).data.find((d:any)=>d.orderId===order.id);assert.match(ownDelivery.pickupRegion,/^(TN|Tennessee)$/);assert.ok(ownDelivery.pickupPostalCode);
     assert.equal((await api('/admin/dispatch',ids.admin)).data.drivers.some((d:any)=>d.profileId===ids.admin),true);
     assert.equal((await api(`/driver/orders/${order.id}/pickup`,ids.admin,'POST')).status,200);
     const code=await api(`/orders/${order.id}/delivery-code`,ids.customer,'POST');
@@ -271,6 +274,36 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     assert.equal((await api('/driver/availability',ids.admin,'PUT',{available:false})).status,200);
     assert.equal((await api(`/admin/drivers/${ids.admin}/approval`,ids.admin,'PATCH',{approved:false})).status,200);
     assert.equal((await api('/admin/profiles',ids.admin)).status,200);
+  });
+  await t.test("on-duty GPS is private, monotonic, freshness-aware and cleared on offline or revocation",async()=>{
+    const position={latitude:35.88,longitude:-84.69,accuracyMeters:8,observedAt:new Date(Date.now()-1000).toISOString()};
+    assert.equal((await api('/driver/location',ids.customer,'POST',position)).status,403);
+    assert.equal((await api('/driver/location',ids.admin,'POST',position)).status,403);
+    assert.equal((await api('/admin/dispatch',ids.driver)).status,403);
+    try{
+      assert.equal((await api('/driver/availability',ids.driver,'PUT',{available:true})).status,200);
+      assert.equal((await api('/driver/heartbeat',ids.driver,'POST')).status,200);
+      assert.equal((await api('/driver/location',ids.driver,'POST',position)).data.accepted,true);
+      assert.equal((await api('/driver/location',ids.driver,'POST',{...position,latitude:36,observedAt:new Date(Date.now()-5000).toISOString()})).data.accepted,false);
+      for(const invalid of [{...position,latitude:91},{...position,accuracyMeters:-1},{...position,observedAt:new Date(Date.now()-180000).toISOString()},{...position,observedAt:new Date(Date.now()+60000).toISOString()}])assert.equal((await api('/driver/location',ids.driver,'POST',invalid)).status,400);
+      let dispatch=await api('/admin/dispatch',ids.admin);let driver=dispatch.data.drivers.find((d:any)=>d.profileId===ids.driver);assert.equal(driver.status,'available');assert.equal(driver.locationStatus,'fresh');assert.equal(driver.location.latitude,position.latitude);
+      await db.update(driverDutyLocationsTable).set({observedAt:new Date(Date.now()-180000)}).where(eq(driverDutyLocationsTable.profileId,ids.driver));
+      dispatch=await api('/admin/dispatch',ids.admin);assert.equal(dispatch.data.drivers.find((d:any)=>d.profileId===ids.driver).locationStatus,'stale');
+      await db.update(driverPresenceTable).set({heartbeatAt:new Date(Date.now()-100000)}).where(eq(driverPresenceTable.profileId,ids.driver));
+      dispatch=await api('/admin/dispatch',ids.admin);driver=dispatch.data.drivers.find((d:any)=>d.profileId===ids.driver);assert.equal(driver.status,'disconnected');assert.equal(driver.location,null);
+      assert.equal((await api('/driver/heartbeat',ids.driver,'POST')).status,409);
+      await api('/driver/availability',ids.driver,'PUT',{available:true});
+      const concurrent=await Promise.all([api('/driver/location',ids.driver,'POST',{...position,observedAt:new Date().toISOString()}),api('/driver/availability',ids.driver,'PUT',{available:false})]);assert.ok(concurrent.every(r=>[200,409].includes(r.status)));
+      assert.equal((await db.select().from(driverDutyLocationsTable).where(eq(driverDutyLocationsTable.profileId,ids.driver))).length,0);
+      assert.equal((await api('/driver/location',ids.driver,'POST',position)).status,409);
+      assert.equal((await api('/driver/heartbeat',ids.driver,'POST')).status,409);
+      await api('/driver/availability',ids.driver,'PUT',{available:true});await api('/driver/location',ids.driver,'POST',position);
+      await db.update(driverDutyLocationsTable).set({receivedAt:new Date(Date.now()-16*60*1000)}).where(eq(driverDutyLocationsTable.profileId,ids.driver));await pruneDutyLocations();
+      assert.equal((await db.select().from(driverDutyLocationsTable).where(eq(driverDutyLocationsTable.profileId,ids.driver))).length,0);
+      await api('/driver/location',ids.driver,'POST',position);await api(`/admin/drivers/${ids.driver}/approval`,ids.admin,'PATCH',{approved:false});
+      assert.equal((await db.select().from(driverDutyLocationsTable).where(eq(driverDutyLocationsTable.profileId,ids.driver))).length,0);
+      assert.equal((await api('/driver/location',ids.driver,'POST',position)).status,403);
+    }finally{await db.update(profilesTable).set({driverApproved:true}).where(eq(profilesTable.id,ids.driver));await db.update(driverPresenceTable).set({available:true,heartbeatAt:new Date()}).where(eq(driverPresenceTable.profileId,ids.driver));await db.delete(driverDutyLocationsTable).where(eq(driverDutyLocationsTable.profileId,ids.driver));}
   });
   await t.test("owners manage modifiers; checkout validates choices and snapshots server pricing", async () => {
     const groups=[{id:"size",name:"Size",minSelections:1,maxSelections:1,options:[{id:"large",name:"Large",priceCents:250},{id:"small",name:"Small",priceCents:0}]},{id:"extras",name:"Extras",minSelections:0,maxSelections:2,options:[{id:"cheese",name:"Cheese",priceCents:100},{id:"sauce",name:"Sauce",priceCents:50}]}];

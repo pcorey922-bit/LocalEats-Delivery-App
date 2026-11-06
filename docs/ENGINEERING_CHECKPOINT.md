@@ -344,3 +344,40 @@ These are test-only identity/provider integrations; actual Clerk identities, rea
 map-app handoff and background GPS remain unverified. Existing demo is preserved.
 Next: latest-location telemetry for on-duty unassigned drivers, secure dispatch status,
 stale/disconnected warnings and explicit foreground/background tracking limitations.
+
+## On-duty GPS, dispatch presentation and privacy — November 6
+
+Migration 0016 adds latest-position-only driver duty telemetry. POST `/driver/location`
+requires an approved driver/administrator, active account and fresh on-duty heartbeat.
+Coordinates/timestamps are validated; older/equal observations never overwrite a newer
+fix. POST `/driver/heartbeat` renews only fresh duty sessions and cannot silently reopen
+an offline/disconnected session. Offline, approval revocation, application resubmission
+and suspension clear current telemetry atomically. The maintenance loop prunes old rows.
+Only authenticated administrators receive duty locations; customer order tracking keeps
+its existing assignment-scoped API. Dispatch includes effective approval/expiry, actual
+active assignment IDs, status, stale/disconnected warnings and full order destinations.
+
+The global foreground duty session stays mounted while an approved owner moves between
+admin/driver screens. Local intent is memory-only, account-scoped, cleared on sign-out,
+and turned off synchronously before offline API calls. Location/heartbeat watches pause
+in the background. Reliable native background tracking is NOT implemented/certified.
+The Google Maps advanced-marker renderer requires real browser-key/map-ID configuration;
+without it, the real status/coordinate list and external navigation remain usable.
+No fake location data is introduced into production flows. Admin manual assignment/
+reassignment controls remain an unimplemented priority; existing driver claim/release
+and duplicate-assignment protections are preserved.
+
+Local HTTP/database tests cover permission, monotonic updates, invalid/stale/future
+fixes, heartbeat recovery, stale/disconnected reporting, concurrent offline/upload,
+revocation and retention. Browser fixture verification used actual navigation and
+map/status components with explicitly simulated GPS/accounts; copying, encoded URLs,
+null destination and stale warnings passed without application errors. This does not
+verify actual Clerk auth, real GPS, real Maps SDK credentials or physical map-app launch.
+A viewport screenshot is in docs/verification/dispatch-navigation-fixture.jpg (full-page
+capture timed out; viewport capture succeeded). Reproduce with the existing fixture
+builder. Next: verify CI, implement protected administrative assignment/reassignment,
+then native background services and real-device/provider/configuration requirements.
+Owner-driver/navigation revision fd83b6276056b0486c5e4011e2eb6b242fe2ca0c passed
+PostgreSQL/restore/container validation (42184948132) and unsigned Android/iOS native
+compilation (42184947908). Final duty telemetry changes passed the local full suite
+and production build. Their fresh CI/provider/device status must be checked separately.

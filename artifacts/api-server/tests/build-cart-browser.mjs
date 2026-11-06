@@ -14,7 +14,7 @@ await build({
   format: "esm",
   jsx: "automatic",
   outfile: path.join(directory, "cart-browser.js"),
-  define: { "process.env.NODE_ENV": '"production"' },
+  define: { "process.env.NODE_ENV": '"production"', "import.meta.env": "{}" },
 });
 await writeFile(
   path.join(directory, "cart-browser.html"),

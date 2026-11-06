@@ -1,5 +1,6 @@
+import { driverDutyLocationsTable } from "@workspace/db";
 import { orderingEnabled, requireOrderingEnabled } from "../lib/commerce-policy";
-import { driverApplicationsTable } from "@workspace/db";
+import { driverApplicationsTable, driverPresenceTable } from "@workspace/db";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { z } from "zod";
@@ -678,6 +679,7 @@ router.patch(
         .where(and(eq(profilesTable.id, id), inArray(profilesTable.role, ["driver","admin"])))
         .returning();
       if (!driver) throw new CommerceError(404, "Driver not found");
+      if(!approved){await tx.update(driverPresenceTable).set({available:false}).where(eq(driverPresenceTable.profileId,id));await tx.delete(driverDutyLocationsTable).where(eq(driverDutyLocationsTable.profileId,id));}
       await audit(tx, profile.id, "driver.approval", id, { approved });
       return driver;
     });

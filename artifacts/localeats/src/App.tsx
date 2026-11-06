@@ -1,3 +1,4 @@
+import { DriverDutySession } from "./pages/driver-duty-session";
 import { NotificationsPage, EarningsPage, OperationsCommerce, DeletionRequest } from './pages/commerce-pages';
 import { MobileLifecycle, unregisterPush } from './lib/mobile';
 import { useState } from 'react';
@@ -502,7 +503,7 @@ function ClerkRoutes() {
   return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`}
     localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your RoCoEats account' } }, signUp: { start: { title: 'Find your place here', subtitle: 'Create your RoCoEats account' } } }}
     routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}>
-    <ApiAuthentication /><MobileLifecycle /><ClerkQueryClientCacheInvalidator /><Router />
+    <ApiAuthentication /><MobileLifecycle /><ClerkQueryClientCacheInvalidator /><DriverDutySession /><Router />
   </ClerkProvider>;
 }
 

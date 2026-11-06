@@ -1,3 +1,4 @@
+import { pruneDutyLocations } from "./lib/duty-location";
 import { randomUUID } from "node:crypto";
 import { lt } from "drizzle-orm";
 import {
@@ -76,6 +77,7 @@ const loops = [
     await drainPushBatch(stopping, progress);
   }),
   worker("maintenance", 60000, async () => {
+    await pruneDutyLocations();
     await db
       .delete(requestLimitsTable)
       .where(lt(requestLimitsTable.expiresAt, new Date()));

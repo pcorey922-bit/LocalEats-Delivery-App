@@ -35,6 +35,8 @@ test("map links encode the full destination and driving intent without leaking d
 });
 test("missing, partial, oversized and control-character destinations fail closed", () => {
   for (const a of [
+    null,
+    undefined,
     {},
     { ...address, street1: "" },
     { ...address, postalCode: null },
