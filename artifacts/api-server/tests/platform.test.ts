@@ -378,6 +378,35 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       assert.equal((await api("/driver/offers", ids.unapproved)).status, 403);
     },
   );
+  await t.test("checkout rejects inputs changed between price calculation and transaction commit",async()=>{
+    const [originalItem]=await db.select().from(menuItemsTable).where(eq(menuItemsTable.id,ids.item));
+    const [originalAddress]=await db.select().from(addressesTable).where(eq(addressesTable.id,ids.address));
+    const scenarios=[
+      {change:()=>db.update(menuItemsTable).set({priceCents:originalItem.priceCents+100}).where(eq(menuItemsTable.id,ids.item)),reset:()=>db.update(menuItemsTable).set({priceCents:originalItem.priceCents}).where(eq(menuItemsTable.id,ids.item))},
+      {change:()=>db.update(menuItemsTable).set({isAvailable:false}).where(eq(menuItemsTable.id,ids.item)),reset:()=>db.update(menuItemsTable).set({isAvailable:true}).where(eq(menuItemsTable.id,ids.item))},
+      {change:()=>db.update(addressesTable).set({deliveryInstructions:'Changed after price calculation'}).where(eq(addressesTable.id,ids.address)),reset:()=>db.update(addressesTable).set({deliveryInstructions:originalAddress.deliveryInstructions}).where(eq(addressesTable.id,ids.address))},
+      {change:()=>db.update(restaurantsTable).set({acceptingOrders:false}).where(eq(restaurantsTable.id,ids.business)),reset:()=>db.update(restaurantsTable).set({acceptingOrders:true}).where(eq(restaurantsTable.id,ids.business))},
+    ];
+    for(const scenario of scenarios){
+      const quote=await api('/orders/quote',ids.customer,'POST',input());assert.equal(quote.status,200);
+      const original=db.transaction.bind(db);let release!:()=>void,arrived!:()=>void;const gate=new Promise<void>(r=>release=r),entered=new Promise<void>(r=>arrived=r);let caught=false;
+      (db as any).transaction=async(...args:any[])=>{if(!caught){caught=true;arrived();await gate;}return (original as any)(...args);};
+      const key=randomUUID();const pending=api('/orders',ids.customer,'POST',{...input(),expectedTotalCents:quote.data.totalCents},key);
+      try{await entered;await scenario.change();(db as any).transaction=original;release();const result=await pending;assert.equal(result.status,409,JSON.stringify(result.data));
+        const rows=await db.select().from(ordersTable).where(eq(ordersTable.requestKey,`${ids.customer}:${key}`));assert.equal(rows.length,0);
+      }finally{(db as any).transaction=original;release();await pending;await scenario.reset();}
+    }
+  });
+  await t.test("preparation instructions persist as separate order lines and delivery instructions stay immutable",async()=>{
+    const body={...input(),items:[{menuItemId:ids.item,quantity:1,specialInstructions:'No onions'},{menuItemId:ids.item,quantity:1,specialInstructions:'Extra onions'}]};
+    const [address]=await db.select().from(addressesTable).where(eq(addressesTable.id,ids.address));
+    await db.update(addressesTable).set({deliveryInstructions:'Use side entrance'}).where(eq(addressesTable.id,ids.address));
+    try{const quote=await api('/orders/quote',ids.customer,'POST',body);const order=await api('/orders',ids.customer,'POST',{...body,expectedTotalCents:quote.data.totalCents},randomUUID());assert.equal(order.status,201);
+      assert.deepEqual(order.data.items.map((i:any)=>i.specialInstructions).sort(),['Extra onions','No onions']);
+      await db.update(addressesTable).set({deliveryInstructions:'New instructions for a future order'}).where(eq(addressesTable.id,ids.address));
+      const loaded=await api(`/orders/${order.data.id}`,ids.customer);assert.equal(loaded.data.deliveryAddress.deliveryInstructions,'Use side entrance');
+    }finally{await db.update(addressesTable).set({deliveryInstructions:address.deliveryInstructions}).where(eq(addressesTable.id,ids.address));}
+  });
   await t.test(
     "checkout creation is idempotent and body conflicts are rejected",
     async () => {

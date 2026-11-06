@@ -8,6 +8,7 @@ try {
   for (const [name, entry] of [
     ["dashboard-sections", "src/lib/dashboard-sections.test.ts"],
     ["order-lifecycle", "src/lib/order-lifecycle.test.ts"],
+    ["cart-line", "tests/cart-line.test.ts"],
     ["mobile-api", "tests/mobile-api.test.ts"],
     ["commerce-policy", "src/lib/commerce-policy.test.ts"],
     ["availability", "src/lib/restaurant-availability.test.ts"],

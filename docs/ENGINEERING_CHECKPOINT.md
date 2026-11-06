@@ -216,3 +216,17 @@ Next checks: real PostgreSQL CI, authenticated browser/device testing of these n
 forms and notification recovery, then partial refunds/disputes and external financial
 reconciliation. No new production website, provider sandbox certification, signed
 mobile artifacts or bank reconciliation is claimed by these changes.
+
+## Checkout snapshot integrity and preparation notes — November 6
+
+Order creation now holds shared row locks on the customer, restaurant, address,
+menu items (in stable ID order), and configured pricing until order snapshots commit.
+It rejects changed inputs and rechecks opening hours inside the transaction.
+Preparation notes are available in the real item controls, separate cart identities,
+checkout payloads and restaurant order lines. New addresses accept delivery instructions;
+those remain immutable in the order after future address edits.
+Tests pause requests immediately before transaction entry, mutate price, availability,
+address or restaurant state, and verify conflict responses with no persisted order.
+Separate instruction lines and address snapshot preservation are tested through HTTP.
+Local full suite and production build passed with PGlite/test-only identity/providers.
+Authenticated real-provider browser/device verification still requires configuration.

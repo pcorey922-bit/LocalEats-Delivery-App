@@ -193,8 +193,10 @@ export function CustomizedAdd({
     selected: Record<string, string[]>,
     extra: number,
     label: string,
+    instructions: string,
   ) => void;
 }) {
+  const [instructions, setInstructions] = useState("");
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   let extra = 0,
     error = "";
@@ -229,6 +231,15 @@ export function CustomizedAdd({
           ))}
         </fieldset>
       ))}
+      <label>
+        Preparation instructions (optional)
+        <textarea
+          className="roco-input"
+          maxLength={500}
+          value={instructions}
+          onChange={(e) => setInstructions(e.target.value)}
+        />
+      </label>
       <p>${((item.priceCents + extra) / 100).toFixed(2)}</p>
       {error && <small>{error}</small>}
       <button
@@ -241,6 +252,7 @@ export function CustomizedAdd({
             customize(item.modifierGroups ?? [], selected)
               .snapshot.map((o) => `${o.group}: ${o.option}`)
               .join(", "),
+            instructions.trim(),
           )
         }
       >

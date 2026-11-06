@@ -298,8 +298,8 @@ export default function DemoPreview() {
                     </div>
                     <CustomizedAdd
                       item={{ ...item, name: itemNames[index] }}
-                      onAdd={(selected, extra, label) => {
-                        const key = item.id + JSON.stringify(selected);
+                      onAdd={(selected, extra, label, instructions) => {
+                        const key = item.id + JSON.stringify(selected) + instructions;
                         setCart((c) =>
                           c.some((l) => l.key === key)
                             ? c.map((l) =>
@@ -314,7 +314,7 @@ export default function DemoPreview() {
                                   name: itemNames[index],
                                   price: item.priceCents + extra,
                                   quantity: 1,
-                                  label,
+                                  label: [label,instructions].filter(Boolean).join(" · "),
                                 },
                               ],
                         );

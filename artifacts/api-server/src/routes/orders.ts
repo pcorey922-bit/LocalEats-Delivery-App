@@ -35,6 +35,7 @@ import {
   ordersTable,
   paymentsTable,
   profilesTable,
+  platformSettingsTable,
   restaurantsTable,
 } from "@workspace/db";
 import { getActiveProfile, requireRole } from "../lib/current-profile";
@@ -235,13 +236,26 @@ router.post(
     }
 
     const itemsById = new Map(availableItems.map((item) => [item.id, item]));
-    const customizations = parsed.data.items.map(line => {
-      try { return customize(itemsById.get(line.menuItemId)!.modifierGroups, line.modifiers); }
-      catch(error) { throw new CommerceError(400, error instanceof Error ? error.message : "Invalid modifiers"); }
+    const customizations = parsed.data.items.map((line) => {
+      try {
+        return customize(
+          itemsById.get(line.menuItemId)!.modifierGroups,
+          line.modifiers,
+        );
+      } catch (error) {
+        throw new CommerceError(
+          400,
+          error instanceof Error ? error.message : "Invalid modifiers",
+        );
+      }
     });
     const subtotalCents = parsed.data.items.reduce((sum, line, index) => {
       const menuItem = itemsById.get(line.menuItemId);
-      return sum + ((menuItem?.priceCents ?? 0) + customizations[index].extraCents) * line.quantity;
+      return (
+        sum +
+        ((menuItem?.priceCents ?? 0) + customizations[index].extraCents) *
+          line.quantity
+      );
     }, 0);
     if (!Number.isSafeInteger(subtotalCents) || subtotalCents > 2_147_483_647) {
       res
@@ -299,12 +313,73 @@ router.post(
 
     let createdNewOrder = true;
     const createdOrderId = await db.transaction(async (tx) => {
+      // Lock checkout inputs until the immutable order snapshot is committed.
+      // Availability/menu/address/settings may have changed since the quote read.
+      const [lockedCustomer] = await tx
+        .select()
+        .from(profilesTable)
+        .where(eq(profilesTable.id, profile.id))
+        .for("share");
+      if (!lockedCustomer?.isActive || lockedCustomer.role !== "customer")
+        throw new CommerceError(403, "Customer account is no longer active");
+      const [lockedRestaurant] = await tx
+        .select()
+        .from(restaurantsTable)
+        .where(eq(restaurantsTable.id, restaurant.id))
+        .for("share");
+      const [lockedAddress] = await tx
+        .select()
+        .from(addressesTable)
+        .where(
+          and(
+            eq(addressesTable.id, address.id),
+            eq(addressesTable.profileId, profile.id),
+          ),
+        )
+        .for("share");
+      const lockedItems = await tx
+        .select()
+        .from(menuItemsTable)
+        .where(
+          and(
+            eq(menuItemsTable.restaurantId, restaurant.id),
+            inArray(menuItemsTable.id, itemIds),
+          ),
+        )
+        .orderBy(asc(menuItemsTable.id))
+        .for("share");
+      await tx
+        .select()
+        .from(platformSettingsTable)
+        .where(eq(platformSettingsTable.settingKey, "test_pricing"))
+        .for("share");
+      const lockedPricing = await readPricing(tx);
+      if (
+        !lockedRestaurant ||
+        lockedRestaurant.status !== "approved" ||
+        !lockedAddress ||
+        JSON.stringify(lockedRestaurant) !== JSON.stringify(restaurant) ||
+        JSON.stringify(lockedAddress) !== JSON.stringify(address) ||
+        JSON.stringify(lockedPricing) !== JSON.stringify(pricing) ||
+        lockedItems.length !== itemIds.length ||
+        lockedItems.some(
+          (item) =>
+            !item.isAvailable ||
+            JSON.stringify(item) !== JSON.stringify(itemsById.get(item.id)),
+        )
+      )
+        throw new CommerceError(
+          409,
+          "Checkout details changed. Review your address, menu and a fresh quote before ordering",
+        );
+      await ensureAccepting(lockedRestaurant, tx);
+
       const [order] = await tx
         .insert(ordersTable)
         .values({
           requestKey,
           requestHash,
-          pricingSnapshot: {...pricing},
+          pricingSnapshot: { ...pricing },
           customerProfileId: profile.id,
           restaurantId: restaurant.id,
           deliveryAddressId: address.id,
@@ -337,7 +412,8 @@ router.post(
             menuItemId: menuItem.id,
             itemNameSnapshot: menuItem.name,
             itemDescriptionSnapshot: menuItem.description,
-            unitPriceCents: menuItem.priceCents + customizations[index].extraCents,
+            unitPriceCents:
+              menuItem.priceCents + customizations[index].extraCents,
             modifierSnapshot: customizations[index].snapshot,
             quantity: line.quantity,
             specialInstructions: line.specialInstructions?.trim() || null,
