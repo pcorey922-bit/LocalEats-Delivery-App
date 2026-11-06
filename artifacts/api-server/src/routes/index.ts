@@ -1,3 +1,4 @@
+import supportRouter from "./support";
 import driverOnboardingRouter from "./driver-onboarding";
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
@@ -17,6 +18,7 @@ import ledgerRouter from "./ledger";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(supportRouter);
 router.use(driverOnboardingRouter);
 router.use(commerceRouter);
 router.use(operationalHealthRouter);

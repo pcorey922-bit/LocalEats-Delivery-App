@@ -32,7 +32,7 @@ router.post("/orders/:orderId/delivery-code", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
   if (!profile || !requireRole(profile, ["customer"], res)) return;
   const orderId = String(req.params.orderId);
-  if (!/^[0-9a-f-]{36}$/i.test(orderId))
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId))
     throw new CommerceError(400, "Invalid order");
   const code = String(randomInt(0, 1000000)).padStart(6, "0");
   const salt = randomUUID();
@@ -75,7 +75,7 @@ router.get("/orders/:orderId/delivery-proof", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
   if (!profile) return;
   const orderId = String(req.params.orderId);
-  if (!/^[0-9a-f-]{36}$/i.test(orderId))
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId))
     throw new CommerceError(400, "Invalid order");
   const [record] = await db
     .select({

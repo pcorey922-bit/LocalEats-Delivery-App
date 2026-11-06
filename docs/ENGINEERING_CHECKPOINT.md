@@ -195,3 +195,24 @@ injected earnings DB failure/rollback/recovery, one delivery event, exactly thre
 notification rows, two earnings rows and one balanced allocation journal. No actual
 Stripe/bank reconciliation, push-provider/device round trip or browser test of the
 new authenticated forms is claimed. Next: support-case escalation for failed handoffs.
+
+## Support escalation — November 6
+
+Migration 0014 adds support cases. Authenticated members submit general or order-linked
+cases at POST `/support/cases` using a client UUID for duplicate-request protection.
+Order references require the customer, owning restaurant, assigned driver or admin.
+GET `/support/cases` returns only the requester's records. Administrators use
+GET `/admin/support/cases` and PATCH `/admin/support/cases/:id` with the case version
+to review, resolve or reopen a case. Decisions have audit records and a private
+in-app notification; notification bodies omit issue details. Support decisions never
+automatically refund, cancel or complete deliveries. Connected UI is in customer
+order details, restaurant/driver order controls and administrator operations.
+
+Tests passed with PGlite/test-only auth/provider adapters: privacy, duplicate
+concurrent submissions, ownership, stale concurrent resolutions, notification
+deduplication and unchanged order state. Production build passed. The handoff proof
+implementation is saved at remote commit 968211a10edd1e4c06d790b932f08077cd4abeaa.
+Next checks: real PostgreSQL CI, authenticated browser/device testing of these new
+forms and notification recovery, then partial refunds/disputes and external financial
+reconciliation. No new production website, provider sandbox certification, signed
+mobile artifacts or bank reconciliation is claimed by these changes.

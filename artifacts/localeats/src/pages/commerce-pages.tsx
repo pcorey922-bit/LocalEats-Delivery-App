@@ -1,3 +1,4 @@
+import { SupportDesk, AdminSupport } from "./support-desk";
 import { DriverApplicationReviews } from "./driver-onboarding";
 import { OrderTracking, DispatchOperations } from "./delivery-tracking";
 import { LedgerReport } from "./ledger-report";
@@ -200,7 +201,7 @@ export function OrderActions({ order }: { order: Order }) {
         {expanded ? "Hide" : "View"} details
       </button>
       <ErrorText error={cancel.error} />
-      {expanded && (
+      <SupportDesk orderId={order.id}/>{expanded && (
         <section>
           <p>
             Food {money(order.subtotalCents)} · delivery{" "}
@@ -433,7 +434,7 @@ export function OperationsCommerce() {
     );
   return (
     <main className="roco-main">
-      <DriverApplicationReviews />
+      <DriverApplicationReviews /><AdminSupport />
       <Link href="/admin">← Operations overview</Link>
       <h1>Test order operations</h1>
       <CommerceBanner />

@@ -460,6 +460,22 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       );
     },
   );
+  await t.test("support cases protect order privacy and deduplicate requests with auditable versioned resolution",async()=>{
+    const order=await create();const body={id:randomUUID(),orderId:order.id,category:'delivery',subject:'Help with delivery',message:'Please check this order and contact me in the app.'};
+    assert.equal((await api('/support/cases',null,'POST',body)).status,401);
+    assert.equal((await api('/support/cases',ids.other,'POST',body)).status,404);
+    const created=await Promise.all([api('/support/cases',ids.customer,'POST',body),api('/support/cases',ids.customer,'POST',body)]);assert.deepEqual(created.map(r=>r.status).sort(),[200,201]);
+    assert.equal((await api('/support/cases',ids.customer,'POST',{...body,subject:'Changed subject'})).status,409);
+    const own=await api('/support/cases',ids.customer);assert.equal(own.data.filter((c:any)=>c.id===body.id).length,1);
+    assert.equal((await api('/support/cases',ids.other)).data.some((c:any)=>c.id===body.id),false);
+    assert.equal((await api('/admin/support/cases',ids.customer)).status,403);
+    const path=`/admin/support/cases/${body.id}`;const change={version:1,status:'resolved',resolution:'Customer contacted; delivery instructions clarified.'};
+    assert.equal((await api(path,ids.customer,'PATCH',change)).status,403);
+    const reviewed=await Promise.all([api(path,ids.admin,'PATCH',change),api(path,ids.admin,'PATCH',change)]);assert.deepEqual(reviewed.map(r=>r.status).sort(),[200,409]);
+    const after=await api('/support/cases',ids.customer);assert.equal(after.data.find((c:any)=>c.id===body.id).status,'resolved');
+    const notices=await db.select().from(notificationsTable).where(eq(notificationsTable.eventKey,`support:${body.id}:2`));assert.equal(notices.length,1);assert.equal(notices[0].profileId,ids.customer);
+    const [unchanged]=await db.select().from(ordersTable).where(eq(ordersTable.id,order.id));assert.equal(unchanged.status,order.status);
+  });
   await t.test("handoff proof is private, rate limited, atomic and safe under concurrent retries",async()=>{
     const order=await create();await ready(order.id);
     assert.equal((await api(`/driver/orders/${order.id}/claim`,ids.driver,'POST')).status,201);

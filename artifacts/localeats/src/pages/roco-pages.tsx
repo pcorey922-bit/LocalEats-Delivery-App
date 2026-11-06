@@ -1,3 +1,4 @@
+import { SupportDesk } from "./support-desk";
 import { CustomerHandoff, DriverHandoff } from "./delivery-handoff";
 import { DriverApplication } from "./driver-onboarding";
 import { CustomizedAdd, ModifierEditor } from "./menu-modifiers";
@@ -146,7 +147,7 @@ export function RestaurantPage() {
 }
 function OrderControls({ order, onStatus }: { order: Order; onStatus: (status: OrderStatus) => void }) {
   const next: Partial<Record<OrderStatus, OrderStatus>> = { placed: 'accepted', restaurant_received: 'accepted', pending: 'accepted', accepted: 'preparing', preparing: 'ready_for_pickup' };
-  return <article className="roco-card"><div className="roco-row"><div><div className="roco-meta">{new Date(order.placedAt).toLocaleString()} · {order.customerName}</div><h2 style={{ marginTop: 7 }}>Order {order.id.slice(0, 8)}</h2></div><span className="roco-badge">{statusText(order.status)}</span></div>{order.items.map(i => <p key={i.id}>{i.quantity} × {i.itemName}{i.modifierSnapshot?.map((m,index)=><span key={index}> · {m.group}: {m.option}</span>)}</p>)}<div className="roco-row"><span>{money(order.totalCents)} · test payment {statusText(order.paymentStatus)}</span>{!['cancelled','out_for_delivery','delivered'].includes(order.status) && <button className="roco-button danger" onClick={() => { if(window.confirm('Cancel this test order and refund its payment?')) onStatus('cancelled'); }}>Cancel / refund</button>}{order.paymentCollected && next[order.status] && <button className="roco-button primary" onClick={() => onStatus(next[order.status]!)}>Mark {statusText(next[order.status]!)}</button>}</div></article>;
+  return <article className="roco-card"><SupportDesk orderId={order.id}/><div className="roco-row"><div><div className="roco-meta">{new Date(order.placedAt).toLocaleString()} · {order.customerName}</div><h2 style={{ marginTop: 7 }}>Order {order.id.slice(0, 8)}</h2></div><span className="roco-badge">{statusText(order.status)}</span></div>{order.items.map(i => <p key={i.id}>{i.quantity} × {i.itemName}{i.modifierSnapshot?.map((m,index)=><span key={index}> · {m.group}: {m.option}</span>)}</p>)}<div className="roco-row"><span>{money(order.totalCents)} · test payment {statusText(order.paymentStatus)}</span>{!['cancelled','out_for_delivery','delivered'].includes(order.status) && <button className="roco-button danger" onClick={() => { if(window.confirm('Cancel this test order and refund its payment?')) onStatus('cancelled'); }}>Cancel / refund</button>}{order.paymentCollected && next[order.status] && <button className="roco-button primary" onClick={() => onStatus(next[order.status]!)}>Mark {statusText(next[order.status]!)}</button>}</div></article>;
 }
 
 export function AdminPage() {
@@ -189,7 +190,7 @@ export function DriverPage() {
   if (!enabled) return <Shell><main className="roco-main"><PageIntro eyebrow="Driver access" title="Your delivery workspace.">Sign in with an active, administrator-approved driver profile to view deliveries.</PageIntro></main></Shell>;
   const card = (d: DriverDelivery, offer: boolean) => <article className="roco-card" key={d.orderId}>
     {d.status==='picked_up'&&d.orderStatus==='out_for_delivery'&&<DriverHandoff orderId={d.orderId} onCompleted={()=>{void client.invalidateQueries({queryKey:['driver-deliveries']});void client.invalidateQueries({queryKey:['driver-offers']});}}/>}
-    <h3>{d.restaurantName}</h3><p>Pickup: {d.pickupStreet}, {d.pickupCity}</p><p className="roco-meta">Order {d.orderId} · {statusText(d.status)}</p>
+    {!offer&&<SupportDesk orderId={d.orderId}/>}<h3>{d.restaurantName}</h3><p>Pickup: {d.pickupStreet}, {d.pickupCity}</p><p className="roco-meta">Order {d.orderId} · {statusText(d.status)}</p>
     {d.deliveryAddress && <><p>Deliver to: {d.deliveryAddress.street1} {d.deliveryAddress.street2}, {d.deliveryAddress.city}, {d.deliveryAddress.region} {d.deliveryAddress.postalCode}</p><p>{d.deliveryAddress.deliveryInstructions}</p></>}
     <a className="roco-button" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(d.status==='picked_up'&&d.deliveryAddress?`${d.deliveryAddress.street1}, ${d.deliveryAddress.city}, ${d.deliveryAddress.region} ${d.deliveryAddress.postalCode}`:`${d.pickupStreet}, ${d.pickupCity}, TN`)}`} target="_blank" rel="noreferrer">Open directions</a>
     {d.status==='assigned'&&<button className="roco-button" disabled={update.isPending} onClick={()=>{if(window.confirm('Release this delivery before pickup?'))update.mutate({orderId:d.orderId,action:'release'});}}>Release delivery</button>}
@@ -198,7 +199,7 @@ export function DriverPage() {
   </article>;
   return <Shell><main className="roco-main"><PageIntro eyebrow="Driver" title="Local deliveries.">Paid orders ready for pickup appear here. Customer addresses are available after you claim a delivery.</PageIntro>
     {update.isError && <p className="roco-alert" role="alert">{update.error.message}</p>}
-    <DriverApplication/><DriverAvailability/><h2>My deliveries</h2>{deliveries.isPending ? <Loading/> : deliveries.isError ? <LoadError retry={() => void deliveries.refetch()} message={deliveries.error.message}/> : <div className="roco-list">{deliveries.data?.length ? deliveries.data.map(d => card(d, false)) : <p>No assigned deliveries.</p>}</div>}
+    <DriverApplication/><SupportDesk/><DriverAvailability/><h2>My deliveries</h2>{deliveries.isPending ? <Loading/> : deliveries.isError ? <LoadError retry={() => void deliveries.refetch()} message={deliveries.error.message}/> : <div className="roco-list">{deliveries.data?.length ? deliveries.data.map(d => card(d, false)) : <p>No assigned deliveries.</p>}</div>}
     <h2>Available offers</h2>{offers.isPending ? <Loading/> : offers.isError ? <LoadError retry={() => void offers.refetch()} message={offers.error.message}/> : <div className="roco-list">{offers.data?.length ? offers.data.map(d => card(d, true)) : <p>No paid deliveries available right now.</p>}</div>}
   </main></Shell>;
 }
