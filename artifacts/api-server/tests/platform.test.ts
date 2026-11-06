@@ -313,6 +313,29 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       );
     },
   );
+  await t.test("driver application privacy, approval checklist, resubmission and stale reviews",async()=>{
+    const application={phone:"+1 865 555 0100",vehicleMake:"Toyota",vehicleModel:"Corolla",vehicleYear:2021,licenseState:"TN",licenseExpiresOn:"2030-12-31",eligibilityAttested:true,insuranceAttested:true};
+    assert.equal((await api('/driver/application',ids.customer,'PUT',application)).status,403);
+    assert.equal((await api('/admin/driver-applications',ids.driver)).status,403);
+    assert.equal((await api(`/admin/drivers/${ids.unapproved}/approval`,ids.admin,'PATCH',{approved:true})).status,409);
+    assert.equal((await api('/driver/application',ids.unapproved,'PUT',{...application,licenseExpiresOn:"2020-02-30"})).status,400);
+    const saved=await api('/driver/application',ids.unapproved,'PUT',application);assert.equal(saved.status,200);assert.equal(saved.data.status,'pending');
+    assert.equal((await api('/driver/application',ids.driver)).data,null);
+    assert.equal((await api('/driver/offers',ids.unapproved)).status,403);
+    const review={version:saved.data.version,approved:true,identityChecked:true,screeningChecked:true,insuranceChecked:true,note:"External verification evidence reference TEST-123"};
+    const path=`/admin/driver-applications/${ids.unapproved}/review`;
+    assert.equal((await api(path,ids.unapproved,'POST',review)).status,403);
+    assert.equal((await api(path,ids.admin,'POST',{...review,screeningChecked:false})).status,400);
+    assert.equal((await api(path,ids.admin,'POST',review)).status,200);
+    assert.equal((await api(path,ids.admin,'POST',review)).status,409);
+    const next=await api('/driver/application',ids.unapproved,'PUT',{...application,vehicleModel:"Prius"});assert.equal(next.data.status,'pending');
+    assert.equal((await api('/driver/offers',ids.unapproved)).status,403);
+    assert.equal((await api(path,ids.admin,'POST',review)).status,409);
+    assert.equal((await api(path,ids.admin,'POST',{...review,version:next.data.version})).status,200);
+    assert.equal((await api("/driver/offers",ids.unapproved)).status,409);
+    assert.equal((await api("/driver/availability",ids.unapproved,"PUT",{available:true})).status,200);
+    const listing=await api('/admin/driver-applications',ids.admin);assert.equal(listing.status,200);assert.ok(listing.data.some((r:any)=>r.application.profileId===ids.unapproved));
+  });
   await t.test(
     "customer cannot grant driver approval and admin revocation takes effect",
     async () => {

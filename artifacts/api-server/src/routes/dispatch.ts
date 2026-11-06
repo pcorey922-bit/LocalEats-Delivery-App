@@ -56,6 +56,7 @@ router.put("/driver/availability", requireAuth, async (req, res) => {
     .object({ available: z.boolean() })
     .strict()
     .parse(req.body);
+  if (available && !profile.driverApproved) throw new CommerceError(403, "Driver approval and an unexpired license are required");
   await db.transaction(async (tx) => {
     const [current] = await tx
       .select()

@@ -1,3 +1,4 @@
+import { DriverApplicationReviews } from "./driver-onboarding";
 import { OrderTracking, DispatchOperations } from "./delivery-tracking";
 import { LedgerReport } from "./ledger-report";
 import { OperationalConsole } from "./operational-console";
@@ -432,6 +433,7 @@ export function OperationsCommerce() {
     );
   return (
     <main className="roco-main">
+      <DriverApplicationReviews />
       <Link href="/admin">← Operations overview</Link>
       <h1>Test order operations</h1>
       <CommerceBanner />

@@ -152,3 +152,26 @@ GitHub is the durable code source. Connector commits may initially have differen
 SHAs from local commits but are verified to have identical tree hashes. Align only
 when clean and trees match; never reset uncommitted progress. Update this checkpoint
 and commit verified progress before the execution session ends.
+
+## Driver onboarding implementation — November 6
+
+Migration 0012 adds private driver applications. Drivers submit contact/vehicle details,
+license state/expiry and eligibility/insurance attestations at `/driver/application`.
+Administrators review applications at `/admin/driver-applications`; approval requires
+recording completed external identity, screening and insurance checks. This is manual
+review infrastructure, not automated identity/background verification. Government IDs,
+license numbers and banking details are not collected by these endpoints.
+
+The driver dashboard and administrator operations include application/review forms.
+Review uses application version checks and profile row locks. Resubmission pauses
+dispatch, rejects edits during an active delivery and invalidates prior reviews.
+Legacy admin approval cannot newly approve a driver without an approved application.
+Already approved legacy drivers remain supported; submitted applications are checked
+for license expiry on authenticated driver requests.
+
+Local suite passed with PGlite and test-only auth/provider adapters; production build
+passed. No external screening, Stripe sandbox round trip, physical-device test or
+new hosted backend deployment was completed. Existing interactive demo is preserved.
+Next: authenticated browser verification of onboarding, expiration/active-delivery
+edge tests, then proof-of-delivery and support workflows. Remaining financial,
+provider, deployment and release blockers listed above still apply.

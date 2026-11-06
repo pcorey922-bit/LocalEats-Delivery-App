@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import type { Request, Response } from "express";
-import { db, profilesTable, type Profile } from "@workspace/db";
+import { db, profilesTable, driverApplicationsTable, type Profile } from "@workspace/db";
 import { getAuthenticatedUserId } from "../middlewares/require-auth";
 
 export async function getActiveProfile(
@@ -24,6 +24,10 @@ export async function getActiveProfile(
     return null;
   }
 
+  if(profile.role === "driver" && profile.driverApproved){
+    const [application]=await db.select().from(driverApplicationsTable).where(eq(driverApplicationsTable.profileId,profile.id));
+    if(application && (application.status !== "approved" || application.licenseExpiresOn < new Date().toISOString().slice(0,10))) profile.driverApproved=false;
+  }
   return profile;
 }
 

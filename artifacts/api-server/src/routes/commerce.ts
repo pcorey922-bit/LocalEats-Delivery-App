@@ -1,3 +1,4 @@
+import { driverApplicationsTable } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { z } from "zod";
@@ -664,6 +665,8 @@ router.patch(
       .parse(req.body);
     const id = uuid.parse(req.params.profileId);
     const result = await db.transaction(async (tx) => {
+      await tx.select().from(profilesTable).where(eq(profilesTable.id,id)).for("update");
+      if(approved){const [application]=await tx.select().from(driverApplicationsTable).where(eq(driverApplicationsTable.profileId,id));if(application?.status!=="approved")throw new CommerceError(409,"Review and approve the driver application first");}
       const [driver] = await tx
         .update(profilesTable)
         .set({ driverApproved: approved })
