@@ -34,11 +34,17 @@ fingerprint() { run_pg psql --no-psqlrc --quiet --tuples-only --no-align --set O
 source_fingerprint="$(fingerprint "$source_db")"
 restored_fingerprint="$(fingerprint "$target_db")"
 [[ "$source_fingerprint" == "$restored_fingerprint" ]] || { echo 'Restored row or sequence fingerprint mismatch' >&2; exit 1; }
-schema_fingerprint() {
+schema_dump() {
   run_pg pg_dump --schema-only --no-owner --no-privileges --dbname="$1" |
-    grep -vE '^--|^\\(un)?restrict ' | sha256sum | cut -d' ' -f1
+    grep -vE '^--|^\\(un)?restrict '
 }
-[[ "$(schema_fingerprint "$source_db")" == "$(schema_fingerprint "$target_db")" ]] || { echo 'Restored schema, constraint or trigger mismatch' >&2; exit 1; }
+schema_dump "$source_db" > "$work/source-schema.sql"
+schema_dump "$target_db" > "$work/restored-schema.sql"
+if ! cmp --silent "$work/source-schema.sql" "$work/restored-schema.sql"; then
+  echo 'Restored schema, constraint or trigger mismatch (fixture DDL differences follow)' >&2
+  diff -u "$work/source-schema.sql" "$work/restored-schema.sql" | head -100 >&2 || true
+  exit 1
+fi
 run_pg psql -X --set ON_ERROR_STOP=1 --dbname="$target_db" --command "DO \$\$ BEGIN IF EXISTS(SELECT transaction_id FROM ledger_lines GROUP BY transaction_id HAVING sum(amount_cents)<>0 OR count(*)<2) THEN RAISE EXCEPTION 'Restored ledger is unbalanced'; END IF; IF NOT EXISTS(SELECT 1 FROM ledger_lines) THEN RAISE EXCEPTION 'Fixture has no ledger data for recovery verification'; END IF; END \$\$;" >/dev/null
 if run_pg psql -X --set ON_ERROR_STOP=1 --dbname="$target_db" --command 'BEGIN; UPDATE ledger_lines SET amount_cents=amount_cents WHERE id=(SELECT id FROM ledger_lines LIMIT 1); ROLLBACK;' > /dev/null 2> "$work/guard.err"; then
   echo 'Restored immutable-ledger guard did not reject an update' >&2; exit 1
