@@ -32,6 +32,7 @@ export type CommerceConfig = {
   mode: "sandbox" | "stripe_test" | "disabled";
   testMode: true;
   liveChargesEnabled: false;
+  orderingEnabled: boolean;
   pricing: Pricing | null;
   taxNotice: string;
 };
@@ -61,7 +62,7 @@ export function CommerceBanner() {
       role="status"
       style={{ margin: "12px auto", maxWidth: 1120 }}
     >
-      <strong>TEST MODE · Live charges disabled.</strong>{" "}
+      {!config.data?.orderingEnabled&&<strong>Ordering is not open yet. </strong>}<strong>TEST MODE · Live charges disabled.</strong>{" "}
       {config.data?.mode === "sandbox"
         ? "Local simulator: no money moves."
         : config.data?.mode === "stripe_test"
@@ -81,6 +82,7 @@ export function CheckoutPanel({
   orderId: string;
   onDone?: () => void;
 }) {
+  const config=useCommerce();
   const [operationId, setOperationId] = useState<string | null>(null);
   const checkout = useMutation({
     mutationFn: () =>
@@ -117,7 +119,7 @@ export function CheckoutPanel({
     <section aria-label="Secure payment">
       <button
         className="roco-button primary"
-        disabled={checkout.isPending || waiting}
+        disabled={!config.data?.orderingEnabled || checkout.isPending || waiting}
         onClick={() => checkout.mutate()}
       >
         {waiting ? "Preparing secure checkout…" : "Prepare secure test payment"}

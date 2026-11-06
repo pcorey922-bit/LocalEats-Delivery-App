@@ -236,3 +236,16 @@ URLs are ignored in favor of fixed Google endpoints. Provider messages expire
 after five minutes while offline and contain no customer/order details. Enable
 the FCM HTTP v1 API and grant the service account permission for the project.
 See https://firebase.google.com/docs/cloud-messaging/send/v1-api .
+
+### Ordering launch gate
+
+`ROCOEATS_ORDERING_ENABLED` defaults to closed. Only the exact server-side value
+`true` permits new order records, new checkout requests and sandbox payment
+confirmations. Public browsing, quotes, account setup, existing receipts, delivery
+recovery, cancellation/refund processing and signed provider webhooks stay available.
+Closing this gate does not expire previously issued provider checkout URLs or cancel
+already accepted financial jobs; use the existing cancellation/recovery workflow for
+those orders. The gate never enables live charges: payment-provider test restrictions
+remain enforced independently. Leave it unset/false on public prelaunch deployments.
+Change it through the hosting account's secure environment configuration only after
+owner authorization. Test fixtures explicitly opt in; browser clients cannot toggle it.

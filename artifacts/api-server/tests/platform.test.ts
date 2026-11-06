@@ -115,6 +115,7 @@ async function ready(id: string) {
   }
 }
 before(async () => {
+  process.env.ROCOEATS_ORDERING_ENABLED="true";
   process.env.PAYMENT_PROVIDER = "sandbox";
   process.env.NODE_ENV = "test";
   process.env.API_MUTATION_LIMIT_PER_MINUTE = "10000";
@@ -199,10 +200,26 @@ after(async () => {
 });
 test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
   t.afterEach(() => {
+    process.env.ROCOEATS_ORDERING_ENABLED="true";
     process.env.PAYMENT_PROVIDER = "sandbox";
     delete process.env.STRIPE_SECRET_KEY;
     delete process.env.STRIPE_WEBHOOK_SECRET;
     process.env.API_MUTATION_LIMIT_PER_MINUTE = "10000";
+  });
+  await t.test("ordering defaults closed; receipts and cancellations recover while new orders and checkout are blocked",async()=>{
+    const order=await create();const quote=await api('/orders/quote',ids.customer,'POST',input());
+    const [saved]=await db.select().from(ordersTable).where(eq(ordersTable.id,order.id));
+    try{for(const value of [undefined,'false','TRUE','1']){if(value===undefined)delete process.env.ROCOEATS_ORDERING_ENABLED;else process.env.ROCOEATS_ORDERING_ENABLED=value;
+      assert.equal((await api('/commerce/config',null)).data.orderingEnabled,false);
+      assert.equal((await api('/orders/quote',ids.customer,'POST',input())).status,200);
+      assert.equal((await api('/orders',ids.customer,'POST',{...input(),expectedTotalCents:quote.data.totalCents},randomUUID())).status,503);
+      assert.equal((await api(`/orders/${order.id}/checkout`,ids.customer,'POST')).status,503);
+      assert.equal((await api(`/orders/${order.id}/sandbox-payment`,ids.customer,'POST',{success:true})).status,503);
+    }
+    assert.equal((await api('/orders',ids.customer,'POST',{...input(),expectedTotalCents:quote.data.totalCents},saved.requestKey!.split(':').at(-1))).status,200);
+    assert.equal((await api(`/orders/${order.id}`,ids.customer)).status,200);
+    assert.equal((await api(`/orders/${order.id}/cancel`,ids.customer,'POST',{reason:'Ordering is closed'})).status,200);
+    }finally{process.env.ROCOEATS_ORDERING_ENABLED='true';}
   });
   await t.test("owners manage modifiers; checkout validates choices and snapshots server pricing", async () => {
     const groups=[{id:"size",name:"Size",minSelections:1,maxSelections:1,options:[{id:"large",name:"Large",priceCents:250},{id:"small",name:"Small",priceCents:0}]},{id:"extras",name:"Extras",minSelections:0,maxSelections:2,options:[{id:"cheese",name:"Cheese",priceCents:100},{id:"sauce",name:"Sauce",priceCents:50}]}];

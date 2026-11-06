@@ -1,3 +1,4 @@
+import { orderingEnabled, requireOrderingEnabled } from "../lib/commerce-policy";
 import { driverApplicationsTable } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
@@ -70,6 +71,7 @@ router.get("/commerce/config", async (_req, res) => {
     mode: paymentMode(),
     testMode: true,
     liveChargesEnabled: false,
+    orderingEnabled: orderingEnabled(),
     pricing,
     configurationRequired: pricing === null,
     taxNotice:
@@ -79,6 +81,7 @@ router.get("/commerce/config", async (_req, res) => {
 router.post("/orders/:orderId/checkout", requireAuth, async (req, res) => {
   const owned = await ownedOrder(req, res);
   if (!owned) return;
+  requireOrderingEnabled();
   const mode = requirePaymentProvider();
   if (mode === "stripe_test") {
     res
@@ -152,6 +155,7 @@ router.post(
   async (req, res) => {
     const owned = await ownedOrder(req, res);
     if (!owned) return;
+    requireOrderingEnabled();
     if (requirePaymentProvider() !== "sandbox")
       throw new CommerceError(404, "Local simulator is disabled");
     const { outcome } = z

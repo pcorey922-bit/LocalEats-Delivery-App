@@ -251,3 +251,13 @@ Checkout revision 628b7ae28b86923f2bac35f283cbed2cc0d89599 passed PostgreSQL CI
 (run 42178396335) and unsigned Android/iOS compilation (run 42178396125).
 Final cart changes passed the full local test suite and production build; checkout
 race tests also cover changes to delivery pricing before transaction entry.
+
+## Prelaunch ordering gate — November 6
+
+New order creation, checkout and sandbox payment confirmation now fail closed unless
+server `ROCOEATS_ORDERING_ENABLED=true`. Quotes and receipt/cancellation recovery
+remain available. The transaction checks the gate again before writing the order.
+Commerce configuration and checkout controls reflect the gate. This authorizes only
+ordering in the separately enforced test provider mode, never live financial activity.
+Tests exercise unset/malformed/false values, blocked writes and recovery while closed.
+The hosted visual demo is unchanged. Next: PostgreSQL backup/restore rehearsal in CI.

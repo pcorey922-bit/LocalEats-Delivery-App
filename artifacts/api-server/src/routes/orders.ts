@@ -1,3 +1,4 @@
+import { requireOrderingEnabled } from "../lib/commerce-policy";
 import { customize } from "../../../../lib/api-zod/src/modifiers";
 import { ensureAccepting } from "../lib/restaurant-availability";
 import { createHash } from "node:crypto";
@@ -183,6 +184,8 @@ router.post(
       }
     }
 
+    if(!isQuote) requireOrderingEnabled();
+
     const [restaurant] = await db
       .select()
       .from(restaurantsTable)
@@ -313,6 +316,7 @@ router.post(
 
     let createdNewOrder = true;
     const createdOrderId = await db.transaction(async (tx) => {
+      requireOrderingEnabled();
       // Lock checkout inputs until the immutable order snapshot is committed.
       // Availability/menu/address/settings may have changed since the quote read.
       const [lockedCustomer] = await tx

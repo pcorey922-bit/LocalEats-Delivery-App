@@ -7,7 +7,7 @@ import { CustomizedAdd, ModifierEditor } from "./menu-modifiers";
 import { DriverAvailability, DriverLocationControl } from './delivery-tracking';
 import { useEffect, useState, type FormEvent } from 'react';
 import { unregisterPush } from '../lib/mobile';
-import { CommerceBanner, OrderActions, CheckoutPanel, RestaurantAvailability } from './commerce-pages';
+import { useCommerce, CommerceBanner, OrderActions, CheckoutPanel, RestaurantAvailability } from './commerce-pages';
 import { Link, useLocation, useParams } from 'wouter';
 import { useAuth, useClerk } from '@clerk/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -89,6 +89,7 @@ function AddressForm({ onCreated }: { onCreated: (a: Address) => void }) {
 }
 export function CartPage() {
   const client = useQueryClient();
+  const commerce=useCommerce();
   const [cart, setCart, cartWarning] = useCustomerCart();
   const [addressId, setAddressId] = useState(''); const [showAddress, setShowAddress] = useState(false);
   const [tipCents, setTipCents] = useState(0); const [placed, setPlaced] = useState<Order | null>(null);
@@ -102,12 +103,12 @@ export function CartPage() {
   useEffect(()=>{setReview(null);},[addressId,tipCents]);
   const totals=(q:Quote)=><dl>{([['Food',q.subtotalCents],['Delivery',q.deliveryFeeCents],['Service',q.serviceFeeCents],['Illustrative test tax',q.taxCents],['Tip',q.tipCents],['Total',q.totalCents]] as const).map(([label,value])=><div className="roco-row" key={label}><dt>{label}</dt><dd>{money(value)}</dd></div>)}</dl>;
   return <Shell><main className="roco-main"><PageIntro eyebrow="Customer · test checkout" title={placed?'Order saved. Complete test payment.':'Review your delivery.'}>All checkout and settlement activity is test mode. Live charges are disabled.</PageIntro>
-    {cartWarning&&<p role="alert">{cartWarning}</p>}{placed?<section className="roco-card">{totals(placed)}<CheckoutPanel orderId={placed.id}/><Link href="/orders" className="roco-button">Track order</Link></section>:<div className="roco-two-col"><section className="roco-card"><h2>Your items</h2>{cart.length?cart.map(i=><div className="roco-menu-item" key={i.lineId??i.menuItemId}><div><strong>{i.name}</strong><p>{i.customization}</p><p>{i.specialInstructions}</p><p>{i.restaurantName} · {money(i.priceCents*i.quantity)}</p></div><div><button className="roco-button" aria-label={`Remove one ${i.name}`} onClick={()=>save(i.quantity>1?cart.map(x=>(x.lineId??x.menuItemId)===(i.lineId??i.menuItemId)?{...x,quantity:x.quantity-1}:x):cart.filter(x=>(x.lineId??x.menuItemId)!==(i.lineId??i.menuItemId)))}>−</button> {i.quantity} <button className="roco-button" aria-label={`Add one ${i.name}`} onClick={()=>save(cart.map(x=>(x.lineId??x.menuItemId)===(i.lineId??i.menuItemId)?{...x,quantity:x.quantity+1}:x))}>+</button></div></div>):<p>Your cart is empty. <Link href="/">Find food</Link></p>}</section>
+    {!commerce.data?.orderingEnabled&&<p className="roco-notice">Ordering is not open yet. You can browse menus and review a quote.</p>}{cartWarning&&<p role="alert">{cartWarning}</p>}{placed?<section className="roco-card">{totals(placed)}<CheckoutPanel orderId={placed.id}/><Link href="/orders" className="roco-button">Track order</Link></section>:<div className="roco-two-col"><section className="roco-card"><h2>Your items</h2>{cart.length?cart.map(i=><div className="roco-menu-item" key={i.lineId??i.menuItemId}><div><strong>{i.name}</strong><p>{i.customization}</p><p>{i.specialInstructions}</p><p>{i.restaurantName} · {money(i.priceCents*i.quantity)}</p></div><div><button className="roco-button" aria-label={`Remove one ${i.name}`} onClick={()=>save(i.quantity>1?cart.map(x=>(x.lineId??x.menuItemId)===(i.lineId??i.menuItemId)?{...x,quantity:x.quantity-1}:x):cart.filter(x=>(x.lineId??x.menuItemId)!==(i.lineId??i.menuItemId)))}>−</button> {i.quantity} <button className="roco-button" aria-label={`Add one ${i.name}`} onClick={()=>save(cart.map(x=>(x.lineId??x.menuItemId)===(i.lineId??i.menuItemId)?{...x,quantity:x.quantity+1}:x))}>+</button></div></div>):<p>Your cart is empty. <Link href="/">Find food</Link></p>}</section>
       <section className="roco-card"><h2>Delivery address</h2>{addresses.isError?<LoadError retry={()=>void addresses.refetch()}/>:<select aria-label="Delivery address" className="roco-select" value={addressId} onChange={e=>setAddressId(e.target.value)}><option value="">Choose a saved address</option>{addresses.data?.map(a=><option key={a.id} value={a.id}>{a.street1}, {a.city}</option>)}</select>}
       <button className="roco-button" onClick={()=>setShowAddress(!showAddress)}>Add address</button>{showAddress&&<AddressForm onCreated={a=>{setAddressId(a.id);setShowAddress(false);}}/>}
       <label className="roco-field">Driver tip (dollars)<input className="roco-input" type="number" min="0" max="1000" step="0.01" value={(tipCents/100).toString()} onChange={e=>setTipCents(Math.round(Number(e.target.value)*100))}/></label>
       <button className="roco-button" disabled={!cart.length||!addressId||quote.isPending||order.isPending} onClick={()=>quote.mutate()}>Calculate test total</button>
-      {review&&<>{totals(review.quote)}<button className="roco-button primary" disabled={order.isPending} onClick={()=>order.mutate()}>Create order · {money(review.quote.totalCents)}</button></>}
+      {review&&<>{totals(review.quote)}<button className="roco-button primary" disabled={!commerce.data?.orderingEnabled||order.isPending} onClick={()=>order.mutate()}>Create order · {money(review.quote.totalCents)}</button></>}
       {quote.isError&&<p role="alert" className="roco-alert">{quote.error.message}</p>}{order.isError&&<p role="alert" className="roco-alert">{order.error.message}</p>}</section></div>}
   </main></Shell>;
 }

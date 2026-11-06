@@ -7,6 +7,17 @@ export class CommerceError extends Error {
     super(message);
   }
 }
+// This server-only gate authorizes new ordering requests; it does not enable live money.
+export function orderingEnabled() {
+  return process.env.ROCOEATS_ORDERING_ENABLED === "true";
+}
+export function requireOrderingEnabled() {
+  if (!orderingEnabled())
+    throw new CommerceError(
+      503,
+      "RoCoEats ordering is not open yet. You can still browse and manage your account.",
+    );
+}
 export const pricingSchema = z
   .object({
     deliveryFeeCents: z.number().int().min(0).max(10000),
