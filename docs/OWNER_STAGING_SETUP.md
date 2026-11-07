@@ -51,7 +51,7 @@ simulations for QA and must not be offered as a transactional business demo.
    `pnpm --filter @workspace/db migrate`, using the staging database secret. This
    command is for a new database or one with correctly recorded migration history;
    legacy unversioned databases require the baseline procedure in DEPLOYMENT.md.
-   Migrations through 0019 are required for this checkpoint. Never use schema push
+   Migrations through 0024 are required for this checkpoint. Never use schema push
    as a substitute for the SQL ledger constraints and triggers.
 7. Configure the Stripe TEST endpoint at `https://<assigned-origin>/api/webhooks/stripe`
    using the event subscriptions in DEPLOYMENT.md. Create restaurant and driver
@@ -89,3 +89,49 @@ when the staging hostname is verified, then rebuild frontend origin-dependent as
 Production apex/www routing, public ordering, live Stripe/bank onboarding and signed
 store publication require separate owner authorization and their unfinished launch
 requirements. Preserve the original visual demonstration throughout this process.
+
+## Prepared local staging package (no hosting purchase)
+
+`compose.staging.yml` runs the actual application image with a separate PostgreSQL
+17 volume, an explicit one-off migration service and a loopback-only API/website
+port. It includes no authentication bypass, fake business data, live payment key,
+public port binding or automatic ordering activation. Docker Engine/Compose and
+Node 22+ are required on your own development machine. Do not use the disposable
+QA database password from CI for this environment.
+
+Minimum owner inputs: a separate Clerk development instance's publishable/server
+keys, your Clerk `user_...` identifier, Stripe TEST server/webhook keys, and a random
+staging database password. A local staging environment needs no paid host or domain
+change. A remotely accessible private HTTPS staging environment additionally needs
+an owner-controlled container/database host with access controls and TLS. Configure
+private access before opening a hosted service. Maps/push configuration can follow;
+the core ordering walkthrough requires the identity/payment/database inputs first.
+
+1. Copy `staging.env.example` to `.env.staging` (gitignored), then run
+   `chmod 600 .env.staging` before adding secrets.
+2. Generate a database password on your own machine with `openssl rand -hex 32`;
+   enter that value and the account settings in `.env.staging`. Do not paste them
+   into chat or commit that file. Keep `ROCOEATS_ORDERING_ENABLED=false`.
+3. Run `node --env-file=.env.staging scripts/check-staging-environment.mjs`.
+   This checks formats/unsafe settings and redacts values; it does not certify
+   credentials, permissions, provider round trips or private network access.
+4. Run `docker compose --env-file .env.staging -f compose.staging.yml build`.
+5. Run `docker compose --env-file .env.staging -f compose.staging.yml up -d db`.
+6. Apply migrations once using
+   `docker compose --env-file .env.staging -f compose.staging.yml run --rm migrate`.
+7. Start the packaged website/API using
+   `docker compose --env-file .env.staging -f compose.staging.yml up -d api`.
+8. Open `http://localhost:3001`. This is a local URL, not a deployed HTTPS demo.
+   Configure Clerk allowed local origins and a Stripe CLI test webhook forwarder
+   or a securely hosted HTTPS test endpoint. Configure owner pricing, approved
+   restaurants/drivers, opening hours, menus, stock and timing policy through the
+   actual interfaces. Enable the test ordering gate only after completing setup,
+   then recreate `api` and perform the four-role test walkthrough.
+9. `docker compose --env-file .env.staging -f compose.staging.yml down` stops it
+   while retaining the staging database volume. Do not add volume-removal flags
+   unless you intentionally authorize deletion of that test database.
+
+The standalone staging PostgreSQL volume is not a production backup strategy.
+Hosted production still requires managed backups, restore verification and the
+remaining financial/provider/device launch gates. Source now requires migrations
+through 0024; use the current migration journal rather than copying older SQL lists.

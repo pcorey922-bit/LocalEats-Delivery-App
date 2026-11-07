@@ -30,6 +30,19 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm audit --prod --audit-level=moderate
+      - name: Validate secure staging configuration preflight
+        run: node --test scripts/check-staging-environment.test.mjs
+      - name: Validate staging Compose configuration with test placeholders
+        env:
+          ROCOEATS_DB_PASSWORD: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          CLERK_PUBLISHABLE_KEY: pk_test_qa
+          CLERK_SECRET_KEY: sk_test_qa
+          LOCALEATS_ADMIN_CLERK_USER_IDS: user_QAOwner
+          STRIPE_SECRET_KEY: sk_test_qa
+          STRIPE_WEBHOOK_SECRET: whsec_qa
+          PUBLIC_APP_URL: http://localhost:3001
+          CORS_ORIGINS: http://localhost:3001
+        run: docker compose --env-file /dev/null -f compose.staging.yml config --quiet
       - run: pnpm test
       - name: Rehearse PostgreSQL backup and restore with ledger guards
         env:

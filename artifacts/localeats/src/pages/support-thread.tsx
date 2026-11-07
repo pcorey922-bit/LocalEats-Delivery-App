@@ -52,6 +52,7 @@ export function SupportThread({ caseId }: { caseId: string }) {
   });
   const refresh = async () => {
     const result = await q.refetch();
+    if (result.isError || !result.data) return;
     if (
       attempt &&
       result.data?.pages.some((p) =>

@@ -161,13 +161,22 @@ export const balanceProofSchema = z
     "Provider balance arithmetic mismatch",
   );
 type BalanceProof = z.infer<typeof balanceProofSchema>;
+function verifiedBalance(value: unknown): BalanceProof {
+  const result = balanceProofSchema.safeParse(value);
+  if (!result.success)
+    throw new CommerceError(
+      409,
+      "Provider balance evidence is invalid or not yet available. Retry after settlement or review in Stripe.",
+    );
+  return result.data;
+}
 export async function recordProviderBalance(
   tx: Transaction,
   orderId: string,
   raw: BalanceProof,
   kind: "payment_fee" | "dispute",
 ) {
-  const proof = balanceProofSchema.parse(raw),
+  const proof = verifiedBalance(raw),
     { status, ...values } = proof;
   await tx
     .insert(providerBalanceEntriesTable)
@@ -214,7 +223,7 @@ export async function recordProviderBalance(
     });
 }
 function balanceProof(b: Stripe.BalanceTransaction): BalanceProof {
-  return balanceProofSchema.parse({
+  return verifiedBalance({
     id: b.id,
     sourceId: typeof b.source === "string" ? b.source : b.source?.id,
     kind: b.type,
@@ -294,7 +303,7 @@ export async function reconcileDispute(
         "Provider dispute proof does not match this hold",
       );
     await requirePaymentJournal(tx, current.orderId);
-    const balances = proof.balances.map((b) => balanceProofSchema.parse(b));
+    const balances = proof.balances.map(verifiedBalance);
     if (
       new Set(balances.map((b) => b.id)).size !== balances.length ||
       balances.some((b) => b.sourceId !== proof.id)

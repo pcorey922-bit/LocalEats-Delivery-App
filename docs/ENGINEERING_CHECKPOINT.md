@@ -5,23 +5,24 @@ enable live transactions, discard changes or claim launch readiness.
 
 ## Saved source and verification
 
-Latest implementation revision: `26e4d95f3d5f7c850baf39f18074692e3b34fd79`.
-The local checkout is aligned with the GitHub history and has no unsaved code.
-This checkpoint may be a later documentation-only commit.
+Current continuation: see the November 7 sections at the end of this file.
+Verified application revision `2c0877806045fe9b4ac01439ff3e0bb29464bba7` passed
+PostgreSQL/restore/container CI (42352071658; PR validation 42352068790) and
+unsigned native CI (42352071596). The following staging package and small error/
+retry refinements are recorded in the final section; verify their own pushed CI.
 
-- 53 automated tests pass locally and in real PostgreSQL CI, including the
-  integration parent. No tests skipped. CI runs `42016933829` and `42016924348`
-  passed the production dependency audit, tests, API/web production builds,
-  Docker build and container startup/website/readiness smoke checks.
-- Production dependency audit reports zero known advisories. This is not a
-  penetration test or a guarantee of security.
-- Native workflow `42016933790` passed Android debug, unsigned release APK/AAB,
-  release lint, iOS simulator and unsigned Release/iphoneos compilation for the
-  same latest implementation revision `26e4d95`.
-- Native artifacts are deliberately named unsigned/unconfigured. They are not
-  signed distribution packages, published apps, or verified physical-device apps.
-- No deployed business website or verified public application URL exists yet.
-  Hosting/database/auth/provider credentials and domain ownership are not connected.
+- 88 automated tests pass with PGlite and with a local PostgreSQL 17 instance,
+  with no skipped tests; an additional staging security preflight test passes.
+- Production API/web build and typechecks pass. Chromium operational-component
+  checks pass at 390x844 using explicitly simulated APIs and accounts.
+- Actual empty-database migration, idempotent rerun, pg_dump/pg_restore, schema,
+  row/sequence fingerprints and restored ledger guards were verified locally.
+- Native CI verifies unsigned/unconfigured Android/iOS builds. No signed store
+  deliverable, physical-device certification or complete provider E2E is claimed.
+- No updated authenticated staging website is deployed. Business-owned host,
+  identity and Stripe TEST credentials remain unconnected; no live money enabled.
+
+Earlier entries below are historical checkpoints, not current launch certification.
 
 ## Completed engineering — preserve and reuse
 
@@ -588,3 +589,42 @@ provider evidence and test identities; no real provider/device round trip is cer
 Partial-refund 52d8272 passed PostgreSQL/restore/container and unsigned native CI.
 Verify this revision's own CI. Next: runnable private staging package/preflight, owner
 configuration, then external-refund/Connect bank-payout reconciliation and broader E2E.
+
+
+## Runnable staging package and final verification
+
+compose.staging.yml packages the real app image, separate PostgreSQL 17 volume,
+one-off migration service and loopback-only web/API port. It has no public binding,
+identity bypass, test business seed, real credentials or automatic ordering activation.
+staging.env.example and the redacting Node preflight document/check the minimum owner
+settings: Clerk development keys/user ID, Stripe TEST server/webhook keys and a random
+hex database password. Live/restricted payment keys, placeholders, unsafe origins,
+weak/password-shaped values and incomplete Maps settings fail preflight. Credential
+validity and access require actual owner configuration; format checks cannot certify it.
+CI now checks this preflight and Compose rendering with clearly fake QA placeholders.
+OWNER_STAGING_SETUP.md contains exact build/migrate/start commands and secure owner steps.
+
+Verification this session: 88 automated tests on PGlite and on actual local PostgreSQL
+17; one preflight security test; production build/typechecks; real pg_dump/pg_restore
+with fingerprints and restored ledger guards; all 25 migrations via the actual Drizzle
+release command on an empty staging fixture and successful idempotent rerun. Chromium
+at 390x844 verified existing dispatch/inventory controls plus timing configuration,
+partial-credit cents, reconciliation controls and support lost-response/failed-refresh
+retry without duplicate messages. Browser APIs/identities/provider proof are simulated,
+not actual Clerk, Stripe, Maps, push or physical devices. Provider evidence errors now
+return a safe reconciliation explanation; failed support refresh retains its saved ID.
+Final pushed revision still needs its own CI result checked.
+
+Minimum owner action for a local actual site: configure the separate Clerk development
+instance, owner Clerk ID and Stripe TEST/webhook credentials in a protected .env.staging,
+then run the documented preflight/build/migrate/start commands. For remote private HTTPS
+also connect an owner-controlled container/PostgreSQL host and access controls. There
+is no verified updated staging URL yet. No DNS, paid service, live payment, app publishing
+or production database changes were performed.
+
+Next engineering priority: recipient/tax-funded partial-refund allocation; external
+refund ingestion/reconciliation; complete Connect bank-payout/failure accounting and
+dispute evidence/appeals. Then configured four-role provider E2E, failed-delivery business
+policy/compensation, privacy/accessibility/load tests and physical-device release gates.
+Keep platform-funded credits explicitly labeled and preserve all existing financial
+idempotency, hold, immutable journal and stock/custody invariants.
