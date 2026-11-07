@@ -1,5 +1,9 @@
+import { restaurantCapacity } from "../lib/restaurant-availability";
 import { driverDutyLocationsTable } from "@workspace/db";
-import { orderingEnabled, requireOrderingEnabled } from "../lib/commerce-policy";
+import {
+  orderingEnabled,
+  requireOrderingEnabled,
+} from "../lib/commerce-policy";
 import { driverApplicationsTable, driverPresenceTable } from "@workspace/db";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
@@ -242,9 +246,12 @@ router.get("/restaurants/:restaurantId/availability", async (req, res) => {
     .select()
     .from(restaurantHoursTable)
     .where(eq(restaurantHoursTable.restaurantId, id));
+  const capacity = await restaurantCapacity(restaurant);
   res.json({
+    capacityAvailable: capacity.capacityAvailable,
     acceptingOrders: restaurant.acceptingOrders,
-    isOpen: restaurant.acceptingOrders && openAt(hours),
+    isOpen:
+      restaurant.acceptingOrders && capacity.capacityAvailable && openAt(hours),
     timezone: "America/New_York",
     hours,
   });
@@ -262,6 +269,7 @@ router.get(
       .limit(1);
     if (!restaurant) throw new CommerceError(404, "Restaurant not found");
     res.json({
+      ...(await restaurantCapacity(restaurant)),
       acceptingOrders: restaurant.acceptingOrders,
       hours: await db
         .select()
@@ -297,6 +305,7 @@ router.put(
     const value = z
       .object({
         acceptingOrders: z.boolean(),
+        maxOpenOrders: z.number().int().min(1).max(1000).nullable().optional(),
         hours: z
           .array(row)
           .length(7)
@@ -310,7 +319,12 @@ router.put(
     await db.transaction(async (tx) => {
       await tx
         .update(restaurantsTable)
-        .set({ acceptingOrders: value.acceptingOrders })
+        .set({
+          acceptingOrders: value.acceptingOrders,
+          ...(value.maxOpenOrders !== undefined
+            ? { maxOpenOrders: value.maxOpenOrders }
+            : {}),
+        })
         .where(eq(restaurantsTable.id, restaurant.id));
       for (const hour of value.hours)
         await tx
@@ -325,6 +339,9 @@ router.put(
           });
       await audit(tx, profile.id, "restaurant.availability", restaurant.id, {
         acceptingOrders: value.acceptingOrders,
+        ...(value.maxOpenOrders !== undefined
+          ? { maxOpenOrders: value.maxOpenOrders }
+          : {}),
       });
     });
     res.json(value);
@@ -416,7 +433,7 @@ router.get("/admin/drivers", requireAuth, async (req, res) => {
         isActive: profilesTable.isActive,
       })
       .from(profilesTable)
-      .where(inArray(profilesTable.role, ["driver","admin"]))
+      .where(inArray(profilesTable.role, ["driver", "admin"]))
       .limit(500),
   );
 });
@@ -519,7 +536,8 @@ router.post(
 );
 router.get("/payouts/me", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
-  if (!profile || !requireRole(profile, ["restaurant", "driver", "admin"], res)) return;
+  if (!profile || !requireRole(profile, ["restaurant", "driver", "admin"], res))
+    return;
   res.json(
     await db
       .select()
@@ -531,7 +549,8 @@ router.get("/payouts/me", requireAuth, async (req, res) => {
 });
 router.get("/payout-account", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
-  if (!profile || !requireRole(profile, ["restaurant", "driver", "admin"], res)) return;
+  if (!profile || !requireRole(profile, ["restaurant", "driver", "admin"], res))
+    return;
   const [account] = await db
     .select()
     .from(connectedAccountsTable)
@@ -568,8 +587,13 @@ router.get("/payout-account", requireAuth, async (req, res) => {
 });
 router.post("/payout-account/onboard", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
-  if (!profile || !requireRole(profile, ["restaurant", "driver", "admin"], res)) return;
-  if(profile.role==="admin"&&!profile.driverApproved)throw new CommerceError(403,"Complete driver approval before payout onboarding");
+  if (!profile || !requireRole(profile, ["restaurant", "driver", "admin"], res))
+    return;
+  if (profile.role === "admin" && !profile.driverApproved)
+    throw new CommerceError(
+      403,
+      "Complete driver approval before payout onboarding",
+    );
   const mode = requirePaymentProvider();
   if (mode === "stripe_test") {
     const result = await (
@@ -671,15 +695,42 @@ router.patch(
       .parse(req.body);
     const id = uuid.parse(req.params.profileId);
     const result = await db.transaction(async (tx) => {
-      await tx.select().from(profilesTable).where(eq(profilesTable.id,id)).for("update");
-      if(approved){const [application]=await tx.select().from(driverApplicationsTable).where(eq(driverApplicationsTable.profileId,id));if(application?.status!=="approved")throw new CommerceError(409,"Review and approve the driver application first");}
+      await tx
+        .select()
+        .from(profilesTable)
+        .where(eq(profilesTable.id, id))
+        .for("update");
+      if (approved) {
+        const [application] = await tx
+          .select()
+          .from(driverApplicationsTable)
+          .where(eq(driverApplicationsTable.profileId, id));
+        if (application?.status !== "approved")
+          throw new CommerceError(
+            409,
+            "Review and approve the driver application first",
+          );
+      }
       const [driver] = await tx
         .update(profilesTable)
         .set({ driverApproved: approved })
-        .where(and(eq(profilesTable.id, id), inArray(profilesTable.role, ["driver","admin"])))
+        .where(
+          and(
+            eq(profilesTable.id, id),
+            inArray(profilesTable.role, ["driver", "admin"]),
+          ),
+        )
         .returning();
       if (!driver) throw new CommerceError(404, "Driver not found");
-      if(!approved){await tx.update(driverPresenceTable).set({available:false}).where(eq(driverPresenceTable.profileId,id));await tx.delete(driverDutyLocationsTable).where(eq(driverDutyLocationsTable.profileId,id));}
+      if (!approved) {
+        await tx
+          .update(driverPresenceTable)
+          .set({ available: false })
+          .where(eq(driverPresenceTable.profileId, id));
+        await tx
+          .delete(driverDutyLocationsTable)
+          .where(eq(driverDutyLocationsTable.profileId, id));
+      }
       await audit(tx, profile.id, "driver.approval", id, { approved });
       return driver;
     });

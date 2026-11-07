@@ -419,3 +419,22 @@ notification/audit deduplication, assignment reset and post-pickup rejection. Th
 remain test-only identity/provider tests. PostgreSQL and native CI for 17601d9 were
 in progress when this checkpoint was saved; inspect their results and this commit's
 new runs. No deployed provider-backed staging or physical-device certification exists.
+
+## Restaurant capacity admission — November 7
+
+Migration 0018 introduces optional owner-configured `maxOpenOrders`, preserving
+unlimited admission for existing restaurants. Restaurant availability settings/forms
+show the limit and current load. Quotes/public availability reflect full capacity;
+checkout serializes per restaurant and checks capacity inside the snapshot transaction.
+Idempotency is rechecked before capacity/menu validation so simultaneous retries
+acknowledge the original reservation. Pending payment through ready-for-pickup consumes
+capacity; pickup/cancellation releases it through actual state, without drift-prone
+counters. Lowering a limit preserves existing orders. Pending unpaid reservations
+still require cancellation; automatic expiry/escalation and inventory remain unfinished.
+
+78 automated tests passed locally, including capacity authorization/range/database
+constraints, concurrent final-slot requests, same-key retries while full, limit
+preservation for older clients, pickup/cancellation release, audits and safe lowering.
+Production build/typechecks passed. Dispatch revision 17601d9 passed PostgreSQL/restore/
+container validation and unsigned Android/iOS CI (42348386135, 42348385949; PR validation
+42348381663 also passed). Arrival and this revision require their own CI review.

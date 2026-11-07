@@ -62,7 +62,10 @@ export function CommerceBanner() {
       role="status"
       style={{ margin: "12px auto", maxWidth: 1120 }}
     >
-      {!config.data?.orderingEnabled&&<strong>Ordering is not open yet. </strong>}<strong>TEST MODE · Live charges disabled.</strong>{" "}
+      {!config.data?.orderingEnabled && (
+        <strong>Ordering is not open yet. </strong>
+      )}
+      <strong>TEST MODE · Live charges disabled.</strong>{" "}
       {config.data?.mode === "sandbox"
         ? "Local simulator: no money moves."
         : config.data?.mode === "stripe_test"
@@ -82,7 +85,7 @@ export function CheckoutPanel({
   orderId: string;
   onDone?: () => void;
 }) {
-  const config=useCommerce();
+  const config = useCommerce();
   const [operationId, setOperationId] = useState<string | null>(null);
   const checkout = useMutation({
     mutationFn: () =>
@@ -119,7 +122,9 @@ export function CheckoutPanel({
     <section aria-label="Secure payment">
       <button
         className="roco-button primary"
-        disabled={!config.data?.orderingEnabled || checkout.isPending || waiting}
+        disabled={
+          !config.data?.orderingEnabled || checkout.isPending || waiting
+        }
         onClick={() => checkout.mutate()}
       >
         {waiting ? "Preparing secure checkout…" : "Prepare secure test payment"}
@@ -203,7 +208,8 @@ export function OrderActions({ order }: { order: Order }) {
         {expanded ? "Hide" : "View"} details
       </button>
       <ErrorText error={cancel.error} />
-      <SupportDesk orderId={order.id}/>{expanded && (
+      <SupportDesk orderId={order.id} />
+      {expanded && (
         <section>
           <p>
             Food {money(order.subtotalCents)} · delivery{" "}
@@ -436,7 +442,8 @@ export function OperationsCommerce() {
     );
   return (
     <main className="roco-main">
-      <DriverApplicationReviews /><AdminSupport />
+      <DriverApplicationReviews />
+      <AdminSupport />
       <Link href="/admin">← Operations overview</Link>
       <h1>Test order operations</h1>
       <CommerceBanner />
@@ -565,12 +572,19 @@ export function RestaurantAvailability() {
   const settings = useQuery({
     queryKey: ["restaurant-availability"],
     queryFn: () =>
-      customFetch<{ acceptingOrders: boolean; hours: Hour[] }>(
-        "/api/restaurants/me/availability/settings",
-      ),
+      customFetch<{
+        acceptingOrders: boolean;
+        maxOpenOrders: number | null;
+        openOrders: number;
+        hours: Hour[];
+      }>("/api/restaurants/me/availability/settings"),
   });
   const save = useMutation({
-    mutationFn: (value: { acceptingOrders: boolean; hours: Hour[] }) =>
+    mutationFn: (value: {
+      acceptingOrders: boolean;
+      maxOpenOrders: number | null;
+      hours: Hour[];
+    }) =>
       customFetch("/api/restaurants/me/availability/settings", {
         method: "PUT",
         body: JSON.stringify(value),
@@ -583,6 +597,9 @@ export function RestaurantAvailability() {
     const form = new FormData(e.currentTarget);
     save.mutate({
       acceptingOrders: form.get("accepting") === "on",
+      maxOpenOrders: String(form.get("capacity")).trim()
+        ? Number(form.get("capacity"))
+        : null,
       hours: Array.from({ length: 7 }, (_, weekday) => ({
         weekday,
         isClosed: form.get(`closed${weekday}`) === "on",
@@ -610,6 +627,23 @@ export function RestaurantAvailability() {
             />{" "}
             Accept test orders during opening hours
           </label>
+          <label className="roco-field">
+            Maximum open orders (blank for unlimited)
+            <input
+              className="roco-input"
+              name="capacity"
+              type="number"
+              min={1}
+              max={1000}
+              step={1}
+              defaultValue={settings.data.maxOpenOrders ?? ""}
+            />
+          </label>
+          <p>
+            Current open orders: {settings.data.openOrders}. Pending payments
+            reserve capacity. Pickup or cancellation frees a slot; lowering the
+            limit does not cancel existing orders.
+          </p>
           {[
             "Sunday",
             "Monday",

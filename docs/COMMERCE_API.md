@@ -80,3 +80,15 @@ before pickup. Concurrent retries return the original timestamp and generate one
 arrival notification per recipient and one audit record. `arrivedAt` is visible in
 own deliveries and administrator dispatch. Reassignment/release clears the timestamp.
 This is driver-reported coordination, not verified GPS or proof of food pickup.
+
+## Restaurant admission capacity
+
+Owner availability settings accept optional `maxOpenOrders` (null for unlimited, or
+an integer from 1–1000). Omitting it preserves the existing limit. Owner reads include
+`openOrders`; public availability includes `capacityAvailable` and closes `isOpen`
+when full. Active orders include pending payment through ready-for-pickup; pickup
+and cancellation free capacity. Checkout locks the restaurant, rechecks its limit
+and snapshots, and reserves one slot atomically. Retries acknowledge their existing
+order even when capacity is full. Lowering capacity never cancels existing orders.
+Pending-payment reservations currently require customer/operator cancellation to free
+them; unattended expiration and escalation remain unfinished launch requirements.

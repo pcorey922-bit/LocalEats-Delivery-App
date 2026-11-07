@@ -306,6 +306,57 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       assert.equal((await api('/driver/location',ids.driver,'POST',position)).status,403);
     }finally{await db.update(profilesTable).set({driverApproved:true}).where(eq(profilesTable.id,ids.driver));await db.update(driverPresenceTable).set({available:true,heartbeatAt:new Date()}).where(eq(driverPresenceTable.profileId,ids.driver));await db.delete(driverDutyLocationsTable).where(eq(driverDutyLocationsTable.profileId,ids.driver));}
   });
+  await t.test("restaurant capacity is owner-controlled and concurrent checkout cannot overbook",async()=>{
+    const path='/restaurants/me/availability/settings';
+    const settings=(await api(path,ids.restaurant)).data;
+    const value={acceptingOrders:settings.acceptingOrders,hours:settings.hours.map((h:any)=>({weekday:h.weekday,isClosed:h.isClosed,openTime:h.openTime.slice(0,5),closeTime:h.closeTime.slice(0,5)}))};
+    assert.equal(settings.maxOpenOrders,null);
+    assert.equal(typeof settings.openOrders,'number');
+    const limit=settings.openOrders+1;
+    assert.equal((await api(path,ids.customer,'PUT',{...value,maxOpenOrders:limit})).status,403);
+    for(const maxOpenOrders of [0,-1,1001,1.5,'2']) assert.equal((await api(path,ids.restaurant,'PUT',{...value,maxOpenOrders})).status,400);
+    const created:string[]=[];
+    try{
+      assert.equal((await api(path,ids.restaurant,'PUT',{...value,maxOpenOrders:limit})).status,200);
+      // Legacy clients changing hours do not silently remove the capacity limit.
+      await api(path,ids.restaurant,'PUT',value);
+      assert.equal((await api(path,ids.restaurant)).data.maxOpenOrders,limit);
+      const quote=await api('/orders/quote',ids.customer,'POST',input());assert.equal(quote.status,200);
+      const body={...input(),expectedTotalCents:quote.data.totalCents};
+      const keys=[randomUUID(),randomUUID()];
+      const results=await Promise.all(keys.map(key=>api('/orders',ids.customer,'POST',body,key)));
+      assert.deepEqual(results.map(r=>r.status).sort(),[201,409]);
+      const index=results.findIndex(r=>r.status===201),order=results[index].data;created.push(order.id);
+      const replay=await api('/orders',ids.customer,'POST',body,keys[index]);assert.equal(replay.status,200);assert.equal(replay.data.id,order.id);
+      assert.equal((await api('/orders/quote',ids.customer,'POST',input())).status,409);
+      const availability=(await api(`/restaurants/${ids.business}/availability`,null)).data;
+      assert.equal(availability.capacityAvailable,false);assert.equal(availability.isOpen,false);
+      assert.equal((await api(path,ids.restaurant)).data.openOrders,limit);
+      await ready(order.id);
+      await api('/driver/availability',ids.driver,'PUT',{available:true});
+      assert.equal((await api(`/driver/orders/${order.id}/claim`,ids.driver,'POST')).status,201);
+      assert.equal((await api(`/driver/orders/${order.id}/pickup`,ids.driver,'POST')).status,200);
+      assert.equal((await api('/orders/quote',ids.customer,'POST',input())).status,200);
+      const code=await api(`/orders/${order.id}/delivery-code`,ids.customer,'POST');
+      assert.equal((await api(`/driver/orders/${order.id}/deliver`,ids.driver,'POST',{code:code.data.code})).status,200);
+      created.splice(created.indexOf(order.id),1);
+      const nextKey=randomUUID();
+      const duplicates=await Promise.all([api('/orders',ids.customer,'POST',body,nextKey),api('/orders',ids.customer,'POST',body,nextKey)]);
+      assert.deepEqual(duplicates.map(r=>r.status).sort(),[200,201]);
+      assert.equal(duplicates[0].data.id,duplicates[1].data.id);created.push(duplicates[0].data.id);
+      await api(path,ids.restaurant,'PUT',{...value,maxOpenOrders:1});
+      const stillExisting=await api(`/orders/${created[0]}`,ids.customer);assert.equal(stillExisting.data.status,'placed');
+      assert.equal((await api(`/orders/${created[0]}/cancel`,ids.customer,'POST',{reason:'Release capacity reservation'})).status,200);created.length=0;
+      await api(path,ids.restaurant,'PUT',{...value,maxOpenOrders:limit});
+      assert.equal((await api('/orders/quote',ids.customer,'POST',input())).status,200);
+      const audits=await db.select().from(auditLogsTable).where(eq(auditLogsTable.resourceId,ids.business));
+      assert.ok(audits.some(a=>a.action==='restaurant.availability' && a.details.maxOpenOrders===limit));
+      await assert.rejects(engine.exec(`UPDATE restaurants SET max_open_orders=-1 WHERE id='${ids.business}'`));
+    }finally{
+      await db.update(restaurantsTable).set({maxOpenOrders:null}).where(eq(restaurantsTable.id,ids.business));
+      for(const id of created) await api(`/orders/${id}/cancel`,ids.admin,'POST',{reason:'Clean up capacity verification'});
+    }
+  });
   await t.test("owners manage modifiers; checkout validates choices and snapshots server pricing", async () => {
     const groups=[{id:"size",name:"Size",minSelections:1,maxSelections:1,options:[{id:"large",name:"Large",priceCents:250},{id:"small",name:"Small",priceCents:0}]},{id:"extras",name:"Extras",minSelections:0,maxSelections:2,options:[{id:"cheese",name:"Cheese",priceCents:100},{id:"sauce",name:"Sauce",priceCents:50}]}];
     const path=`/restaurants/me/menu-items/${ids.item}`;

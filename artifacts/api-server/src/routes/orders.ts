@@ -1,6 +1,9 @@
 import { requireOrderingEnabled } from "../lib/commerce-policy";
 import { customize } from "../../../../lib/api-zod/src/modifiers";
-import { ensureAccepting } from "../lib/restaurant-availability";
+import {
+  ensureAccepting,
+  ensureCapacity,
+} from "../lib/restaurant-availability";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import {
@@ -184,7 +187,7 @@ router.post(
       }
     }
 
-    if(!isQuote) requireOrderingEnabled();
+    if (!isQuote) requireOrderingEnabled();
 
     const [restaurant] = await db
       .select()
@@ -290,6 +293,7 @@ router.post(
       pricing,
     );
     if (isQuote) {
+      await ensureCapacity(restaurant);
       res.json({
         ...price,
         testMode: true,
@@ -326,13 +330,37 @@ router.post(
         .for("share");
       if (!lockedCustomer?.isActive || lockedCustomer.role !== "customer")
         throw new CommerceError(403, "Customer account is no longer active");
-      const [lockedOwner]=await tx.select().from(profilesTable).where(eq(profilesTable.id,restaurant.ownerProfileId)).for("share");
-      if(!lockedOwner?.isActive||lockedOwner.role!=="restaurant")throw new CommerceError(409,"Restaurant account is not available for ordering");
+      const [lockedOwner] = await tx
+        .select()
+        .from(profilesTable)
+        .where(eq(profilesTable.id, restaurant.ownerProfileId))
+        .for("share");
+      if (!lockedOwner?.isActive || lockedOwner.role !== "restaurant")
+        throw new CommerceError(
+          409,
+          "Restaurant account is not available for ordering",
+        );
       const [lockedRestaurant] = await tx
         .select()
         .from(restaurantsTable)
         .where(eq(restaurantsTable.id, restaurant.id))
-        .for("share");
+        .for("update");
+      // Creation is serialized per restaurant. A retry must acknowledge its
+      // existing order before checking a now-full capacity or changed menu.
+      const [retry] = await tx
+        .select()
+        .from(ordersTable)
+        .where(eq(ordersTable.requestKey, requestKey!))
+        .limit(1);
+      if (retry) {
+        if (retry.requestHash !== requestHash)
+          throw new CommerceError(
+            409,
+            "Idempotency key conflicts with another order",
+          );
+        createdNewOrder = false;
+        return retry.id;
+      }
       const [lockedAddress] = await tx
         .select()
         .from(addressesTable)
@@ -379,6 +407,7 @@ router.post(
           "Checkout details changed. Review your address, menu and a fresh quote before ordering",
         );
       await ensureAccepting(lockedRestaurant, tx);
+      await ensureCapacity(lockedRestaurant, tx);
 
       const [order] = await tx
         .insert(ordersTable)

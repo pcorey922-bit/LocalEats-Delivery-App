@@ -127,6 +127,13 @@
       "when": 1794020000000,
       "tag": "0017_driver_arrival",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794021000000,
+      "tag": "0018_restaurant_capacity",
+      "breakpoints": true
     }
   ]
 }
