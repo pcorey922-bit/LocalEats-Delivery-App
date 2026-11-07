@@ -1,0 +1,70 @@
+name: Validate
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: rocoeats
+          POSTGRES_PASSWORD: rocoeats_test_only
+          POSTGRES_DB: rocoeats_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rocoeats -d rocoeats_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://rocoeats:rocoeats_test_only@localhost:5432/rocoeats_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --prod --audit-level=moderate
+      - name: Validate secure staging configuration preflight
+        run: node --test scripts/check-staging-environment.test.mjs
+      - name: Validate staging Compose configuration with test placeholders
+        env:
+          ROCOEATS_DB_PASSWORD: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          CLERK_PUBLISHABLE_KEY: pk_test_qa
+          CLERK_SECRET_KEY: sk_test_qa
+          LOCALEATS_ADMIN_CLERK_USER_IDS: user_QAOwner
+          STRIPE_SECRET_KEY: sk_test_qa
+          STRIPE_WEBHOOK_SECRET: whsec_qa
+          PUBLIC_APP_URL: http://localhost:3001
+          CORS_ORIGINS: http://localhost:3001
+        run: docker compose --env-file /dev/null -f compose.staging.yml config --quiet
+      - run: pnpm test
+      - name: Rehearse PostgreSQL backup and restore with ledger guards
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+          PGUSER: rocoeats
+          PGPASSWORD: rocoeats_test_only
+        run: bash scripts/verify-postgres-recovery.sh
+      - run: pnpm build
+      - name: Build deployable website and API container
+        run: docker build --tag rocoeats:ci .
+      - name: Verify container startup, website routes and dependency readiness
+        run: |
+          docker run --detach --network host --name rocoeats-ci --env DATABASE_URL="$TEST_DATABASE_URL" --env PORT=3001 rocoeats:ci
+          trap 'docker logs rocoeats-ci; docker rm --force rocoeats-ci' EXIT
+          curl --fail --retry 15 --retry-delay 2 --retry-connrefused http://localhost:3001/livez
+          curl --fail http://localhost:3001/ | grep -q RoCoEats
+          curl --fail http://localhost:3001/orders | grep -q RoCoEats
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://localhost:3001/readyz)" = 503
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://localhost:3001/.env)" = 404
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RoCoEats-web-and-api-unconfigured
+          path: |
+            artifacts/localeats/dist/public/
+            artifacts/api-server/dist/

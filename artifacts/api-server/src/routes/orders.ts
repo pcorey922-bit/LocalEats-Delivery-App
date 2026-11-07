@@ -1,4 +1,27 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { requireOrderingEnabled } from "../lib/commerce-policy";
+import { readTimingPolicy } from "../lib/order-timing";
+import { databaseNow } from "../lib/database-clock";
+import { ensureInventory, inventoryQuantities } from "../lib/inventory";
+import { customize } from "../../../../lib/api-zod/src/modifiers";
+import {
+  ensureAccepting,
+  ensureCapacity,
+} from "../lib/restaurant-availability";
+import { createHash } from "node:crypto";
+import { z } from "zod";
+import {
+  readPricing,
+  notifyOrder,
+  audit,
+  cancelOrRefundOrder,
+} from "../lib/commerce";
+import {
+  calculatePrice,
+  CommerceError,
+  paymentMode,
+} from "../lib/commerce-policy";
+import { requirePaymentProvider } from "../lib/payment-provider";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import {
   CreateMyOrderBody,
@@ -19,6 +42,7 @@ import {
   ordersTable,
   paymentsTable,
   profilesTable,
+  platformSettingsTable,
   restaurantsTable,
 } from "@workspace/db";
 import { getActiveProfile, requireRole } from "../lib/current-profile";
@@ -41,8 +65,14 @@ async function readOrders(orderIds: string[]) {
         customerName: profilesTable.displayName,
       })
       .from(ordersTable)
-      .innerJoin(restaurantsTable, eq(ordersTable.restaurantId, restaurantsTable.id))
-      .innerJoin(profilesTable, eq(ordersTable.customerProfileId, profilesTable.id))
+      .innerJoin(
+        restaurantsTable,
+        eq(ordersTable.restaurantId, restaurantsTable.id),
+      )
+      .innerJoin(
+        profilesTable,
+        eq(ordersTable.customerProfileId, profilesTable.id),
+      )
       .where(inArray(ordersTable.id, orderIds))
       .orderBy(desc(ordersTable.placedAt)),
     db
@@ -73,7 +103,9 @@ async function readOrders(orderIds: string[]) {
     list.push(event);
     eventsByOrder.set(event.orderId, list);
   }
-  const paymentsByOrder = new Map(payments.map((payment) => [payment.orderId, payment]));
+  const paymentsByOrder = new Map(
+    payments.map((payment) => [payment.orderId, payment]),
+  );
 
   return rows.map(({ order, restaurantName, customerName }) => {
     if (!order.addressSnapshot) {
@@ -100,6 +132,7 @@ async function readOrders(orderIds: string[]) {
         id: item.id,
         menuItemId: item.menuItemId,
         itemName: item.itemNameSnapshot,
+        modifierSnapshot: item.modifierSnapshot,
         unitPriceCents: item.unitPriceCents,
         quantity: item.quantity,
         specialInstructions: item.specialInstructions,
@@ -116,134 +149,360 @@ async function readOrders(orderIds: string[]) {
   });
 }
 
-router.post("/orders", requireAuth, async (req, res): Promise<void> => {
-  const profile = await getActiveProfile(req, res);
-  if (!profile || !requireRole(profile, ["customer"], res)) return;
+router.post(
+  ["/orders", "/orders/quote"],
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const profile = await getActiveProfile(req, res);
+    if (!profile || !requireRole(profile, ["customer"], res)) return;
 
-  const parsed = CreateMyOrderBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Review the restaurant, address, and order items" });
-    return;
-  }
+    const parsed = CreateMyOrderBody.safeParse(req.body);
+    if (!parsed.success) {
+      res
+        .status(400)
+        .json({ error: "Review the restaurant, address, and order items" });
+      return;
+    }
 
-  const [restaurant] = await db
-    .select()
-    .from(restaurantsTable)
-    .where(
-      and(
-        eq(restaurantsTable.id, parsed.data.restaurantId),
-        eq(restaurantsTable.status, "approved"),
-      ),
-    )
-    .limit(1);
-  if (!restaurant) {
-    res.status(409).json({ error: "This restaurant is not currently accepting orders" });
-    return;
-  }
+    const isQuote = req.path.endsWith("/quote");
+    const mode = isQuote ? paymentMode() : requirePaymentProvider();
+    const requestKey = isQuote
+      ? null
+      : `${profile.id}:${z.string().uuid().parse(req.header("Idempotency-Key"))}`;
+    const requestHash = createHash("sha256")
+      .update(JSON.stringify(parsed.data))
+      .digest("hex");
+    if (requestKey) {
+      const [existing] = await db
+        .select()
+        .from(ordersTable)
+        .where(eq(ordersTable.requestKey, requestKey))
+        .limit(1);
+      if (existing) {
+        if (existing.requestHash !== requestHash)
+          throw new CommerceError(
+            409,
+            "Idempotency key was already used for a different order",
+          );
+        const [view] = await readOrders([existing.id]);
+        res.status(200).json(CreateMyOrderResponse.parse(view));
+        return;
+      }
+    }
 
-  const [address] = await db
-    .select()
-    .from(addressesTable)
-    .where(
-      and(
-        eq(addressesTable.id, parsed.data.addressId),
-        eq(addressesTable.profileId, profile.id),
-      ),
-    )
-    .limit(1);
-  if (!address) {
-    res.status(404).json({ error: "Saved delivery address not found" });
-    return;
-  }
+    if (!isQuote) requireOrderingEnabled();
 
-  const itemIds = [...new Set(parsed.data.items.map((item) => item.menuItemId))];
-  const availableItems = await db
-    .select()
-    .from(menuItemsTable)
-    .where(
-      and(
-        eq(menuItemsTable.restaurantId, restaurant.id),
-        eq(menuItemsTable.isAvailable, true),
-        inArray(menuItemsTable.id, itemIds),
-      ),
-    );
-  if (availableItems.length !== itemIds.length) {
-    res.status(409).json({ error: "One or more menu items are unavailable" });
-    return;
-  }
+    const [restaurant] = await db
+      .select()
+      .from(restaurantsTable)
+      .where(
+        and(
+          eq(restaurantsTable.id, parsed.data.restaurantId),
+          eq(restaurantsTable.status, "approved"),
+        ),
+      )
+      .limit(1);
+    if (!restaurant) {
+      res
+        .status(409)
+        .json({ error: "This restaurant is not currently accepting orders" });
+      return;
+    }
 
-  const itemsById = new Map(availableItems.map((item) => [item.id, item]));
-  const subtotalCents = parsed.data.items.reduce((sum, line) => {
-    const menuItem = itemsById.get(line.menuItemId);
-    return sum + (menuItem?.priceCents ?? 0) * line.quantity;
-  }, 0);
-  if (!Number.isSafeInteger(subtotalCents) || subtotalCents > 2_147_483_647) {
-    res.status(400).json({ error: "Order total exceeds the supported limit" });
-    return;
-  }
+    await ensureAccepting(restaurant);
 
-  const addressSnapshot = {
-    label: address.label,
-    street1: address.street1,
-    street2: address.street2,
-    city: address.city,
-    region: address.region,
-    postalCode: address.postalCode,
-    deliveryInstructions: address.deliveryInstructions,
-  };
+    const [address] = await db
+      .select()
+      .from(addressesTable)
+      .where(
+        and(
+          eq(addressesTable.id, parsed.data.addressId),
+          eq(addressesTable.profileId, profile.id),
+        ),
+      )
+      .limit(1);
+    if (!address) {
+      res.status(404).json({ error: "Saved delivery address not found" });
+      return;
+    }
 
-  const createdOrderId = await db.transaction(async (tx) => {
-    const [order] = await tx
-      .insert(ordersTable)
-      .values({
-        customerProfileId: profile.id,
-        restaurantId: restaurant.id,
-        deliveryAddressId: address.id,
-        addressSnapshot,
-        status: "placed",
-        subtotalCents,
-        deliveryFeeCents: 0,
-        serviceFeeCents: 0,
-        taxCents: 0,
-        tipCents: 0,
-        totalCents: subtotalCents,
-      })
-      .returning({ id: ordersTable.id });
+    const itemIds = [
+      ...new Set(parsed.data.items.map((item) => item.menuItemId)),
+    ];
+    const availableItems = await db
+      .select()
+      .from(menuItemsTable)
+      .where(
+        and(
+          eq(menuItemsTable.restaurantId, restaurant.id),
+          eq(menuItemsTable.isAvailable, true),
+          inArray(menuItemsTable.id, itemIds),
+        ),
+      );
+    if (availableItems.length !== itemIds.length) {
+      res.status(409).json({ error: "One or more menu items are unavailable" });
+      return;
+    }
 
-    await tx.insert(orderItemsTable).values(
-      parsed.data.items.map((line) => {
-        const menuItem = itemsById.get(line.menuItemId)!;
-        return {
-          orderId: order.id,
-          menuItemId: menuItem.id,
-          itemNameSnapshot: menuItem.name,
-          itemDescriptionSnapshot: menuItem.description,
-          unitPriceCents: menuItem.priceCents,
-          quantity: line.quantity,
-          specialInstructions: line.specialInstructions?.trim() || null,
-        };
-      }),
-    );
-    await tx.insert(paymentsTable).values({
-      orderId: order.id,
-      amountCents: subtotalCents,
-      currency: "USD",
-      status: "pending",
-      provider: "rocoeats-development-no-charge",
+    const itemsById = new Map(availableItems.map((item) => [item.id, item]));
+    if (isQuote) ensureInventory(availableItems, parsed.data.items);
+    const customizations = parsed.data.items.map((line) => {
+      try {
+        return customize(
+          itemsById.get(line.menuItemId)!.modifierGroups,
+          line.modifiers,
+        );
+      } catch (error) {
+        throw new CommerceError(
+          400,
+          error instanceof Error ? error.message : "Invalid modifiers",
+        );
+      }
     });
-    await tx.insert(orderEventsTable).values({
-      orderId: order.id,
-      actorProfileId: profile.id,
-      fromStatus: null,
-      toStatus: "placed",
-      note: "Development order saved; no payment was collected.",
-    });
-    return order.id;
-  });
+    const subtotalCents = parsed.data.items.reduce((sum, line, index) => {
+      const menuItem = itemsById.get(line.menuItemId);
+      return (
+        sum +
+        ((menuItem?.priceCents ?? 0) + customizations[index].extraCents) *
+          line.quantity
+      );
+    }, 0);
+    if (!Number.isSafeInteger(subtotalCents) || subtotalCents > 2_147_483_647) {
+      res
+        .status(400)
+        .json({ error: "Order total exceeds the supported limit" });
+      return;
+    }
 
-  const [orderView] = await readOrders([createdOrderId]);
-  res.status(201).json(CreateMyOrderResponse.parse(orderView));
-});
+    const pricing = await readPricing();
+    if (
+      !["tn", "tennessee"].includes(address.region.trim().toLowerCase()) ||
+      !["tn", "tennessee"].includes(restaurant.region.trim().toLowerCase())
+    )
+      throw new CommerceError(
+        409,
+        "Test delivery is configured for Tennessee only",
+      );
+    if (
+      !pricing.allowedPostalCodes.includes(address.postalCode) ||
+      !pricing.allowedPostalCodes.includes(restaurant.postalCode)
+    )
+      throw new CommerceError(
+        409,
+        "Address or restaurant is outside the configured test delivery area",
+      );
+    const price = calculatePrice(
+      subtotalCents,
+      parsed.data.tipCents ?? 0,
+      pricing,
+    );
+    if (isQuote) {
+      await ensureCapacity(restaurant);
+      res.json({
+        ...price,
+        testMode: true,
+        taxNotice:
+          "Illustrative test tax configuration; not a production tax determination.",
+      });
+      return;
+    }
+    if (parsed.data.expectedTotalCents !== price.totalCents)
+      throw new CommerceError(
+        409,
+        "Pricing changed. Review a fresh quote before placing the order",
+      );
+
+    const addressSnapshot = {
+      label: address.label,
+      street1: address.street1,
+      street2: address.street2,
+      city: address.city,
+      region: address.region,
+      postalCode: address.postalCode,
+      deliveryInstructions: address.deliveryInstructions,
+    };
+
+    let createdNewOrder = true;
+    const createdOrderId = await db.transaction(async (tx) => {
+      requireOrderingEnabled();
+      // Lock checkout inputs until the immutable order snapshot is committed.
+      // Availability/menu/address/settings may have changed since the quote read.
+      const [lockedCustomer] = await tx
+        .select()
+        .from(profilesTable)
+        .where(eq(profilesTable.id, profile.id))
+        .for("share");
+      if (!lockedCustomer?.isActive || lockedCustomer.role !== "customer")
+        throw new CommerceError(403, "Customer account is no longer active");
+      const [lockedOwner] = await tx
+        .select()
+        .from(profilesTable)
+        .where(eq(profilesTable.id, restaurant.ownerProfileId))
+        .for("share");
+      if (!lockedOwner?.isActive || lockedOwner.role !== "restaurant")
+        throw new CommerceError(
+          409,
+          "Restaurant account is not available for ordering",
+        );
+      const [lockedRestaurant] = await tx
+        .select()
+        .from(restaurantsTable)
+        .where(eq(restaurantsTable.id, restaurant.id))
+        .for("update");
+      // Creation is serialized per restaurant. A retry must acknowledge its
+      // existing order before checking a now-full capacity or changed menu.
+      const [retry] = await tx
+        .select()
+        .from(ordersTable)
+        .where(eq(ordersTable.requestKey, requestKey!))
+        .limit(1);
+      if (retry) {
+        if (retry.requestHash !== requestHash)
+          throw new CommerceError(
+            409,
+            "Idempotency key conflicts with another order",
+          );
+        createdNewOrder = false;
+        return retry.id;
+      }
+      const [lockedAddress] = await tx
+        .select()
+        .from(addressesTable)
+        .where(
+          and(
+            eq(addressesTable.id, address.id),
+            eq(addressesTable.profileId, profile.id),
+          ),
+        )
+        .for("share");
+      const lockedItems = await tx
+        .select()
+        .from(menuItemsTable)
+        .where(
+          and(
+            eq(menuItemsTable.restaurantId, restaurant.id),
+            inArray(menuItemsTable.id, itemIds),
+          ),
+        )
+        .orderBy(asc(menuItemsTable.id))
+        .for("update");
+      await tx
+        .select()
+        .from(platformSettingsTable)
+        .where(eq(platformSettingsTable.settingKey, "test_pricing"))
+        .for("share");
+      const lockedPricing = await readPricing(tx);
+      if (
+        !lockedRestaurant ||
+        lockedRestaurant.status !== "approved" ||
+        !lockedAddress ||
+        JSON.stringify(lockedRestaurant) !== JSON.stringify(restaurant) ||
+        JSON.stringify(lockedAddress) !== JSON.stringify(address) ||
+        JSON.stringify(lockedPricing) !== JSON.stringify(pricing) ||
+        lockedItems.length !== itemIds.length ||
+        lockedItems.some(
+          (item) =>
+            !item.isAvailable ||
+            JSON.stringify(item) !== JSON.stringify(itemsById.get(item.id)),
+        )
+      )
+        throw new CommerceError(
+          409,
+          "Checkout details changed. Review your address, menu and a fresh quote before ordering",
+        );
+      await ensureAccepting(lockedRestaurant, tx);
+      await ensureCapacity(lockedRestaurant, tx);
+      ensureInventory(lockedItems, parsed.data.items);
+
+      const timingPolicy = await readTimingPolicy(tx);
+      const now = await databaseNow(tx);
+      const [order] = await tx
+        .insert(ordersTable)
+        .values({
+          requestKey,
+          requestHash,
+          timingPolicy,
+          reservationExpiresAt: new Date(
+            now.getTime() + timingPolicy.reservationMinutes * 60000,
+          ),
+          pricingSnapshot: { ...pricing },
+          customerProfileId: profile.id,
+          restaurantId: restaurant.id,
+          deliveryAddressId: address.id,
+          addressSnapshot,
+          status: "placed",
+          ...price,
+        })
+        .onConflictDoNothing({ target: ordersTable.requestKey })
+        .returning({ id: ordersTable.id });
+      if (!order) {
+        createdNewOrder = false;
+        const [existing] = await tx
+          .select()
+          .from(ordersTable)
+          .where(eq(ordersTable.requestKey, requestKey!))
+          .limit(1);
+        if (!existing || existing.requestHash !== requestHash)
+          throw new CommerceError(
+            409,
+            "Idempotency key conflicts with another order",
+          );
+        return existing.id;
+      }
+
+      const quantities = inventoryQuantities(parsed.data.items);
+      for (const item of lockedItems) {
+        if (item.stockOnHand === null) continue;
+        await tx
+          .update(menuItemsTable)
+          .set({
+            stockOnHand: item.stockOnHand - quantities.get(item.id)!,
+            stockRevision: sql`${menuItemsTable.stockRevision}+1`,
+          })
+          .where(eq(menuItemsTable.id, item.id));
+      }
+      await tx.insert(orderItemsTable).values(
+        parsed.data.items.map((line, index) => {
+          const menuItem = itemsById.get(line.menuItemId)!;
+          return {
+            orderId: order.id,
+            menuItemId: menuItem.id,
+            itemNameSnapshot: menuItem.name,
+            itemDescriptionSnapshot: menuItem.description,
+            unitPriceCents:
+              menuItem.priceCents + customizations[index].extraCents,
+            modifierSnapshot: customizations[index].snapshot,
+            quantity: line.quantity,
+            inventoryDeducted:
+              menuItem.stockOnHand === null ? 0 : line.quantity,
+            specialInstructions: line.specialInstructions?.trim() || null,
+          };
+        }),
+      );
+      await tx.insert(paymentsTable).values({
+        orderId: order.id,
+        amountCents: price.totalCents,
+        currency: "USD",
+        status: "pending",
+        provider: mode,
+      });
+      await tx.insert(orderEventsTable).values({
+        orderId: order.id,
+        actorProfileId: profile.id,
+        fromStatus: null,
+        toStatus: "placed",
+        note: "Test order created; awaiting test payment confirmation.",
+      });
+      await audit(tx, profile.id, "order.created", order.id, price);
+      return order.id;
+    });
+
+    const [orderView] = await readOrders([createdOrderId]);
+    res
+      .status(createdNewOrder ? 201 : 200)
+      .json(CreateMyOrderResponse.parse(orderView));
+  },
+);
 
 router.get("/orders/me", requireAuth, async (req, res): Promise<void> => {
   const profile = await getActiveProfile(req, res);
@@ -338,8 +597,17 @@ router.patch(
       return;
     }
     const nextStatus = parsed.data.status as OrderStatus;
+    if (["out_for_delivery", "delivered"].includes(nextStatus)) {
+      res.status(403).json({
+        error: "Only the assigned driver can record pickup and delivery",
+      });
+      return;
+    }
+
     if (nextStatus === "cart" || nextStatus === "pending") {
-      res.status(400).json({ error: "This order status cannot be set manually" });
+      res
+        .status(400)
+        .json({ error: "This order status cannot be set manually" });
       return;
     }
 
@@ -374,9 +642,17 @@ router.patch(
       res.status(403).json({ error: "You cannot update this order" });
       return;
     }
-    if (
-      !canTransitionOrderStatus(order.status as OrderStatus, nextStatus)
-    ) {
+    if (nextStatus === "cancelled") {
+      await cancelOrRefundOrder(
+        order.id,
+        profile,
+        "Order cancelled from order management",
+      );
+      const [view] = await readOrders([order.id]);
+      res.json(UpdateOrderStatusResponse.parse(view));
+      return;
+    }
+    if (!canTransitionOrderStatus(order.status as OrderStatus, nextStatus)) {
       res.status(400).json({
         error: `Order cannot move from ${order.status} to ${nextStatus}`,
       });
@@ -384,6 +660,30 @@ router.patch(
     }
 
     const updated = await db.transaction(async (tx) => {
+      // Serialize payment/refund/driver/order transitions on the same order row.
+      const [locked] = await tx
+        .select()
+        .from(ordersTable)
+        .where(eq(ordersTable.id, order.id))
+        .for("update")
+        .limit(1);
+      if (locked.status !== order.status) return false;
+      const [payment] = await tx
+        .select()
+        .from(paymentsTable)
+        .where(
+          and(
+            eq(paymentsTable.orderId, order.id),
+            eq(paymentsTable.status, "succeeded"),
+          ),
+        )
+        .limit(1);
+      if (!payment)
+        throw new CommerceError(
+          409,
+          "Test payment must be confirmed before fulfillment",
+        );
+
       const [changed] = await tx
         .update(ordersTable)
         .set({ status: nextStatus })
@@ -402,10 +702,23 @@ router.patch(
         toStatus: nextStatus,
         note: null,
       });
+      await notifyOrder(
+        tx,
+        order.id,
+        nextStatus,
+        `Order ${nextStatus.replaceAll("_", " ")} (test)`,
+        "Your order status has changed.",
+      );
+      await audit(tx, profile.id, "order.status", order.id, {
+        from: order.status,
+        to: nextStatus,
+      });
       return true;
     });
     if (!updated) {
-      res.status(409).json({ error: "Order changed while you were updating it" });
+      res
+        .status(409)
+        .json({ error: "Order changed while you were updating it" });
       return;
     }
 

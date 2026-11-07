@@ -1,3 +1,6 @@
+import { DriverDutySession } from "./pages/driver-duty-session";
+import { NotificationsPage, EarningsPage, OperationsCommerce, DeletionRequest } from './pages/commerce-pages';
+import { MobileLifecycle, unregisterPush } from './lib/mobile';
 import { useState } from 'react';
 import { ArrowDown, ArrowRight, Menu, X, UserRound, Store, Bike, MapPin, ShieldCheck, LogOut, CircleAlert, UtensilsCrossed, RefreshCw } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useRef } from 'react';
@@ -5,12 +8,12 @@ import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/reac
 import { ClerkProvider, SignIn, SignUp, useClerk, useAuth, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
-import { getGetMyProfileQueryKey, getGetMyDashboardQueryKey, useGetMyProfile, useCreateMyProfile, useGetMyDashboard } from '@workspace/api-client-react';
+import { setAuthTokenGetter, getGetMyProfileQueryKey, getGetMyDashboardQueryKey, useGetMyProfile, useCreateMyProfile, useGetMyDashboard } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { AdminPage, CartPage, DiscoveryPage, OrdersPage, RestaurantMenuPage, RestaurantPage } from '@/pages/roco-pages';
+import { DriverPage, AdminPage, CartPage, DiscoveryPage, OrdersPage, RestaurantMenuPage, RestaurantPage } from '@/pages/roco-pages';
 import {
   Route,
   Redirect,
@@ -296,7 +299,7 @@ function PortalHeader({ active }: { active: 'dashboard' | 'account' }) {
     <nav className="portal-nav" aria-label="Account navigation" data-testid="nav-account">
       <a className={active === 'dashboard' ? 'portal-nav-current' : ''} href={`${basePath}/dashboard`} data-testid="link-dashboard">Dashboard</a>
       <a className={active === 'account' ? 'portal-nav-current' : ''} href={`${basePath}/account`} data-testid="link-account">Account</a>
-      <button type="button" onClick={() => signOut({ redirectUrl: basePath || '/' })} data-testid="button-logout"><LogOut size={14} /> Log out</button>
+      <button type="button" onClick={async () => { await unregisterPush().catch(()=>{}); await signOut({ redirectUrl: basePath || '/' }); }} data-testid="button-logout"><LogOut size={14} /> Log out</button>
     </nav>
   </header>;
 }
@@ -449,6 +452,11 @@ function Router() {
     <Route path="/cart" component={() => <Protected><CartPage /></Protected>} />
     <Route path="/orders" component={() => <Protected><OrdersPage /></Protected>} />
     <Route path="/restaurant" component={() => <Protected><RestaurantPage /></Protected>} />
+    <Route path="/account/delete" component={() => <Protected><DeletionRequest /></Protected>} />
+    <Route path="/notifications" component={() => <Protected><NotificationsPage /></Protected>} />
+    <Route path="/earnings" component={() => <Protected><EarningsPage /></Protected>} />
+    <Route path="/operations" component={() => <Protected><OperationsCommerce /></Protected>} />
+    <Route path="/driver" component={() => <Protected><DriverPage /></Protected>} />
     <Route path="/admin" component={() => <Protected><AdminPage /></Protected>} />
     <Route path="/sign-in/*?" component={SignInPage} />
     <Route path="/sign-up/*?" component={SignUpPage} />
@@ -479,13 +487,23 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
+function ApiAuthentication() {
+  const { getToken } = useAuth();
+  useEffect(() => {
+    if (!import.meta.env.VITE_API_ORIGIN) return;
+    setAuthTokenGetter(() => getToken());
+    return () => setAuthTokenGetter(null);
+  }, [getToken]);
+  return null;
+}
+
 function ClerkRoutes() {
   const [, setLocation] = useLocation();
   if (!clerkPubKey) throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY');
   return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`}
     localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your RoCoEats account' } }, signUp: { start: { title: 'Find your place here', subtitle: 'Create your RoCoEats account' } } }}
     routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}>
-    <ClerkQueryClientCacheInvalidator /><Router />
+    <ApiAuthentication /><MobileLifecycle /><ClerkQueryClientCacheInvalidator /><DriverDutySession /><Router />
   </ClerkProvider>;
 }
 

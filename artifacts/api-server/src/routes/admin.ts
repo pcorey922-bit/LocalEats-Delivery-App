@@ -1,3 +1,7 @@
+import { driverDutyLocationsTable } from "@workspace/db";
+import { audit } from "../lib/commerce";
+import { deliveriesTable, driverPresenceTable } from "@workspace/db";
+import { CommerceError, paymentMode } from "../lib/commerce-policy";
 import { and, count, desc, eq, inArray, sum } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
@@ -35,9 +39,7 @@ async function requireAdmin(
   return profile;
 }
 
-async function readCount(
-  query: PromiseLike<Array<{ value: number }>>,
-) {
+async function readCount(query: PromiseLike<Array<{ value: number }>>) {
   const [result] = await query;
   return Number(result?.value ?? 0);
 }
@@ -130,37 +132,45 @@ router.get("/admin/overview", requireAuth, async (req, res): Promise<void> => {
   );
 });
 
-router.get("/admin/restaurants", requireAuth, async (req, res): Promise<void> => {
-  if (!(await requireAdmin(req, res))) return;
+router.get(
+  "/admin/restaurants",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    if (!(await requireAdmin(req, res))) return;
 
-  const rows = await db
-    .select({
-      id: restaurantsTable.id,
-      ownerProfileId: profilesTable.id,
-      ownerName: profilesTable.displayName,
-      name: restaurantsTable.name,
-      description: restaurantsTable.description,
-      phone: restaurantsTable.phone,
-      street1: restaurantsTable.street1,
-      city: restaurantsTable.city,
-      region: restaurantsTable.region,
-      postalCode: restaurantsTable.postalCode,
-      status: restaurantsTable.status,
-      createdAt: restaurantsTable.createdAt,
-    })
-    .from(restaurantsTable)
-    .innerJoin(profilesTable, eq(restaurantsTable.ownerProfileId, profilesTable.id))
-    .orderBy(desc(restaurantsTable.createdAt))
-    .limit(500);
+    const rows = await db
+      .select({
+        id: restaurantsTable.id,
+        ownerProfileId: profilesTable.id,
+        ownerName: profilesTable.displayName,
+        name: restaurantsTable.name,
+        description: restaurantsTable.description,
+        phone: restaurantsTable.phone,
+        street1: restaurantsTable.street1,
+        city: restaurantsTable.city,
+        region: restaurantsTable.region,
+        postalCode: restaurantsTable.postalCode,
+        status: restaurantsTable.status,
+        createdAt: restaurantsTable.createdAt,
+      })
+      .from(restaurantsTable)
+      .innerJoin(
+        profilesTable,
+        eq(restaurantsTable.ownerProfileId, profilesTable.id),
+      )
+      .orderBy(desc(restaurantsTable.createdAt))
+      .limit(500);
 
-  res.json(ListAdminRestaurantsResponse.parse(rows));
-});
+    res.json(ListAdminRestaurantsResponse.parse(rows));
+  },
+);
 
 router.patch(
   "/admin/restaurants/:restaurantId/status",
   requireAuth,
   async (req, res): Promise<void> => {
-    if (!(await requireAdmin(req, res))) return;
+    const actor = await requireAdmin(req, res);
+    if (!actor) return;
     const params = UpdateAdminRestaurantStatusParams.safeParse(req.params);
     const parsed = UpdateAdminRestaurantStatusBody.safeParse(req.body);
     if (!params.success || !parsed.success) {
@@ -168,15 +178,29 @@ router.patch(
       return;
     }
 
-    const [restaurant] = await db
-      .update(restaurantsTable)
-      .set({ status: parsed.data.status })
-      .where(eq(restaurantsTable.id, params.data.restaurantId))
-      .returning();
-    if (!restaurant) {
-      res.status(404).json({ error: "Restaurant not found" });
-      return;
-    }
+    const restaurant = await db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(restaurantsTable)
+        .where(eq(restaurantsTable.id, params.data.restaurantId))
+        .for("update");
+      if (!current) throw new CommerceError(404, "Restaurant not found");
+      const [saved] = await tx
+        .update(restaurantsTable)
+        .set({
+          status: parsed.data.status,
+          ...(parsed.data.status !== "approved"
+            ? { acceptingOrders: false }
+            : {}),
+        })
+        .where(eq(restaurantsTable.id, current.id))
+        .returning();
+      await audit(tx, actor.id, "restaurant.status.updated", current.id, {
+        fromStatus: current.status,
+        toStatus: saved.status,
+      });
+      return saved;
+    });
 
     const [owner] = await db
       .select({ displayName: profilesTable.displayName })
@@ -237,36 +261,104 @@ router.patch(
       return;
     }
 
-    const [target] = await db
-      .select()
-      .from(profilesTable)
-      .where(eq(profilesTable.id, params.data.profileId))
-      .limit(1);
-    if (!target) {
-      res.status(404).json({ error: "Profile not found" });
-      return;
-    }
-    if (target.role === "admin") {
-      res.status(403).json({
-        error: "Administrator access is managed through the trusted server allowlist",
+    const updated = await db.transaction(async (tx) => {
+      const [target] = await tx
+        .select()
+        .from(profilesTable)
+        .where(eq(profilesTable.id, params.data.profileId))
+        .for("update");
+      if (!target) throw new CommerceError(404, "Profile not found");
+      if (target.role === "admin")
+        throw new CommerceError(
+          403,
+          "Administrator access is managed through the trusted server allowlist",
+        );
+      if (parsed.data.role && parsed.data.role !== target.role) {
+        const activeStatuses = [
+          "placed",
+          "restaurant_received",
+          "pending",
+          "accepted",
+          "preparing",
+          "ready_for_pickup",
+          "out_for_delivery",
+        ] as const;
+        const [activeDelivery] = await tx
+          .select({ id: deliveriesTable.id })
+          .from(deliveriesTable)
+          .where(
+            and(
+              eq(deliveriesTable.driverProfileId, target.id),
+              inArray(deliveriesTable.status, ["assigned", "picked_up"]),
+            ),
+          )
+          .limit(1);
+        const restaurants = await tx
+          .select({ id: restaurantsTable.id })
+          .from(restaurantsTable)
+          .where(eq(restaurantsTable.ownerProfileId, target.id));
+        const [customerOrder] = await tx
+          .select({ id: ordersTable.id })
+          .from(ordersTable)
+          .where(
+            and(
+              eq(ordersTable.customerProfileId, target.id),
+              inArray(ordersTable.status, activeStatuses),
+            ),
+          )
+          .limit(1);
+        const restaurantOrders = restaurants.length
+          ? await tx
+              .select({ id: ordersTable.id })
+              .from(ordersTable)
+              .where(
+                and(
+                  inArray(
+                    ordersTable.restaurantId,
+                    restaurants.map((r) => r.id),
+                  ),
+                  inArray(ordersTable.status, activeStatuses),
+                ),
+              )
+              .limit(1)
+          : [];
+        if (activeDelivery || customerOrder || restaurantOrders.length)
+          throw new CommerceError(
+            409,
+            "Finish or cancel outstanding orders and deliveries before changing this account's role",
+          );
+      }
+      const nextRole = parsed.data.role ?? target.role;
+      const nextActive = parsed.data.isActive ?? target.isActive;
+      const [saved] = await tx
+        .update(profilesTable)
+        .set({
+          ...parsed.data,
+          ...(!nextActive || nextRole !== "driver"
+            ? { driverApproved: false }
+            : {}),
+        })
+        .where(eq(profilesTable.id, target.id))
+        .returning();
+      if (!nextActive || nextRole !== "restaurant")
+        await tx
+          .update(restaurantsTable)
+          .set({ acceptingOrders: false })
+          .where(eq(restaurantsTable.ownerProfileId, target.id));
+      if (!nextActive || nextRole !== "driver")
+        await tx
+          .update(driverPresenceTable)
+          .set({ available: false })
+          .where(eq(driverPresenceTable.profileId, target.id));
+      if(!nextActive||nextRole!=="driver")await tx.delete(driverDutyLocationsTable).where(eq(driverDutyLocationsTable.profileId,target.id));
+      await audit(tx, actor.id, "profile.updated", target.id, {
+        fromRole: target.role,
+        toRole: saved.role,
+        fromActive: target.isActive,
+        toActive: saved.isActive,
       });
-      return;
-    }
-
-    const [updated] = await db
-      .update(profilesTable)
-      .set({
-        ...(parsed.data.role !== undefined && { role: parsed.data.role }),
-        ...(parsed.data.isActive !== undefined && { isActive: parsed.data.isActive }),
-      })
-      .where(eq(profilesTable.id, target.id))
-      .returning({
-        id: profilesTable.id,
-        role: profilesTable.role,
-        displayName: profilesTable.displayName,
-        isActive: profilesTable.isActive,
-        createdAt: profilesTable.createdAt,
-      });
+      return saved;
+    });
     res.json(UpdateAdminProfileResponse.parse(updated));
   },
 );
@@ -274,44 +366,38 @@ router.patch(
 router.get("/admin/finance", requireAuth, async (req, res): Promise<void> => {
   if (!(await requireAdmin(req, res))) return;
 
-  const [
-    succeeded,
-    pending,
-    refunded,
-    paidOut,
-    pendingPayout,
-    failedPayout,
-  ] = await Promise.all([
-    db
-      .select({ count: count(), amount: sum(paymentsTable.amountCents) })
-      .from(paymentsTable)
-      .where(eq(paymentsTable.status, "succeeded")),
-    db
-      .select({ count: count(), amount: sum(paymentsTable.amountCents) })
-      .from(paymentsTable)
-      .where(eq(paymentsTable.status, "pending")),
-    db
-      .select({ count: count(), amount: sum(paymentsTable.amountCents) })
-      .from(paymentsTable)
-      .where(eq(paymentsTable.status, "refunded")),
-    db
-      .select({ amount: sum(payoutsTable.amountCents) })
-      .from(payoutsTable)
-      .where(eq(payoutsTable.status, "paid")),
-    db
-      .select({ amount: sum(payoutsTable.amountCents) })
-      .from(payoutsTable)
-      .where(inArray(payoutsTable.status, ["pending", "processing"])),
-    db
-      .select({ count: count() })
-      .from(payoutsTable)
-      .where(eq(payoutsTable.status, "failed")),
-  ]);
+  const [succeeded, pending, refunded, paidOut, pendingPayout, failedPayout] =
+    await Promise.all([
+      db
+        .select({ count: count(), amount: sum(paymentsTable.amountCents) })
+        .from(paymentsTable)
+        .where(eq(paymentsTable.status, "succeeded")),
+      db
+        .select({ count: count(), amount: sum(paymentsTable.amountCents) })
+        .from(paymentsTable)
+        .where(eq(paymentsTable.status, "pending")),
+      db
+        .select({ count: count(), amount: sum(paymentsTable.amountCents) })
+        .from(paymentsTable)
+        .where(eq(paymentsTable.status, "refunded")),
+      db
+        .select({ amount: sum(payoutsTable.amountCents) })
+        .from(payoutsTable)
+        .where(inArray(payoutsTable.status, ["paid", "reversal_pending"])),
+      db
+        .select({ amount: sum(payoutsTable.amountCents) })
+        .from(payoutsTable)
+        .where(inArray(payoutsTable.status, ["pending", "processing"])),
+      db
+        .select({ count: count() })
+        .from(payoutsTable)
+        .where(eq(payoutsTable.status, "failed")),
+    ]);
 
   const cents = (value: string | null | undefined) => Number(value ?? 0);
   res.json(
     GetAdminFinanceResponse.parse({
-      paymentProviderConnected: false,
+      paymentProviderConnected: paymentMode() !== "disabled",
       succeededPaymentCount: Number(succeeded[0]?.count ?? 0),
       succeededPaymentCents: cents(succeeded[0]?.amount),
       pendingPaymentCount: Number(pending[0]?.count ?? 0),
