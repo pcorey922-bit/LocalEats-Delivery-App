@@ -114,8 +114,8 @@ to `index.html`, and proxy `/api` or configure the build-time HTTPS API origin.
 Run `pnpm --filter @workspace/api-server start` with PostgreSQL, Clerk, port,
 `NODE_ENV=production`, an explicit `CORS_ORIGINS` list, and **Stripe test** mode.
 The local simulator cannot start payment operations in production.
-Retain production dependencies: Firebase Admin and its runtime dependencies are
-external to the bundled API. Keep the worker process running for push delivery.
+Retain production dependencies required by the bundled API. Android push uses the
+direct FCM HTTP v1 adapter; Firebase Admin is not a runtime dependency. Keep the worker process running for push delivery.
 The outbox polls every 15 seconds and attempts delivery at most five times.
 In-app notifications persist even if push is unconfigured or fails.
 
@@ -206,6 +206,11 @@ The root Dockerfile builds the API and website together and serves both on port
 VITE_API_ORIGIN for same-origin web requests. Mobile builds still require the
 public HTTPS API origin. Only publishable frontend values belong in build args.
 Runtime secrets belong in the host's secret environment, never in image layers.
+Configured dispatch maps require build arguments `VITE_GOOGLE_MAPS_API_KEY` and
+`VITE_GOOGLE_MAPS_MAP_ID`; setting them only at container runtime cannot change
+the already-built frontend. These are public browser settings. Restrict the key
+to the staging/production web origins and the Maps JavaScript API, and approve
+Google billing before enabling the integration.
 The image runs as the non-root node user and defaults to disabled payments.
 
 The hosting account needs a Node-compatible container service, HTTPS and a

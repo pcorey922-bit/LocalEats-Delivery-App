@@ -471,3 +471,15 @@ Capacity revision 6aacb47 passed PostgreSQL/restore/container and unsigned Andro
 Check this revision's own CI after push. Remaining priorities: unattended reservation
 expiry/acceptance/dispatch escalation, then partial refunds/disputes/reconciliation,
 configured staging and real-provider/device release requirements described above.
+
+### Deployment configuration correction
+
+The container now accepts public Maps browser-key/map-ID build arguments; runtime
+variables alone cannot configure an already-built frontend. `.env.example` includes
+the closed ordering gate and Maps settings. Removed stale Firebase Admin dependency
+advice. OWNER_STAGING_SETUP.md records the secure owner-only staging, migrations,
+Clerk/Stripe TEST, private access and Cloudflare steps without applying external
+changes or purchases. The latest application implementation is 2fa9064; its local
+79-test/build/browser/audit checks passed. Its real PostgreSQL tests, backup/restore
+and build had passed while container validation was still running. Confirm the final
+Validate and unsigned native results for this and subsequent configuration revisions.
