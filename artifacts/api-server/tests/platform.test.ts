@@ -662,11 +662,28 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     const assigned = await api(path, ids.admin, "POST", initial);
     assert.equal(assigned.status, 200, JSON.stringify(assigned.data));
     assert.equal((await api(path, ids.admin, "POST", initial)).status, 409);
+    const arrivalPath = `/driver/orders/${order.id}/arrive`;
+    assert.equal((await api(arrivalPath,ids.customer,'POST')).status,403);
+    assert.equal((await api(arrivalPath,ids.driver2,'POST')).status,409);
+    assert.equal((await api('/driver/orders/not-a-uuid/arrive',ids.driver,'POST')).status,400);
+    const arrivals=await Promise.all([api(arrivalPath,ids.driver,'POST'),api(arrivalPath,ids.driver,'POST')]);
+    assert.deepEqual(arrivals.map(r=>r.status),[200,200]);
+    assert.equal(arrivals[0].data.arrivedAt,arrivals[1].data.arrivedAt);
+    const arrivalNotices=await db.select().from(notificationsTable).where(eq(notificationsTable.orderId,order.id));
+    assert.equal(arrivalNotices.filter(n=>n.eventKey.includes(':arrival:')).length,3);
+    assert.ok(arrivalNotices.some(n=>n.profileId===ids.restaurant && n.eventKey.includes(':arrival:')));
+    const arrivalAudits=await db.select().from(auditLogsTable).where(eq(auditLogsTable.resourceId,order.id));
+    assert.equal(arrivalAudits.filter(a=>a.action==='delivery.arrived').length,1);
+    assert.ok((await api('/driver/deliveries',ids.driver)).data.find((d:any)=>d.orderId===order.id).arrivedAt);
     const [delivery] = await db.select().from(deliveriesTable).where(eq(deliveriesTable.orderId,order.id));
     await db.insert(deliveryLocationsTable).values({deliveryId:delivery.id,driverProfileId:ids.driver,latitude:35,longitude:-84,accuracyMeters:8,observedAt:new Date()});
     assert.ok((await api(`/orders/${order.id}/tracking`,ids.customer)).data.location);
     const reassigned = await api(path,ids.admin,"POST",{...initial,driverProfileId:ids.driver2,expectedDriverProfileId:ids.driver,expectedAssignedAt:assigned.data.assignedAt,reason:"Reassign before pickup due to driver issue"});
     assert.equal(reassigned.status,200,JSON.stringify(reassigned.data));
+    assert.equal((await api(arrivalPath,ids.driver,'POST')).status,409);
+    assert.equal((await api('/driver/deliveries',ids.driver2)).data.find((d:any)=>d.orderId===order.id).arrivedAt,null);
+    assert.equal((await api(arrivalPath,ids.driver2,'POST')).status,200);
+
     assert.equal((await api(`/orders/${order.id}/tracking`,ids.customer)).data.location,null);
     assert.equal((await api(`/driver/orders/${order.id}/pickup`,ids.driver,"POST")).status,409);
     assert.equal((await api(`/driver/orders/${order.id}/location`,ids.driver,"POST",{latitude:35,longitude:-84,accuracyMeters:8,observedAt:new Date()})).status,403);
@@ -687,6 +704,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     assert.equal((await api(`/driver/orders/${order.id}/claim`,ids.driver2,"POST")).status,201);
     const [current]=await db.select().from(deliveriesTable).where(eq(deliveriesTable.orderId,order.id));
     await api(`/driver/orders/${order.id}/pickup`,ids.driver2,"POST");
+    assert.equal((await api(arrivalPath,ids.driver2,'POST')).status,409);
     assert.equal((await api(path,ids.admin,"POST",{...initial,expectedDriverProfileId:ids.driver2,expectedAssignedAt:current.assignedAt?.toISOString()})).status,409);
     const code=await api(`/orders/${order.id}/delivery-code`,ids.customer,"POST");
     assert.equal((await api(`/driver/orders/${order.id}/deliver`,ids.driver2,"POST",{code:code.data.code})).status,200);
@@ -708,6 +726,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     assert.equal((await assign(unpaid.id,ids.driver)).status,409);
     await api(`/orders/${unpaid.id}/cancel`,ids.customer,'POST',{reason:'End unpaid assignment test'});
     const expired=await create();await ready(expired.id);
+    const [previousApplication]=await db.select().from(driverApplicationsTable).where(eq(driverApplicationsTable.profileId,ids.driver));
     const application=await api('/driver/application',ids.driver,'PUT',{phone:'+1 865 555 0199',vehicleMake:'Toyota',vehicleModel:'Corolla',vehicleYear:2022,licenseState:'TN',licenseExpiresOn:'2030-12-31',eligibilityAttested:true,insuranceAttested:true});
     assert.equal(application.status,200);
     await db.update(driverApplicationsTable).set({status:'approved',licenseExpiresOn:'2020-01-01'}).where(eq(driverApplicationsTable.profileId,ids.driver));
@@ -716,6 +735,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     assert.equal((await assign(expired.id,ids.driver)).status,409);
     assert.equal((await api(`/driver/orders/${expired.id}/claim`,ids.driver,'POST')).status,403);
     await db.delete(driverApplicationsTable).where(eq(driverApplicationsTable.profileId,ids.driver));
+    if(previousApplication) await db.insert(driverApplicationsTable).values(previousApplication);
     await api(`/orders/${expired.id}/cancel`,ids.admin,'POST',{reason:'End expired application verification'});
   });
   await t.test(

@@ -14,6 +14,7 @@ export const deliveriesTable = pgTable("deliveries", {
   deliveryFeeCents: integer("delivery_fee_cents").notNull().default(0),
   tipCents: integer("tip_cents").notNull().default(0),
   assignedAt: timestamp("assigned_at", { withTimezone: true }),
+  arrivedAt: timestamp("arrived_at", { withTimezone: true }),
   pickedUpAt: timestamp("picked_up_at", { withTimezone: true }),
   handoffHash: text("handoff_hash"),
   handoffExpiresAt: timestamp("handoff_expires_at", { withTimezone: true }),

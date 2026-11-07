@@ -403,3 +403,19 @@ all successful. New PostgreSQL multi-connection/restore/native CI must be checke
 this pushed revision. No real provider, hardware, configured Maps or Clerk E2E claim.
 Next: restaurant-arrival coordination, restaurant capacity/inventory, acceptance and
 dispatch escalation, then remaining partial-refund/dispute/reconciliation blockers.
+
+## Restaurant arrival coordination — November 7
+
+Migration 0017 adds assignment-scoped `arrivedAt`. Assigned approved drivers report
+arrival through POST `/driver/orders/:id/arrive` and the driver workspace. Restaurant,
+customer and driver receive durable notifications; dispatch shows the attestation time.
+Order locking makes concurrent retries emit one set of notifications and one audit.
+Reassignment/release clears arrival, and former drivers cannot report arrival or pickup.
+This is driver attestation, not GPS-verified presence or custody proof.
+
+All 77 local tests and production build/typechecks passed with the new migration.
+Coverage includes arrival authorization, malformed order IDs, concurrent retries,
+notification/audit deduplication, assignment reset and post-pickup rejection. These
+remain test-only identity/provider tests. PostgreSQL and native CI for 17601d9 were
+in progress when this checkpoint was saved; inspect their results and this commit's
+new runs. No deployed provider-backed staging or physical-device certification exists.

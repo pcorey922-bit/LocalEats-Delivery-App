@@ -175,6 +175,7 @@ export function AdminPage() {
 }
 
 type DriverDelivery = {
+  arrivedAt?:string|null;
   orderId: string; status: string; orderStatus?: string; restaurantName: string;
   pickupStreet: string; pickupCity: string; pickupRegion?:string; pickupPostalCode?:string;
   deliveryAddress?: { street1: string; street2?: string | null; city: string; region: string; postalCode: string; deliveryInstructions?: string | null };
@@ -197,6 +198,7 @@ export function DriverPage() {
     <NavigationActions label="Navigate to Restaurant" address={{street1:d.pickupStreet,city:d.pickupCity,region:d.pickupRegion,postalCode:d.pickupPostalCode}}/>
     {!offer&&d.deliveryAddress&&<NavigationActions label="Navigate to Customer" address={d.deliveryAddress}/>}
 
+    {d.status==='assigned'&&(d.arrivedAt?<p role="status">Arrival reported at {new Date(d.arrivedAt).toLocaleTimeString()}</p>:<button className="roco-button" disabled={update.isPending} onClick={()=>update.mutate({orderId:d.orderId,action:'arrive'})}>I’m at the restaurant</button>)}
     {d.status==='assigned'&&<button className="roco-button" disabled={update.isPending} onClick={()=>{if(window.confirm('Release this delivery before pickup?'))update.mutate({orderId:d.orderId,action:'release'});}}>Release delivery</button>}
     {!offer&&['assigned','picked_up'].includes(d.status)&&<DriverLocationControl orderId={d.orderId}/>}
     {(offer || (d.status === 'assigned' && d.orderStatus === 'ready_for_pickup')) && <button className="roco-button primary" disabled={update.isPending} onClick={() => update.mutate({ orderId: d.orderId, action: offer ? 'claim' : d.status === 'assigned' ? 'pickup' : 'deliver' })}>{offer ? 'Claim delivery' : d.status === 'assigned' ? 'Confirm pickup' : 'Confirm delivered'}</button>}

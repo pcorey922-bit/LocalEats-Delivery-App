@@ -74,3 +74,9 @@ Changes commit the assignment, previous-driver GPS deletion, recipient notificat
 release also clears assigned-order GPS. Push still requires configured providers and
 physical-device verification. Reassignment after pickup requires support review;
 this endpoint refuses it rather than silently changing delivery custody.
+
+`POST /driver/orders/:id/arrive` lets the assigned approved driver attest arrival
+before pickup. Concurrent retries return the original timestamp and generate one
+arrival notification per recipient and one audit record. `arrivedAt` is visible in
+own deliveries and administrator dispatch. Reassignment/release clears the timestamp.
+This is driver-reported coordination, not verified GPS or proof of food pickup.

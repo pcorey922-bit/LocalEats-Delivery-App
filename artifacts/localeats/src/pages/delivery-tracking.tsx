@@ -339,6 +339,7 @@ export function DispatchOperations() {
           restaurantName: string;
           driverProfileId: string | null;
           assignedAt: string | null;
+          arrivedAt: string | null;
           waitingMinutes: number;
           pickupStreet: string;
           pickupCity: string;
@@ -384,6 +385,12 @@ export function DispatchOperations() {
             minutes ago ·{" "}
             {order.driverProfileId ? "driver assigned" : "no driver assigned"}
           </p>
+          {order.arrivedAt && (
+            <p>
+              Driver reported restaurant arrival at{" "}
+              {new Date(order.arrivedAt).toLocaleTimeString()}.
+            </p>
+          )}
           <p className="roco-meta">{order.orderId}</p>
           {order.status === "ready_for_pickup" && (
             <AssignmentControls

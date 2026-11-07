@@ -461,6 +461,7 @@ router.post(
             driverProfileId: input.driverProfileId,
             status,
             assignedAt,
+            arrivedAt: null,
             handoffHash: null,
             handoffExpiresAt: null,
             handoffAttempts: 0,
@@ -525,6 +526,7 @@ router.get("/admin/dispatch", requireAuth, async (req, res) => {
       deliveryAddress: ordersTable.addressSnapshot,
       driverProfileId: deliveriesTable.driverProfileId,
       assignedAt: deliveriesTable.assignedAt,
+      arrivedAt: deliveriesTable.arrivedAt,
     })
     .from(ordersTable)
     .innerJoin(

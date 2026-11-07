@@ -180,6 +180,7 @@ router.get(
         orderId: ordersTable.id,
         status: deliveriesTable.status,
         orderStatus: ordersTable.status,
+        arrivedAt: deliveriesTable.arrivedAt,
         restaurantName: restaurantsTable.name,
         pickupStreet: restaurantsTable.street1,
         pickupCity: restaurantsTable.city,
@@ -371,7 +372,12 @@ router.post(
         );
       const [delivery] = await tx
         .update(deliveriesTable)
-        .set({ driverProfileId: null, status: "unassigned", assignedAt: null })
+        .set({
+          driverProfileId: null,
+          status: "unassigned",
+          assignedAt: null,
+          arrivedAt: null,
+        })
         .where(
           and(
             eq(deliveriesTable.orderId, orderId),
@@ -408,6 +414,64 @@ router.post(
     res.json({ orderId, status: "unassigned" });
   },
 );
+
+router.post("/driver/orders/:orderId/arrive", requireAuth, async (req, res) => {
+  const profile = await getActiveProfile(req, res);
+  if (!profile || !requireRole(profile, ["driver", "admin"], res)) return;
+  if (!profile.driverApproved)
+    throw new CommerceError(403, "Driver approval is required");
+  const orderId = String(req.params.orderId);
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      orderId,
+    )
+  )
+    throw new CommerceError(400, "Invalid order ID");
+  const result = await db.transaction(async (tx) => {
+    const [order] = await tx
+      .select()
+      .from(ordersTable)
+      .where(eq(ordersTable.id, orderId))
+      .for("update");
+    const [delivery] = await tx
+      .select()
+      .from(deliveriesTable)
+      .where(
+        and(
+          eq(deliveriesTable.orderId, orderId),
+          eq(deliveriesTable.driverProfileId, profile.id),
+        ),
+      );
+    if (
+      !order ||
+      order.status !== "ready_for_pickup" ||
+      delivery?.status !== "assigned"
+    )
+      throw new CommerceError(
+        409,
+        "Only the assigned driver can confirm arrival before pickup",
+      );
+    if (delivery.arrivedAt) return { orderId, arrivedAt: delivery.arrivedAt };
+    const arrivedAt = new Date();
+    await tx
+      .update(deliveriesTable)
+      .set({ arrivedAt })
+      .where(eq(deliveriesTable.id, delivery.id));
+    await notifyOrder(
+      tx,
+      orderId,
+      `arrival:${randomUUID()}`,
+      "Driver at restaurant (test)",
+      "The assigned driver reported arrival at the restaurant. Coordinate pickup in the order.",
+    );
+    await audit(tx, profile.id, "delivery.arrived", orderId, {
+      assignedAt: delivery.assignedAt,
+      method: "driver_attestation",
+    });
+    return { orderId, arrivedAt };
+  });
+  res.json(result);
+});
 
 router.post(
   "/driver/orders/:orderId/:action",

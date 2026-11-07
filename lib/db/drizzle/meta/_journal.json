@@ -120,6 +120,13 @@
       "when": 1793934000000,
       "tag": "0016_driver_duty_locations",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794020000000,
+      "tag": "0017_driver_arrival",
+      "breakpoints": true
     }
   ]
 }
