@@ -1,3 +1,6 @@
+import { isConfiguredOwner } from "../lib/owner-access";
+import { getActiveProfile } from "../lib/current-profile";
+import { audit } from "../lib/commerce";
 import { eq } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import {
@@ -5,22 +8,17 @@ import {
   CreateMyProfileResponse,
   GetMyProfileResponse,
 } from "@workspace/api-zod";
-import { db, profilesTable, type Profile as ProfileRecord } from "@workspace/db";
+import {
+  db,
+  profilesTable,
+  type Profile as ProfileRecord,
+} from "@workspace/db";
 import {
   getAuthenticatedUserId,
   requireAuth,
 } from "../middlewares/require-auth";
 
 const router: IRouter = Router();
-
-function isConfiguredAdmin(clerkUserId: string): boolean {
-  const configuredIds = process.env.LOCALEATS_ADMIN_CLERK_USER_IDS ?? "";
-  return configuredIds
-    .split(",")
-    .map((id) => id.trim())
-    .filter(Boolean)
-    .includes(clerkUserId);
-}
 
 function toApiProfile(profile: ProfileRecord) {
   return {
@@ -32,40 +30,17 @@ function toApiProfile(profile: ProfileRecord) {
 }
 
 router.get("/profiles/me", requireAuth, async (req, res): Promise<void> => {
-  const clerkUserId = getAuthenticatedUserId(req);
-  let [profile] = await db
-    .select()
-    .from(profilesTable)
-    .where(eq(profilesTable.clerkUserId, clerkUserId))
-    .limit(1);
-
-  if (!profile) {
-    res.status(404).json({ error: "Profile setup is required" });
-    return;
-  }
-
-  // The owner can designate the first administrator through a server-only
-  // Clerk user ID allowlist. No public profile input can grant this role.
-  if (isConfiguredAdmin(clerkUserId) && profile.role !== "admin") {
-    [profile] = await db
-      .update(profilesTable)
-      .set({ role: "admin" })
-      .where(eq(profilesTable.id, profile.id))
-      .returning();
-  }
-
-  if (!profile.isActive) {
-    res.status(403).json({ error: "This account is not active" });
-    return;
-  }
-
+  const profile = await getActiveProfile(req, res);
+  if (!profile) return;
   res.json(GetMyProfileResponse.parse(toApiProfile(profile)));
 });
 
 router.post("/profiles/me", requireAuth, async (req, res): Promise<void> => {
   const parsed = CreateMyProfileBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Choose a valid account type and display name" });
+    res
+      .status(400)
+      .json({ error: "Choose a valid account type and display name" });
     return;
   }
 
@@ -76,19 +51,28 @@ router.post("/profiles/me", requireAuth, async (req, res): Promise<void> => {
   }
 
   const clerkUserId = getAuthenticatedUserId(req);
-  const role = isConfiguredAdmin(clerkUserId) ? "admin" : parsed.data.role;
-  const [profile] = await db
-    .insert(profilesTable)
-    .values({
-      clerkUserId,
-      role,
-      displayName,
-    })
-    .onConflictDoNothing({ target: profilesTable.clerkUserId })
-    .returning();
+  const role = isConfiguredOwner(clerkUserId) ? "admin" : parsed.data.role;
+  const profile = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(profilesTable)
+      .values({
+        clerkUserId,
+        role,
+        displayName,
+      })
+      .onConflictDoNothing({ target: profilesTable.clerkUserId })
+      .returning();
+    if (created && role === "admin")
+      await audit(tx, created.id, "owner.bootstrap.granted", created.id, {
+        source: "server_allowlist",
+      });
+    return created;
+  });
 
   if (!profile) {
-    res.status(409).json({ error: "A LocalEats profile already exists for this account" });
+    res
+      .status(409)
+      .json({ error: "A LocalEats profile already exists for this account" });
     return;
   }
 

@@ -1,3 +1,4 @@
+import { isOwnerDriver } from "../lib/owner-access";
 import { restaurantCapacity } from "../lib/restaurant-availability";
 import { expireReservation } from "../lib/reservation-expiry";
 import { driverDutyLocationsTable } from "@workspace/db";
@@ -244,7 +245,18 @@ router.get("/orders/:orderId/payment", requireAuth, async (req, res) => {
   res.json({
     testMode: true,
     reservationExpiresAt: owned.order.reservationExpiresAt,
-    partialRefunds: (await db.select().from(partialRefundsTable).where(eq(partialRefundsTable.orderId,owned.order.id))).map(r=>({id:r.id,amountCents:r.amountCents,status:r.status,fundingPolicy:r.fundingPolicy,createdAt:r.createdAt})),
+    partialRefunds: (
+      await db
+        .select()
+        .from(partialRefundsTable)
+        .where(eq(partialRefundsTable.orderId, owned.order.id))
+    ).map((r) => ({
+      id: r.id,
+      amountCents: r.amountCents,
+      status: r.status,
+      fundingPolicy: r.fundingPolicy,
+      createdAt: r.createdAt,
+    })),
     payment,
     refund: refund ?? null,
   });
@@ -442,17 +454,30 @@ router.delete("/notification-devices", requireAuth, async (req, res) => {
 router.get("/admin/drivers", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
   if (!profile || !requireRole(profile, ["admin"], res)) return;
+  const drivers = await db
+    .select({
+      id: profilesTable.id,
+      clerkUserId: profilesTable.clerkUserId,
+      role: profilesTable.role,
+      displayName: profilesTable.displayName,
+      driverApproved: profilesTable.driverApproved,
+      isActive: profilesTable.isActive,
+    })
+    .from(profilesTable)
+    .where(inArray(profilesTable.role, ["driver", "admin"]))
+    .limit(500);
   res.json(
-    await db
-      .select({
-        id: profilesTable.id,
-        displayName: profilesTable.displayName,
-        driverApproved: profilesTable.driverApproved,
-        isActive: profilesTable.isActive,
-      })
-      .from(profilesTable)
-      .where(inArray(profilesTable.role, ["driver", "admin"]))
-      .limit(500),
+    drivers.map(({ clerkUserId, role, ...driver }) => ({
+      ...driver,
+      ownerDriverAccess: isOwnerDriver({
+        clerkUserId,
+        role,
+        isActive: driver.isActive,
+      }),
+      driverApproved:
+        driver.driverApproved ||
+        isOwnerDriver({ clerkUserId, role, isActive: driver.isActive }),
+    })),
   );
 });
 router.get(

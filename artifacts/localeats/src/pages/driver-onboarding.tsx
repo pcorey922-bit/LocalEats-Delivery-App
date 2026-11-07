@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
+import { useAuth } from "@clerk/react";
 type Application = {
   profileId: string;
   phone: string;
@@ -14,8 +15,17 @@ type Application = {
   reviewNote: string | null;
 };
 export function DriverApplication() {
+  const { userId } = useAuth();
+  const access = useQuery({
+    queryKey: ["driver-availability", userId],
+    queryFn: () =>
+      customFetch<{ ownerDriverAccess: boolean; approved: boolean }>(
+        "/api/driver/availability",
+      ),
+    enabled: !!userId,
+  });
   const q = useQuery({
-    queryKey: ["driver-application"],
+    queryKey: ["driver-application", userId],
     queryFn: () => customFetch<Application | null>("/api/driver/application"),
   });
   const client = useQueryClient();
@@ -64,15 +74,24 @@ export function DriverApplication() {
   return (
     <section className="roco-card">
       <h2>Driver application</h2>
+      {access.data?.ownerDriverAccess && (
+        <p className="roco-notice">
+          Your server-configured owner account can drive without submitting or
+          approving its own application. Vehicle details are optional here. A
+          recorded expired license must be updated before going on duty; valid
+          licensing and insurance remain your responsibility. Owner access is
+          separate from screening or insurance verification.
+        </p>
+      )}
       <p>
         {a
           ? `Application status: ${a.status}`
           : "Tell us about your vehicle and delivery eligibility."}
       </p>
       {a?.reviewNote && <p>Review: {a.reviewNote}</p>}
-      {a && !edit ? (
+      {(a || access.data?.ownerDriverAccess) && !edit ? (
         <button className="roco-button" onClick={() => setEdit(true)}>
-          Update application
+          {a ? "Update application" : "Add optional vehicle details"}
         </button>
       ) : (
         <form onSubmit={submit}>
@@ -110,11 +129,16 @@ export function DriverApplication() {
             insurance appropriate for my delivery activity.
           </label>
           <p>
-            Submitting changes pauses dispatch access until the updated
-            application is approved.
+            {access.data?.ownerDriverAccess
+              ? "Updating details does not require self-approval. Reconnect explicitly afterward to resume sharing your location."
+              : "Submitting changes pauses dispatch access until the updated application is approved."}
           </p>
           <button className="roco-button primary" disabled={busy}>
-            {busy ? "Submitting…" : "Submit for review"}
+            {busy
+              ? "Submitting…"
+              : access.data?.ownerDriverAccess
+                ? "Save vehicle details"
+                : "Submit for review"}
           </button>
         </form>
       )}

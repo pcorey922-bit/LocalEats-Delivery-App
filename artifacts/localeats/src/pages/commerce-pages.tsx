@@ -435,7 +435,12 @@ export function OperationsCommerce() {
     queryKey: ["admin-driver-approvals"],
     queryFn: () =>
       customFetch<
-        Array<{ id: string; displayName: string; driverApproved: boolean }>
+        Array<{
+          id: string;
+          displayName: string;
+          driverApproved: boolean;
+          ownerDriverAccess: boolean;
+        }>
       >("/api/admin/drivers"),
     enabled,
   });
@@ -493,10 +498,16 @@ export function OperationsCommerce() {
       {drivers.data?.map((d) => (
         <article className="roco-card" key={d.id}>
           <strong>{d.displayName}</strong>
-          <p>{d.driverApproved ? "approved" : "pending approval"}</p>
+          <p>
+            {d.ownerDriverAccess
+              ? "Owner driver access is managed by secure server configuration; no self-approval required."
+              : d.driverApproved
+                ? "approved"
+                : "pending approval"}
+          </p>
           <button
             className="roco-button"
-            disabled={change.isPending}
+            disabled={change.isPending || d.ownerDriverAccess}
             onClick={() =>
               change.mutate({
                 path: `/api/admin/drivers/${d.id}/approval`,

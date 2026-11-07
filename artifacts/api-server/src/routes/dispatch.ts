@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { hasDriverAccess, isOwnerDriver } from "../lib/owner-access";
 import { audit, notifyOrder } from "../lib/commerce";
 import {
   driverDutyLocationsTable,
@@ -54,6 +55,7 @@ router.get("/driver/availability", requireAuth, async (req, res) => {
   if (!profile || !requireRole(profile, ["driver", "admin"], res)) return;
   res.json({
     approved: profile.driverApproved,
+    ownerDriverAccess: isOwnerDriver(profile),
     ...(await driverDispatchState(profile.id)),
   });
 });
@@ -76,12 +78,7 @@ router.put("/driver/availability", requireAuth, async (req, res) => {
       .where(eq(profilesTable.id, profile.id))
       .for("update")
       .limit(1);
-    if (
-      available &&
-      (!current.driverApproved ||
-        !current.isActive ||
-        !["driver", "admin"].includes(current.role))
-    )
+    if (available && !hasDriverAccess(current))
       throw new CommerceError(403, "Driver approval is required to go online");
     const [previous] = await tx
       .select()
@@ -121,8 +118,7 @@ router.post("/driver/heartbeat", requireAuth, async (req, res) => {
       .from(driverPresenceTable)
       .where(eq(driverPresenceTable.profileId, profile.id));
     if (
-      !current?.isActive ||
-      !current.driverApproved ||
+      !hasDriverAccess(current) ||
       !presence?.available ||
       Date.now() - presence.heartbeatAt.getTime() >= presenceFreshMs
     )
@@ -169,9 +165,7 @@ router.post("/driver/location", requireAuth, async (req, res) => {
       .from(driverPresenceTable)
       .where(eq(driverPresenceTable.profileId, profile.id));
     if (
-      !current?.isActive ||
-      !current.driverApproved ||
-      !["driver", "admin"].includes(current.role) ||
+      !hasDriverAccess(current) ||
       !presence?.available ||
       Date.now() - presence.heartbeatAt.getTime() >= presenceFreshMs
     )
@@ -201,6 +195,8 @@ router.post(
     const profile = await getActiveProfile(req, res);
     if (!profile || !requireRole(profile, ["driver", "admin"], res)) return;
     const orderId = uuid.parse(req.params.orderId);
+    if (!profile.driverApproved)
+      throw new CommerceError(403, "Driver access is required");
     const position = z
       .object({
         latitude: z.number().finite().min(-90).max(90),
@@ -369,15 +365,7 @@ router.post(
           .select()
           .from(driverPresenceTable)
           .where(eq(driverPresenceTable.profileId, input.driverProfileId));
-        if (
-          !driver?.isActive ||
-          !driver.driverApproved ||
-          !["driver", "admin"].includes(driver.role) ||
-          (application &&
-            (application.status !== "approved" ||
-              application.licenseExpiresOn <
-                new Date().toISOString().slice(0, 10)))
-        )
+        if (!hasDriverAccess(driver, application))
           throw new CommerceError(
             409,
             "Select an active, approved driver with an unexpired application",
@@ -547,6 +535,8 @@ router.get("/admin/dispatch", requireAuth, async (req, res) => {
   const drivers = await db
     .select({
       profileId: profilesTable.id,
+      clerkUserId: profilesTable.clerkUserId,
+      role: profilesTable.role,
       displayName: profilesTable.displayName,
       approved: profilesTable.driverApproved,
       isActive: profilesTable.isActive,
@@ -595,13 +585,27 @@ router.get("/admin/dispatch", requireAuth, async (req, res) => {
       waitingMinutes: Math.floor((Date.now() - o.placedAt.getTime()) / 60000),
     })),
     drivers: drivers.map(
-      ({ dutyLocation, applicationStatus, licenseExpiresOn, ...d }) => {
-        const approved = Boolean(
-          d.approved &&
-          (!applicationStatus ||
-            (applicationStatus === "approved" &&
-              licenseExpiresOn &&
-              licenseExpiresOn >= new Date().toISOString().slice(0, 10))),
+      ({
+        dutyLocation,
+        applicationStatus,
+        licenseExpiresOn,
+        clerkUserId,
+        role,
+        ...d
+      }) => {
+        const approved = hasDriverAccess(
+          {
+            clerkUserId,
+            role,
+            isActive: d.isActive,
+            driverApproved: d.approved,
+          },
+          applicationStatus
+            ? {
+                status: applicationStatus,
+                licenseExpiresOn: licenseExpiresOn ?? "",
+              }
+            : null,
         );
         const online = Boolean(
           d.isActive &&

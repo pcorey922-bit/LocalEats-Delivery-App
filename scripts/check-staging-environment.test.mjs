@@ -16,6 +16,7 @@ const fixture = () => ({
 });
 test("staging preflight accepts explicit private-test settings and loopback; rejects live keys, placeholders, unsafe origins and weak database passwords", () => {
   assert.deepEqual(checkStagingEnvironment(fixture()), []);
+  assert.deepEqual(checkStagingEnvironment({...fixture(),ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS:"user_QAOwner"}),[]);
   assert.deepEqual(
     checkStagingEnvironment({
       ...fixture(),
@@ -38,6 +39,7 @@ test("staging preflight accepts explicit private-test settings and loopback; rej
     { ROCOEATS_ORDERING_ENABLED: "yes" },
     { VITE_GOOGLE_MAPS_API_KEY: "qa" },
     { LOCALEATS_ADMIN_CLERK_USER_IDS: "owner@rocoeats.com" },
+    { ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS: "user_UnlistedOwner" },
     { STRIPE_SECRET_KEY: "sk_test_REPLACE_ME" },
   ])
     assert.ok(

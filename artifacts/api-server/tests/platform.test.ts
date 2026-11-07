@@ -2821,4 +2821,64 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     await assert.rejects(engine.exec(`UPDATE support_messages SET body='rewritten' WHERE id='${reply.id}'`));await assert.rejects(engine.exec(`DELETE FROM support_messages WHERE id='${reply.id}'`));await assert.rejects(engine.exec('TRUNCATE support_messages'));
   });
 
+  await t.test("server-configured owners bootstrap securely and deliver without self-approval; other admins and drivers cannot borrow access",async()=>{
+    const previousDriver=process.env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS;
+    const previous=process.env.LOCALEATS_ADMIN_CLERK_USER_IDS,ownerClerk=`user_QAOwner${randomUUID().replaceAll('-','')}`,otherClerk=`user_QAMember${randomUUID().replaceAll('-','')}`;
+    process.env.LOCALEATS_ADMIN_CLERK_USER_IDS=`  ${ownerClerk}  `;
+    process.env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS=ownerClerk;
+    let ownerId='';
+    try{
+      assert.equal((await api('/admin/profiles',null)).status,401);
+      assert.equal((await api('/profiles/me',otherClerk,'POST',{displayName:'Fake client owner',role:'admin',ownerDriverAccess:true,clerkUserId:ownerClerk})).status,400);
+      const ordinary=await api('/profiles/me',otherClerk,'POST',{displayName:'Ordinary member',role:'customer',driverApproved:true,isOwner:true,clerkUserId:ownerClerk});assert.equal(ordinary.status,201);assert.equal(ordinary.data.role,'customer');
+      assert.equal((await api('/admin/profiles',otherClerk)).status,403);assert.equal((await api('/driver/availability',otherClerk,'PUT',{available:true})).status,403);
+      const created=await api('/profiles/me',ownerClerk,'POST',{displayName:'Configured owner fixture',role:'customer'});assert.equal(created.status,201);assert.equal(created.data.role,'admin');ownerId=created.data.id;
+      assert.equal((await api('/admin/profiles',ownerClerk)).status,200);
+      let access=await api('/driver/availability',ownerClerk);assert.equal(access.data.ownerDriverAccess,true);assert.equal(access.data.approved,true);
+      assert.equal((await api('/driver/application',ownerClerk)).data,null);
+      assert.equal((await api('/driver/availability',ownerClerk,'PUT',{available:true})).status,200);
+      assert.equal((await api('/driver/heartbeat',ownerClerk,'POST')).status,200);
+      assert.equal((await api('/driver/location',ownerClerk,'POST',{latitude:35.8,longitude:-84.7,accuracyMeters:8,observedAt:new Date()})).status,200);
+      const order=await create();await ready(order.id);
+      assert.equal((await api(`/driver/orders/${order.id}/claim`,ownerClerk,'POST')).status,201);
+      const second=await create();await ready(second.id);assert.equal((await api(`/driver/orders/${second.id}/claim`,ownerClerk,'POST')).status,409);
+      const dispatch=await api('/admin/dispatch',ownerClerk);const ownerDriver=dispatch.data.drivers.find((d:any)=>d.profileId===ownerId);assert.equal(ownerDriver.approved,true);assert.equal(ownerDriver.status,'delivering');assert.equal('clerkUserId' in ownerDriver,false);
+      assert.equal((await api(`/driver/orders/${order.id}/pickup`,ownerClerk,'POST')).status,200);
+      assert.equal((await api(`/driver/orders/${order.id}/deliver`,ownerClerk,'POST')).status,400);
+      const code=await api(`/orders/${order.id}/delivery-code`,ids.customer,'POST');assert.equal((await api(`/driver/orders/${order.id}/deliver`,ownerClerk,'POST',{code:code.data.code})).status,200);
+      const earnings=await db.select().from(payoutsTable).where(eq(payoutsTable.orderId,order.id));assert.equal(earnings.find(p=>p.kind==='driver')?.recipientProfileId,ownerId);
+      const assigned=await api(`/admin/orders/${second.id}/assignment`,ownerClerk,'POST',{driverProfileId:ownerId,expectedDriverProfileId:null,expectedAssignedAt:null,reason:'Owner delivery assignment without self review'});assert.equal(assigned.status,200);
+      assert.equal((await api(`/driver/orders/${second.id}/release`,ownerClerk,'POST')).status,200);
+      await api(`/orders/${second.id}/cancel`,ownerClerk,'POST',{reason:'End owner dispatch verification'});
+      const application={phone:'+1 865 555 0199',vehicleMake:'Toyota',vehicleModel:'Corolla',vehicleYear:2022,licenseState:'TN',licenseExpiresOn:'2030-12-31',eligibilityAttested:true,insuranceAttested:true};
+      const submitted=await api('/driver/application',ownerClerk,'PUT',application);assert.equal(submitted.status,200);assert.equal(submitted.data.status,'pending');assert.equal(submitted.data.reviewedBy,null);
+      assert.equal((await api('/driver/availability',ownerClerk)).data.approved,true);
+      await db.update(driverApplicationsTable).set({licenseExpiresOn:'2020-01-01'}).where(eq(driverApplicationsTable.profileId,ownerId));
+      assert.equal((await api('/driver/availability',ownerClerk)).data.approved,false);assert.equal((await api('/driver/availability',ownerClerk,'PUT',{available:true})).status,403);
+      await api('/driver/application',ownerClerk,'PUT',application);assert.equal((await api('/driver/availability',ownerClerk,'PUT',{available:true})).status,200);
+      const [stored]=await db.select().from(profilesTable).where(eq(profilesTable.id,ownerId));assert.equal(stored.driverApproved,false);assert.equal(stored.role,'admin');
+      const adminQueue=(await api('/admin/drivers',ownerClerk)).data.find((d:any)=>d.id===ownerId);assert.equal(adminQueue.ownerDriverAccess,true);
+      const ownerDriverIds=process.env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS;process.env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS=ids.admin;
+      assert.equal((await api('/driver/availability',ids.admin)).data.ownerDriverAccess,false);process.env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS=ownerDriverIds;
+      assert.equal((await api('/driver/offers',ids.admin)).status,403);
+      assert.equal((await api('/driver/availability',ids.unapproved,'PUT',{available:true,ownerDriverAccess:true})).status,400);
+      const bootstrapAudits=await db.select().from(auditLogsTable).where(eq(auditLogsTable.resourceId,ownerId));assert.equal(bootstrapAudits.filter(a=>a.action==='owner.bootstrap.granted').length,1);
+      process.env.LOCALEATS_ADMIN_CLERK_USER_IDS='';access=await api('/driver/availability',ownerClerk);assert.equal(access.data.ownerDriverAccess,false);assert.equal(access.data.approved,false);
+      assert.equal((await api('/driver/heartbeat',ownerClerk,'POST')).status,403);assert.equal((await api('/admin/profiles',ownerClerk)).status,200);
+    }finally{if(previousDriver===undefined)delete process.env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS;else process.env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS=previousDriver;if(previous===undefined)delete process.env.LOCALEATS_ADMIN_CLERK_USER_IDS;else process.env.LOCALEATS_ADMIN_CLERK_USER_IDS=previous;if(ownerId)await db.update(driverPresenceTable).set({available:false}).where(eq(driverPresenceTable.profileId,ownerId));}
+  });
+  await t.test("owner bootstrap applies on protected APIs, serializes grants and does not reactivate suspended accounts",async()=>{
+    const previous=process.env.LOCALEATS_ADMIN_CLERK_USER_IDS,activeClerk=`user_QABootstrap${randomUUID().replaceAll('-','')}`,inactiveClerk=`user_QASuspended${randomUUID().replaceAll('-','')}`,activeId=randomUUID(),inactiveId=randomUUID();
+    await db.insert(profilesTable).values([{id:activeId,clerkUserId:activeClerk,displayName:'Existing owner fixture',role:'customer'},{id:inactiveId,clerkUserId:inactiveClerk,displayName:'Suspended owner fixture',role:'customer',isActive:false}]);
+    process.env.LOCALEATS_ADMIN_CLERK_USER_IDS=`${activeClerk},${inactiveClerk}`;
+    try{
+      const results=await Promise.all([api('/admin/profiles',activeClerk),api('/admin/profiles',activeClerk)]);assert.deepEqual(results.map(r=>r.status),[200,200]);
+      assert.equal((await api('/profiles/me',activeClerk)).data.role,'admin');
+      assert.equal((await api('/driver/availability',activeClerk)).data.approved,false);
+      const audits=await db.select().from(auditLogsTable).where(eq(auditLogsTable.resourceId,activeId));assert.equal(audits.filter(a=>a.action==='owner.bootstrap.granted').length,1);
+      assert.equal((await api('/admin/profiles',inactiveClerk)).status,403);assert.equal((await api('/driver/availability',inactiveClerk)).status,403);
+      const [suspended]=await db.select().from(profilesTable).where(eq(profilesTable.id,inactiveId));assert.equal(suspended.role,'customer');assert.equal(suspended.isActive,false);
+    }finally{if(previous===undefined)delete process.env.LOCALEATS_ADMIN_CLERK_USER_IDS;else process.env.LOCALEATS_ADMIN_CLERK_USER_IDS=previous;}
+  });
+
 });

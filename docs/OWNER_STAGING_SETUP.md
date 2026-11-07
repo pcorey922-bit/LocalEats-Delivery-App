@@ -135,3 +135,49 @@ The standalone staging PostgreSQL volume is not a production backup strategy.
 Hosted production still requires managed backups, restore verification and the
 remaining financial/provider/device launch gates. Source now requires migrations
 through 0024; use the current migration journal rather than copying older SQL lists.
+
+## Configure the owner account securely
+
+The local `.env.staging` is ignored by Git and must remain permission 0600. Keep
+actual user IDs and all secret values there or in the deployment host's secure
+runtime environment; do not add them to tracked templates, Clerk client metadata,
+frontend code, or VITE variables.
+
+- `LOCALEATS_ADMIN_CLERK_USER_IDS`: comma-separated Clerk IDs trusted to bootstrap
+  the owner/administrator role. The backend compares the authenticated Clerk subject
+  against this server-only setting and audits creation/promotion. Client role fields,
+  display names and metadata cannot grant administrator access. Suspended accounts
+  stay blocked; an existing active profile can bootstrap on a protected API request.
+- `ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS`: explicit owner driver exception. An ID must
+  also be in the administrator bootstrap allowlist and have an active administrator
+  profile. This lets the configured owner drive without submitting or approving an
+  application. Other administrators and ordinary drivers still need driver approval.
+  This is an access exception, not a recorded screening/insurance/license approval.
+  If a submitted license expiry is past, update it before going online. Going on duty,
+  location consent, fresh heartbeat, one active assignment and customer delivery proof
+  remain mandatory. Vehicle-detail updates pause sharing until explicit reconnection.
+
+To add your Clerk development credentials, open https://dashboard.clerk.com, select
+the RoCoEats application and its Development instance, then Configure → API keys.
+Copy its Publishable key into `CLERK_PUBLISHABLE_KEY` and its Secret key into
+`CLERK_SECRET_KEY` in your protected `.env.staging` using a local editor. Do not paste
+secret keys into chat. The prepared Compose build passes only the publishable key to
+`VITE_CLERK_PUBLISHABLE_KEY`; the secret key goes only to the API runtime. For a hosted
+service, enter these in that service's secret/environment settings, and copy both
+server allowlists there as well. An ignored local file is not deployed by a Git push.
+
+After configuring the remaining staging settings, run the preflight and build/migrate/
+start commands above. In Clerk's application settings allow the actual staging web
+origin/redirects (localhost:3001 for the local Compose package, HTTPS origin when hosted).
+Sign in with the configured owner identity. If initial account setup is required,
+submit your display name with one of the ordinary account types; the server derives
+and returns administrator status for an allowlisted owner. Visit `/admin` for owner
+controls and `/driver` to go on duty under the same identity. No self-review is needed.
+
+Removing an ID from the explicit owner-driver setting withdraws that exception on
+subsequent requests; independent driver approval can still grant ordinary access.
+Bootstrap administrator roles already stored in the database are not automatically
+revoked by editing the allowlist; administrator removal needs deliberate server-side
+account management. Clerk credential validity, actual sign-in and hosted behavior
+must be verified after real keys are supplied. Automated identity fixtures alone
+cannot certify your personal Clerk login.

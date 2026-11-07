@@ -101,6 +101,20 @@ export function checkStagingEnvironment(env) {
     errors.push(
       "Maps: configure both the origin-restricted public key and map ID, or neither",
     );
+  const administrators = (env.LOCALEATS_ADMIN_CLERK_USER_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (
+    (env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .some((id) => !administrators.includes(id))
+  )
+    errors.push(
+      "ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS: owner driver IDs must also be server-allowlisted administrators",
+    );
   return errors;
 }
 if (

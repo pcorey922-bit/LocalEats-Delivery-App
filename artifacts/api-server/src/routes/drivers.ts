@@ -5,6 +5,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { CommerceError } from "../lib/commerce-policy";
+import { hasDriverAccess } from "../lib/owner-access";
 import { notifyOrder, createEarnings, audit } from "../lib/commerce";
 import { driverDispatchState, presenceFreshMs } from "./dispatch";
 import { and, eq, isNull, desc, inArray } from "drizzle-orm";
@@ -229,21 +230,13 @@ router.post(
         .where(eq(profilesTable.id, profile.id))
         .for("update")
         .limit(1);
-      if (
-        !current?.driverApproved ||
-        !current.isActive ||
-        !["driver", "admin"].includes(current.role)
-      )
+      if (!hasDriverAccess(current))
         throw new CommerceError(403, "Driver approval is required");
       const [application] = await tx
         .select()
         .from(driverApplicationsTable)
         .where(eq(driverApplicationsTable.profileId, profile.id));
-      if (
-        application &&
-        (application.status !== "approved" ||
-          application.licenseExpiresOn < new Date().toISOString().slice(0, 10))
-      )
+      if (!hasDriverAccess(current, application))
         throw new CommerceError(
           403,
           "An approved, unexpired driver application is required",

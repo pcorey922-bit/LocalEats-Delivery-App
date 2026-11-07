@@ -628,3 +628,33 @@ dispute evidence/appeals. Then configured four-role provider E2E, failed-deliver
 policy/compensation, privacy/accessibility/load tests and physical-device release gates.
 Keep platform-funded credits explicitly labeled and preserve all existing financial
 idempotency, hold, immutable journal and stock/custody invariants.
+
+## Secure owner administrator and owner-driver configuration
+
+The supplied owner Clerk ID was added only to the gitignored local .env.staging,
+permission 0600, in LOCALEATS_ADMIN_CLERK_USER_IDS and the explicit new server-only
+ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS setting. No actual owner ID or secret is embedded
+in source, tests or tracked templates. Compose forwards both runtime settings; secure
+staging preflight requires owner-driver IDs to be a subset of bootstrap admin IDs.
+Local configuration is not a hosted deployment and must be entered in host secrets
+when deploying; never commit the private environment file.
+
+Central active-profile authorization now audits trusted bootstrap grants and applies
+on protected APIs as well as profile reads. Client metadata/body roles do not confer
+admin or owner-driver authority. Active, double-allowlisted administrators have effective
+driver access without self-review; stored driver approval/application review fields
+remain untouched. Known license expiry still blocks duty until updated. Ordinary
+admins/drivers retain approval rules. Locked claim, duty/GPS and dispatch assignment
+checks use the same server-derived capability. Presence consent/freshness, duplicate
+assignment prevention, custody transitions and handoff proof remain enforced.
+The driver UI identifies owner access and makes vehicle details optional; it does not
+claim owner screening or insurance verification. Owner operations stay accessible.
+
+90 automated tests and production build/typechecks passed locally, including same-owner
+registration/bootstrap, direct protected API promotion, concurrent grant deduplication,
+no self-approval delivery/earnings/assignment, spoofed roles/Clerk IDs/driver flags,
+ordinary-admin and single-allowlist rejection, license expiry, suspension and withdrawal
+of owner-driver configuration. Real Clerk login requires the development publishable/
+secret keys and instance origins; test-only identity adapters do not verify personal
+Clerk sign-in. OWNER_STAGING_SETUP.md names the exact secure file, provider dashboard
+location and hosted runtime settings. Check this commit's PostgreSQL/native CI next.
