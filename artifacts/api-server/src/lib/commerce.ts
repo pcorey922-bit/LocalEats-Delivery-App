@@ -1,6 +1,7 @@
 import { restoreUnacceptedInventory } from "./inventory";
 import { expireReservation } from "./reservation-expiry";
 import { databaseNow } from "./database-clock";
+import { fullRefundAmount } from "./partial-refunds";
 import {
   journalPayment,
   journalAllocation,
@@ -437,12 +438,13 @@ export async function cancelOrRefundOrder(
           409,
           "Payment requires provider reconciliation",
         );
+      const remaining=await fullRefundAmount(tx,orderId,payment.amountCents);
       await tx
         .insert(refundsTable)
         .values({
           id: orderId,
           orderId,
-          amountCents: payment.amountCents,
+          amountCents: remaining,
           reason,
           actorProfileId: actor.id,
         })
@@ -475,7 +477,7 @@ export async function cancelOrRefundOrder(
         }
         const result = await refundTestPayment(
           payment.providerPaymentId,
-          payment.amountCents,
+          refund.amountCents,
           refund.id,
         );
         await tx

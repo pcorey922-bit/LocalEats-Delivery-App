@@ -1,4 +1,5 @@
 import supportRouter from "./support";
+import partialRefundsRouter from "./partial-refunds";
 import orderIncidentsRouter from "./order-incidents";
 import inventoryRouter from "./inventory";
 import driverOnboardingRouter from "./driver-onboarding";
@@ -20,6 +21,7 @@ import ledgerRouter from "./ledger";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(partialRefundsRouter);
 router.use(orderIncidentsRouter);
 router.use(inventoryRouter);
 router.use(supportRouter);

@@ -4,6 +4,7 @@ import {
   ledgerTransactionsTable as transactions,
   ledgerLinesTable as lines,
   payoutsTable,
+  partialRefundsTable,
 } from "@workspace/db";
 import type { Transaction } from "./commerce";
 import { CommerceError } from "./commerce-policy";
@@ -179,6 +180,14 @@ export async function journalRefund(
   total: number,
 ) {
   await requirePaymentJournal(tx, orderId);
+  const credits = await tx
+    .select()
+    .from(partialRefundsTable)
+    .where(eq(partialRefundsTable.orderId, orderId));
+  const priorCredits = credits
+    .filter((r) => r.status === "succeeded")
+    .reduce((n, r) => n + r.amountCents, 0);
+  const cashTotal = total - priorCredits;
   const [existing] = await tx
     .select()
     .from(transactions)
@@ -194,7 +203,7 @@ export async function journalRefund(
       existing.kind !== "refund" ||
       entries
         .filter((line) => line.account === "platform_cash")
-        .reduce((sum, line) => sum + line.amountCents, 0) !== -total
+        .reduce((sum, line) => sum + line.amountCents, 0) !== -cashTotal
     )
       throw new CommerceError(
         409,
@@ -245,7 +254,11 @@ export async function journalRefund(
     id: `refund:${orderId}`,
     orderId,
     kind: "refund",
-    lines: [...entries, { account: "platform_cash", amountCents: -total }],
+    lines: [
+      ...entries,
+      { account: "platform_revenue", amountCents: -priorCredits },
+      { account: "platform_cash", amountCents: -cashTotal },
+    ],
   });
 }
 export async function journalReversal(

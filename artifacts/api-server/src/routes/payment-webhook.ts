@@ -1,4 +1,5 @@
 import { journalRefund } from "../lib/ledger";
+import { applyPartialRefundEvent } from "../lib/partial-refunds";
 import { and, eq } from "drizzle-orm";
 import type { Request, Response } from "express";
 import type Stripe from "stripe";
@@ -187,6 +188,7 @@ export async function processStripeEvent(event: Stripe.Event) {
         .from(ordersTable)
         .where(eq(ordersTable.id, payment.orderId))
         .for("update");
+      if(await applyPartialRefundEvent(tx,remote,payment))return;
       const [refund] = await tx
         .select()
         .from(refundsTable)
@@ -218,7 +220,7 @@ export async function processStripeEvent(event: Stripe.Event) {
       if (
         !refund ||
         refund.providerRefundId !== remote.id ||
-        remote.amount !== payment.amountCents ||
+        remote.amount !== refund.amountCents ||
         remote.currency !== "usd"
       ) {
         await audit(

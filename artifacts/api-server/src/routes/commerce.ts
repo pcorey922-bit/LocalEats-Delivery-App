@@ -16,6 +16,7 @@ import {
   payoutsTable,
   profilesTable,
   refundsTable,
+  partialRefundsTable,
   connectedAccountsTable,
   notificationsTable,
   platformSettingsTable,
@@ -243,6 +244,7 @@ router.get("/orders/:orderId/payment", requireAuth, async (req, res) => {
   res.json({
     testMode: true,
     reservationExpiresAt: owned.order.reservationExpiresAt,
+    partialRefunds: (await db.select().from(partialRefundsTable).where(eq(partialRefundsTable.orderId,owned.order.id))).map(r=>({id:r.id,amountCents:r.amountCents,status:r.status,fundingPolicy:r.fundingPolicy,createdAt:r.createdAt})),
     payment,
     refund: refund ?? null,
   });

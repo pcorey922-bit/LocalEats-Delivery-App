@@ -2,6 +2,7 @@ import { SupportDesk, AdminSupport } from "./support-desk";
 import { DriverApplicationReviews } from "./driver-onboarding";
 import { OrderTracking, DispatchOperations } from "./delivery-tracking";
 import { OrderIncidentConsole } from "./order-incidents";
+import { PartialRefundControls } from "./partial-refunds";
 import { LedgerReport } from "./ledger-report";
 import { OperationalConsole } from "./operational-console";
 import { useEffect, useState, type FormEvent } from "react";
@@ -177,9 +178,10 @@ export function OrderActions({ order }: { order: Order }) {
   const details = useQuery({
     queryKey: ["payment", order.id],
     queryFn: () =>
-      customFetch<{ refund: { status: string; amountCents: number } | null }>(
-        `/api/orders/${order.id}/payment`,
-      ),
+      customFetch<{
+        refund: { status: string; amountCents: number } | null;
+        partialRefunds: { id: string; status: string; amountCents: number }[];
+      }>(`/api/orders/${order.id}/payment`),
     enabled: expanded,
     refetchInterval: 10000,
   });
@@ -227,6 +229,11 @@ export function OrderActions({ order }: { order: Order }) {
       <SupportDesk orderId={order.id} />
       {expanded && (
         <section>
+          {details.data?.partialRefunds?.map((r) => (
+            <p key={r.id}>
+              Partial refund {money(r.amountCents)} · {r.status}
+            </p>
+          ))}
           <p>
             Food {money(order.subtotalCents)} · delivery{" "}
             {money(order.deliveryFeeCents)} · service{" "}
@@ -507,6 +514,9 @@ export function OperationsCommerce() {
             {o.id} · {money(o.totalCents)} · test payment {o.paymentStatus}
           </p>
           <OrderActions order={o} />
+          {o.status === "delivered" && o.paymentStatus === "succeeded" && (
+            <PartialRefundControls orderId={o.id} />
+          )}
         </article>
       ))}
       <h2>Refund requests</h2>

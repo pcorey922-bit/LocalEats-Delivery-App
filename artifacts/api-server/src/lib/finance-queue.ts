@@ -3,7 +3,7 @@ import { financialOperationsTable } from "@workspace/db";
 import type { Transaction } from "./commerce";
 import { CommerceError } from "./commerce-policy";
 export type FinanceKind =
-  "checkout" | "refund" | "transfer" | "reversal" | "expire_checkout";
+  "checkout" | "refund" | "partial_refund" | "transfer" | "reversal" | "expire_checkout";
 export async function enqueueFinancialOperation(
   tx: Transaction,
   input: {

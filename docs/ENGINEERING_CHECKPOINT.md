@@ -524,3 +524,31 @@ permissions/bounds, concurrent reviews, deduplicated escalation, stale acknowled
 automatic resolution, assignment release/GPS cleanup, arrival preservation, pickup and
 delivery recovery. CI must confirm PostgreSQL/restore/container/native for this revision.
 Next: partial refunds and dispute/reconciliation safeguards, then staging validation.
+
+## Platform-funded partial Stripe test refunds
+
+Migration 0022 adds multiple immutable partial-refund requests, provider identity and
+monotonic confirmation guards. Administrators request explicitly platform-funded
+`platform_goodwill_v1` credits on delivered Stripe test orders. Restaurant/driver
+earnings and tips remain intact. This is a defined limited funding policy, not a
+proportional tax/recipient-funded refund implementation. Request UUIDs are durable
+idempotency keys; pending/unknown outcomes reserve the cumulative charge budget.
+Confirmed failure releases the budget. Provider jobs use existing leases/backoff,
+23-hour unknown-write holds, known-refund polling and read-only reconciliation.
+Signed matching webhooks can confirm before the worker; stale events cannot regress
+confirmed records or journal twice. Amount/currency/payment mismatches are quarantined.
+
+Confirmed partial credits post balanced immutable cash/revenue journals. After all
+credits settle, the existing full-refund path requests only the remaining cash and
+reverses the original allocation with an offset for prior platform-funded credits.
+Full refund plus partial credits never intentionally exceeds the original charge;
+pending credits block the remaining full refund. Customer receipts and administrator
+forms show multiple credits. No live money or provider round-trip certification.
+
+85 automated tests and production build passed locally, including competing budgets,
+same-ID retries, ambiguous provider outcomes, webhook-before-response/stale events,
+immutable request/delete/truncate protection, preserved earnings and tips, and a
+partial-plus-remaining-refund flow with zero final ledger balances. PostgreSQL CI
+must validate this revision. Reservation b510e0b and timeout 3d784ff both passed full
+PostgreSQL/restore/container and unsigned native CI. Next: signed dispute holds,
+financial reconciliation controls and staging preparation.

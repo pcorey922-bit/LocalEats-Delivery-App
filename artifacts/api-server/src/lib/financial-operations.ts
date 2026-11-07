@@ -2,6 +2,7 @@ import { databaseNow } from "./database-clock";
 import { alias } from "drizzle-orm/pg-core";
 import { restoreUnacceptedInventory } from "./inventory";
 import { expireReservation } from "./reservation-expiry";
+import { fullRefundAmount, applyPartialRefund, RefundReconciliationError } from "./partial-refunds";
 import {
   requirePaymentJournal,
   journalTransfer,
@@ -17,6 +18,7 @@ import {
   paymentsTable,
   payoutsTable,
   refundsTable,
+  partialRefundsTable,
   connectedAccountsTable,
   restaurantsTable,
   deliveriesTable,
@@ -223,12 +225,13 @@ export async function enqueueRefund(
       409,
       "Payment requires reconciliation before refund",
     );
+  const amount = await fullRefundAmount(tx, orderId, payment.amountCents);
   await tx
     .insert(refundsTable)
     .values({
       id: orderId,
       orderId,
-      amountCents: payment.amountCents,
+      amountCents: amount,
       reason,
       actorProfileId: actorId,
     })
@@ -240,7 +243,7 @@ export async function enqueueRefund(
     resourceId: orderId,
     payload: {
       paymentId: payment.providerPaymentId,
-      amount: payment.amountCents,
+      amount,
       currency: "usd",
     },
   });
@@ -411,6 +414,7 @@ async function claimOperation(): Promise<FinancialOperation | null> {
           : ({
               expire_checkout: 0,
               refund: 1,
+              partial_refund: 1,
               reversal: 2,
               transfer: 3,
               checkout: 4,
@@ -430,7 +434,7 @@ async function claimOperation(): Promise<FinancialOperation | null> {
       if (!job) return null;
       if (
         job.firstAttemptAt &&
-        !(job.kind === "refund" && job.result?.id) &&
+        !(["refund", "partial_refund"].includes(job.kind) && job.result?.id) &&
         now.getTime() - job.firstAttemptAt.getTime() > retryWindowMs
       ) {
         await tx
@@ -444,7 +448,9 @@ async function claimOperation(): Promise<FinancialOperation | null> {
           .where(eq(operations.id, job.id));
         return null;
       }
-      if (["transfer", "refund", "reversal"].includes(job.kind)) {
+      if (
+        ["transfer", "refund", "partial_refund", "reversal"].includes(job.kind)
+      ) {
         try {
           await requirePaymentJournal(tx, orderId);
         } catch (error) {
@@ -573,7 +579,7 @@ export async function executeStripeOperation(
     if (result.livemode) throw new CommerceError(503, "Live transfer rejected");
     return { id: result.id, status: "succeeded" };
   }
-  if (job.kind === "refund") {
+  if (job.kind === "refund" || job.kind === "partial_refund") {
     const result = job.result?.id
       ? await stripe.refunds.retrieve(String(job.result.id))
       : await stripe.refunds.create(
@@ -584,6 +590,12 @@ export async function executeStripeOperation(
           },
           { idempotencyKey: job.id },
         );
+    if (
+      result.payment_intent !== String(p.paymentId) ||
+      result.amount !== Number(p.amount) ||
+      result.currency !== "usd"
+    )
+      throw new RefundReconciliationError("Provider refund does not match the committed request");
     return { id: result.id, status: result.status ?? "pending" };
   }
   if (job.kind === "reversal") {
@@ -673,6 +685,22 @@ async function applyResult(
       .limit(1);
     if (order.status === "cancelled" || refund)
       await queueSettlementRecovery(tx, job.orderId);
+  } else if (job.kind === "partial_refund") {
+    if (!result.id) throw new Error("Provider partial refund ID missing");
+    const [refund] = await tx
+      .select()
+      .from(partialRefundsTable)
+      .where(eq(partialRefundsTable.id, job.resourceId));
+    if (
+      !refund ||
+      refund.orderId !== job.orderId ||
+      refund.amountCents !== Number(job.payload.amount)
+    )
+      throw new CommerceError(409, "Partial refund operation mismatch");
+    await applyPartialRefund(tx, refund, {
+      id: result.id,
+      status: result.status,
+    });
   } else if (job.kind === "refund") {
     if (!result.id) throw new Error("Provider refund ID missing");
     await tx
@@ -776,6 +804,7 @@ export async function processFinancialOperation(
         ? "CONFIGURATION_OR_STATE_ERROR"
         : (error as { type?: string })?.type;
     const needsReconciliation =
+      (error as {requiresReconciliation?:boolean})?.requiresReconciliation === true ||
       code === "StripeIdempotencyError" ||
       (error as { statusCode?: number })?.statusCode === 500;
     await db
@@ -845,7 +874,7 @@ export async function reconcileFinancialOperation(id: string, actor: Profile) {
     }
     if (matches.length === 1)
       result = { id: matches[0].id, status: "succeeded" };
-  } else if (job.kind === "refund") {
+  } else if (job.kind === "refund" || job.kind === "partial_refund") {
     const matches = [];
     for await (const refund of stripe.refunds.list({
       payment_intent: String(job.payload.paymentId),

@@ -155,6 +155,13 @@
       "when": 1794024000000,
       "tag": "0021_order_timeout_incidents",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794025000000,
+      "tag": "0022_partial_refunds",
+      "breakpoints": true
     }
   ]
 }

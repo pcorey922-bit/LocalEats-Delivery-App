@@ -131,3 +131,16 @@ Acknowledgement does not resolve a still-active exception. Use dispatch, restaur
 status, cancellation/refund and support controls for recovery. Background review
 resolves incidents when actual state recovers. Arrival-reported drivers are never
 silently released by a timeout; no paid order is automatically refunded on timeout.
+
+## Platform-funded partial test credits
+
+Admin GET/POST `/admin/orders/:id/partial-refunds`. POST requires
+`{id:UUID,amountCents:positiveInteger,fundingPolicy:"platform_goodwill_v1",reason:string}`
+with a 10–500 character reason. Only delivered, paid Stripe test orders qualify.
+Pending/successful requests reserve the cumulative budget; the total must remain
+below the original charge. Same-ID/body retries return the saved request; conflicts
+return 409. Full-refund requests block while partial outcomes are unresolved, then
+refund only the remaining amount. The original full-refund record remains unique;
+partial records are separate immutable financial requests. Receipts include
+`partialRefunds`. This policy is paid by RoCoEats and preserves restaurant/driver
+allocations and tips; recipient/tax-funded partial allocation remains unfinished.

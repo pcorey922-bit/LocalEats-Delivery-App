@@ -1,3 +1,4 @@
+import { processStripeEvent } from "../src/routes/payment-webhook";
 import { processOrderTiming } from "../src/lib/order-timing";
 import { processReservationExpiry } from "../src/lib/reservation-expiry";
 import { recordPayment } from "../src/lib/commerce";
@@ -21,6 +22,7 @@ import {
   ordersTable,
   orderEventsTable,
   orderIncidentsTable,
+  partialRefundsTable,
   orderItemsTable,
   paymentsTable,
   notificationsTable,
@@ -2670,6 +2672,69 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       await review();incidents=await db.select().from(orderIncidentsTable).where(eq(orderIncidentsTable.orderId,order.id));assert.ok(incidents.every(i=>i.status==='resolved'));
       const code=await api(`/orders/${order.id}/delivery-code`,ids.customer,'POST');assert.equal((await api(`/driver/orders/${order.id}/deliver`,driver,'POST',{code:code.data.code})).status,200);
     }finally{await api(`/orders/${order.id}/cancel`,ids.admin,'POST',{reason:'End timeout recovery verification'});await api('/driver/availability',driver,'PUT',{available:false});}
+  });
+
+  await t.test("partial refunds are durable, cumulative, webhook-monotonic and combine with a remaining full refund",async()=>{
+    const driver=randomUUID();await db.insert(profilesTable).values({id:driver,clerkUserId:driver,displayName:'Refund delivery fixture',role:'driver',driverApproved:true});await api('/driver/availability',driver,'PUT',{available:true});
+    const order=await create();await ready(order.id);await api(`/driver/orders/${order.id}/claim`,driver,'POST');await api(`/driver/orders/${order.id}/pickup`,driver,'POST');const code=await api(`/orders/${order.id}/delivery-code`,ids.customer,'POST');assert.equal((await api(`/driver/orders/${order.id}/deliver`,driver,'POST',{code:code.data.code})).status,200);
+    const pi=`pi_partial_${order.id}`;await db.update(paymentsTable).set({provider:'stripe_test',providerPaymentId:pi}).where(eq(paymentsTable.orderId,order.id));
+    process.env.PAYMENT_PROVIDER='stripe_test';process.env.STRIPE_SECRET_KEY='sk_test_fixture';
+    const path=`/admin/orders/${order.id}/partial-refunds`,request={id:randomUUID(),amountCents:501,fundingPolicy:'platform_goodwill_v1',reason:'Platform funded service recovery credit'};
+    const run=async(id:string,execute:(job:any)=>Promise<any>)=>{await db.update(financialOperationsTable).set({createdAt:new Date(0),nextAttemptAt:new Date(0)}).where(eq(financialOperationsTable.id,id));assert.equal(await processFinancialOperation(async(job)=>{assert.equal(job.id,id);return execute(job);}),true);};
+    try{
+      assert.equal((await api(path,ids.customer,'POST',request)).status,403);
+      const retries=await Promise.all([api(path,ids.admin,'POST',request),api(path,ids.admin,'POST',request)]);assert.deepEqual(retries.map(r=>r.status),[202,202]);
+      assert.equal((await api(path,ids.admin,'POST',{...request,amountCents:502})).status,409);
+      assert.equal((await db.select().from(partialRefundsTable).where(eq(partialRefundsTable.orderId,order.id))).length,1);
+      assert.equal((await api(`/orders/${order.id}/cancel`,ids.admin,'POST',{reason:'Must wait for pending partial refund'})).status,409);
+      const opId=`partial_refund:${request.id}`,remoteId=`re_partial_${request.id}`;
+      const event=(id:string,status:string,amount=501)=>({id,type:'refund.updated',livemode:false,data:{object:{id:remoteId,object:'refund',payment_intent:pi,amount,currency:'usd',status,metadata:{operationId:opId}}}} as any);
+      await run(opId,async()=>{
+        await processStripeEvent(event('evt_partial_success','succeeded'));
+        return {id:remoteId,status:'pending'};
+      });
+      await processStripeEvent(event('evt_partial_success','succeeded'));
+      await processStripeEvent(event('evt_partial_stale','failed'));
+      const [saved]=await db.select().from(partialRefundsTable).where(eq(partialRefundsTable.id,request.id));assert.equal(saved.status,'succeeded');
+      assert.equal((await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.id,opId)))[0].state,'succeeded');
+      await assert.rejects(()=>processStripeEvent(event('evt_partial_mismatch','succeeded',500)));
+      await assert.rejects(engine.exec(`UPDATE partial_refunds SET amount_cents=1 WHERE id='${request.id}'`));
+      await assert.rejects(engine.exec(`UPDATE partial_refunds SET status='pending' WHERE id='${request.id}'`));
+      await assert.rejects(engine.exec(`DELETE FROM partial_refunds WHERE id='${request.id}'`));
+      await assert.rejects(engine.exec('TRUNCATE partial_refunds'));
+      const second={...request,id:randomUUID(),amountCents:99};assert.equal((await api(path,ids.admin,'POST',second)).status,202);
+      await run(`partial_refund:${second.id}`,async()=>({id:`re_partial_${second.id}`,status:'succeeded'}));
+      const earnings=await db.select().from(payoutsTable).where(eq(payoutsTable.orderId,order.id));assert.equal(earnings.find(p=>p.kind==='driver')?.amountCents,699);assert.equal(earnings.find(p=>p.kind==='restaurant')?.amountCents,1800);
+      const details=await api(`/orders/${order.id}/payment`,ids.customer);assert.equal(details.data.partialRefunds.length,2);
+      assert.equal((await api(`/orders/${order.id}/cancel`,ids.admin,'POST',{reason:'Refund remaining amount after goodwill credits'})).status,200);
+      const [full]=await db.select().from(refundsTable).where(eq(refundsTable.orderId,order.id));assert.equal(full.amountCents,order.totalCents-600);
+      const [job]=await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.id,`refund:${order.id}`));assert.equal(job.payload.amount,order.totalCents-600);
+      await run(job.id,async()=>({id:`re_remaining_${order.id}`,status:'succeeded'}));
+      assert.equal((await db.select().from(paymentsTable).where(eq(paymentsTable.orderId,order.id)))[0].status,'refunded');
+      assert.equal((await api(path,ids.admin,'POST',{...request,id:randomUUID()})).status,409);
+      const journals=await db.select({line:ledgerLinesTable}).from(ledgerLinesTable).innerJoin(ledgerTransactionsTable,eq(ledgerTransactionsTable.id,ledgerLinesTable.transactionId)).where(eq(ledgerTransactionsTable.orderId,order.id));
+      const balances=new Map<string,number>();for(const {line} of journals)balances.set(line.account,(balances.get(line.account)??0)+line.amountCents);assert.ok([...balances.values()].every(n=>n===0));
+      await db.transaction(tx=>journalRefund(tx,order.id,order.totalCents));
+    }finally{process.env.PAYMENT_PROVIDER='sandbox';delete process.env.STRIPE_SECRET_KEY;await api('/driver/availability',driver,'PUT',{available:false});}
+  });
+  await t.test("concurrent partial refunds reserve the cumulative budget and retain unknown provider outcomes",async()=>{
+    const driver=randomUUID();await db.insert(profilesTable).values({id:driver,clerkUserId:driver,displayName:'Refund budget fixture',role:'driver',driverApproved:true});await api('/driver/availability',driver,'PUT',{available:true});
+    const order=await create();await ready(order.id);await api(`/driver/orders/${order.id}/claim`,driver,'POST');await api(`/driver/orders/${order.id}/pickup`,driver,'POST');const code=await api(`/orders/${order.id}/delivery-code`,ids.customer,'POST');await api(`/driver/orders/${order.id}/deliver`,driver,'POST',{code:code.data.code});
+    await db.update(paymentsTable).set({provider:'stripe_test',providerPaymentId:`pi_budget_${order.id}`}).where(eq(paymentsTable.orderId,order.id));process.env.PAYMENT_PROVIDER='stripe_test';process.env.STRIPE_SECRET_KEY='sk_test_fixture';
+    const path=`/admin/orders/${order.id}/partial-refunds`,requests=[0,1].map(()=>({id:randomUUID(),amountCents:order.totalCents-1,fundingPolicy:'platform_goodwill_v1',reason:'Concurrent credit budget verification'}));
+    try{
+      const results=await Promise.all(requests.map(r=>api(path,ids.admin,'POST',r)));assert.deepEqual(results.map(r=>r.status).sort(),[202,409]);
+      const accepted=requests[results.findIndex(r=>r.status===202)],id=`partial_refund:${accepted.id}`;
+      await db.update(financialOperationsTable).set({createdAt:new Date(0),nextAttemptAt:new Date(0)}).where(eq(financialOperationsTable.id,id));
+      await processFinancialOperation(async(job)=>{assert.equal(job.id,id);throw new Error('Provider accepted request but response was lost');});
+      const [unknown]=await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.id,id));assert.equal(unknown.state,'queued');assert.equal(unknown.attempts,1);
+      assert.equal((await api(path,ids.admin,'POST',accepted)).status,202);
+      assert.equal((await api(path,ids.admin,'POST',{...accepted,id:randomUUID(),amountCents:1})).status,409);
+      assert.equal((await api(`/orders/${order.id}/cancel`,ids.admin,'POST',{reason:'Unknown credit must remain reserved'})).status,409);
+      await db.update(financialOperationsTable).set({nextAttemptAt:new Date(0)}).where(eq(financialOperationsTable.id,id));
+      await processFinancialOperation(async(job)=>{assert.equal(job.id,id);return {id:`re_budget_${accepted.id}`,status:'failed'};});
+      assert.equal((await api(path,ids.admin,'POST',{...accepted,id:randomUUID(),amountCents:200})).status,202);
+    }finally{process.env.PAYMENT_PROVIDER='sandbox';delete process.env.STRIPE_SECRET_KEY;await api('/driver/availability',driver,'PUT',{available:false});}
   });
 
 });

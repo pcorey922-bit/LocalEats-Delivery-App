@@ -53,7 +53,7 @@ export const financialOperationsTable = pgTable(
     ),
     check(
       "financial_operations_kind_check",
-      sql`${t.kind} in ('checkout','refund','transfer','reversal','expire_checkout')`,
+      sql`${t.kind} in ('checkout','refund','partial_refund','transfer','reversal','expire_checkout')`,
     ),
   ],
 );
