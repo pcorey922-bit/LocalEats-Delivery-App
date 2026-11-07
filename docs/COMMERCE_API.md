@@ -92,3 +92,25 @@ and snapshots, and reserves one slot atomically. Retries acknowledge their exist
 order even when capacity is full. Lowering capacity never cancels existing orders.
 Pending-payment reservations currently require customer/operator cancellation to free
 them; unattended expiration and escalation remain unfinished launch requirements.
+
+## Item stock and menu customization
+
+Menu reads now include configured modifier groups in customer and owner views.
+`GET /restaurants/me` resolves before public restaurant-ID lookup.
+
+`GET /restaurants/me/inventory` returns owned item IDs/names, available `stockOnHand`
+and integer `revision`. Null stock means untracked; zero marks an otherwise listed
+item sold out. `PUT /restaurants/me/inventory/:itemId` accepts
+`{stockOnHand:integer|null,expectedRevision:integer,reason:string}`. Stock is 0–1,000,000;
+reasons require 5–500 characters. Only the item's restaurant owner can adjust it.
+A stale revision returns 409. Adjustments and their before/after audit commit together.
+
+Checkout aggregates quantities across all customization/instruction lines for the same
+item, locks stock rows in stable ID order, and deducts tracked units atomically with
+order creation. Retries never deduct twice. Per-line deducted quantities distinguish
+tracked reservations from historical/untracked orders. Pending payments retain stock
+until cancellation. Cancellations before restaurant acceptance return deducted units
+once, in both sandbox and durable Stripe-test cancellation paths. Accepted/prepared
+food does not automatically return to available stock; restaurant staff must record
+an appropriate reasoned adjustment. Deleted/untracked items are not fabricated or
+recreated. Limits are item units, not modifier/ingredient-level inventory.

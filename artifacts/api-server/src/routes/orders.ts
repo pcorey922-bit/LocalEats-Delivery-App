@@ -1,4 +1,5 @@
 import { requireOrderingEnabled } from "../lib/commerce-policy";
+import { ensureInventory, inventoryQuantities } from "../lib/inventory";
 import { customize } from "../../../../lib/api-zod/src/modifiers";
 import {
   ensureAccepting,
@@ -18,7 +19,7 @@ import {
   paymentMode,
 } from "../lib/commerce-policy";
 import { requirePaymentProvider } from "../lib/payment-provider";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import {
   CreateMyOrderBody,
@@ -242,6 +243,7 @@ router.post(
     }
 
     const itemsById = new Map(availableItems.map((item) => [item.id, item]));
+    if (isQuote) ensureInventory(availableItems, parsed.data.items);
     const customizations = parsed.data.items.map((line) => {
       try {
         return customize(
@@ -381,7 +383,7 @@ router.post(
           ),
         )
         .orderBy(asc(menuItemsTable.id))
-        .for("share");
+        .for("update");
       await tx
         .select()
         .from(platformSettingsTable)
@@ -408,6 +410,7 @@ router.post(
         );
       await ensureAccepting(lockedRestaurant, tx);
       await ensureCapacity(lockedRestaurant, tx);
+      ensureInventory(lockedItems, parsed.data.items);
 
       const [order] = await tx
         .insert(ordersTable)
@@ -439,6 +442,17 @@ router.post(
         return existing.id;
       }
 
+      const quantities = inventoryQuantities(parsed.data.items);
+      for (const item of lockedItems) {
+        if (item.stockOnHand === null) continue;
+        await tx
+          .update(menuItemsTable)
+          .set({
+            stockOnHand: item.stockOnHand - quantities.get(item.id)!,
+            stockRevision: sql`${menuItemsTable.stockRevision}+1`,
+          })
+          .where(eq(menuItemsTable.id, item.id));
+      }
       await tx.insert(orderItemsTable).values(
         parsed.data.items.map((line, index) => {
           const menuItem = itemsById.get(line.menuItemId)!;
@@ -451,6 +465,8 @@ router.post(
               menuItem.priceCents + customizations[index].extraCents,
             modifierSnapshot: customizations[index].snapshot,
             quantity: line.quantity,
+            inventoryDeducted:
+              menuItem.stockOnHand === null ? 0 : line.quantity,
             specialInstructions: line.specialInstructions?.trim() || null,
           };
         }),

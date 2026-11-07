@@ -134,6 +134,13 @@
       "when": 1794021000000,
       "tag": "0018_restaurant_capacity",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794022000000,
+      "tag": "0019_menu_inventory",
+      "breakpoints": true
     }
   ]
 }

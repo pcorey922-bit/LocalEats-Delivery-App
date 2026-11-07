@@ -1,5 +1,6 @@
 import { databaseNow } from "./database-clock";
 import { alias } from "drizzle-orm/pg-core";
+import { restoreUnacceptedInventory } from "./inventory";
 import {
   requirePaymentJournal,
   journalTransfer,
@@ -284,6 +285,11 @@ export async function requestProviderCancellation(
     // Stop operational fulfillment immediately. Provider recovery continues in
     // durable jobs; a timeout can no longer roll back a restaurant cancellation.
     if (!["cancelled", "delivered"].includes(order.status)) {
+      const restored = await restoreUnacceptedInventory(tx, order);
+      if (restored.length)
+        await audit(tx, actor.id, "inventory.released", orderId, {
+          items: restored,
+        });
       await tx
         .update(ordersTable)
         .set({ status: "cancelled" })

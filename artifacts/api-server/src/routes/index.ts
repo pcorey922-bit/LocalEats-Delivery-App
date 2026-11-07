@@ -1,4 +1,5 @@
 import supportRouter from "./support";
+import inventoryRouter from "./inventory";
 import driverOnboardingRouter from "./driver-onboarding";
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
@@ -18,6 +19,7 @@ import ledgerRouter from "./ledger";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(inventoryRouter);
 router.use(supportRouter);
 router.use(driverOnboardingRouter);
 router.use(commerceRouter);

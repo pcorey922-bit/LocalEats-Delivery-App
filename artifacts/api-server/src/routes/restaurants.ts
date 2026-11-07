@@ -34,7 +34,10 @@ import { requireAuth } from "../middlewares/require-auth";
 
 const router: IRouter = Router();
 
-async function loadCategories(restaurantId: string, includeUnavailable: boolean) {
+async function loadCategories(
+  restaurantId: string,
+  includeUnavailable: boolean,
+) {
   const categories = await db
     .select()
     .from(menuCategoriesTable)
@@ -69,7 +72,9 @@ async function loadCategories(restaurantId: string, includeUnavailable: boolean)
           name: item.name,
           description: item.description,
           priceCents: item.priceCents,
-          isAvailable: item.isAvailable,
+          isAvailable:
+            item.isAvailable && (includeUnavailable || item.stockOnHand !== 0),
+          modifierGroups: item.modifierGroups,
         })),
     }))
     .filter((category) => includeUnavailable || category.items.length > 0);
@@ -105,7 +110,11 @@ function restaurantValues(data: {
   for (const [key, value] of Object.entries(data)) {
     if (typeof value === "string") {
       const cleaned = value.trim();
-      result[key] = cleaned || (key === "description" || key === "phone" || key === "street2" ? null : "");
+      result[key] =
+        cleaned ||
+        (key === "description" || key === "phone" || key === "street2"
+          ? null
+          : "");
     } else if (value === null) {
       result[key] = null;
     }
@@ -149,6 +158,24 @@ router.get("/restaurants", async (req, res): Promise<void> => {
   res.json(ListRestaurantsResponse.parse(restaurants));
 });
 
+router.get("/restaurants/me", requireAuth, async (req, res): Promise<void> => {
+  const profile = await getActiveProfile(req, res);
+  if (!profile || !requireRole(profile, ["restaurant"], res)) return;
+
+  const [restaurant] = await db
+    .select()
+    .from(restaurantsTable)
+    .where(eq(restaurantsTable.ownerProfileId, profile.id))
+    .limit(1);
+
+  if (!restaurant) {
+    res.status(404).json({ error: "Restaurant profile has not been created" });
+    return;
+  }
+
+  res.json(GetMyRestaurantResponse.parse(await ownerView(restaurant)));
+});
+
 router.get("/restaurants/:restaurantId", async (req, res): Promise<void> => {
   const params = GetRestaurantParams.safeParse(req.params);
   if (!params.success) {
@@ -188,37 +215,23 @@ router.get("/restaurants/:restaurantId", async (req, res): Promise<void> => {
   res.json(GetRestaurantResponse.parse(view));
 });
 
-router.get("/restaurants/me", requireAuth, async (req, res): Promise<void> => {
-  const profile = await getActiveProfile(req, res);
-  if (!profile || !requireRole(profile, ["restaurant"], res)) return;
-
-  const [restaurant] = await db
-    .select()
-    .from(restaurantsTable)
-    .where(eq(restaurantsTable.ownerProfileId, profile.id))
-    .limit(1);
-
-  if (!restaurant) {
-    res.status(404).json({ error: "Restaurant profile has not been created" });
-    return;
-  }
-
-  res.json(GetMyRestaurantResponse.parse(await ownerView(restaurant)));
-});
-
 router.post("/restaurants/me", requireAuth, async (req, res): Promise<void> => {
   const profile = await getActiveProfile(req, res);
   if (!profile || !requireRole(profile, ["restaurant"], res)) return;
 
   const parsed = CreateMyRestaurantBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Enter a valid restaurant name and address" });
+    res
+      .status(400)
+      .json({ error: "Enter a valid restaurant name and address" });
     return;
   }
 
   const values = restaurantValues(parsed.data);
   if (!values.name || !values.street1 || !values.city || !values.postalCode) {
-    res.status(400).json({ error: "Restaurant name and address fields cannot be blank" });
+    res
+      .status(400)
+      .json({ error: "Restaurant name and address fields cannot be blank" });
     return;
   }
 
@@ -254,40 +267,54 @@ router.post("/restaurants/me", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  res.status(201).json(CreateMyRestaurantResponse.parse(await ownerView(restaurant)));
+  res
+    .status(201)
+    .json(CreateMyRestaurantResponse.parse(await ownerView(restaurant)));
 });
 
-router.patch("/restaurants/me", requireAuth, async (req, res): Promise<void> => {
-  const profile = await getActiveProfile(req, res);
-  if (!profile || !requireRole(profile, ["restaurant"], res)) return;
+router.patch(
+  "/restaurants/me",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const profile = await getActiveProfile(req, res);
+    if (!profile || !requireRole(profile, ["restaurant"], res)) return;
 
-  const parsed = UpdateMyRestaurantBody.safeParse(req.body);
-  if (!parsed.success || Object.keys(parsed.data ?? {}).length === 0) {
-    res.status(400).json({ error: "Enter at least one valid restaurant field" });
-    return;
-  }
-
-  const values = restaurantValues(parsed.data);
-  for (const requiredField of ["name", "street1", "city", "postalCode"]) {
-    if (requiredField in values && !values[requiredField]) {
-      res.status(400).json({ error: "Restaurant name and address fields cannot be blank" });
+    const parsed = UpdateMyRestaurantBody.safeParse(req.body);
+    if (!parsed.success || Object.keys(parsed.data ?? {}).length === 0) {
+      res
+        .status(400)
+        .json({ error: "Enter at least one valid restaurant field" });
       return;
     }
-  }
 
-  const [restaurant] = await db
-    .update(restaurantsTable)
-    .set(values)
-    .where(eq(restaurantsTable.ownerProfileId, profile.id))
-    .returning();
+    const values = restaurantValues(parsed.data);
+    for (const requiredField of ["name", "street1", "city", "postalCode"]) {
+      if (requiredField in values && !values[requiredField]) {
+        res
+          .status(400)
+          .json({
+            error: "Restaurant name and address fields cannot be blank",
+          });
+        return;
+      }
+    }
 
-  if (!restaurant) {
-    res.status(404).json({ error: "Restaurant profile has not been created" });
-    return;
-  }
+    const [restaurant] = await db
+      .update(restaurantsTable)
+      .set(values)
+      .where(eq(restaurantsTable.ownerProfileId, profile.id))
+      .returning();
 
-  res.json(UpdateMyRestaurantResponse.parse(await ownerView(restaurant)));
-});
+    if (!restaurant) {
+      res
+        .status(404)
+        .json({ error: "Restaurant profile has not been created" });
+      return;
+    }
+
+    res.json(UpdateMyRestaurantResponse.parse(await ownerView(restaurant)));
+  },
+);
 
 router.post(
   "/restaurants/me/categories",
@@ -307,7 +334,9 @@ router.post(
       .where(eq(restaurantsTable.ownerProfileId, profile.id))
       .limit(1);
     if (!restaurant) {
-      res.status(404).json({ error: "Restaurant profile has not been created" });
+      res
+        .status(404)
+        .json({ error: "Restaurant profile has not been created" });
       return;
     }
 
@@ -321,7 +350,9 @@ router.post(
       .returning();
     res
       .status(201)
-      .json(CreateMyRestaurantCategoryResponse.parse({ ...category, items: [] }));
+      .json(
+        CreateMyRestaurantCategoryResponse.parse({ ...category, items: [] }),
+      );
   },
 );
 
@@ -333,7 +364,11 @@ router.patch(
     if (!profile || !requireRole(profile, ["restaurant"], res)) return;
     const params = UpdateMyRestaurantCategoryParams.safeParse(req.params);
     const parsed = UpdateMyRestaurantCategoryBody.safeParse(req.body);
-    if (!params.success || !parsed.success || Object.keys(parsed.data ?? {}).length === 0) {
+    if (
+      !params.success ||
+      !parsed.success ||
+      Object.keys(parsed.data ?? {}).length === 0
+    ) {
       res.status(400).json({ error: "Enter a valid category update" });
       return;
     }
@@ -348,14 +383,20 @@ router.patch(
       .where(eq(restaurantsTable.ownerProfileId, profile.id))
       .limit(1);
     if (!restaurant) {
-      res.status(404).json({ error: "Restaurant profile has not been created" });
+      res
+        .status(404)
+        .json({ error: "Restaurant profile has not been created" });
       return;
     }
     const [category] = await db
       .update(menuCategoriesTable)
       .set({
-        ...(parsed.data.name !== undefined && { name: parsed.data.name.trim() }),
-        ...(parsed.data.sortOrder !== undefined && { sortOrder: parsed.data.sortOrder }),
+        ...(parsed.data.name !== undefined && {
+          name: parsed.data.name.trim(),
+        }),
+        ...(parsed.data.sortOrder !== undefined && {
+          sortOrder: parsed.data.sortOrder,
+        }),
       })
       .where(
         and(
@@ -391,7 +432,9 @@ router.delete(
       .where(eq(restaurantsTable.ownerProfileId, profile.id))
       .limit(1);
     if (!restaurant) {
-      res.status(404).json({ error: "Restaurant profile has not been created" });
+      res
+        .status(404)
+        .json({ error: "Restaurant profile has not been created" });
       return;
     }
     const [category] = await db
@@ -414,10 +457,14 @@ router.delete(
       .where(eq(menuItemsTable.categoryId, category.id))
       .limit(1);
     if (item) {
-      res.status(409).json({ error: "Move or remove the category's menu items first" });
+      res
+        .status(409)
+        .json({ error: "Move or remove the category's menu items first" });
       return;
     }
-    await db.delete(menuCategoriesTable).where(eq(menuCategoriesTable.id, category.id));
+    await db
+      .delete(menuCategoriesTable)
+      .where(eq(menuCategoriesTable.id, category.id));
     res.sendStatus(204);
   },
 );
@@ -439,7 +486,9 @@ router.post(
       .where(eq(restaurantsTable.ownerProfileId, profile.id))
       .limit(1);
     if (!restaurant) {
-      res.status(404).json({ error: "Restaurant profile has not been created" });
+      res
+        .status(404)
+        .json({ error: "Restaurant profile has not been created" });
       return;
     }
     const [category] = await db
@@ -480,7 +529,11 @@ router.patch(
     if (!profile || !requireRole(profile, ["restaurant"], res)) return;
     const params = UpdateMyRestaurantMenuItemParams.safeParse(req.params);
     const parsed = UpdateMyRestaurantMenuItemBody.safeParse(req.body);
-    if (!params.success || !parsed.success || Object.keys(parsed.data ?? {}).length === 0) {
+    if (
+      !params.success ||
+      !parsed.success ||
+      Object.keys(parsed.data ?? {}).length === 0
+    ) {
       res.status(400).json({ error: "Enter a valid menu item update" });
       return;
     }
@@ -494,7 +547,9 @@ router.patch(
       .where(eq(restaurantsTable.ownerProfileId, profile.id))
       .limit(1);
     if (!restaurant) {
-      res.status(404).json({ error: "Restaurant profile has not been created" });
+      res
+        .status(404)
+        .json({ error: "Restaurant profile has not been created" });
       return;
     }
     if (parsed.data.categoryId) {
@@ -516,14 +571,24 @@ router.patch(
     const [item] = await db
       .update(menuItemsTable)
       .set({
-        ...(parsed.data.modifierGroups !== undefined && { modifierGroups: parsed.data.modifierGroups }),
-        ...(parsed.data.categoryId !== undefined && { categoryId: parsed.data.categoryId }),
-        ...(parsed.data.name !== undefined && { name: parsed.data.name.trim() }),
+        ...(parsed.data.modifierGroups !== undefined && {
+          modifierGroups: parsed.data.modifierGroups,
+        }),
+        ...(parsed.data.categoryId !== undefined && {
+          categoryId: parsed.data.categoryId,
+        }),
+        ...(parsed.data.name !== undefined && {
+          name: parsed.data.name.trim(),
+        }),
         ...(parsed.data.description !== undefined && {
           description: parsed.data.description?.trim() || null,
         }),
-        ...(parsed.data.priceCents !== undefined && { priceCents: parsed.data.priceCents }),
-        ...(parsed.data.isAvailable !== undefined && { isAvailable: parsed.data.isAvailable }),
+        ...(parsed.data.priceCents !== undefined && {
+          priceCents: parsed.data.priceCents,
+        }),
+        ...(parsed.data.isAvailable !== undefined && {
+          isAvailable: parsed.data.isAvailable,
+        }),
       })
       .where(
         and(
@@ -557,7 +622,9 @@ router.delete(
       .where(eq(restaurantsTable.ownerProfileId, profile.id))
       .limit(1);
     if (!restaurant) {
-      res.status(404).json({ error: "Restaurant profile has not been created" });
+      res
+        .status(404)
+        .json({ error: "Restaurant profile has not been created" });
       return;
     }
     const [item] = await db

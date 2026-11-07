@@ -363,6 +363,11 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     assert.equal((await api(path,ids.customer,"PATCH",{modifierGroups:groups})).status,403);
     assert.equal((await api(path,ids.restaurant,"PATCH",{modifierGroups:[{...groups[0],minSelections:3}]})).status,400);
     assert.equal((await api(path,ids.restaurant,"PATCH",{modifierGroups:groups})).status,200);
+    for(const [endpoint,user] of [[`/restaurants/${ids.business}`,null],['/restaurants/me',ids.restaurant]] as const){
+      const menu=await api(endpoint,user);assert.equal(menu.status,200);
+      assert.deepEqual(menu.data.categories.flatMap((c:any)=>c.items).find((i:any)=>i.id===ids.item).modifierGroups,groups);
+    }
+
     const body={...input(),items:[{menuItemId:ids.item,quantity:2,modifiers:{size:["large"],extras:["cheese"]},priceCents:1}]};
     for(const modifiers of [{},{size:["large","small"]},{size:["large","large"]},{size:["bogus"]},{size:["large"],foreign:["cheese"]}]) {
       assert.equal((await api("/orders/quote",ids.customer,"POST",{...body,items:[{...body.items[0],modifiers}]})).status,400);
@@ -377,7 +382,76 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     const [preserved]=await db.select().from(orderItemsTable).where(eq(orderItemsTable.id,line.id));
     assert.deepEqual(preserved.modifierSnapshot,line.modifierSnapshot);
   });
+  await t.test("inventory aggregates customizations, prevents overselling and restores only unaccepted cancellations",async()=>{
+    const list='/restaurants/me/inventory',path=`${list}/${ids.item}`;
+    const stock=async()=>(await api(list,ids.restaurant)).data.find((i:any)=>i.id===ids.item);
+    const adjust=async(stockOnHand:number|null)=>{const item=await stock();const result=await api(path,ids.restaurant,'PUT',{stockOnHand,expectedRevision:item.revision,reason:'Test stock receipt adjustment'});assert.equal(result.status,200,JSON.stringify(result.data));return result.data;};
+    assert.equal((await api(list,ids.customer)).status,403);
+    assert.equal((await api(path,ids.customer,'PUT',{stockOnHand:3,expectedRevision:0,reason:'Forbidden adjustment'})).status,403);
+    const initial=await stock();assert.equal(initial.stockOnHand,null);
+    for(const stockOnHand of [-1,1.5,1000001,'2'])assert.equal((await api(path,ids.restaurant,'PUT',{stockOnHand,expectedRevision:initial.revision,reason:'Invalid stock range'})).status,400);
+    assert.equal((await api(`${list}/${randomUUID()}`,ids.restaurant,'PUT',{stockOnHand:3,expectedRevision:0,reason:'Missing item inventory'})).status,404);
+    const orders:string[]=[];
+    try{
+      const adjusted=await adjust(3);
+      await engine.exec(`CREATE FUNCTION inventory_test_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected inventory rollback'; END $$; CREATE TRIGGER inventory_test_failure BEFORE INSERT ON order_items FOR EACH ROW EXECUTE FUNCTION inventory_test_failure();`);
+      try {
+        const quote=await api('/orders/quote',ids.customer,'POST',input());
+        const failed=await api('/orders',ids.customer,'POST',{...input(),expectedTotalCents:quote.data.totalCents},randomUUID());
+        assert.equal(failed.status,500);assert.equal((await stock()).stockOnHand,3);
+        assert.equal((await stock()).revision,adjusted.revision);
+      } finally { await engine.exec('DROP TRIGGER inventory_test_failure ON order_items; DROP FUNCTION inventory_test_failure();'); }
+
+      assert.equal((await api(path,ids.restaurant,'PUT',{stockOnHand:20,expectedRevision:initial.revision,reason:'Stale stock adjustment'})).status,409);
+      const duplicateLines={...input(),items:[{menuItemId:ids.item,quantity:2,specialInstructions:'First customization'},{menuItemId:ids.item,quantity:2,specialInstructions:'Second customization'}]};
+      assert.equal((await api('/orders/quote',ids.customer,'POST',duplicateLines)).status,409);
+      const quote=await api('/orders/quote',ids.customer,'POST',input());assert.equal(quote.status,200);
+      const body={...input(),expectedTotalCents:quote.data.totalCents},keys=[randomUUID(),randomUUID()];
+      const results=await Promise.all(keys.map(key=>api('/orders',ids.customer,'POST',body,key)));
+      assert.deepEqual(results.map(r=>r.status).sort(),[201,409]);
+      const winner=results.findIndex(r=>r.status===201),order=results[winner].data;orders.push(order.id);
+      assert.equal((await stock()).stockOnHand,1);
+      const lines=await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId,order.id));assert.equal(lines[0].inventoryDeducted,2);
+      assert.equal((await api('/orders',ids.customer,'POST',body,keys[winner])).status,200);assert.equal((await stock()).stockOnHand,1);
+      assert.equal((await api(path,ids.restaurant,'PUT',{stockOnHand:10,expectedRevision:adjusted.revision,reason:'Cannot overwrite new reservation'})).status,409);
+      const cancellations=await Promise.all([api(`/orders/${order.id}/cancel`,ids.customer,'POST',{reason:'Return stock before acceptance'}),api(`/orders/${order.id}/cancel`,ids.customer,'POST',{reason:'Return stock before acceptance'})]);
+      assert.deepEqual(cancellations.map(r=>r.status),[200,200]);assert.equal((await stock()).stockOnHand,3);orders.length=0;
+      const audits=await db.select().from(auditLogsTable).where(eq(auditLogsTable.resourceId,order.id));assert.equal(audits.filter(a=>a.action==='inventory.released').length,1);
+      const sameKey=randomUUID();
+      const repeats=await Promise.all([api('/orders',ids.customer,'POST',body,sameKey),api('/orders',ids.customer,'POST',body,sameKey)]);
+      assert.deepEqual(repeats.map(r=>r.status).sort(),[200,201]);assert.equal((await stock()).stockOnHand,1);
+      orders.push(repeats[0].data.id);
+      await pay(orders[0]);assert.equal((await api(`/orders/${orders[0]}`,ids.restaurant,'PATCH',{status:'accepted'})).status,200);
+      assert.equal((await api(`/orders/${orders[0]}/cancel`,ids.restaurant,'POST',{reason:'Prepared ingredients cannot be automatically returned'})).status,200);
+      assert.equal((await stock()).stockOnHand,1);orders.length=0;
+      await adjust(0);
+      const menu=(await api(`/restaurants/${ids.business}`,null)).data;
+      assert.equal(menu.categories.flatMap((c:any)=>c.items).find((i:any)=>i.id===ids.item).isAvailable,false);
+      assert.equal((await api('/orders/quote',ids.customer,'POST',input())).status,409);
+      await adjust(null);
+      const unlimited=await create();orders.push(unlimited.id);
+      assert.equal((await stock()).stockOnHand,null);
+      await adjust(5);
+      await api(`/orders/${unlimited.id}/cancel`,ids.customer,'POST',{reason:'Untracked original order has no stock deduction'});orders.length=0;
+      assert.equal((await stock()).stockOnHand,5);
+      const providerOrder=await create();orders.push(providerOrder.id);assert.equal((await stock()).stockOnHand,3);
+      await db.update(paymentsTable).set({provider:'stripe_test'}).where(eq(paymentsTable.orderId,providerOrder.id));
+      const actor=(await db.select().from(profilesTable).where(eq(profilesTable.id,ids.customer)))[0];
+      const {requestProviderCancellation}=await import('../src/lib/financial-operations');
+      await requestProviderCancellation(providerOrder.id,actor,'Durable provider cancellation returns reserved inventory');
+      await requestProviderCancellation(providerOrder.id,actor,'Idempotent provider cancellation');
+      assert.equal((await stock()).stockOnHand,5);orders.length=0;
+      await processFinancialOperation(async(job:any)=>{assert.equal(job.id,`expire:${providerOrder.id}`);return {status:'expired'};});
+      await assert.rejects(engine.exec(`UPDATE menu_items SET stock_on_hand=-1 WHERE id='${ids.item}'`));
+    }finally{
+      for(const id of orders)await api(`/orders/${id}/cancel`,ids.admin,'POST',{reason:'End inventory verification'});
+      await adjust(null);
+    }
+  });
   await t.test("anonymous and wrong-role requests are rejected", async () => {
+    assert.equal((await api('/restaurants/me',null)).status,401);
+    assert.equal((await api('/restaurants/me',ids.customer)).status,403);
+
     assert.equal((await api("/driver/offers", null)).status, 401);
     assert.equal(
       (

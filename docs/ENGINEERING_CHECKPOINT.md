@@ -438,3 +438,36 @@ preservation for older clients, pickup/cancellation release, audits and safe low
 Production build/typechecks passed. Dispatch revision 17601d9 passed PostgreSQL/restore/
 container validation and unsigned Android/iOS CI (42348386135, 42348385949; PR validation
 42348381663 also passed). Arrival and this revision require their own CI review.
+
+## Item inventory and working restaurant menus — November 7
+
+Migration 0019 adds optional available stock, monotonic stock revision and per-order-line
+inventory deductions, with database bounds. Owner inventory APIs and forms support
+reasoned, optimistic updates. Checkout aggregates customizations/instructions by item,
+locks stock rows in ID order, checks availability and deducts once with the order.
+Before-acceptance cancellation restores only deducted tracked units once, in sandbox
+and durable Stripe-test paths. Accepted food requires manual stock adjustment; payment
+decline alone retains reservations until cancellation. Item units only, no ingredient
+inventory. Unlimited/legacy items retain their existing behavior.
+
+Fixed two existing functional defects exposed by broader menu tests: public restaurant
+lookup shadowed GET `/restaurants/me`, and menu projections dropped modifier groups.
+The authenticated owner route now resolves and both menu views expose real choices.
+Inventory and dispatch forms preserve stale observation tokens/errors through polling
+and require explicit refresh after conflicts instead of silently adopting new values.
+
+79 local automated tests passed (50 relational tests including parent), with injected
+stock-write rollback, concurrent final units, same-key retries, aggregate customization
+limits, revision conflicts, zero-stock listing, tracked/untracked cancellation rules,
+and provider cancellation/expiry fixtures. Production build/typechecks passed.
+Chromium at 390x844 passed actual-component stock/assignment saves, retained conflicts,
+explicit refresh, eligible-driver choices, release, no horizontal overflow and no
+application errors. Browser APIs/accounts are explicitly simulated; not Clerk/provider
+or physical-device verification. Reproduce via `node artifacts/api-server/tests/build-operations-browser.mjs /tmp/rocoeats-operations-browser`,
+then with Playwright installed outside the project, set ROCOEATS_PLAYWRIGHT_MODULE to
+its index.mjs and run `node artifacts/api-server/tests/verify-operations-browser.mjs /tmp/rocoeats-operations-browser`.
+Arrival revision a31313d passed PostgreSQL/restore/container and unsigned native CI.
+Capacity revision 6aacb47 passed PostgreSQL/restore/container and unsigned Android/iOS CI (42348754164, 42348754244).
+Check this revision's own CI after push. Remaining priorities: unattended reservation
+expiry/acceptance/dispatch escalation, then partial refunds/disputes/reconciliation,
+configured staging and real-provider/device release requirements described above.

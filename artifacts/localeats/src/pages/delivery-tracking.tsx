@@ -243,20 +243,25 @@ function AssignmentControls({
 }) {
   const [driverId, setDriverId] = useState(order.driverProfileId ?? "");
   const [reason, setReason] = useState("");
+  const [observed, setObserved] = useState(order);
   const client = useQueryClient();
   const mutation = useMutation({
     mutationFn: () =>
-      customFetch(`/api/admin/orders/${order.orderId}/assignment`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          driverProfileId: driverId || null,
-          expectedDriverProfileId: order.driverProfileId,
-          expectedAssignedAt: order.assignedAt,
-          reason,
-        }),
-      }),
-    onSuccess: () => {
+      customFetch<AssignmentOrder>(
+        `/api/admin/orders/${order.orderId}/assignment`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            driverProfileId: driverId || null,
+            expectedDriverProfileId: observed.driverProfileId,
+            expectedAssignedAt: observed.assignedAt,
+            reason,
+          }),
+        },
+      ),
+    onSuccess: (updated) => {
+      setObserved(updated);
       setReason("");
     },
     onSettled: () => {
@@ -319,6 +324,25 @@ function AssignmentControls({
             : "Release assignment"}
       </button>
       {mutation.error && <p role="alert">{mutation.error.message}</p>}
+      {(observed.driverProfileId !== order.driverProfileId ||
+        observed.assignedAt !== order.assignedAt) && (
+        <p role="status">
+          Assignment changed. Refresh values before another dispatch change.
+        </p>
+      )}
+      <button
+        type="button"
+        className="roco-button"
+        disabled={mutation.isPending}
+        onClick={() => {
+          setObserved(order);
+          setDriverId(order.driverProfileId ?? "");
+          setReason("");
+          mutation.reset();
+        }}
+      >
+        Refresh assignment values
+      </button>
       {mutation.isSuccess && <p role="status">Assignment updated.</p>}
       <p className="roco-meta">
         Only online, approved drivers without another delivery are eligible.
@@ -394,7 +418,7 @@ export function DispatchOperations() {
           <p className="roco-meta">{order.orderId}</p>
           {order.status === "ready_for_pickup" && (
             <AssignmentControls
-              key={`${order.orderId}:${order.driverProfileId}:${order.assignedAt}`}
+              key={order.orderId}
               order={order}
               drivers={dispatch.data?.drivers ?? []}
             />

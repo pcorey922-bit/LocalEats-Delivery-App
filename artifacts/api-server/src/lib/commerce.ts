@@ -1,3 +1,4 @@
+import { restoreUnacceptedInventory } from "./inventory";
 import {
   journalPayment,
   journalAllocation,
@@ -503,6 +504,11 @@ export async function cancelOrRefundOrder(
         .set({ status: "failed" })
         .where(eq(paymentsTable.id, payment.id));
     if (order.status !== "cancelled" && order.status !== "delivered") {
+      const restored = await restoreUnacceptedInventory(tx, order);
+      if (restored.length)
+        await audit(tx, actor.id, "inventory.released", orderId, {
+          items: restored,
+        });
       await tx
         .update(ordersTable)
         .set({ status: "cancelled" })
