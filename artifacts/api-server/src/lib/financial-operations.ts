@@ -1,6 +1,7 @@
 import { databaseNow } from "./database-clock";
 import { alias } from "drizzle-orm/pg-core";
 import { restoreUnacceptedInventory } from "./inventory";
+import { expireReservation } from "./reservation-expiry";
 import {
   requirePaymentJournal,
   journalTransfer,
@@ -60,6 +61,11 @@ export async function requestProviderCheckout(orderId: string, actor: Profile) {
     if (!order) throw new CommerceError(404, "Order not found");
     if (order.customerProfileId !== actor.id && actor.role !== "admin")
       throw new CommerceError(403, "You cannot access this checkout");
+    if (await expireReservation(tx, order))
+      return {
+        expired: true,
+        error: "Reservation expired. Start a new order.",
+      };
     if (order.status !== "placed")
       throw new CommerceError(409, "Order cannot enter checkout");
     const [payment] = await tx

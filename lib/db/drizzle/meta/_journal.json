@@ -141,6 +141,13 @@
       "when": 1794022000000,
       "tag": "0019_menu_inventory",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794023000000,
+      "tag": "0020_order_reservation_expiry",
+      "breakpoints": true
     }
   ]
 }

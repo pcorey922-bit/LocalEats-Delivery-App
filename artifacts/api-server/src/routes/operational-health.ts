@@ -34,7 +34,7 @@ export const readiness: RequestHandler = async (_req, res) => {
           workerHeartbeatsTable.lastSuccessAt,
         ),
       );
-    const workerReady = ["finance", "webhooks", "onboarding", "push"].every(
+    const workerReady = ["finance", "webhooks", "onboarding", "push", "orders"].every(
       (component) => workers.some((w) => w.component === component),
     );
     const authReady = Boolean(

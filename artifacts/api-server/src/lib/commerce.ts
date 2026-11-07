@@ -1,4 +1,5 @@
 import { restoreUnacceptedInventory } from "./inventory";
+import { expireReservation } from "./reservation-expiry";
 import {
   journalPayment,
   journalAllocation,
@@ -142,6 +143,7 @@ export async function recordPayment(
       throw new CommerceError(409, "Different payment already recorded");
     return;
   }
+  await expireReservation(tx, order);
   await journalPayment(tx, orderId, amount);
   await tx
     .update(paymentsTable)

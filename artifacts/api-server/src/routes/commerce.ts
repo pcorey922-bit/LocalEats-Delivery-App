@@ -1,4 +1,5 @@
 import { restaurantCapacity } from "../lib/restaurant-availability";
+import { expireReservation } from "../lib/reservation-expiry";
 import { driverDutyLocationsTable } from "@workspace/db";
 import {
   orderingEnabled,
@@ -89,13 +90,10 @@ router.post("/orders/:orderId/checkout", requireAuth, async (req, res) => {
   requireOrderingEnabled();
   const mode = requirePaymentProvider();
   if (mode === "stripe_test") {
-    res
-      .status(202)
-      .json(
-        await (
-          await import("../lib/financial-operations")
-        ).requestProviderCheckout(owned.order.id, owned.profile),
-      );
+    const result = await (
+      await import("../lib/financial-operations")
+    ).requestProviderCheckout(owned.order.id, owned.profile);
+    res.status("expired" in result ? 410 : 202).json(result);
     return;
   }
   const result = await db.transaction(async (tx) => {
@@ -105,6 +103,11 @@ router.post("/orders/:orderId/checkout", requireAuth, async (req, res) => {
       .where(eq(ordersTable.id, owned.order.id))
       .for("update")
       .limit(1);
+    if (await expireReservation(tx, order))
+      return {
+        expired: true,
+        error: "Reservation expired. Start a new order.",
+      };
     if (order.status !== "placed")
       throw new CommerceError(
         409,
@@ -152,7 +155,7 @@ router.post("/orders/:orderId/checkout", requireAuth, async (req, res) => {
     });
     return { mode, sessionId: session.id, url: session.url, testMode: true };
   });
-  res.json(result);
+  res.status("expired" in result ? 410 : 200).json(result);
 });
 router.post(
   "/orders/:orderId/sandbox-payment",
@@ -167,13 +170,14 @@ router.post(
       .object({ outcome: z.enum(["succeeded", "declined"]) })
       .strict()
       .parse(req.body);
-    await db.transaction(async (tx) => {
+    const expired = await db.transaction(async (tx) => {
       const [order] = await tx
         .select()
         .from(ordersTable)
         .where(eq(ordersTable.id, owned.order.id))
         .for("update")
         .limit(1);
+      if (await expireReservation(tx, order)) return true;
       const [payment] = await tx
         .select()
         .from(paymentsTable)
@@ -195,7 +199,14 @@ router.post(
         );
       else if (payment.status !== "succeeded")
         await audit(tx, owned.profile.id, "sandbox.card_declined", order.id);
+      return false;
     });
+    if (expired) {
+      res
+        .status(410)
+        .json({ error: "Reservation expired. Start a new order." });
+      return;
+    }
     if (outcome === "declined") {
       res.status(402).json({
         error: "Sandbox card declined. No money moved.",
@@ -229,7 +240,12 @@ router.get("/orders/:orderId/payment", requireAuth, async (req, res) => {
     .from(refundsTable)
     .where(eq(refundsTable.orderId, owned.order.id))
     .limit(1);
-  res.json({ testMode: true, payment, refund: refund ?? null });
+  res.json({
+    testMode: true,
+    reservationExpiresAt: owned.order.reservationExpiresAt,
+    payment,
+    refund: refund ?? null,
+  });
 });
 router.get("/restaurants/:restaurantId/availability", async (req, res) => {
   const id = uuid.parse(req.params.restaurantId);

@@ -1,3 +1,5 @@
+import { processReservationExpiry } from "../src/lib/reservation-expiry";
+import { recordPayment } from "../src/lib/commerce";
 import { pruneDutyLocations } from "../src/lib/duty-location";
 import assert from "node:assert/strict";
 import { before, after, test } from "node:test";
@@ -2569,6 +2571,48 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     // native timestamp microseconds and invalidate a legitimate byte-level check.
     assert.notEqual(await fingerprint(`UPDATE profiles SET display_name='Recovery fingerprint probe' WHERE id='${ids.other}';`),before);
     assert.equal(await fingerprint(),before);
+  });
+
+  await t.test("unpaid reservations release stock once under competing workers, checkout and cancellation",async()=>{
+    await db.update(menuItemsTable).set({stockOnHand:4}).where(eq(menuItemsTable.id,ids.item));
+    const order=await create();
+    try{
+      await db.update(ordersTable).set({reservationExpiresAt:new Date(0)}).where(eq(ordersTable.id,order.id));
+      const outcomes=await Promise.all([processReservationExpiry(),processReservationExpiry()]);
+      assert.equal(outcomes.filter(Boolean).length,1);
+      const [item]=await db.select().from(menuItemsTable).where(eq(menuItemsTable.id,ids.item));assert.equal(item.stockOnHand,4);
+      const [current]=await db.select().from(ordersTable).where(eq(ordersTable.id,order.id));assert.equal(current.status,'cancelled');
+      assert.equal((await api(`/orders/${order.id}/checkout`,ids.customer,'POST')).status,409);
+      assert.equal((await api(`/orders/${order.id}/cancel`,ids.customer,'POST',{reason:'Repeated expiry cancellation'})).status,200);
+      const after=(await db.select().from(menuItemsTable).where(eq(menuItemsTable.id,ids.item)))[0];assert.equal(after.stockOnHand,4);
+      const events=await db.select().from(orderEventsTable).where(eq(orderEventsTable.orderId,order.id));assert.equal(events.filter(e=>e.note==='Unpaid reservation expired').length,1);
+      const audits=await db.select().from(auditLogsTable).where(eq(auditLogsTable.resourceId,order.id));assert.equal(audits.filter(a=>a.action==='order.reservation_expired').length,1);
+      const second=await create();await db.update(ordersTable).set({reservationExpiresAt:new Date(0)}).where(eq(ordersTable.id,second.id));
+      assert.equal((await api(`/orders/${second.id}/checkout`,ids.customer,'POST')).status,410);
+      assert.equal((await db.select().from(menuItemsTable).where(eq(menuItemsTable.id,ids.item)))[0].stockOnHand,4);
+    }finally{await db.update(menuItemsTable).set({stockOnHand:null}).where(eq(menuItemsTable.id,ids.item));}
+  });
+  await t.test("confirmed payments survive reservation expiry; late Stripe payment stays cancelled and queues refund",async()=>{
+    const paid=await create();await pay(paid.id);
+    await db.update(ordersTable).set({reservationExpiresAt:new Date(0)}).where(eq(ordersTable.id,paid.id));
+    await processReservationExpiry();
+    assert.equal((await db.select().from(ordersTable).where(eq(ordersTable.id,paid.id)))[0].status,'placed');
+    await api(`/orders/${paid.id}/cancel`,ids.customer,'POST',{reason:'End paid reservation check'});
+    await db.update(menuItemsTable).set({stockOnHand:4}).where(eq(menuItemsTable.id,ids.item));
+    const late=await create();
+    try{
+      await db.update(paymentsTable).set({provider:'stripe_test'}).where(eq(paymentsTable.orderId,late.id));
+      await db.update(ordersTable).set({reservationExpiresAt:new Date(0)}).where(eq(ordersTable.id,late.id));
+      process.env.PAYMENT_PROVIDER='stripe_test';process.env.STRIPE_SECRET_KEY='sk_test_fixture';
+      await Promise.all([processReservationExpiry(),db.transaction(tx=>recordPayment(tx,late.id,`pi_late_${late.id}`,late.totalCents,'usd'))]);
+      const [current]=await db.select().from(ordersTable).where(eq(ordersTable.id,late.id));assert.equal(current.status,'cancelled');
+      assert.equal((await db.select().from(menuItemsTable).where(eq(menuItemsTable.id,ids.item)))[0].stockOnHand,4);
+      const refunds=await db.select().from(refundsTable).where(eq(refundsTable.orderId,late.id));assert.equal(refunds.length,1);assert.equal(refunds[0].amountCents,late.totalCents);
+      const ops=await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.orderId,late.id));assert.equal(ops.filter(o=>o.kind==='refund').length,1);
+      const events=await db.select().from(orderEventsTable).where(eq(orderEventsTable.orderId,late.id));assert.equal(events.filter(e=>e.toStatus==='cancelled').length,1);
+      await db.transaction(tx=>recordPayment(tx,late.id,`pi_late_${late.id}`,late.totalCents,'usd'));
+      assert.equal((await db.select().from(menuItemsTable).where(eq(menuItemsTable.id,ids.item)))[0].stockOnHand,4);
+    }finally{process.env.PAYMENT_PROVIDER='sandbox';delete process.env.STRIPE_SECRET_KEY;await db.update(menuItemsTable).set({stockOnHand:null}).where(eq(menuItemsTable.id,ids.item));}
   });
 
 });

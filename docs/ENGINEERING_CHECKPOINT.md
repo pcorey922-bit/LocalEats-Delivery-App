@@ -483,3 +483,23 @@ changes or purchases. The latest application implementation is 2fa9064; its loca
 79-test/build/browser/audit checks passed. Its real PostgreSQL tests, backup/restore
 and build had passed while container validation was still running. Confirm the final
 Validate and unsigned native results for this and subsequent configuration revisions.
+
+## Unpaid reservation expiry — November 7 continuation
+
+Migration 0020 gives existing/new orders a persisted 15-minute unpaid reservation
+window. The orders worker expires due unpaid orders with SKIP LOCKED and the same
+order lock as payment/cancellation/fulfillment. Stock return, cancellation event,
+audit, notifications and Stripe checkout-expiration job commit together; no provider
+I/O occurs inside this transaction. Checkout attempts on a newly expired reservation
+return 410. Paid orders do not expire. A valid late Stripe confirmation atomically
+expires the reservation first, keeps it cancelled and queues the existing full-refund
+recovery. Invalid provider amounts cannot trigger expiry through payment recording.
+The worker remains enabled while the ordering gate is closed and participates in
+readiness. Customer checkout discloses the reservation window.
+
+81 tests and production build/typechecks passed locally, including competing workers,
+checkout/cancel retries, exactly-once stock recovery, paid-order preservation and
+late-payment races. PGlite/test-only identity/provider adapters were used; verify
+this commit's real PostgreSQL/restore/container CI after push. Source 7cd193d passed
+all PostgreSQL/container and unsigned native checks. Next: configurable timing,
+restaurant/dispatch escalation, recovery and financial partial-refund work.

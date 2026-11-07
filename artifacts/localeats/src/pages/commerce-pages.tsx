@@ -120,6 +120,11 @@ export function CheckoutPanel({
   );
   return (
     <section aria-label="Secure payment">
+      <p>
+        Unpaid reservations expire after 15 minutes and release their stock. An
+        expired order cannot resume; start a new order. Late payments require
+        refund recovery.
+      </p>
       <button
         className="roco-button primary"
         disabled={

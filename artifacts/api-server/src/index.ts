@@ -1,4 +1,5 @@
 import { pruneDutyLocations } from "./lib/duty-location";
+import { processReservationExpiry } from "./lib/reservation-expiry";
 import { randomUUID } from "node:crypto";
 import { lt } from "drizzle-orm";
 import {
@@ -49,6 +50,12 @@ function worker(
   });
 }
 const loops = [
+  worker("orders",15000,async(stopping,progress)=>{
+    for(let i=0;i<50 && !stopping();i++){
+      if(!(await processReservationExpiry()))break;
+      await progress();
+    }
+  }),
   worker("webhooks", 2000, async (stopping, progress) => {
     if (paymentMode() !== "stripe_test") return;
     for (let i = 0; i < 20 && !stopping(); i++) {
