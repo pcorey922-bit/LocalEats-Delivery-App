@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
+import { SupportThread } from "./support-thread";
 type Case = {
   id: string;
   orderId: string | null;
@@ -111,6 +112,7 @@ export function SupportDesk({ orderId }: { orderId?: string }) {
                   </strong>
                   <p>{c.message}</p>
                   {c.resolution && <p>Operations response: {c.resolution}</p>}
+                  <SupportThread caseId={c.id}/>
                 </article>
               ))
           )}
@@ -152,6 +154,7 @@ function SupportReview({
       </p>
       <p>{entry.message}</p>
       {entry.resolution && <p>Previous response: {entry.resolution}</p>}
+      <SupportThread caseId={entry.id}/>
       <label>
         Status
         <select

@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { z } from "zod";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { eq, desc, and } from "drizzle-orm";
 import {
   db,
   supportCasesTable,
+  supportMessagesTable,
   ordersTable,
   restaurantsTable,
   deliveriesTable,
@@ -43,12 +44,10 @@ router.post("/support/cases", requireAuth, async (req, res) => {
     .strict()
     .safeParse(req.body);
   if (!parsed.success) {
-    res
-      .status(400)
-      .json({
-        error:
-          "Enter a subject and issue details without payment or identity secrets",
-      });
+    res.status(400).json({
+      error:
+        "Enter a subject and issue details without payment or identity secrets",
+    });
     return;
   }
   const v = parsed.data;
@@ -172,6 +171,18 @@ router.patch("/admin/support/cases/:id", requireAuth, async (req, res) => {
       status: updated.status,
       version: updated.version,
     });
+    await tx
+      .insert(supportMessagesTable)
+      .values({
+        id: randomUUID(),
+        caseId: id,
+        authorProfileId: p.id,
+        authorRole: p.role,
+        kind: "decision",
+        body: v.data.resolution,
+        caseVersion: updated.version,
+        statusAfter: updated.status,
+      });
     await tx
       .insert(notificationsTable)
       .values({

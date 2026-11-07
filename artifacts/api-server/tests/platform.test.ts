@@ -1,3 +1,4 @@
+import { reconcileDispute, reconcilePayment } from "../src/lib/financial-holds";
 import { processStripeEvent } from "../src/routes/payment-webhook";
 import { processOrderTiming } from "../src/lib/order-timing";
 import { processReservationExpiry } from "../src/lib/reservation-expiry";
@@ -23,6 +24,10 @@ import {
   orderEventsTable,
   orderIncidentsTable,
   partialRefundsTable,
+  financialHoldsTable,
+  providerBalanceEntriesTable,
+  supportMessagesTable,
+  supportCasesTable,
   orderItemsTable,
   paymentsTable,
   notificationsTable,
@@ -48,7 +53,7 @@ import { testPricing } from "../src/lib/testing/pricing";
 import { fanOutPushNotifications, processPushDelivery } from "../src/lib/push";
 import { processWebhookInbox } from "../src/lib/webhook-worker";
 import { processPayoutProvisioning } from "../src/lib/payout-onboarding";
-import { processFinancialOperation } from "../src/lib/financial-operations";
+import { processFinancialOperation, reconcileFinancialOperation } from "../src/lib/financial-operations";
 import { postJournal, journalRefund } from "../src/lib/ledger";
 const ids = {
   customer: randomUUID(),
@@ -2735,6 +2740,85 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       await processFinancialOperation(async(job)=>{assert.equal(job.id,id);return {id:`re_budget_${accepted.id}`,status:'failed'};});
       assert.equal((await api(path,ids.admin,'POST',{...accepted,id:randomUUID(),amountCents:200})).status,202);
     }finally{process.env.PAYMENT_PROVIDER='sandbox';delete process.env.STRIPE_SECRET_KEY;await api('/driver/availability',driver,'PUT',{available:false});}
+  });
+
+  await t.test("signed disputes hold outgoing funds; provider reconciliation fences stale reads and releases only verified recovery",async()=>{
+    const driver=randomUUID();await db.insert(profilesTable).values({id:driver,clerkUserId:driver,displayName:'Dispute fixture driver',role:'driver',driverApproved:true});await api('/driver/availability',driver,'PUT',{available:true});
+    const order=await create();await ready(order.id);await api(`/driver/orders/${order.id}/claim`,driver,'POST');await api(`/driver/orders/${order.id}/pickup`,driver,'POST');const code=await api(`/orders/${order.id}/delivery-code`,ids.customer,'POST');await api(`/driver/orders/${order.id}/deliver`,driver,'POST',{code:code.data.code});
+    const pi=`pi_dispute_${order.id}`,dp=`dp_${order.id}`,holdId=`dispute:${dp}`;await db.update(paymentsTable).set({provider:'stripe_test',providerPaymentId:pi}).where(eq(paymentsTable.orderId,order.id));
+    process.env.PAYMENT_PROVIDER='stripe_test';process.env.STRIPE_SECRET_KEY='sk_test_fixture';process.env.STRIPE_WEBHOOK_SECRET='whsec_fixture';
+    const [actor]=await db.select().from(profilesTable).where(eq(profilesTable.id,ids.admin));
+    const request={id:randomUUID(),amountCents:250,fundingPolicy:'platform_goodwill_v1',reason:'Pending credit before dispute receipt'},path=`/admin/orders/${order.id}/partial-refunds`;
+    const event=(id:string,status:string,created:number)=>({id,type:'charge.dispute.updated',created,livemode:false,data:{object:{id:dp,object:'dispute',payment_intent:pi,amount:1000,currency:'usd',livemode:false,status}}} as any);
+    const now=Math.floor(Date.now()/1000),received=event(`evt_${dp}`,'needs_response',now),stripe=new Stripe('sk_test_fixture');
+    const withdrawal={id:`txn_withdraw_${dp}`,sourceId:dp,kind:'adjustment',amountCents:-1000,feeCents:15,netCents:-1015,currency:'usd' as const,status:'available' as const},reinstatement={id:`txn_return_${dp}`,sourceId:dp,kind:'adjustment',amountCents:1000,feeCents:0,netCents:1000,currency:'usd' as const,status:'available' as const};
+    const proof={id:dp,paymentId:pi,amountCents:1000,currency:'usd',status:'won',livemode:false,balances:[withdrawal,reinstatement]};
+    try{
+      assert.equal((await api(path,ids.admin,'POST',request)).status,202);
+      const payload=JSON.stringify(received),response=await fetch(`${origin}/api/webhooks/stripe`,{method:'POST',headers:{'content-type':'application/json','stripe-signature':stripe.webhooks.generateTestHeaderString({payload,secret:'whsec_fixture'})},body:payload});assert.equal(response.status,202);await processWebhookInbox();
+      assert.equal((await api('/admin/financial-holds',ids.driver)).status,403);
+      let hold=(await db.select().from(financialHoldsTable).where(eq(financialHoldsTable.id,holdId)))[0];assert.equal(hold.active,true);
+      await processStripeEvent(received);await processStripeEvent(event('evt_dispute_old','under_review',now-10));
+      assert.equal((await db.select().from(financialHoldsTable).where(eq(financialHoldsTable.id,holdId)))[0].version,hold.version);
+      assert.equal((await api(path,ids.admin,'POST',{...request,id:randomUUID()})).status,409);
+      const [payout]=await db.select().from(payoutsTable).where(eq(payoutsTable.orderId,order.id));assert.equal((await api(`/admin/payouts/${payout.id}/transfer`,ids.admin,'POST')).status,409);
+      let attemptedHeld=false;await processFinancialOperation(async job=>{if(job.id===`partial_refund:${request.id}`)attemptedHeld=true;throw new Error('Unrelated fixture work retains retry state');});assert.equal(attemptedHeld,false);
+      assert.equal((await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.id,`partial_refund:${request.id}`)))[0].attempts,0);
+      const heldJobId=`partial_refund:${request.id}`;
+      await db.update(financialOperationsTable).set({state:'processing',firstAttemptAt:new Date(Date.now()-1000),leaseExpiresAt:new Date(0),leaseToken:randomUUID(),attempts:1}).where(eq(financialOperationsTable.id,heldJobId));
+      await reconcileFinancialOperation(heldJobId,actor,async job=>{assert.equal(job.id,heldJobId);return {id:`re_after_hold_${request.id}`,status:'pending'};});
+      assert.equal((await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.id,heldJobId)))[0].state,'pending');
+      assert.equal((await db.select().from(financialHoldsTable).where(eq(financialHoldsTable.id,holdId)))[0].active,true);
+
+      let release!:()=>void,started!:()=>void;const gate=new Promise<void>(r=>release=r),reading=new Promise<void>(r=>started=r);
+      const pending=reconcileDispute(holdId,actor,'Provider evidence review with concurrent update',async()=>{started();await gate;return proof;});await reading;
+      await processStripeEvent(event('evt_dispute_new','under_review',now+1));release();await assert.rejects(()=>pending,/changed during/);
+      assert.equal((await db.select().from(providerBalanceEntriesTable).where(eq(providerBalanceEntriesTable.orderId,order.id))).length,0);
+      await assert.rejects(()=>reconcileDispute(holdId,actor,'Reject mismatched evidence',async()=>({...proof,currency:'eur'})));
+      const lost=await reconcileDispute(holdId,actor,'Record settled loss while owner reviews',async()=>({...proof,status:'lost',balances:[withdrawal]}));assert.equal(lost.active,true);
+      const won=await reconcileDispute(holdId,actor,'Verify settled withdrawal and reinstatement',async()=>proof);assert.equal(won.active,false);assert.ok(won.releasedAt);
+      await reconcileDispute(holdId,actor,'Idempotent provider evidence review',async()=>proof);
+      const balances=await db.select().from(providerBalanceEntriesTable).where(eq(providerBalanceEntriesTable.orderId,order.id));assert.equal(balances.length,2);
+      const journals=await db.select().from(ledgerTransactionsTable).where(eq(ledgerTransactionsTable.orderId,order.id));assert.equal(journals.filter(j=>j.kind==='dispute').length,2);
+      const id=`partial_refund:${request.id}`;await db.update(financialOperationsTable).set({createdAt:new Date(0),nextAttemptAt:new Date(0)}).where(eq(financialOperationsTable.id,id));
+      await processFinancialOperation(async job=>{assert.equal(job.id,id);return{id:`re_after_hold_${request.id}`,status:'succeeded'};});assert.equal((await db.select().from(partialRefundsTable).where(eq(partialRefundsTable.id,request.id)))[0].status,'succeeded');
+    }finally{process.env.PAYMENT_PROVIDER='sandbox';delete process.env.STRIPE_SECRET_KEY;delete process.env.STRIPE_WEBHOOK_SECRET;await api('/driver/availability',driver,'PUT',{available:false});}
+  });
+  await t.test("verified charge reconciliation records exact immutable fee/net evidence without provider I/O locks",async()=>{
+    const order=await create();await pay(order.id);const pi=`pi_reconcile_${order.id}`,ch=`ch_${order.id}`,id=`txn_charge_${order.id}`;
+    await db.update(paymentsTable).set({provider:'stripe_test',providerPaymentId:pi}).where(eq(paymentsTable.orderId,order.id));
+    const [actor]=await db.select().from(profilesTable).where(eq(profilesTable.id,ids.admin));
+    const proof={id:pi,amountReceived:order.totalCents,currency:'usd',livemode:false,status:'succeeded',chargeId:ch,chargePaymentId:pi,chargeAmount:order.totalCents,chargePaid:true,balance:{id,sourceId:ch,kind:'charge',amountCents:order.totalCents,feeCents:100,netCents:order.totalCents-100,currency:'usd' as const,status:'available' as const}};
+    assert.equal((await api(`/admin/orders/${order.id}/reconcile-payment`,ids.customer,'POST',{reason:'Unauthorized provider reconciliation'})).status,403);
+    for(const invalid of [{...proof,livemode:true},{...proof,amountReceived:1},{...proof,chargePaymentId:'pi_wrong'},{...proof,balance:{...proof.balance,netCents:1}},{...proof,balance:{...proof.balance,status:'pending'}}])await assert.rejects(()=>reconcilePayment(order.id,actor,'Reject inconsistent provider data',async()=>invalid as any));
+    const first=await reconcilePayment(order.id,actor,'Verify original settled charge and fees',async()=>proof);assert.equal(first.feeCents,100);assert.equal(first.netCents,order.totalCents-100);
+    await reconcilePayment(order.id,actor,'Replay original settled charge evidence',async()=>proof);
+    const entries=await db.select().from(providerBalanceEntriesTable).where(eq(providerBalanceEntriesTable.orderId,order.id));assert.equal(entries.length,1);
+    const journals=await db.select().from(ledgerTransactionsTable).where(eq(ledgerTransactionsTable.orderId,order.id));assert.equal(journals.filter(j=>j.kind==='provider_fee').length,1);
+    await assert.rejects(()=>reconcilePayment(order.id,actor,'Reject conflicting immutable fee evidence',async()=>({...proof,balance:{...proof.balance,feeCents:101,netCents:order.totalCents-101}})));
+    await assert.rejects(engine.exec(`UPDATE provider_balance_entries SET fee_cents=1 WHERE id='${id}'`));await assert.rejects(engine.exec(`DELETE FROM provider_balance_entries WHERE id='${id}'`));await assert.rejects(engine.exec('TRUNCATE provider_balance_entries'));
+  });
+
+  await t.test("support conversations preserve private append-only history, safe retries, reopening and stable pagination",async()=>{
+    const id=randomUUID(),created=await api('/support/cases',ids.customer,'POST',{id,category:'delivery',subject:'Delivery support follow up',message:'Initial private delivery issue details'});assert.equal(created.status,201);
+    const path=`/support/cases/${id}/messages`,reply={id:randomUUID(),version:1,message:'Please update the recovery plan'};
+    assert.equal((await api(path,null)).status,401);assert.equal((await api(path,ids.other)).status,404);assert.equal((await api(path,ids.driver,'POST',reply)).status,404);
+    const retries=await Promise.all([api(path,ids.customer,'POST',reply),api(path,ids.customer,'POST',reply)]);assert.deepEqual(retries.map(r=>r.status),[201,201]);
+    assert.equal((await api(path,ids.customer,'POST',{...reply,message:'Conflicting content'})).status,409);
+    const races=await Promise.all([api(path,ids.customer,'POST',{id:randomUUID(),version:2,message:'First concurrent follow up'}),api(path,ids.admin,'POST',{id:randomUUID(),version:2,message:'Operator concurrent follow up'})]);assert.deepEqual(races.map(r=>r.status).sort(),[201,409]);
+    assert.equal((await api(`/admin/support/cases/${id}`,ids.admin,'PATCH',{version:3,status:'resolved',resolution:'Operations recorded the full recovery decision'})).status,200);
+    let page=await api(path,ids.customer);assert.equal(page.data.case.status,'resolved');assert.ok(page.data.messages.some((m:any)=>m.kind==='decision'&&m.body.includes('full recovery decision')));
+    const reopened=await api(path,ids.customer,'POST',{id:randomUUID(),version:4,message:'The issue remains unresolved; please reopen'});assert.equal(reopened.status,201);
+    const [entry]=await db.select().from(supportCasesTable).where(eq(supportCasesTable.id,id));assert.equal(entry.status,'open');assert.equal(entry.resolution,null);
+    let version=reopened.data.caseVersion;
+    for(let i=0;i<31;i++){const sent=await api(path,ids.customer,'POST',{id:randomUUID(),version,message:`Pagination follow up message ${i}`});assert.equal(sent.status,201);version=sent.data.caseVersion;}
+    page=await api(path,ids.admin);assert.equal(page.status,200);assert.equal(page.data.messages.length,30);assert.ok(page.data.nextBeforeVersion);
+    const older=await api(`${path}?beforeVersion=${page.data.nextBeforeVersion}`,ids.customer);assert.equal(older.data.nextBeforeVersion,null);
+    const messages=[...older.data.messages,...page.data.messages];assert.equal(messages.length,35);assert.equal(new Set(messages.map((m:any)=>m.id)).size,35);
+    for(let i=1;i<messages.length;i++)assert.ok(messages[i].caseVersion>messages[i-1].caseVersion);
+    assert.ok(messages.some((m:any)=>m.kind==='decision'&&m.body.includes('full recovery decision')));
+    const notices=await db.select().from(notificationsTable).where(eq(notificationsTable.eventKey,`support.reply:${reply.id}`));assert.equal(notices.length,1);
+    await assert.rejects(engine.exec(`UPDATE support_messages SET body='rewritten' WHERE id='${reply.id}'`));await assert.rejects(engine.exec(`DELETE FROM support_messages WHERE id='${reply.id}'`));await assert.rejects(engine.exec('TRUNCATE support_messages'));
   });
 
 });

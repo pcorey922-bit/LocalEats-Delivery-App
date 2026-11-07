@@ -162,6 +162,20 @@
       "when": 1794025000000,
       "tag": "0022_partial_refunds",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1794026000000,
+      "tag": "0023_dispute_holds_reconciliation",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794027000000,
+      "tag": "0024_support_conversations",
+      "breakpoints": true
     }
   ]
 }

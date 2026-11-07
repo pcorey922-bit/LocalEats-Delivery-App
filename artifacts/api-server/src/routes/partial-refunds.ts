@@ -15,6 +15,7 @@ import { requirePaymentProvider } from "../lib/payment-provider";
 import { audit } from "../lib/commerce";
 import { requirePaymentJournal } from "../lib/ledger";
 import { enqueueFinancialOperation } from "../lib/finance-queue";
+import { requireNoFinancialHold } from "../lib/financial-holds";
 const router = Router();
 router.get(
   "/admin/orders/:orderId/partial-refunds",
@@ -57,6 +58,7 @@ router.post(
         .where(eq(ordersTable.id, orderId))
         .for("update");
       if (!order) throw new CommerceError(404, "Order not found");
+    await requireNoFinancialHold(tx,order.id);
       const [existing] = await tx
         .select()
         .from(partialRefundsTable)

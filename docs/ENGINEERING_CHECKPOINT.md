@@ -552,3 +552,39 @@ partial-plus-remaining-refund flow with zero final ledger balances. PostgreSQL C
 must validate this revision. Reservation b510e0b and timeout 3d784ff both passed full
 PostgreSQL/restore/container and unsigned native CI. Next: signed dispute holds,
 financial reconciliation controls and staging preparation.
+
+## Dispute holds, provider evidence and support conversations
+
+Migration 0023 records signed Stripe dispute events as versioned financial holds.
+Known holds block new payout/partial-credit requests and outgoing transfer/refund
+worker execution; safe recovery operations remain separate and held work is excluded
+from queue candidate selection. Existing provider writes cannot be undone by a hold;
+expired disputed jobs can be reconciled read-only, with state/lease/attempt fencing.
+No replacement provider write is issued by reconciliation. Provider reads occur
+outside DB transactions and are revalidated under the order lock afterward.
+
+Administrator reconciliation verifies original payment/charge/available balance
+identity, integer amount/currency and fee/net arithmetic, storing immutable balance
+evidence and balanced fee journals once. Dispute reconciliation records settled
+withdrawal/reinstatement and fee evidence; a won dispute releases only with matching
+settled recovery, and a closed warning/prevented dispute requires no balance movement.
+Lost disputes remain held. Dispute losses are recorded as platform expense pending
+owner review. Evidence submission/appeal, external-refund reconciliation, remaining
+refund fees, bank payouts and recipient-funded partial allocation remain unfinished.
+No report claims complete net profit, tax remittance or bank reconciliation.
+
+Migration 0024 adds private append-only support conversations with durable reply IDs,
+version-safe concurrent replies, stored operator decisions, requester reopening and
+stable version-based pagination. Existing current decisions are preserved from stored
+case data. Customers/restaurants/drivers can continue their own cases and admins can
+reply/review; unrelated accounts receive 404. Messages never trigger financial or
+custody actions. Generic notifications do not expose private message contents.
+
+88 local tests and production build/typechecks passed, including signed dispute
+inbox ingestion, stale event/provider-read fences, held-job filtering, loss/reinstatement
+journal replay, exact fee evidence and immutable protection; support reply privacy,
+duplicates, races, reopening, retained decisions and pagination. Tests use injected
+provider evidence and test identities; no real provider/device round trip is certified.
+Partial-refund 52d8272 passed PostgreSQL/restore/container and unsigned native CI.
+Verify this revision's own CI. Next: runnable private staging package/preflight, owner
+configuration, then external-refund/Connect bank-payout reconciliation and broader E2E.

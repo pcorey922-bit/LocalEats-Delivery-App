@@ -1,8 +1,13 @@
 import { databaseNow } from "./database-clock";
+import { requireNoFinancialHold } from "./financial-holds";
 import { alias } from "drizzle-orm/pg-core";
 import { restoreUnacceptedInventory } from "./inventory";
 import { expireReservation } from "./reservation-expiry";
-import { fullRefundAmount, applyPartialRefund, RefundReconciliationError } from "./partial-refunds";
+import {
+  fullRefundAmount,
+  applyPartialRefund,
+  RefundReconciliationError,
+} from "./partial-refunds";
 import {
   requirePaymentJournal,
   journalTransfer,
@@ -10,7 +15,17 @@ import {
   journalReversal,
 } from "./ledger";
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, lte, or, sql, notExists } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  inArray,
+  lte,
+  or,
+  sql,
+  notExists,
+  exists,
+} from "drizzle-orm";
 import {
   db,
   financialOperationsTable as operations,
@@ -19,6 +34,7 @@ import {
   payoutsTable,
   refundsTable,
   partialRefundsTable,
+  financialHoldsTable,
   connectedAccountsTable,
   restaurantsTable,
   deliveriesTable,
@@ -161,6 +177,7 @@ export async function requestProviderTransfer(
       .from(payoutsTable)
       .where(eq(payoutsTable.id, payoutId))
       .limit(1);
+    await requireNoFinancialHold(tx, order.id);
     const [payment] = await tx
       .select()
       .from(paymentsTable)
@@ -368,6 +385,7 @@ export async function requestProviderCancellation(
 async function claimOperation(): Promise<FinancialOperation | null> {
   const now = await databaseNow();
   const blocked = alias(operations, "blocked_operations");
+  const heldRunning = alias(operations, "held_running_operations");
   const candidates = await db
     .select({ orderId: operations.orderId })
     .from(operations)
@@ -375,6 +393,47 @@ async function claimOperation(): Promise<FinancialOperation | null> {
       and(
         inArray(operations.state, ["queued", "processing", "pending"]),
         lte(operations.nextAttemptAt, sql`clock_timestamp()`),
+        notExists(
+          db
+            .select({ id: heldRunning.id })
+            .from(heldRunning)
+            .where(
+              and(
+                eq(heldRunning.orderId, operations.orderId),
+                eq(heldRunning.state, "processing"),
+                inArray(heldRunning.kind, [
+                  "transfer",
+                  "refund",
+                  "partial_refund",
+                ]),
+                exists(
+                  db
+                    .select({ id: financialHoldsTable.id })
+                    .from(financialHoldsTable)
+                    .where(
+                      and(
+                        eq(financialHoldsTable.orderId, operations.orderId),
+                        eq(financialHoldsTable.active, true),
+                      ),
+                    ),
+                ),
+              ),
+            ),
+        ),
+        or(
+          inArray(operations.kind, ["checkout", "expire_checkout", "reversal"]),
+          notExists(
+            db
+              .select({ id: financialHoldsTable.id })
+              .from(financialHoldsTable)
+              .where(
+                and(
+                  eq(financialHoldsTable.orderId, operations.orderId),
+                  eq(financialHoldsTable.active, true),
+                ),
+              ),
+          ),
+        ),
         notExists(
           db
             .select({ id: blocked.id })
@@ -405,6 +464,20 @@ async function claimOperation(): Promise<FinancialOperation | null> {
         .from(operations)
         .where(eq(operations.orderId, orderId))
         .orderBy(asc(operations.createdAt));
+      const [hold] = await tx
+        .select()
+        .from(financialHoldsTable)
+        .where(
+          and(
+            eq(financialHoldsTable.orderId, orderId),
+            eq(financialHoldsTable.active, true),
+          ),
+        )
+        .limit(1);
+      const allowed = (j: FinancialOperation) =>
+        !hold || !["transfer", "refund", "partial_refund"].includes(j.kind);
+      if (jobs.some((j) => j.state === "processing" && !allowed(j)))
+        return null;
       if (jobs.some((j) => j.state === "reconciliation")) return null;
       const running = jobs.find((j) => j.state === "processing");
       if (running?.leaseExpiresAt && running.leaseExpiresAt > now) return null;
@@ -420,11 +493,13 @@ async function claimOperation(): Promise<FinancialOperation | null> {
               checkout: 4,
             }[j.kind] ?? 5);
       const job =
-        running ??
+        (running && allowed(running) ? running : undefined) ??
         jobs
           .filter(
             (j) =>
-              ["queued", "pending"].includes(j.state) && j.nextAttemptAt <= now,
+              allowed(j) &&
+              ["queued", "pending"].includes(j.state) &&
+              j.nextAttemptAt <= now,
           )
           .sort(
             (a, b) =>
@@ -595,7 +670,9 @@ export async function executeStripeOperation(
       result.amount !== Number(p.amount) ||
       result.currency !== "usd"
     )
-      throw new RefundReconciliationError("Provider refund does not match the committed request");
+      throw new RefundReconciliationError(
+        "Provider refund does not match the committed request",
+      );
     return { id: result.id, status: result.status ?? "pending" };
   }
   if (job.kind === "reversal") {
@@ -804,7 +881,8 @@ export async function processFinancialOperation(
         ? "CONFIGURATION_OR_STATE_ERROR"
         : (error as { type?: string })?.type;
     const needsReconciliation =
-      (error as {requiresReconciliation?:boolean})?.requiresReconciliation === true ||
+      (error as { requiresReconciliation?: boolean })
+        ?.requiresReconciliation === true ||
       code === "StripeIdempotencyError" ||
       (error as { statusCode?: number })?.statusCode === 500;
     await db
@@ -835,20 +913,9 @@ export async function processFinancialOperation(
 
 // Reconciliation only reads provider objects. It never creates a replacement
 // transfer/refund or resets an expired idempotency key on an unknown outcome.
-export async function reconcileFinancialOperation(id: string, actor: Profile) {
-  if (actor.role !== "admin")
-    throw new CommerceError(403, "Administrator access is required");
-  const [job] = await db
-    .select()
-    .from(operations)
-    .where(eq(operations.id, id))
-    .limit(1);
-  if (!job) throw new CommerceError(404, "Financial operation not found");
-  if (!["reconciliation", "failed"].includes(job.state))
-    throw new CommerceError(
-      409,
-      "Only held financial operations may be reconciled",
-    );
+async function readFinancialReceipt(
+  job: FinancialOperation,
+): Promise<OperationResult | undefined> {
   const stripe = stripeTest();
   let result: OperationResult | undefined;
   if (job.kind === "transfer") {
@@ -928,6 +995,51 @@ export async function reconcileFinancialOperation(id: string, actor: Profile) {
       }
     }
   }
+  return result;
+}
+export async function reconcileFinancialOperation(
+  id: string,
+  actor: Profile,
+  read: (
+    job: FinancialOperation,
+  ) => Promise<OperationResult | undefined> = readFinancialReceipt,
+) {
+  if (actor.role !== "admin")
+    throw new CommerceError(403, "Administrator access is required");
+  const [job] = await db
+    .select()
+    .from(operations)
+    .where(eq(operations.id, id))
+    .limit(1);
+  if (!job) throw new CommerceError(404, "Financial operation not found");
+  const eligible = async (
+    executor: Pick<typeof db, "select" | "execute">,
+    candidate: FinancialOperation,
+  ) => {
+    if (["reconciliation", "failed"].includes(candidate.state)) return true;
+    if (!["pending", "processing"].includes(candidate.state)) return false;
+    const [hold] = await executor
+      .select()
+      .from(financialHoldsTable)
+      .where(
+        and(
+          eq(financialHoldsTable.orderId, candidate.orderId),
+          eq(financialHoldsTable.active, true),
+        ),
+      )
+      .limit(1);
+    return (
+      !!hold &&
+      (!candidate.leaseExpiresAt ||
+        candidate.leaseExpiresAt <= (await databaseNow(executor)))
+    );
+  };
+  if (!(await eligible(db, job)))
+    throw new CommerceError(
+      409,
+      "Only held or expired disputed operations may be reconciled",
+    );
+  const result = await read(job);
   if (!result)
     throw new CommerceError(
       409,
@@ -945,7 +1057,12 @@ export async function reconcileFinancialOperation(id: string, actor: Profile) {
       .from(operations)
       .where(eq(operations.id, id))
       .limit(1);
-    if (!["reconciliation", "failed"].includes(current.state))
+    if (
+      current.state !== job.state ||
+      current.attempts !== job.attempts ||
+      current.leaseToken !== job.leaseToken ||
+      !(await eligible(tx, current))
+    )
       throw new CommerceError(
         409,
         "Operation state changed during reconciliation",

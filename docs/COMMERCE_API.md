@@ -144,3 +144,24 @@ refund only the remaining amount. The original full-refund record remains unique
 partial records are separate immutable financial requests. Receipts include
 `partialRefunds`. This policy is paid by RoCoEats and preserves restaurant/driver
 allocations and tips; recipient/tax-funded partial allocation remains unfinished.
+
+## Disputes and reconciliation
+
+Subscribe the Stripe TEST webhook to `charge.dispute.created`, `charge.dispute.updated`,
+`charge.dispute.closed`, `charge.dispute.funds_withdrawn` and
+`charge.dispute.funds_reinstated`. Known dispute holds stop new outgoing funds.
+Admin GET `/admin/financial-holds`; POST `/admin/financial-holds/:id/reconcile` with
+`{reason}` reads provider evidence and releases only verified won/recovered or closed
+no-movement warnings. Lost disputes stay held. POST `/admin/orders/:id/reconcile-payment`
+with `{reason}` verifies original charge/available balance and posts its provider fee
+once. GET `/admin/orders/:id/provider-balances` exposes recorded evidence. These are
+not bank payout confirmations. Dispute appeal/evidence submission remains in Stripe.
+
+## Support conversations
+
+Requester/admin GET `/support/cases/:id/messages?beforeVersion=N` returns 30 messages,
+current case state/version and `nextBeforeVersion`. POST the same path with
+`{id:UUID,version:integer,message:string}` (3–3000 characters) appends one private
+reply. A same-ID/body/version retry returns its existing record; stale versions or
+conflicting IDs return 409. Replies reopen resolved cases while retaining previous
+operator decisions in immutable history. The original request stays on the case.

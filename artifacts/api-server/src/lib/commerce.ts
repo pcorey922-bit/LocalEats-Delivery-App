@@ -1,6 +1,7 @@
 import { restoreUnacceptedInventory } from "./inventory";
 import { expireReservation } from "./reservation-expiry";
 import { databaseNow } from "./database-clock";
+import { requireNoFinancialHold } from "./financial-holds";
 import { fullRefundAmount } from "./partial-refunds";
 import {
   journalPayment,
@@ -258,6 +259,7 @@ export async function settlePayout(payoutId: string, actor: Profile) {
       .from(payoutsTable)
       .where(eq(payoutsTable.id, payoutId))
       .limit(1);
+    await requireNoFinancialHold(tx,order.id);
     const [payment] = await tx
       .select()
       .from(paymentsTable)

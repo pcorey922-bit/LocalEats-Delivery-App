@@ -3,6 +3,10 @@ import { DriverApplicationReviews } from "./driver-onboarding";
 import { OrderTracking, DispatchOperations } from "./delivery-tracking";
 import { OrderIncidentConsole } from "./order-incidents";
 import { PartialRefundControls } from "./partial-refunds";
+import {
+  FinancialHoldConsole,
+  PaymentReconciliation,
+} from "./financial-reconciliation";
 import { LedgerReport } from "./ledger-report";
 import { OperationalConsole } from "./operational-console";
 import { useEffect, useState, type FormEvent } from "react";
@@ -484,6 +488,7 @@ export function OperationsCommerce() {
       <LedgerReport />
       <DispatchOperations />
       <OrderIncidentConsole />
+      <FinancialHoldConsole />
       <h2>Driver approval</h2>
       {drivers.data?.map((d) => (
         <article className="roco-card" key={d.id}>
@@ -514,6 +519,7 @@ export function OperationsCommerce() {
             {o.id} · {money(o.totalCents)} · test payment {o.paymentStatus}
           </p>
           <OrderActions order={o} />
+          {o.paymentCollected && <PaymentReconciliation orderId={o.id} />}
           {o.status === "delivered" && o.paymentStatus === "succeeded" && (
             <PartialRefundControls orderId={o.id} />
           )}

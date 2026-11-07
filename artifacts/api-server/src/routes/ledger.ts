@@ -163,7 +163,7 @@ router.get("/admin/ledger", requireAuth, async (req, res) => {
       ) === 0n,
     liveChargesEnabled: false,
     notice:
-      "Gross operational ledger. Provider fees, disputes, tax remittances and bank payouts are not yet reconciled. Missing payment baselines are counted across all dates for this order scope; do not interpret this report as net profit or a bank statement.",
+      "Operational ledger includes only explicitly verified original charge fees and dispute balance entries. Other provider adjustments, refund fees, tax remittances and bank payouts still require reconciliation. Missing payment baselines are counted across all dates for this order scope; this is not verified net profit or a bank statement.",
   });
 });
 export default router;

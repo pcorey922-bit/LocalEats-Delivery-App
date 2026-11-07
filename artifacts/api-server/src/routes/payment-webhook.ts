@@ -1,4 +1,5 @@
 import { journalRefund } from "../lib/ledger";
+import { recordDisputeEvent } from "../lib/financial-holds";
 import { applyPartialRefundEvent } from "../lib/partial-refunds";
 import { and, eq } from "drizzle-orm";
 import type { Request, Response } from "express";
@@ -27,6 +28,7 @@ export async function processStripeEvent(event: Stripe.Event) {
       .onConflictDoNothing()
       .returning();
     if (!received) return;
+    if(event.type.startsWith("charge.dispute.")){await recordDisputeEvent(tx,event);return;}
     if (
       event.type === "checkout.session.completed" ||
       event.type === "checkout.session.async_payment_succeeded"

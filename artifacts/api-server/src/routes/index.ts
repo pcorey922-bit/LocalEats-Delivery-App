@@ -1,4 +1,6 @@
 import supportRouter from "./support";
+import supportConversationsRouter from "./support-conversations";
+import financialReconciliationRouter from "./financial-reconciliation";
 import partialRefundsRouter from "./partial-refunds";
 import orderIncidentsRouter from "./order-incidents";
 import inventoryRouter from "./inventory";
@@ -21,6 +23,8 @@ import ledgerRouter from "./ledger";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(supportConversationsRouter);
+router.use(financialReconciliationRouter);
 router.use(partialRefundsRouter);
 router.use(orderIncidentsRouter);
 router.use(inventoryRouter);
