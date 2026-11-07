@@ -1,5 +1,6 @@
 import { restoreUnacceptedInventory } from "./inventory";
 import { expireReservation } from "./reservation-expiry";
+import { databaseNow } from "./database-clock";
 import {
   journalPayment,
   journalAllocation,
@@ -150,7 +151,7 @@ export async function recordPayment(
     .set({
       status: "succeeded",
       providerPaymentId: providerId,
-      processedAt: new Date(),
+      processedAt: await databaseNow(tx),
     })
     .where(eq(paymentsTable.id, payment.id));
   // A late webhook for a cancelled order must never reopen fulfillment. Queue a

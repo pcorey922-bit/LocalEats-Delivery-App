@@ -1,5 +1,6 @@
 import { pruneDutyLocations } from "./lib/duty-location";
 import { processReservationExpiry } from "./lib/reservation-expiry";
+import { processOrderTiming } from "./lib/order-timing";
 import { randomUUID } from "node:crypto";
 import { lt } from "drizzle-orm";
 import {
@@ -50,9 +51,13 @@ function worker(
   });
 }
 const loops = [
-  worker("orders",15000,async(stopping,progress)=>{
-    for(let i=0;i<50 && !stopping();i++){
-      if(!(await processReservationExpiry()))break;
+  worker("orders", 15000, async (stopping, progress) => {
+    for (let i = 0; i < 50 && !stopping(); i++) {
+      if (!(await processReservationExpiry())) break;
+      await progress();
+    }
+    for (let i = 0; i < 50 && !stopping(); i++) {
+      if (!(await processOrderTiming())) break;
       await progress();
     }
   }),

@@ -1,6 +1,7 @@
 import { SupportDesk, AdminSupport } from "./support-desk";
 import { DriverApplicationReviews } from "./driver-onboarding";
 import { OrderTracking, DispatchOperations } from "./delivery-tracking";
+import { OrderIncidentConsole } from "./order-incidents";
 import { LedgerReport } from "./ledger-report";
 import { OperationalConsole } from "./operational-console";
 import { useEffect, useState, type FormEvent } from "react";
@@ -87,6 +88,13 @@ export function CheckoutPanel({
 }) {
   const config = useCommerce();
   const [operationId, setOperationId] = useState<string | null>(null);
+  const reservation = useQuery({
+    queryKey: ["reservation", orderId],
+    queryFn: () =>
+      customFetch<{ reservationExpiresAt: string }>(
+        `/api/orders/${orderId}/payment`,
+      ),
+  });
   const checkout = useMutation({
     mutationFn: () =>
       customFetch<{ mode: string; operationId: string; url: string | null }>(
@@ -121,9 +129,12 @@ export function CheckoutPanel({
   return (
     <section aria-label="Secure payment">
       <p>
-        Unpaid reservations expire after 15 minutes and release their stock. An
-        expired order cannot resume; start a new order. Late payments require
-        refund recovery.
+        Unpaid reservations release their stock at expiry
+        {reservation.data
+          ? ` (${new Date(reservation.data.reservationExpiresAt).toLocaleString()})`
+          : ""}
+        . An expired order cannot resume; start a new order. Late payments
+        require refund recovery.
       </p>
       <button
         className="roco-button primary"
@@ -465,6 +476,7 @@ export function OperationsCommerce() {
       <OperationalConsole />
       <LedgerReport />
       <DispatchOperations />
+      <OrderIncidentConsole />
       <h2>Driver approval</h2>
       {drivers.data?.map((d) => (
         <article className="roco-card" key={d.id}>

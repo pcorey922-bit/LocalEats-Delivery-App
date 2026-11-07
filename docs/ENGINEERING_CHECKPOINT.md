@@ -503,3 +503,24 @@ late-payment races. PGlite/test-only identity/provider adapters were used; verif
 this commit's real PostgreSQL/restore/container CI after push. Source 7cd193d passed
 all PostgreSQL/container and unsigned native checks. Next: configurable timing,
 restaurant/dispatch escalation, recovery and financial partial-refund work.
+
+## Timeout escalation and operational recovery
+
+Migration 0021 adds per-order timing snapshots, fair scheduled reviews and durable
+versioned incidents. Administrators configure future-order reservation/response/
+assignment/pickup windows in the operational dashboard (defaults 15/5/10/10 minutes).
+Changes never rewrite existing deadlines. Paid restaurant response and unassigned
+orders escalate without automatic financial cancellation. An assignment exceeding
+its pickup window is released only before driver-reported arrival, clearing GPS and
+notifying the previous driver and order participants. Arrival-reported assignments
+remain in custody for operator review. Pickup/reassignment/cancellation resolves the
+corresponding incidents from actual state; acknowledgement records a recovery plan
+and cannot dismiss an unresolved operational condition. Recurrent unassigned incidents
+reopen with a new version and deduplicated notification. Worker scheduling uses the
+database clock and cycles reviews to avoid starving newer orders.
+
+83 local tests and production build/typechecks passed, covering timing snapshots,
+permissions/bounds, concurrent reviews, deduplicated escalation, stale acknowledgement,
+automatic resolution, assignment release/GPS cleanup, arrival preservation, pickup and
+delivery recovery. CI must confirm PostgreSQL/restore/container/native for this revision.
+Next: partial refunds and dispute/reconciliation safeguards, then staging validation.

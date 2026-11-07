@@ -1,4 +1,6 @@
 import { requireOrderingEnabled } from "../lib/commerce-policy";
+import { readTimingPolicy } from "../lib/order-timing";
+import { databaseNow } from "../lib/database-clock";
 import { ensureInventory, inventoryQuantities } from "../lib/inventory";
 import { customize } from "../../../../lib/api-zod/src/modifiers";
 import {
@@ -412,11 +414,17 @@ router.post(
       await ensureCapacity(lockedRestaurant, tx);
       ensureInventory(lockedItems, parsed.data.items);
 
+      const timingPolicy = await readTimingPolicy(tx);
+      const now = await databaseNow(tx);
       const [order] = await tx
         .insert(ordersTable)
         .values({
           requestKey,
           requestHash,
+          timingPolicy,
+          reservationExpiresAt: new Date(
+            now.getTime() + timingPolicy.reservationMinutes * 60000,
+          ),
           pricingSnapshot: { ...pricing },
           customerProfileId: profile.id,
           restaurantId: restaurant.id,

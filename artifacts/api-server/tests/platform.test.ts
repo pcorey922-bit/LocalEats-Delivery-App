@@ -1,3 +1,4 @@
+import { processOrderTiming } from "../src/lib/order-timing";
 import { processReservationExpiry } from "../src/lib/reservation-expiry";
 import { recordPayment } from "../src/lib/commerce";
 import { pruneDutyLocations } from "../src/lib/duty-location";
@@ -19,6 +20,7 @@ import {
   restaurantHoursTable,
   ordersTable,
   orderEventsTable,
+  orderIncidentsTable,
   orderItemsTable,
   paymentsTable,
   notificationsTable,
@@ -2613,6 +2615,61 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       await db.transaction(tx=>recordPayment(tx,late.id,`pi_late_${late.id}`,late.totalCents,'usd'));
       assert.equal((await db.select().from(menuItemsTable).where(eq(menuItemsTable.id,ids.item)))[0].stockOnHand,4);
     }finally{process.env.PAYMENT_PROVIDER='sandbox';delete process.env.STRIPE_SECRET_KEY;await db.update(menuItemsTable).set({stockOnHand:null}).where(eq(menuItemsTable.id,ids.item));}
+  });
+
+  await t.test("timeout policy snapshots, restaurant escalation, operator acknowledgement and recovery",async()=>{
+    const path='/admin/order-timing',policy={reservationMinutes:20,restaurantResponseMinutes:2,driverAssignmentMinutes:2,driverPickupMinutes:2};
+    assert.equal((await api(path,null)).status,401);assert.equal((await api(path,ids.customer,'PUT',{policy,reason:'Cannot configure owner timings'})).status,403);
+    assert.equal((await api(path,ids.admin,'PUT',{policy:{...policy,reservationMinutes:0},reason:'Invalid deadline range'})).status,400);
+    assert.equal((await api(path,ids.admin,'PUT',{policy,reason:'Configure staged operational timing policy'})).status,200);
+    const order=await create();
+    try{
+      const [snapshot]=await db.select().from(ordersTable).where(eq(ordersTable.id,order.id));assert.deepEqual(snapshot.timingPolicy,policy);assert.ok(snapshot.reservationExpiresAt.getTime()-Date.now()>19*60000);
+      await api(path,ids.admin,'PUT',{policy:{...policy,reservationMinutes:30},reason:'Future orders use new timing only'});
+      assert.equal((await db.select().from(ordersTable).where(eq(ordersTable.id,order.id)))[0].timingPolicy.reservationMinutes,20);
+      await pay(order.id);await db.update(paymentsTable).set({processedAt:new Date(0)}).where(eq(paymentsTable.orderId,order.id));
+      await db.update(ordersTable).set({timingReviewAt:new Date(0)}).where(eq(ordersTable.id,order.id));
+      await Promise.all([processOrderTiming(),processOrderTiming()]);
+      const incidents=await db.select().from(orderIncidentsTable).where(eq(orderIncidentsTable.orderId,order.id));assert.equal(incidents.length,1);assert.equal(incidents[0].kind,'restaurant_response');
+      const notices=await db.select().from(notificationsTable).where(eq(notificationsTable.orderId,order.id));assert.equal(notices.filter(n=>n.eventKey.startsWith('incident:')).length,1);
+      const ack=`/admin/order-incidents/${incidents[0].id}/acknowledge`,body={version:incidents[0].version,note:'Operator contacted restaurant for recovery'};
+      assert.equal((await api(ack,ids.driver,'POST',body)).status,403);assert.equal((await api(ack,ids.admin,'POST',body)).status,200);assert.equal((await api(ack,ids.admin,'POST',body)).status,409);
+      assert.equal((await api(`/orders/${order.id}`,ids.restaurant,'PATCH',{status:'accepted'})).status,200);
+      await db.update(ordersTable).set({timingReviewAt:new Date(0)}).where(eq(ordersTable.id,order.id));await processOrderTiming();
+      const [recovered]=await db.select().from(orderIncidentsTable).where(eq(orderIncidentsTable.id,incidents[0].id));assert.equal(recovered.status,'resolved');assert.ok(recovered.resolvedAt);
+      assert.equal((await api(ack,ids.admin,'POST',{...body,version:recovered.version})).status,409);
+    }finally{await db.delete(platformSettingsTable).where(eq(platformSettingsTable.settingKey,'order_timing_policy'));await api(`/orders/${order.id}/cancel`,ids.admin,'POST',{reason:'End response timeout verification'});}
+  });
+  await t.test("driver timeouts release only before arrival and recover without duplicate assignment or alerts",async()=>{
+    const driver=randomUUID();await db.insert(profilesTable).values({id:driver,clerkUserId:driver,displayName:'Timeout driver fixture',role:'driver',driverApproved:true});
+    await api('/driver/availability',driver,'PUT',{available:true});
+    const order=await create();await ready(order.id);
+    const review=async()=>{await db.update(ordersTable).set({timingReviewAt:new Date(0)}).where(eq(ordersTable.id,order.id));await processOrderTiming();};
+    try{
+      await db.update(orderEventsTable).set({createdAt:new Date(0)}).where(sql`${orderEventsTable.orderId}=${order.id} AND ${orderEventsTable.toStatus}='ready_for_pickup'`);
+      await review();
+      let incidents=await db.select().from(orderIncidentsTable).where(eq(orderIncidentsTable.orderId,order.id));assert.equal(incidents.find(i=>i.kind==='driver_unassigned')?.status,'open');
+      assert.equal((await api(`/driver/orders/${order.id}/claim`,driver,'POST')).status,201);
+      await review();incidents=await db.select().from(orderIncidentsTable).where(eq(orderIncidentsTable.orderId,order.id));assert.equal(incidents.find(i=>i.kind==='driver_unassigned')?.status,'resolved');
+      const [delivery]=await db.select().from(deliveriesTable).where(eq(deliveriesTable.orderId,order.id));
+      await db.update(deliveriesTable).set({assignedAt:new Date(0)}).where(eq(deliveriesTable.id,delivery.id));
+      await db.insert(deliveryLocationsTable).values({deliveryId:delivery.id,driverProfileId:driver,latitude:35,longitude:-84,accuracyMeters:8,observedAt:new Date()});
+      await review();
+      const [released]=await db.select().from(deliveriesTable).where(eq(deliveriesTable.id,delivery.id));assert.equal(released.driverProfileId,null);assert.equal(released.status,'unassigned');
+      assert.equal((await db.select().from(deliveryLocationsTable).where(eq(deliveryLocationsTable.deliveryId,delivery.id))).length,0);
+      assert.equal((await api(`/driver/orders/${order.id}/pickup`,driver,'POST')).status,409);
+      const audits=await db.select().from(auditLogsTable).where(eq(auditLogsTable.resourceId,order.id));assert.equal(audits.filter(a=>a.action==='delivery.assignment_expired').length,1);
+      await review();const again=await db.select().from(auditLogsTable).where(eq(auditLogsTable.resourceId,order.id));assert.equal(again.filter(a=>a.action==='delivery.assignment_expired').length,1);
+      assert.equal((await api(`/driver/orders/${order.id}/claim`,driver,'POST')).status,201);
+      assert.equal((await api(`/driver/orders/${order.id}/arrive`,driver,'POST')).status,200);
+      await db.update(deliveriesTable).set({assignedAt:new Date(1)}).where(eq(deliveriesTable.id,delivery.id));
+      await review();
+      assert.equal((await db.select().from(deliveriesTable).where(eq(deliveriesTable.id,delivery.id)))[0].driverProfileId,driver);
+      incidents=await db.select().from(orderIncidentsTable).where(eq(orderIncidentsTable.orderId,order.id));assert.ok(incidents.some(i=>i.kind==='driver_pickup'&&i.status==='open'));
+      assert.equal((await api(`/driver/orders/${order.id}/pickup`,driver,'POST')).status,200);
+      await review();incidents=await db.select().from(orderIncidentsTable).where(eq(orderIncidentsTable.orderId,order.id));assert.ok(incidents.every(i=>i.status==='resolved'));
+      const code=await api(`/orders/${order.id}/delivery-code`,ids.customer,'POST');assert.equal((await api(`/driver/orders/${order.id}/deliver`,driver,'POST',{code:code.data.code})).status,200);
+    }finally{await api(`/orders/${order.id}/cancel`,ids.admin,'POST',{reason:'End timeout recovery verification'});await api('/driver/availability',driver,'PUT',{available:false});}
   });
 
 });

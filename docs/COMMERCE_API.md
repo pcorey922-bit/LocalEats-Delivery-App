@@ -114,3 +114,20 @@ once, in both sandbox and durable Stripe-test cancellation paths. Accepted/prepa
 food does not automatically return to available stock; restaurant staff must record
 an appropriate reasoned adjustment. Deleted/untracked items are not fabricated or
 recreated. Limits are item units, not modifier/ingredient-level inventory.
+
+## Reservation and timeout recovery
+
+Unpaid orders expire at persisted `reservationExpiresAt`; cancellation, stock return,
+audit, notification and provider-expiration jobs are atomic. Late Stripe success keeps
+the order cancelled and queues refund recovery. Paid orders do not expire as unpaid.
+
+Administrators GET/PUT `/admin/order-timing` (PUT `{policy,reason}`) to configure
+`reservationMinutes` (1–120), `restaurantResponseMinutes` (1–120),
+`driverAssignmentMinutes` (1–240), `driverPickupMinutes` (1–240). New orders snapshot
+this policy; defaults are 15/5/10/10. GET `/admin/order-incidents?status=active|resolved`
+returns the latest 100 matching incidents. POST `/admin/order-incidents/:id/acknowledge`
+requires `{version,note}`; notes are 10–1000 characters. Stale versions return 409.
+Acknowledgement does not resolve a still-active exception. Use dispatch, restaurant
+status, cancellation/refund and support controls for recovery. Background review
+resolves incidents when actual state recovers. Arrival-reported drivers are never
+silently released by a timeout; no paid order is automatically refunded on timeout.

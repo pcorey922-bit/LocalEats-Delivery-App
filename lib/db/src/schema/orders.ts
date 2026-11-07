@@ -18,6 +18,8 @@ export const ordersTable = pgTable("orders", {
   pricingSnapshot: jsonb("pricing_snapshot").$type<{ restaurantCommissionBps: number; driverShareBps: number; taxBps: number; testMode: true }>(),
   status: orderStatusEnum("status").notNull().default("pending"),
   reservationExpiresAt: timestamp("reservation_expires_at", { withTimezone: true }).notNull().default(sql`now() + interval '15 minutes'`),
+  timingPolicy: jsonb("timing_policy").$type<{reservationMinutes:number;restaurantResponseMinutes:number;driverAssignmentMinutes:number;driverPickupMinutes:number}>().notNull().default({reservationMinutes:15,restaurantResponseMinutes:5,driverAssignmentMinutes:10,driverPickupMinutes:10}),
+  timingReviewAt: timestamp("timing_review_at",{withTimezone:true}).notNull().defaultNow(),
   subtotalCents: integer("subtotal_cents").notNull(),
   deliveryFeeCents: integer("delivery_fee_cents").notNull().default(0),
   serviceFeeCents: integer("service_fee_cents").notNull().default(0),
@@ -29,6 +31,7 @@ export const ordersTable = pgTable("orders", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 }, (table) => [
   index("orders_reservation_expiry_idx").on(table.status,table.reservationExpiresAt),
+  index("orders_timing_review_idx").on(table.timingReviewAt,table.id),
   index("orders_customer_created_idx").on(table.customerProfileId, table.createdAt),
   index("orders_restaurant_status_created_idx").on(
     table.restaurantId,
