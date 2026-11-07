@@ -55,3 +55,22 @@ completed delivery preserves the delivered status/history and reverses earnings.
 Paid cancellation expires open checkout first, never reopens cancelled dispatch,
 and exposes pending/failed refunds for support. Partial external refunds and
 unknown old provider operations require reconciliation rather than blind retries.
+
+## Protected administrator dispatch
+
+`POST /admin/orders/:id/assignment` requires an active administrator and JSON:
+`{driverProfileId:UUID|null,expectedDriverProfileId:UUID|null,expectedAssignedAt:ISO|null,reason:string}`.
+Use the observed driver and assignment timestamp from `GET /admin/dispatch`.
+A null destination releases the assignment; stale observations return 409 and must
+be refreshed. Reasons require 5–500 characters. Only paid, ready, unpicked orders
+can change assignment. Drivers must be active, approved, online and free of another
+active delivery, with unexpired approved applications when present. An approved
+owner-driver is eligible under the same checks. Administrative assignment is immediate;
+driver pickup confirms possession. Assignment offers requiring separate acceptance
+are not implemented by this endpoint.
+
+Changes commit the assignment, previous-driver GPS deletion, recipient notifications
+(including the removed driver) and reason-bearing audit record together. Driver
+release also clears assigned-order GPS. Push still requires configured providers and
+physical-device verification. Reassignment after pickup requires support review;
+this endpoint refuses it rather than silently changing delivery custody.

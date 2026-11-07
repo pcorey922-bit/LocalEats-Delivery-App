@@ -229,6 +229,105 @@ export function OrderTracking({ orderId }: { orderId: string }) {
     </section>
   );
 }
+type AssignmentOrder = {
+  orderId: string;
+  driverProfileId: string | null;
+  assignedAt: string | null;
+};
+function AssignmentControls({
+  order,
+  drivers,
+}: {
+  order: AssignmentOrder;
+  drivers: DispatchDriver[];
+}) {
+  const [driverId, setDriverId] = useState(order.driverProfileId ?? "");
+  const [reason, setReason] = useState("");
+  const client = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: () =>
+      customFetch(`/api/admin/orders/${order.orderId}/assignment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          driverProfileId: driverId || null,
+          expectedDriverProfileId: order.driverProfileId,
+          expectedAssignedAt: order.assignedAt,
+          reason,
+        }),
+      }),
+    onSuccess: () => {
+      setReason("");
+    },
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ["admin-dispatch"] });
+    },
+  });
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        mutation.mutate();
+      }}
+    >
+      <label>
+        Delivery assignment
+        <select
+          aria-label={`Driver for order ${order.orderId}`}
+          value={driverId}
+          disabled={mutation.isPending}
+          onChange={(event) => setDriverId(event.target.value)}
+        >
+          <option value="">Unassigned</option>
+          {drivers
+            .filter(
+              (d) =>
+                d.profileId === order.driverProfileId ||
+                (d.online && d.approved && !d.activeOrderId),
+            )
+            .map((d) => (
+              <option key={d.profileId} value={d.profileId}>
+                {d.displayName} · {d.status}
+              </option>
+            ))}
+        </select>
+      </label>
+      <label>
+        Reason for dispatch change
+        <input
+          required
+          minLength={5}
+          maxLength={500}
+          value={reason}
+          disabled={mutation.isPending}
+          onChange={(event) => setReason(event.target.value)}
+        />
+      </label>
+      <button
+        className="roco-button"
+        type="submit"
+        disabled={
+          mutation.isPending ||
+          reason.trim().length < 5 ||
+          (driverId || null) === order.driverProfileId
+        }
+      >
+        {mutation.isPending
+          ? "Updating assignment…"
+          : driverId
+            ? "Assign driver"
+            : "Release assignment"}
+      </button>
+      {mutation.error && <p role="alert">{mutation.error.message}</p>}
+      {mutation.isSuccess && <p role="status">Assignment updated.</p>}
+      <p className="roco-meta">
+        Only online, approved drivers without another delivery are eligible.
+        Assignment is immediate; pickup confirms possession. Picked-up orders
+        require support review.
+      </p>
+    </form>
+  );
+}
 export function DispatchOperations() {
   const dispatch = useQuery({
     queryKey: ["admin-dispatch"],
@@ -239,6 +338,7 @@ export function DispatchOperations() {
           status: string;
           restaurantName: string;
           driverProfileId: string | null;
+          assignedAt: string | null;
           waitingMinutes: number;
           pickupStreet: string;
           pickupCity: string;
@@ -285,6 +385,13 @@ export function DispatchOperations() {
             {order.driverProfileId ? "driver assigned" : "no driver assigned"}
           </p>
           <p className="roco-meta">{order.orderId}</p>
+          {order.status === "ready_for_pickup" && (
+            <AssignmentControls
+              key={`${order.orderId}:${order.driverProfileId}:${order.assignedAt}`}
+              order={order}
+              drivers={dispatch.data?.drivers ?? []}
+            />
+          )}
           <OrderTracking orderId={order.orderId} />
         </article>
       ))}

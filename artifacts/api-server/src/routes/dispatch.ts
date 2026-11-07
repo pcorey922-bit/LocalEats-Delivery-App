@@ -1,4 +1,5 @@
-import { audit } from "../lib/commerce";
+import { randomUUID } from "node:crypto";
+import { audit, notifyOrder } from "../lib/commerce";
 import {
   driverDutyLocationsTable,
   driverApplicationsTable,
@@ -14,6 +15,8 @@ import {
   deliveryLocationsTable,
   ordersTable,
   restaurantsTable,
+  paymentsTable,
+  notificationsTable,
 } from "@workspace/db";
 import { getActiveProfile, requireRole } from "../lib/current-profile";
 import { requireAuth } from "../middlewares/require-auth";
@@ -316,7 +319,7 @@ router.get("/orders/:orderId/tracking", requireAuth, async (req, res) => {
     status: order.status,
     driverAssigned: Boolean(delivery?.driverProfileId),
     location:
-      active && fresh
+      active && delivery?.driverProfileId === location?.driverProfileId && fresh
         ? {
             latitude: location.latitude,
             longitude: location.longitude,
@@ -333,6 +336,179 @@ router.get("/orders/:orderId/tracking", requireAuth, async (req, res) => {
           : "stale",
   });
 });
+// Lock the destination driver before the order, matching driver claim lock order.
+// An observed assignment token prevents stale operator actions from replacing newer work.
+router.post(
+  "/admin/orders/:orderId/assignment",
+  requireAuth,
+  async (req, res) => {
+    const actor = await getActiveProfile(req, res);
+    if (!actor || !requireRole(actor, ["admin"], res)) return;
+    const orderId = uuid.parse(req.params.orderId);
+    const input = z
+      .object({
+        driverProfileId: uuid.nullable(),
+        expectedDriverProfileId: uuid.nullable(),
+        expectedAssignedAt: z.string().datetime().nullable(),
+        reason: z.string().trim().min(5).max(500),
+      })
+      .strict()
+      .parse(req.body);
+    const result = await db.transaction(async (tx) => {
+      if (input.driverProfileId) {
+        const [driver] = await tx
+          .select()
+          .from(profilesTable)
+          .where(eq(profilesTable.id, input.driverProfileId))
+          .for("update");
+        const [application] = await tx
+          .select()
+          .from(driverApplicationsTable)
+          .where(eq(driverApplicationsTable.profileId, input.driverProfileId));
+        const [presence] = await tx
+          .select()
+          .from(driverPresenceTable)
+          .where(eq(driverPresenceTable.profileId, input.driverProfileId));
+        if (
+          !driver?.isActive ||
+          !driver.driverApproved ||
+          !["driver", "admin"].includes(driver.role) ||
+          (application &&
+            (application.status !== "approved" ||
+              application.licenseExpiresOn <
+                new Date().toISOString().slice(0, 10)))
+        )
+          throw new CommerceError(
+            409,
+            "Select an active, approved driver with an unexpired application",
+          );
+        if (
+          !presence?.available ||
+          Date.now() - presence.heartbeatAt.getTime() >= presenceFreshMs
+        )
+          throw new CommerceError(409, "The selected driver must be online");
+        const [busy] = await tx
+          .select()
+          .from(deliveriesTable)
+          .where(
+            and(
+              eq(deliveriesTable.driverProfileId, driver.id),
+              inArray(deliveriesTable.status, ["assigned", "picked_up"]),
+            ),
+          )
+          .limit(1);
+        if (busy && busy.orderId !== orderId)
+          throw new CommerceError(
+            409,
+            "The selected driver already has an active delivery",
+          );
+      }
+      const [order] = await tx
+        .select()
+        .from(ordersTable)
+        .where(eq(ordersTable.id, orderId))
+        .for("update");
+      if (!order || order.status !== "ready_for_pickup")
+        throw new CommerceError(
+          409,
+          "Only ready, unpicked orders can be assigned or released",
+        );
+      const [payment] = await tx
+        .select()
+        .from(paymentsTable)
+        .where(
+          and(
+            eq(paymentsTable.orderId, orderId),
+            eq(paymentsTable.status, "succeeded"),
+          ),
+        );
+      if (!payment)
+        throw new CommerceError(409, "A confirmed payment is required");
+      const [previous] = await tx
+        .select()
+        .from(deliveriesTable)
+        .where(eq(deliveriesTable.orderId, orderId));
+      if (
+        (previous?.driverProfileId ?? null) !== input.expectedDriverProfileId ||
+        (previous?.assignedAt?.toISOString() ?? null) !==
+          input.expectedAssignedAt
+      )
+        throw new CommerceError(
+          409,
+          "Assignment changed. Refresh dispatch before trying again",
+        );
+      if (previous && !["unassigned", "assigned"].includes(previous.status))
+        throw new CommerceError(409, "This delivery cannot be reassigned");
+      if ((previous?.driverProfileId ?? null) === input.driverProfileId)
+        return { orderId, status: previous?.status ?? "unassigned" };
+      const status = input.driverProfileId ? "assigned" : "unassigned";
+      const assignedAt = input.driverProfileId
+        ? new Date(
+            Math.max(Date.now(), (previous?.assignedAt?.getTime() ?? 0) + 1),
+          )
+        : null;
+      const [delivery] = await tx
+        .insert(deliveriesTable)
+        .values({
+          orderId,
+          driverProfileId: input.driverProfileId,
+          status,
+          assignedAt,
+        })
+        .onConflictDoUpdate({
+          target: deliveriesTable.orderId,
+          set: {
+            driverProfileId: input.driverProfileId,
+            status,
+            assignedAt,
+            handoffHash: null,
+            handoffExpiresAt: null,
+            handoffAttempts: 0,
+          },
+        })
+        .returning();
+      await tx
+        .delete(deliveryLocationsTable)
+        .where(eq(deliveryLocationsTable.deliveryId, delivery.id));
+      const event = `assignment:${randomUUID()}`;
+      await notifyOrder(
+        tx,
+        orderId,
+        event,
+        input.driverProfileId
+          ? "Driver assigned (test)"
+          : "Finding another driver (test)",
+        "Dispatch updated the delivery assignment. Open the order for current instructions.",
+      );
+      if (previous?.driverProfileId)
+        await tx
+          .insert(notificationsTable)
+          .values({
+            profileId: previous.driverProfileId,
+            orderId,
+            eventKey: `${orderId}:${event}`,
+            title: "Assignment removed (test)",
+            body: "Dispatch removed this assignment. Do not pick up this order.",
+          })
+          .onConflictDoNothing();
+      await audit(tx, actor.id, "delivery.assignment.updated", orderId, {
+        previousDriverProfileId: previous?.driverProfileId ?? null,
+        driverProfileId: input.driverProfileId,
+        reason: input.reason,
+        previousAssignedAt: input.expectedAssignedAt,
+        assignedAt,
+      });
+      return {
+        orderId,
+        status,
+        driverProfileId: input.driverProfileId,
+        assignedAt,
+      };
+    });
+    res.json(result);
+  },
+);
+
 router.get("/admin/dispatch", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
   if (!profile || !requireRole(profile, ["admin"], res)) return;

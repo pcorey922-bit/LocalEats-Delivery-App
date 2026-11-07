@@ -381,3 +381,25 @@ Owner-driver/navigation revision fd83b6276056b0486c5e4011e2eb6b242fe2ca0c passed
 PostgreSQL/restore/container validation (42184948132) and unsigned Android/iOS native
 compilation (42184947908). Final duty telemetry changes passed the local full suite
 and production build. Their fresh CI/provider/device status must be checked separately.
+
+## Protected dispatch assignment and location cleanup — November 7
+
+Administrators can assign, reassign or release paid ready-for-pickup deliveries through
+POST `/admin/orders/:id/assignment` and mobile-friendly dispatch controls. Observed
+assignment identity/timestamp tokens reject stale operators; driver profile locks,
+order locks and the existing unique active-driver index prevent competing claims and
+double booking. Eligibility includes active/approved driver or approved owner-driver,
+online heartbeat, available capacity and unexpired application. Pickup remains the
+custody confirmation; this is immediate assignment, not a separate offer acceptance.
+Reason-required audits and durable notifications include removed drivers. Assigned
+GPS is deleted on reassignment and driver release; tracking checks location ownership.
+Driver claim also rechecks application approval/expiry inside its locked transaction.
+
+77 automated tests passed locally (48 in the relational HTTP suite including parent),
+with no skips, using PGlite and test-only identity/provider adapters. Production build
+and typechecks passed. Initial sandbox tests could not use loopback; HTTP validation
+ran using the supported escalated executor. Existing GitHub checks for 249bbc2 were
+all successful. New PostgreSQL multi-connection/restore/native CI must be checked on
+this pushed revision. No real provider, hardware, configured Maps or Clerk E2E claim.
+Next: restaurant-arrival coordination, restaurant capacity/inventory, acceptance and
+dispatch escalation, then remaining partial-refund/dispute/reconciliation blockers.

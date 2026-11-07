@@ -19,6 +19,8 @@ import {
   profilesTable,
   driverPresenceTable,
   deliveryLocationsTable,
+  driverApplicationsTable,
+  notificationsTable,
 } from "@workspace/db";
 import { getActiveProfile, requireRole } from "../lib/current-profile";
 import { requireAuth } from "../middlewares/require-auth";
@@ -32,7 +34,11 @@ router.post("/orders/:orderId/delivery-code", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
   if (!profile || !requireRole(profile, ["customer"], res)) return;
   const orderId = String(req.params.orderId);
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId))
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      orderId,
+    )
+  )
     throw new CommerceError(400, "Invalid order");
   const code = String(randomInt(0, 1000000)).padStart(6, "0");
   const salt = randomUUID();
@@ -75,7 +81,11 @@ router.get("/orders/:orderId/delivery-proof", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
   if (!profile) return;
   const orderId = String(req.params.orderId);
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId))
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      orderId,
+    )
+  )
     throw new CommerceError(400, "Invalid order");
   const [record] = await db
     .select({
@@ -173,8 +183,8 @@ router.get(
         restaurantName: restaurantsTable.name,
         pickupStreet: restaurantsTable.street1,
         pickupCity: restaurantsTable.city,
-      pickupRegion: restaurantsTable.region,
-      pickupPostalCode: restaurantsTable.postalCode,
+        pickupRegion: restaurantsTable.region,
+        pickupPostalCode: restaurantsTable.postalCode,
         deliveryAddress: ordersTable.addressSnapshot,
       })
       .from(deliveriesTable)
@@ -221,9 +231,22 @@ router.post(
       if (
         !current?.driverApproved ||
         !current.isActive ||
-        !["driver","admin"].includes(current.role)
+        !["driver", "admin"].includes(current.role)
       )
         throw new CommerceError(403, "Driver approval is required");
+      const [application] = await tx
+        .select()
+        .from(driverApplicationsTable)
+        .where(eq(driverApplicationsTable.profileId, profile.id));
+      if (
+        application &&
+        (application.status !== "approved" ||
+          application.licenseExpiresOn < new Date().toISOString().slice(0, 10))
+      )
+        throw new CommerceError(
+          403,
+          "An approved, unexpired driver application is required",
+        );
       const [presence] = await tx
         .select()
         .from(driverPresenceTable)
@@ -362,11 +385,22 @@ router.post(
           409,
           "Delivery cannot be released by this driver",
         );
+      await tx
+        .delete(deliveryLocationsTable)
+        .where(eq(deliveryLocationsTable.deliveryId, delivery.id));
+      const eventKey = `released:${randomUUID()}`;
+      await tx.insert(notificationsTable).values({
+        profileId: profile.id,
+        orderId,
+        eventKey: `${orderId}:${eventKey}`,
+        title: "Delivery released (test)",
+        body: "You released this delivery before pickup.",
+      });
       await audit(tx, profile.id, "delivery.released", orderId);
       await notifyOrder(
         tx,
         orderId,
-        `released:${profile.id}:${Date.now()}`,
+        eventKey,
         "Finding another driver (test)",
         "The driver released this delivery before pickup.",
       );
@@ -519,12 +553,10 @@ router.post(
       return toDelivery;
     });
     if (result === "invalid_proof") {
-      res
-        .status(400)
-        .json({
-          error:
-            "Enter the customer’s valid handoff code. After five failed attempts or expiry, ask the customer to generate a new code.",
-        });
+      res.status(400).json({
+        error:
+          "Enter the customer’s valid handoff code. After five failed attempts or expiry, ask the customer to generate a new code.",
+      });
       return;
     }
     if (!result) {
