@@ -253,6 +253,20 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     await assert.rejects(createTestCheckout({id: randomUUID(), totalCents: 100}, 1), /webhook before checkout/);
     assert.equal((await api(`/orders/${order.id}/checkout`, ids.customer, "POST")).status, 503);
   });
+  await t.test("payment setup is administrator-only, redacted and never enables ordering or accepts keys from clients",async()=>{
+    process.env.ROCOEATS_ORDERING_ENABLED='false';
+    assert.equal((await api('/admin/payment-setup',null)).status,401);
+    assert.equal((await api('/admin/payment-setup',ids.restaurant)).status,403);
+    assert.equal((await api('/admin/payment-setup/verify',ids.driver,'POST',{})).status,403);
+    const state=await api('/admin/payment-setup',ids.admin);assert.equal(state.status,200);
+    assert.equal(state.data.liveChargesEnabled,false);assert.equal(state.data.testProviderConfigured,false);
+    assert.ok(state.data.requiredEvents.includes('charge.dispute.created'));
+    assert.equal(JSON.stringify(state.data).includes('STRIPE_SECRET_KEY'),false);
+    assert.equal((await api('/admin/payment-setup/verify',ids.admin,'POST',{secretKey:'sk_test_do_not_accept'})).status,400);
+    assert.equal((await api('/admin/payment-setup/verify',ids.admin,'POST',{})).status,503);
+    assert.equal(state.data.orderingEnabled,false);
+    assert.equal(process.env.ROCOEATS_ORDERING_ENABLED,'false');
+  });
   await t.test("ordering defaults closed; receipts and cancellations recover while new orders and checkout are blocked",async()=>{
     const order=await create();const quote=await api('/orders/quote',ids.customer,'POST',input());
     const [saved]=await db.select().from(ordersTable).where(eq(ordersTable.id,order.id));

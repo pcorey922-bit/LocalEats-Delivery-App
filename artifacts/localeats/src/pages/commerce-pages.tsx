@@ -3,6 +3,7 @@ import { DriverApplicationReviews } from "./driver-onboarding";
 import { OrderTracking, DispatchOperations } from "./delivery-tracking";
 import { OrderIncidentConsole } from "./order-incidents";
 import { PartialRefundControls } from "./partial-refunds";
+import { PaymentSetupChecks } from "./payment-setup";
 import {
   FinancialHoldConsole,
   PaymentReconciliation,
@@ -478,6 +479,7 @@ export function OperationsCommerce() {
       <AdminSupport />
       <Link href="/admin">← Operations overview</Link>
       <h1>Test order operations</h1>
+      <PaymentSetupChecks/>
       <CommerceBanner />
       {error && (
         <p role="alert" className="roco-alert">

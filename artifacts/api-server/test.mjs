@@ -14,6 +14,7 @@ try {
     ["navigation", "tests/navigation.test.ts"],
     ["mobile-api", "tests/mobile-api.test.ts"],
     ["commerce-policy", "src/lib/commerce-policy.test.ts"],
+    ["stripe-setup", "src/lib/stripe-setup.test.ts"],
     ["availability", "src/lib/restaurant-availability.test.ts"],
     ["platform", "tests/platform.test.ts"],
     ["recovery-safety", "tests/recovery-safety.test.ts"],

@@ -874,3 +874,25 @@ artifacts/localeats/tests/account-browser.tsx and scripts/verify-account-browser
 with developer-tool prerequisites in that tests directory's README. No substantive
 finished UI verification work is left only in a temporary workspace. The harness
 explicitly simulates identity/API and adds no runtime dependency or auth bypass.
+
+## November 8 — real TEST payment setup checks
+
+Resumed clean remote 6cad154; actual staging revision matches. Read-only deployed
+checks again found pricingReady=false/webhookReady=false, with DB/auth/workers and
+test-provider configuration present. No hosted secrets or owner session is attached
+to this engineering executor. Do not infer that a Stripe key prefix proves provider
+connectivity or that a historical signed event verifies the current webhook secret.
+
+Added admin-only payment setup/status and an audited, read-only real Stripe API
+probe for TEST-mode Balance and the exact webhook destination/version/subscriptions.
+No raw provider errors, keys, account balances, endpoint IDs or secrets return to
+the browser. No SQL transaction spans provider I/O. Endpoint pagination uncertainty,
+live responses, disabled endpoints, version/event mismatch and API failures are
+reported conservatively. /operations explains the required protected configuration.
+The probe never changes ordering, creates payments or mutates Stripe configuration.
+
+99 automated tests and complete production build/typechecks pass. Phone-size actual
+component QA passes with simulated auth/API. Provider verification is not claimed:
+the owner must deploy, configure the webhook/pricing and invoke the check through
+the real authenticated app. PRIVATE_TEST_DELIVERY.md specifies setup, authorization,
+actual Checkout/delivery/proof/reconciliation and failure evidence requirements.

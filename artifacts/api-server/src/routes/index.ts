@@ -1,4 +1,5 @@
 import supportRouter from "./support";
+import paymentSetupRouter from "./payment-setup";
 import supportConversationsRouter from "./support-conversations";
 import financialReconciliationRouter from "./financial-reconciliation";
 import partialRefundsRouter from "./partial-refunds";
@@ -23,6 +24,7 @@ import ledgerRouter from "./ledger";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(paymentSetupRouter);
 router.use(supportConversationsRouter);
 router.use(financialReconciliationRouter);
 router.use(partialRefundsRouter);

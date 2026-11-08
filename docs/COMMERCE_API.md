@@ -7,6 +7,8 @@ administrator approval. No endpoint enables live charges.
 
 | Endpoint | Access | Purpose |
 | --- | --- | --- |
+| `GET /admin/payment-setup` | Admin | Redacted pricing, webhook and TEST-mode settings; exact expected destination/version/events; historical signed-event receipt time. |
+| `POST /admin/payment-setup/verify` | Admin | Empty body. Read-only real Stripe Balance/Webhook Endpoints checks, sanitized failures and audit; never creates money movements or enables ordering. Configuration checks do not certify checkout/signature delivery. |
 | `GET /session/access` | Verified Clerk session, self only | Redacted owner/owner-driver match flags and effective capabilities; no configured IDs or secrets. Available despite private admission mismatch. |
 | `PATCH /profiles/me` | Active self | Strict `{displayName,expectedDisplayName}`; compare-and-set name update and audit. No role, approval or identity changes. |
 | `GET /admin/administrator-access` | Active configured owner only | Dedicated staff account selector with opaque full-precision `accessVersion`; no Clerk IDs. |

@@ -86,6 +86,17 @@ try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await page.goto("http://127.0.0.1:" + server.address().port);
   await page
+    .getByRole("button", { name: "Verify Stripe TEST connection", exact: true })
+    .click();
+  await page
+    .getByText("Stripe confirmed TEST mode: Yes", { exact: true })
+    .waitFor();
+  await page
+    .getByText(
+      /These are configuration checks, not payment or webhook-delivery certification/,
+    )
+    .waitFor();
+  await page
     .getByText("Super Administrator (owner)", { exact: true })
     .waitFor();
   assert.equal(

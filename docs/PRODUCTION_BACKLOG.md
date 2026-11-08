@@ -4,9 +4,10 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
-## Current priority: owner access and functional workspaces
+## Current priority: real private TEST payment and delivery acceptance
 
-Staging: https://localeats-delivery-app.onrender.com/ (owner reports deployed 5e1fd62).
+Staging: https://localeats-delivery-app.onrender.com/ (verified deployed 6cad154 on
+November 8). Owner has confirmed Google sign-in and administrator controls.
 Read-only deployed checks November 8: /livez 200; /readyz reports DB/auth/provider/
 workers ready, pricing and webhook missing; unsigned profile and forged admin
 requests return 401. No authenticated Clerk session or Render/Neon secret access
@@ -56,6 +57,23 @@ the owner-only account list before retrying a conflict; never replay stale grant
 Next priority: deploy latest account/permission batches; configure test pricing and
 Stripe signing secret in owner-controlled settings, then complete the real
 four-role Stripe TEST acceptance sequence. Do not recreate the implemented APIs.
+
+## Current session: payment setup and delivery execution
+
+Baseline remote/workspace clean at 6cad154. Ten real read-only HTTP/security checks
+passed at that exact deployed revision; DB/auth/workers/test-provider configuration
+present, but pricing and webhook signing secret still missing. The engineering
+environment has no hosted secrets, owner session or provider credentials.
+
+Payment setup batch adds admin-only redacted local status and real server-side
+read-only Stripe Balance/Webhook Endpoints verification. Exact destination, SDK API
+version and event subscriptions are shown in /operations. Disabled/live/wrong-version/
+incomplete endpoints and provider failures never appear verified. No charges, bank
+data, endpoint changes, secret inputs or ordering activation are introduced.
+99 automated tests and production build/typechecks pass; phone-size component QA
+passes with explicit simulated auth/provider responses. Actual Stripe probe and
+signed checkout still require the owner-deployed endpoint and real owner session.
+Follow PRIVATE_TEST_DELIVERY.md for exact owner setup and the real acceptance path.
 
 ## Existing implemented foundation — preserve and verify on staging
 
