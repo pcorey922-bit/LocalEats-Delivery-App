@@ -4,6 +4,9 @@ import type { RequestHandler } from "express";
 // Admission is separate from roles: admitted testers still need ordinary approval.
 // Stripe's signed raw webhook is mounted before this middleware intentionally.
 export const privateStaging: RequestHandler = (req, res, next) => {
+  // Signed-in users may inspect only their own access, including an identity
+  // accidentally omitted from staging. The handler still requires real auth.
+  if (req.method === "GET" && req.path === "/session/access") return next();
   if (process.env.ROCOEATS_PRIVATE_STAGING !== "true") return next();
   const userId = getAuth(req).userId;
   if (!userId) {

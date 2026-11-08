@@ -1,4 +1,6 @@
 import { DriverDutySession } from "./pages/driver-duty-session";
+import { AccountAccess } from "./pages/account-access";
+import { workspaceLinks } from "./lib/workspace-links";
 import { NotificationsPage, EarningsPage, OperationsCommerce, DeletionRequest } from './pages/commerce-pages';
 import { MobileLifecycle, unregisterPush } from './lib/mobile';
 import { useState } from 'react';
@@ -294,11 +296,15 @@ function BrandLink() {
 
 function PortalHeader({ active }: { active: 'dashboard' | 'account' }) {
   const { signOut } = useClerk();
+  const profile = useProfileQuery();
   return <header className="portal-topbar">
     <BrandLink />
     <nav className="portal-nav" aria-label="Account navigation" data-testid="nav-account">
       <a className={active === 'dashboard' ? 'portal-nav-current' : ''} href={`${basePath}/dashboard`} data-testid="link-dashboard">Dashboard</a>
       <a className={active === 'account' ? 'portal-nav-current' : ''} href={`${basePath}/account`} data-testid="link-account">Account</a>
+      <a href={`${basePath}/account/access`}>Access check</a>
+      {profile.data?.role === 'admin' && <a href={`${basePath}/admin`}>Administrator</a>}
+      {['admin','driver'].includes(profile.data?.role??'') && <a href={`${basePath}/driver`}>Driver</a>}
       <button type="button" onClick={async () => { await unregisterPush().catch(()=>{}); await signOut({ redirectUrl: basePath || '/' }); }} data-testid="button-logout"><LogOut size={14} /> Log out</button>
     </nav>
   </header>;
@@ -436,10 +442,10 @@ function DashboardPage() {
   return <Protected><main className="portal" data-testid="page-dashboard"><div className="portal-shell"><PortalHeader active="dashboard" /><section className="portal-main">
     {profile.isError && !isNotFound(profile.error) ? <><div className="portal-eyebrow">Your LocalEats home</div><h1 className="portal-title">A place in the <em>community.</em></h1><div style={{ marginTop: 28 }}><QueryError retry={() => profile.refetch()} /></div></> : dashboard.isLoading ? <LoadingView label="Loading dashboard sections" /> : dashboard.isError ? <><div className="portal-eyebrow">Your LocalEats home</div><h1 className="portal-title">A place in the <em>community.</em></h1><div style={{ marginTop: 28 }}><QueryError retry={() => dashboard.refetch()} /></div></> : dashboard.data && <>
       <div className="portal-eyebrow">{dashboard.data.role} dashboard · Roane County</div><h1 className="portal-title">Welcome, <em>{dashboard.data.displayName}.</em></h1><p className="portal-lede">Your LocalEats space is ready. Here’s what’s part of your {dashboard.data.role} experience.</p>
-      <div className="portal-grid"><section className="portal-panel" data-testid="panel-dashboard-sections"><h2>Your dashboard</h2><p className="portal-panel-intro">Sections are provided for your account role. LocalEats is still preparing its operational services.</p>
-        <div className="portal-section-list" data-testid="list-dashboard-sections">{dashboard.data.sections.map((section, index) => <article className="portal-section-item" key={`${section}-${index}`} data-testid={`item-dashboard-section-${index}`}><span className="portal-section-number">{String(index + 1).padStart(2, '0')}</span><strong>{section}</strong></article>)}</div>
+      <div className="portal-grid"><section className="portal-panel" data-testid="panel-dashboard-sections"><h2>Your dashboard</h2><p className="portal-panel-intro">Open your workspace to manage actual records. Ordering remains controlled by the server’s staging settings.</p>
+        <div className="portal-section-list" data-testid="list-dashboard-sections">{workspaceLinks(dashboard.data.role).map((section, index) => <a href={`${basePath}${section.href}`} className="portal-section-item" key={section.href} data-testid={`item-dashboard-section-${index}`}><span className="portal-section-number">{String(index + 1).padStart(2, '0')}</span><div><strong>{section.title}</strong><p>{section.detail}</p></div><ArrowRight size={18}/></a>)}</div>
         {!dashboard.data.sections.length && <div className="portal-empty-error" data-testid="status-no-sections">No dashboard sections are available for this profile yet.</div>}
-        <div className="portal-status-note" data-testid="notice-services-inactive"><CircleAlert size={16} /><span>Not active yet: ordering, payments, restaurant and driver enrollment, dispatch, and GPS tracking. This dashboard does not represent live orders or operational activity.</span></div>
+        <div className="portal-status-note"><ShieldCheck size={16} /><span>Private staging · Stripe TEST only. Restaurant and driver approvals still apply. Check Account access if your owner controls are missing.</span></div>
       </section><aside className="portal-aside"><div className="portal-aside-mark"><UtensilsCrossed size={18} /></div><h3>Built around here.</h3><p>Local food and local people come first. We’re building the pieces carefully before service begins.</p><div className="portal-aside-rule" /><div className="portal-aside-foot"><MapPin size={15} />Roane County, Tennessee</div></aside></div>
     </>}
   </section></div></main></Protected>;
@@ -453,6 +459,7 @@ function Router() {
     <Route path="/orders" component={() => <Protected><OrdersPage /></Protected>} />
     <Route path="/restaurant" component={() => <Protected><RestaurantPage /></Protected>} />
     <Route path="/account/delete" component={() => <Protected><DeletionRequest /></Protected>} />
+    <Route path="/account/access" component={() => <Protected><AccountAccess /></Protected>} />
     <Route path="/notifications" component={() => <Protected><NotificationsPage /></Protected>} />
     <Route path="/earnings" component={() => <Protected><EarningsPage /></Protected>} />
     <Route path="/operations" component={() => <Protected><OperationsCommerce /></Protected>} />

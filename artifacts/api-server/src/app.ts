@@ -48,7 +48,10 @@ app.use((_req, res, next) => {
   res.setHeader("X-Frame-Options", "DENY");
   next();
 });
-app.get("/livez", (_req, res) => res.json({ alive: true }));
+app.get("/livez", (_req, res) => {
+  const revision = process.env.RENDER_GIT_COMMIT || process.env.ROCOEATS_RELEASE_SHA || "";
+  res.json({ alive: true, revision: /^[a-f0-9]{40}$/i.test(revision) ? revision : null });
+});
 app.get("/readyz", readiness);
 if (process.env.WEB_DIST_DIR) app.use(webHosting(process.env.WEB_DIST_DIR));
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());

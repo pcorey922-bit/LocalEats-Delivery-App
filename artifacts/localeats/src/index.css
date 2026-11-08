@@ -331,7 +331,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .portal-topbar { height: 76px; border-bottom: 1px solid #ded4c1; display:flex; align-items:center; justify-content:space-between; }
 .portal-brand { color:#254337; text-decoration:none; font-weight:700; letter-spacing:-.7px; font-size:19px; display:flex; align-items:center; gap:10px; }
 .portal-brand img { width:33px; height:33px; }
-.portal-nav { display:flex; align-items:center; gap:9px; }
+.portal-nav { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
 .portal-nav a,.portal-nav button { border:0; background:transparent; color:#52685a; text-decoration:none; font:600 12px var(--app-font-sans); padding:10px 14px; border-radius:99px; cursor:pointer; }
 .portal-nav a:hover,.portal-nav button:hover { background:#e7decb; color:#294538; }
 .portal-nav .portal-nav-current { background:#294538; color:#f7f0df; }
@@ -375,6 +375,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .portal-section-item { display:flex;gap:14px;align-items:center;background:#f8f3e7;border:1px solid #e2d8c6;border-radius:12px;padding:16px; }
 .portal-section-number { font:500 15px var(--app-font-serif);color:#bc6241;min-width:26px; }
 .portal-section-item strong { font:500 17px var(--app-font-serif);color:#31513f; }
+.portal-section-item { text-decoration:none; }
+.portal-section-item:focus-visible { outline:3px solid var(--roco-amber,#efbd68); outline-offset:3px; }
+@media(max-width:700px) { .portal-topbar { height:auto; min-height:76px; flex-wrap:wrap; gap:10px; padding-block:12px; } }
 .portal-status-note { display:flex;gap:12px;align-items:flex-start;margin-top:22px;padding:16px;border-left:2px solid #c36945;background:#eee6d6;color:#667568;border-radius:0 10px 10px 0;font-size:11px;line-height:1.65; }
 .portal-status-note svg { flex:0 0 auto;color:#b65e40;margin-top:1px; }
 .portal-skeleton { background:linear-gradient(90deg,#e9e0cf 25%,#f3eddf 45%,#e9e0cf 65%);background-size:200% 100%;border-radius:10px;animation:portal-shimmer 1.25s ease-in-out infinite; }

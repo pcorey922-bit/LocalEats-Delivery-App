@@ -1,5 +1,18 @@
 # Owner-controlled staging setup
 
+Owner-deployed staging: https://localeats-delivery-app.onrender.com/ . November 8
+checks verified liveness, protected anonymous/forged-header rejection and the Clerk
+Google sign-in screen at phone dimensions. Positive owner authentication remains
+unverified by engineering. After the owner-access update is deployed, sign in and
+open `/account/access`: both owner match rows must say Yes, with Super Administrator
+and Driver access. It returns match booleans, not configured IDs or secret keys.
+If Google created a different Clerk identity, compare your signed-in User ID on
+`/account` with Render Environment's `LOCALEATS_ADMIN_CLERK_USER_IDS` and
+`ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS`; correct those protected settings and redeploy.
+Never grant owner access by email or client metadata. A configured new owner profile
+is bootstrapped automatically; a suspended owner is never reactivated automatically.
+Then use `/dashboard` links to the real administrator and driver workspaces.
+
 No hosting purchase, account connection, DNS change, live payment or application
 publication has been performed. Do not enter bank details or secrets into chat,
 GitHub files, frontend variables, or the local payment simulator.
@@ -25,9 +38,9 @@ is likely necessary for reliable business operation. Confirm current provider
 pricing and authorize the purchase before creating paid resources. Current small
 staging pricing and explicit resource sizes are recorded in the Render guide.
 
-A private staging deployment is blocked until owner-controlled hosting, database,
-Clerk and Stripe test configuration are available through secure account settings.
-There is no deployed updated staging URL to provide yet. Component fixtures are
+The owner has connected free hosting/database and Clerk. Engineering has no access
+to hosted settings or an authenticated owner session. Stripe test webhook/pricing
+configuration and authenticated four-role acceptance checks remain open. Component fixtures are
 simulations for QA and must not be offered as a transactional business demo.
 
 ## Staging execution checklist

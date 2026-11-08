@@ -2860,6 +2860,44 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     await assert.rejects(engine.exec(`UPDATE support_messages SET body='rewritten' WHERE id='${reply.id}'`));await assert.rejects(engine.exec(`DELETE FROM support_messages WHERE id='${reply.id}'`));await assert.rejects(engine.exec('TRUNCATE support_messages'));
   });
 
+  await t.test("first owner sign-in bootstraps once and self-only access diagnostics work across private admission", async () => {
+    const previous = process.env.LOCALEATS_ADMIN_CLERK_USER_IDS;
+    const previousDriver = process.env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS;
+    const owner = `user_QAFirst${randomUUID().replaceAll('-','')}`;
+    try {
+      process.env.ROCOEATS_PRIVATE_STAGING = "true";
+      process.env.LOCALEATS_ADMIN_CLERK_USER_IDS = owner;
+      process.env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS = owner;
+      assert.equal((await api('/session/access',null)).status,401);
+      const member = await api('/session/access',ids.customer);
+      assert.equal(member.status,200); assert.equal(member.data.ownerConfigured,true);
+      assert.equal(member.data.ownerMatched,false); assert.equal(member.data.administrator,false);
+      assert.equal((await api('/admin/profiles',ids.customer)).status,403);
+      assert.equal((await api('/session/access',ids.customer,'POST',{})).status,403);
+      assert.equal(JSON.stringify(member.data).includes(owner),false);
+      assert.equal(JSON.stringify(member.data).includes(ids.customer),false);
+      const visits = await Promise.all([api('/dashboard',owner),api('/profiles/me',owner)]);
+      assert.ok(visits.every(result => result.status===200 && result.data.role==='admin'));
+      const access = await api('/session/access',owner);
+      assert.equal(access.data.superAdministrator,true);assert.equal(access.data.driver,true);
+      assert.equal(access.data.ownerDriverMatched,true);
+      assert.equal(access.data.profileStatus,'active');
+      const [saved] = await db.select().from(profilesTable).where(eq(profilesTable.clerkUserId,owner));
+      const audits=await db.select().from(auditLogsTable).where(eq(auditLogsTable.resourceId,saved.id));
+      assert.equal(audits.filter(row=>row.action==='owner.bootstrap.granted').length,1);
+      assert.equal((await api('/admin/profiles',owner)).status,200);
+      assert.equal((await api('/driver/availability',owner)).data.ownerDriverAccess,true);
+      await db.update(profilesTable).set({isActive:false}).where(eq(profilesTable.id,saved.id));
+      const suspended = await api('/session/access',owner);
+      assert.equal(suspended.data.profileStatus,'suspended');assert.equal(suspended.data.administrator,false);
+      assert.equal(suspended.data.driver,false);
+      assert.equal((await api('/dashboard',owner)).status,403);
+    } finally {
+      delete process.env.ROCOEATS_PRIVATE_STAGING;
+      if(previous===undefined)delete process.env.LOCALEATS_ADMIN_CLERK_USER_IDS;else process.env.LOCALEATS_ADMIN_CLERK_USER_IDS=previous;
+      if(previousDriver===undefined)delete process.env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS;else process.env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS=previousDriver;
+    }
+  });
   await t.test("server-configured owners bootstrap securely and deliver without self-approval; other admins and drivers cannot borrow access",async()=>{
     const previousDriver=process.env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS;
     const previous=process.env.LOCALEATS_ADMIN_CLERK_USER_IDS,ownerClerk=`user_QAOwner${randomUUID().replaceAll('-','')}`,otherClerk=`user_QAMember${randomUUID().replaceAll('-','')}`;

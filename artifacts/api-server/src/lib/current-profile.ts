@@ -20,6 +20,17 @@ export async function getActiveProfile(
     .where(eq(profilesTable.clerkUserId, clerkUserId))
     .limit(1);
   if (!profile) {
+    if (isConfiguredOwner(clerkUserId)) {
+      await db.transaction(async (tx) => {
+        const [created] = await tx.insert(profilesTable).values({
+          clerkUserId, role: "admin", displayName: "RoCoEats owner",
+        }).onConflictDoNothing({ target: profilesTable.clerkUserId }).returning();
+        if (created) await audit(tx, created.id, "owner.bootstrap.granted", created.id, { source: "server_allowlist" });
+      });
+      [profile] = await db.select().from(profilesTable).where(eq(profilesTable.clerkUserId, clerkUserId)).limit(1);
+    }
+  }
+  if (!profile) {
     res.status(404).json({ error: "Profile setup is required" });
     return null;
   }

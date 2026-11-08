@@ -785,3 +785,30 @@ Owner redeploy: existing Render web service > Manual Deploy > Deploy latest comm
 on feature/rocoeats-launch-readiness. Retain the free startup Docker Command and
 all protected settings, keep ordering false, and do not reset Neon. The owner's
 existing Render HTTPS URL was not supplied or verified in this repair session.
+
+## November 8 — working dashboard and verifiable owner access
+
+Continue from PRODUCTION_BACKLOG.md, which now persists priority, implemented
+foundation, external dependencies and the actual staging acceptance sequence.
+Owner supplied https://localeats-delivery-app.onrender.com/ and reports deployed
+5e1fd62 with Google sign-in. Read-only checks verified /livez 200, DB/auth/provider/
+worker readiness, missing pricing and webhook, and 401 for anonymous profile and
+forged administrator requests. Chromium at 390x844 verified real website navigation
+to Clerk's Google sign-in screen. No authenticated owner session was used.
+
+Found stale non-clickable /dashboard placeholders and a separate role read path.
+Dashboard now uses central active-profile authorization and real role-specific
+workspace links. Configured owners bootstrap a missing profile transactionally on
+first protected use; concurrent visits audit once, and suspension is preserved.
+Signed-in /account/access reports exact-match booleans for both owner settings,
+effective Super Administrator/Driver access and profile status, without returning
+IDs or secrets. Its self-only API remains available to a signed-in identity omitted
+from private admission; other business APIs remain blocked. /livez now includes a
+validated host-provided release hash when available for deployment verification.
+Navy styling/demo and ordering/payment guards are unchanged.
+
+93 automated tests and complete production build/typechecks pass locally, including
+new owner bootstrap, direct dashboard authorization, admission exemption privacy,
+forged-role rejection and suspended-owner diagnostics. Actual hosted flag values
+and positive owner/driver authorization remain unverified until deployment and a
+real owner session. No Render/Neon secrets or browser-control connector is connected.
