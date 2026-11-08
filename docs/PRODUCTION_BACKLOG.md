@@ -88,6 +88,17 @@ show ended sharing rather than waiting for a driver; manual refresh supports rec
 100 automated tests cover the full assignment/reassignment/pickup/handoff/completion
 path with test identities/payments and GPS samples. Phone UI fixture checks ended
 tracking; real device/background and actual-provider delivery remain unverified.
+Tracking committed as 8030577; all previous work was pushed before native changes.
+
+Native dependency batch isolates official Gradle/Swift package resolution from
+compiler steps, retries only transient HTTP 502/503/504 or transport timeouts up
+to three attempts, and preserves original failures. iOS builds share the explicitly
+resolved package directory; jobs have a 30-minute ceiling. Canonical URLs, TLS and
+package verification remain unchanged. The regression verifies recovery, no retry
+for compiler failures and bounded persistent outages. Actual native build results
+must be taken from the new CI run; upstream availability is not certified locally.
+Signing, system-browser Google OAuth on devices, push/background GPS and store
+distribution remain unverified and require owner-controlled accounts/devices.
 
 ## Existing implemented foundation — preserve and verify on staging
 

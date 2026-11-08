@@ -915,3 +915,15 @@ fresh/stale sample GPS, reassignment access revocation, pickup, real relational 
 proof and completion using test-only payment/identity adapters. Production typechecks/
 build and simulated phone-size actual-component tests pass. Actual Stripe/device E2E
 is still blocked on the owner's sandbox webhook/pricing/accounts and authorization.
+
+## November 8 — bounded native dependency recovery
+
+Tracking batch 8030577 is pushed; preserve it. Recent native runs fail before
+compilation on HTTP 504 fetching Gradle 8.14.3 and Capacitor 8.6.0 Swift binaries
+from their official releases. Added dependency-only bounded retries for transient
+transport failures, shared explicit Swift package resolution for simulator/release,
+and 30-minute job deadlines. Compiler/lint steps are not retried or suppressed;
+no mirror, TLS bypass, new service or paid cache was introduced. A standalone test
+verifies transient recovery, immediate compiler failure and original error codes
+after persistent outage. Check the new native CI; do not claim unsigned/native or
+actual-device readiness from these helper tests. Linux has no attached iOS device.

@@ -7,6 +7,7 @@ permissions:
 jobs:
   android:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -25,6 +26,9 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0'
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @workspace/localeats mobile:sync
+      - name: Resolve Gradle dependencies with bounded transport retries
+        run: bash ../../../scripts/retry-native-dependencies.sh ./gradlew help --no-daemon
+        working-directory: artifacts/localeats/android
       - run: ./gradlew assembleDebug --no-daemon
         working-directory: artifacts/localeats/android
       - name: Validate unsigned release APK and Android App Bundle
@@ -42,6 +46,7 @@ jobs:
           path: artifacts/localeats/android/app/build/outputs/apk/debug/app-debug.apk
   ios:
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -52,11 +57,14 @@ jobs:
       - run: xcodebuild -version
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @workspace/localeats mobile:sync
-      - run: xcodebuild -project App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+      - name: Resolve iOS packages with bounded transport retries
+        run: bash ../../../scripts/retry-native-dependencies.sh xcodebuild -resolvePackageDependencies -project App/App.xcodeproj -scheme App -clonedSourcePackagesDirPath "$RUNNER_TEMP/rocoeats-ios-packages"
+        working-directory: artifacts/localeats/ios
+      - run: xcodebuild -project App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -clonedSourcePackagesDirPath "$RUNNER_TEMP/rocoeats-ios-packages" -disableAutomaticPackageResolution -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
         working-directory: artifacts/localeats/ios
       - run: ditto -c -k --keepParent artifacts/localeats/ios/build/Build/Products/Debug-iphonesimulator/App.app "$RUNNER_TEMP/RoCoEats-iOS-simulator.zip"
       - name: Validate unsigned iOS device release compilation
-        run: xcodebuild -project App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath release-build CODE_SIGNING_ALLOWED=NO build
+        run: xcodebuild -project App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -clonedSourcePackagesDirPath "$RUNNER_TEMP/rocoeats-ios-packages" -disableAutomaticPackageResolution -derivedDataPath release-build CODE_SIGNING_ALLOWED=NO build
         working-directory: artifacts/localeats/ios
       - run: ditto -c -k --keepParent artifacts/localeats/ios/release-build/Build/Products/Release-iphoneos/App.app "$RUNNER_TEMP/RoCoEats-iOS-release-unsigned.zip"
       - uses: actions/upload-artifact@v4
