@@ -1,5 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { Client, freeStagingEnvironment, migrateFreeStaging } from "./free-staging.mjs";
 
 const valid = () => ({
@@ -37,16 +41,20 @@ test("startup waits for migration lock and completion; failures close the lock s
 });
 
 // CI uses a separate disposable database; never apply these tests to owner data.
-if (process.env.TEST_DATABASE_URL) test("real PostgreSQL migrations survive restart and serialize concurrent startup", async () => {
+if (process.env.TEST_DATABASE_URL) test("real PostgreSQL migrations bypass EACCES pnpm and preserve data through concurrent startup and restart", async () => {
   const testUrl = new URL(process.env.TEST_DATABASE_URL);
   assert.equal(testUrl.pathname, "/rocoeats_test", "Disposable CI database only");
   const control = new Client({ connectionString: testUrl.toString() });
   await control.connect();
   const database = "rocoeats_free_test";
   const smokeUrl = new URL(testUrl); smokeUrl.pathname = `/${database}`;
+  const deniedPath = await mkdtemp(join(tmpdir(), "rocoeats-denied-pnpm-"));
   try {
+    await writeFile(join(deniedPath, "pnpm"), "This shim must never be executed", { mode: 0o600 });
+    const denied = spawnSync("pnpm", ["--version"], { env: { PATH: deniedPath } });
+    assert.equal(denied.error?.code, "EACCES");
     await control.query(`CREATE DATABASE ${database}`);
-    const env = { ...process.env, DATABASE_URL: smokeUrl.toString() };
+    const env = { ...process.env, PATH: deniedPath, DATABASE_URL: smokeUrl.toString() };
     await Promise.all([migrateFreeStaging(env), migrateFreeStaging(env)]);
     const first = new Client({ connectionString: smokeUrl.toString() });
     await first.connect();
@@ -61,5 +69,6 @@ if (process.env.TEST_DATABASE_URL) test("real PostgreSQL migrations survive rest
   } finally {
     await control.query(`DROP DATABASE IF EXISTS ${database} WITH (FORCE)`);
     await control.end();
+    await rm(deniedPath, { recursive: true, force: true });
   }
 });

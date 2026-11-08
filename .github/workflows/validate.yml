@@ -53,6 +53,13 @@ jobs:
       - run: pnpm build
       - name: Build deployable website and API container
         run: docker build --tag rocoeats:ci .
+      - name: Verify packaged migrations as non-root without pnpm on PATH
+        run: |
+          docker exec ${{ job.services.postgres.id }} createdb --username=rocoeats rocoeats_container_migration
+          migration_url="postgresql://rocoeats:rocoeats_test_only@localhost:5432/rocoeats_container_migration"
+          docker run --rm --network host --env DATABASE_URL="$migration_url" --env PATH=/nonexistent rocoeats:ci /usr/local/bin/node --input-type=module -e "import assert from 'node:assert/strict'; import {migrateFreeStaging} from './scripts/free-staging.mjs'; assert.equal(process.getuid(),1000); await migrateFreeStaging(process.env);"
+          docker exec ${{ job.services.postgres.id }} psql --username=rocoeats --dbname=rocoeats_container_migration --command="INSERT INTO profiles (clerk_user_id, display_name, role) VALUES ('user_ContainerQA', 'Container migration QA', 'customer')"
+          docker run --rm --network host --env DATABASE_URL="$migration_url" --env PATH=/nonexistent rocoeats:ci /usr/local/bin/node --input-type=module -e "import {migrateFreeStaging,Client} from './scripts/free-staging.mjs'; import assert from 'node:assert/strict'; await migrateFreeStaging(process.env); const client=new Client({connectionString:process.env.DATABASE_URL}); await client.connect(); const result=await client.query('SELECT display_name FROM profiles WHERE clerk_user_id=\$1',['user_ContainerQA']); assert.equal(result.rows[0].display_name,'Container migration QA'); await client.end();"
       - name: Verify container startup, website routes and dependency readiness
         run: |
           docker run --detach --network host --name rocoeats-ci --env DATABASE_URL="$TEST_DATABASE_URL" --env PORT=3001 rocoeats:ci

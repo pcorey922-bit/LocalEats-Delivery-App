@@ -761,3 +761,27 @@ Enter the future Neon connection string only in Render's protected DATABASE_URL
 setting. FREE_STAGING_ANDROID.md provides the remaining phone steps for one-at-a-time
 assistance. After owner provisioning, verify actual HTTPS access, Clerk owner login,
 restricted testers, database persistence and real Stripe TEST webhook/order flow.
+
+## November 8 — Render migration subprocess EACCES correction
+
+Owner reported first Render Free startup at c9eaad7 failed spawning pnpm with
+EACCES. `free-staging.mjs` now launches the installed Drizzle JS CLI using the
+current absolute Node executable and the database package's working directory.
+This uses the same migration/configuration without a PATH lookup, executable pnpm
+shim or package-manager cache. Existing advisory locking, failure-before-startup,
+private admission and test-only ordering controls are unchanged. No schema, design,
+dependency, hosting plan or protected environment value changed.
+
+Focused PostgreSQL regression reproduces EACCES with an unreadable-for-execution
+pnpm shim, then passes fresh, concurrent and repeated migrations plus persistence
+checks using that same blocked PATH. Earlier container validation only started
+the API and did not run migrations inside the runtime image; CI now also migrates
+a fresh database as container UID 1000 with PATH=/nonexistent, restarts migration
+and verifies a persisted profile. Check this revision's Validate run for Docker
+build and non-root migration results. Local Docker storage remains constrained;
+the final image/build test runs on the GitHub CI runner.
+
+Owner redeploy: existing Render web service > Manual Deploy > Deploy latest commit
+on feature/rocoeats-launch-readiness. Retain the free startup Docker Command and
+all protected settings, keep ordering false, and do not reset Neon. The owner's
+existing Render HTTPS URL was not supplied or verified in this repair session.

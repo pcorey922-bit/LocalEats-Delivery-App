@@ -137,3 +137,15 @@ For rollback use a compatible previous Render deploy; never reverse financial SQ
 automatically or erase the DB to fix migration failures. Export Neon data before
 important changes and retain it privately. A later paid move uses the same code,
 SQL and Docker image; change hosting/settings after authorization, not business logic.
+
+## Redeploy after the migration launch permission fix
+
+If the first deploy failed with `spawn pnpm EACCES`, keep the existing service,
+Neon database and protected environment values. Startup now invokes the installed
+Drizzle JavaScript CLI with Node directly; it does not execute a pnpm shim.
+In Render, open this web service, confirm its branch is
+`feature/rocoeats-launch-readiness`, then tap **Manual Deploy → Deploy latest commit**.
+Keep Docker Command `node --enable-source-maps scripts/start-free-staging.mjs` and
+`ROCOEATS_ORDERING_ENABLED=false`. Do not reset the database or switch plans.
+Wait for successful migrations and **Live**, then open the service's existing
+HTTPS link. Incomplete webhook/pricing settings can still make `/readyz` return 503.

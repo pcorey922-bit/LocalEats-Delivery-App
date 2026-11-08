@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { containerEnvironment } from "./container-environment.mjs";
 
 const require = createRequire(new URL("../artifacts/api-server/package.json", import.meta.url));
@@ -23,9 +24,14 @@ export function freeStagingEnvironment(env) {
 
 function migrateProcess(env, signal) {
   return new Promise((resolve, reject) => {
-    const child = spawn("pnpm", ["--filter", "@workspace/db", "migrate"], {
+    // Run the packaged JS CLI using the already-running Node executable. Do not
+    // depend on PATH, executable pnpm shims or a root-owned package-manager cache.
+    const child = spawn(process.execPath, [
+      fileURLToPath(new URL("../lib/db/node_modules/drizzle-kit/bin.cjs", import.meta.url)),
+      "migrate", "--config", "./drizzle.config.ts",
+    ], {
       env, signal, stdio: "inherit",
-      cwd: new URL("../", import.meta.url),
+      cwd: new URL("../lib/db/", import.meta.url),
     });
     child.once("error", reject);
     child.once("exit", code => code === 0 ? resolve() : reject(new Error("Staging migration failed; server was not started")));
