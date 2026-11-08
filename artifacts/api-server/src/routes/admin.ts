@@ -1,4 +1,5 @@
 import { driverDutyLocationsTable } from "@workspace/db";
+import { isConfiguredOwner } from "../lib/owner-access";
 import { audit } from "../lib/commerce";
 import { deliveriesTable, driverPresenceTable } from "@workspace/db";
 import { CommerceError, paymentMode } from "../lib/commerce-policy";
@@ -268,7 +269,7 @@ router.patch(
         .where(eq(profilesTable.id, params.data.profileId))
         .for("update");
       if (!target) throw new CommerceError(404, "Profile not found");
-      if (target.role === "admin")
+      if (target.role === "admin" || isConfiguredOwner(target.clerkUserId))
         throw new CommerceError(
           403,
           "Administrator access is managed through the trusted server allowlist",

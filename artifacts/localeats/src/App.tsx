@@ -1,5 +1,6 @@
 import { DriverDutySession } from "./pages/driver-duty-session";
 import { AccountAccess } from "./pages/account-access";
+import { AccountSettings } from "./pages/account-settings";
 import { workspaceLinks } from "./lib/workspace-links";
 import { NotificationsPage, EarningsPage, OperationsCommerce, DeletionRequest } from './pages/commerce-pages';
 import { MobileLifecycle, unregisterPush } from './lib/mobile';
@@ -377,8 +378,8 @@ function AccountSetup() {
   }, [profile.data, setLocation]);
   const roles = [
     { id: 'customer' as const, label: 'Neighbor', detail: 'Here to discover local food', Icon: UserRound },
-    { id: 'restaurant' as const, label: 'Restaurant', detail: 'Part of the local food scene', Icon: Store },
-    { id: 'driver' as const, label: 'Driver', detail: 'Interested in local delivery', Icon: Bike },
+    { id: 'restaurant' as const, label: 'Restaurant', detail: 'Apply and manage your restaurant', Icon: Store },
+    { id: 'driver' as const, label: 'Driver', detail: 'Apply to deliver with RoCoEats', Icon: Bike },
   ];
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -386,10 +387,10 @@ function AccountSetup() {
     if (!cleanName) { setErrorText('Add a display name to continue.'); return; }
     setErrorText('');
     createProfile.mutate({ data: { role, displayName: cleanName } }, {
-      onSuccess: () => {
+      onSuccess: (saved) => {
         queryClient.invalidateQueries({ queryKey: getGetMyProfileQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetMyDashboardQueryKey() });
-        setLocation('/dashboard');
+        setLocation(saved.role === 'admin' ? '/admin' : saved.role === 'restaurant' ? '/restaurant' : saved.role === 'driver' ? '/driver' : '/dashboard');
       },
       onError: () => setErrorText('We couldn’t save your profile just now. Please try again.'),
     });
@@ -423,6 +424,7 @@ function AccountPage() {
     <div className="portal-eyebrow">Your LocalEats profile</div><h1 className="portal-title">Account, <em>at a glance.</em></h1><p className="portal-lede">Your account details and how you’re connected to the LocalEats community.</p>
     {profile.isError ? <div style={{ marginTop: 30 }}><QueryError retry={() => profile.refetch()} /></div> : profile.data && <div className="portal-grid"><section className="portal-panel" data-testid="panel-profile-details"><h2>Profile details</h2><p className="portal-panel-intro">This is the information attached to your LocalEats profile.</p>
       <div className="portal-profile-row"><span className="portal-profile-label">Display name</span><span className="portal-profile-value" data-testid="text-profile-name">{profile.data.displayName}</span></div>
+      <AccountSettings displayName={profile.data.displayName}/>
       <div className="portal-profile-row"><span className="portal-profile-label">Role</span><span className="portal-profile-value"><span className="portal-role-badge" data-testid="text-profile-role">{profile.data.role}</span></span></div>
       <div className="portal-profile-row"><span className="portal-profile-label">Account ID</span><span className="portal-profile-value" data-testid="text-profile-id">{profile.data.id}</span></div>
       <div className="portal-profile-row"><span className="portal-profile-label">Clerk user ID</span><span className="portal-profile-value" data-testid="text-clerk-user-id">{user?.id || 'Not available'}</span></div>

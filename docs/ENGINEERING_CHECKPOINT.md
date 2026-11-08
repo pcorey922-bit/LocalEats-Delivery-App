@@ -812,3 +812,25 @@ new owner bootstrap, direct dashboard authorization, admission exemption privacy
 forged-role rejection and suspended-owner diagnostics. Actual hosted flag values
 and positive owner/driver authorization remain unverified until deployment and a
 real owner session. No Render/Neon secrets or browser-control connector is connected.
+
+## November 8 — protected owner recovery and account/onboarding controls
+
+Owner/dashboard batch 8d651fa passed complete PostgreSQL, backup/restore, production
+build, Docker image, non-root migration/persistence and startup CI 42463887908.
+
+Second batch prevents member management from changing a configured owner's record
+even before bootstrap has changed its stored customer role. Added self-only
+display-name updates with strict input, atomic expected-name checks, active-account
+fencing and audit; role/identity/approval input is rejected. Account settings expose
+Clerk-managed sign-in/security controls. Restaurant/driver registration routes into
+the real respective workspace. Denied admin/driver/profile views now offer safe
+access/setup recovery links. Signed-in Clerk ID copying works independently of a
+business profile so an owner omitted from admission can repair host configuration.
+
+94 automated tests and complete production typechecks/build passed locally. An
+isolated Chromium 390x844 test of the real React components verified owner/driver
+workspace links, identity-mismatch recovery, self-profile PATCH payload, security
+settings delegation and mobile layout with production CSS. Its auth/API are
+explicitly simulated, distinct from the actual deployed sign-in-screen checks.
+No authenticated real owner, Stripe, push or physical-device verification is claimed.
+Use the second batch's pushed PostgreSQL/container CI before redeployment.

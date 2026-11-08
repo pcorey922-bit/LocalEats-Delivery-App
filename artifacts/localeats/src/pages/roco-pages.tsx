@@ -38,7 +38,7 @@ function Logo() { return <Link className="roco-logo" href="/"><span className="r
 function Shell({ children }: { children: React.ReactNode }) {
   const { isSignedIn, userId } = useAuth(); const { signOut } = useClerk();
   return <div className="roco-page"><header className="roco-header roco-wrap"><Logo/><nav className="roco-nav" aria-label="Main navigation">
-    <Link href="/">Find food</Link>{isSignedIn && <><Link href="/orders">Orders</Link><Link href="/restaurant">Restaurant</Link><Link href="/driver">Driver</Link><Link href="/account">Account</Link><Link href="/admin">Operations</Link><button onClick={async () => { if(userId)dutyIntent.set(userId,false); await customFetch('/api/driver/availability',{method:'PUT',body:JSON.stringify({available:false})}).catch(()=>{}); await unregisterPush().catch(()=>{}); await signOut({ redirectUrl: '/' }); }}>Sign out</button></>}
+    <Link href="/">Find food</Link>{isSignedIn && <><Link href="/dashboard">Dashboard</Link><Link href="/orders">Orders</Link><Link href="/restaurant">Restaurant</Link><Link href="/driver">Driver</Link><Link href="/account">Account</Link><Link href="/admin">Operations</Link><button onClick={async () => { if(userId)dutyIntent.set(userId,false); await customFetch('/api/driver/availability',{method:'PUT',body:JSON.stringify({available:false})}).catch(()=>{}); await unregisterPush().catch(()=>{}); await signOut({ redirectUrl: '/' }); }}>Sign out</button></>}
     {!isSignedIn && <><Link href="/sign-in">Sign in</Link><Link href="/sign-up">Create account</Link></>}
   </nav></header><CommerceBanner/>{children}</div>;
 }
@@ -51,7 +51,7 @@ function useMyProfile() { return useGetMyProfile({ query: { queryKey: ['/api/pro
 function RoleGate({ allowed }: { allowed: string[] }) {
   const profile = useMyProfile();
   if (profile.isLoading) return <Loading label="Checking account permissions"/>;
-  if (profile.isError) return <Shell><main className="roco-main"><LoadError retry={() => void profile.refetch()} message="Sign in and complete your profile to continue."/></main></Shell>;
+  if (profile.isError) return <Shell><main className="roco-main"><LoadError retry={() => void profile.refetch()} message="Sign in and complete your profile to continue."/><p><Link href="/account/setup">Complete profile setup</Link> · <Link href="/account/access">Check account access</Link></p></main></Shell>;
   if (!profile.data || !allowed.includes(profile.data.role)) return <Shell><main className="roco-main"><PageIntro eyebrow="Permission required" title="This area is not part of your role."/><div className="roco-alert">Your account does not have an allowed role. Contact an administrator if you need different access.</div></main></Shell>;
   return null;
 }
@@ -162,7 +162,7 @@ export function AdminPage() {
   const finance = useGetAdminFinance({ query: { queryKey: getGetAdminFinanceQueryKey(), enabled: profile.data?.role === 'admin', retry: false } });
   const changeRestaurant = useUpdateAdminRestaurantStatus(); const changeProfile = useUpdateAdminProfile();
   if (profile.isLoading) return <Shell><Loading label="Checking operations access"/></Shell>;
-  if (profile.isError || profile.data?.role !== 'admin') return <Shell><main className="roco-main"><PageIntro eyebrow="Restricted operations" title="Administrator access only."/><div className="roco-alert">This view requires an active admin profile. Customer and restaurant accounts cannot access operations records.</div></main></Shell>;
+  if (profile.isError || profile.data?.role !== 'admin') return <Shell><main className="roco-main"><PageIntro eyebrow="Restricted operations" title="Administrator access only."/><div className="roco-alert">This view requires an active admin profile. <Link href="/account/access">Check owner access and configuration</Link> or <Link href="/account/setup">complete profile setup</Link>.</div></main></Shell>;
   const refresh = () => invalidate(client, getGetAdminOverviewQueryKey(), getListAdminRestaurantsQueryKey(), getListAdminProfilesQueryKey(), getGetAdminFinanceQueryKey());
   const changeStatus = (id: string, status: 'approved'|'rejected'|'suspended') => changeRestaurant.mutate({ restaurantId: id, data: { status } }, { onSuccess: refresh });
   const stat = (label: string, value: number | string) => <div className="roco-stat" key={label}><span>{label}</span><strong>{value}</strong></div>;
@@ -192,7 +192,8 @@ export function DriverPage() {
     mutationFn: ({ orderId, action }: { orderId: string; action: string }) => customFetch(`/api/driver/orders/${orderId}/${action}`, { method: 'POST' }),
     onSuccess: () => { void client.invalidateQueries({queryKey:['driver-availability']}); void client.invalidateQueries({ queryKey: ['driver-offers'] }); void client.invalidateQueries({ queryKey: ['driver-deliveries'] }); },
   });
-  if (!enabled) return <Shell><main className="roco-main"><PageIntro eyebrow="Driver access" title="Your delivery workspace.">Sign in with an active, administrator-approved driver profile to view deliveries.</PageIntro></main></Shell>;
+  if (profile.isLoading) return <Shell><Loading label="Checking driver access"/></Shell>;
+  if (!enabled) return <Shell><main className="roco-main"><PageIntro eyebrow="Driver access" title="Your delivery workspace.">Sign in with an active, administrator-approved driver profile to view deliveries.</PageIntro><p><Link href="/account/access">Check owner-driver access</Link> · <Link href="/account/setup">Complete profile setup</Link></p></main></Shell>;
   const card = (d: DriverDelivery, offer: boolean) => <article className="roco-card" key={d.orderId}>
     {d.status==='picked_up'&&d.orderStatus==='out_for_delivery'&&<DriverHandoff orderId={d.orderId} onCompleted={()=>{void client.invalidateQueries({queryKey:['driver-availability']});void client.invalidateQueries({queryKey:['driver-deliveries']});void client.invalidateQueries({queryKey:['driver-offers']});}}/>}
     {!offer&&<SupportDesk orderId={d.orderId}/>}<h3>{d.restaurantName}</h3><p>Pickup: {d.pickupStreet}, {d.pickupCity}</p><p className="roco-meta">Order {d.orderId} · {statusText(d.status)}</p>

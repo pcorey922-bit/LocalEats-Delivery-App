@@ -1,7 +1,9 @@
 import { isConfiguredOwner } from "../lib/owner-access";
 import { getActiveProfile } from "../lib/current-profile";
 import { audit } from "../lib/commerce";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { z } from "zod";
+import { CommerceError } from "../lib/commerce-policy";
 import { Router, type IRouter } from "express";
 import {
   CreateMyProfileBody,
@@ -57,6 +59,23 @@ router.get("/profiles/me", requireAuth, async (req, res): Promise<void> => {
   const profile = await getActiveProfile(req, res);
   if (!profile) return;
   res.json(GetMyProfileResponse.parse(toApiProfile(profile)));
+});
+
+router.patch("/profiles/me", requireAuth, async (req, res) => {
+  const profile = await getActiveProfile(req, res);
+  if (!profile) return;
+  const input = z.object({
+    displayName: z.string().trim().min(1).max(120),
+    expectedDisplayName: z.string().min(1).max(120),
+  }).strict().parse(req.body);
+  const saved = await db.transaction(async tx => {
+    const [updated] = await tx.update(profilesTable).set({ displayName: input.displayName })
+      .where(and(eq(profilesTable.id,profile.id),eq(profilesTable.isActive,true),eq(profilesTable.displayName,input.expectedDisplayName))).returning();
+    if (!updated) throw new CommerceError(409,"Your profile changed. Refresh before saving again.");
+    await audit(tx,profile.id,"profile.settings_updated",profile.id,{fields:["displayName"]});
+    return updated;
+  });
+  res.json(GetMyProfileResponse.parse(toApiProfile(saved)));
 });
 
 router.post("/profiles/me", requireAuth, async (req, res): Promise<void> => {

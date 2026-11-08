@@ -2860,6 +2860,34 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     await assert.rejects(engine.exec(`UPDATE support_messages SET body='rewritten' WHERE id='${reply.id}'`));await assert.rejects(engine.exec(`DELETE FROM support_messages WHERE id='${reply.id}'`));await assert.rejects(engine.exec('TRUNCATE support_messages'));
   });
 
+  await t.test("account settings are self-only, audited, race-safe and cannot change privileges; configured owners are protected before bootstrap", async () => {
+    const subject=`user_QASettings${randomUUID().replaceAll('-','')}`;
+    const created=await api('/profiles/me',subject,'POST',{displayName:'Account settings fixture',role:'customer'});
+    assert.equal(created.status,201);
+    const path='/profiles/me';
+    assert.equal((await api(path,null,'PATCH',{displayName:'Changed',expectedDisplayName:created.data.displayName})).status,401);
+    assert.equal((await api(path,subject,'PATCH',{displayName:'Changed',expectedDisplayName:created.data.displayName,role:'admin'})).status,400);
+    assert.equal((await api(path,subject,'PATCH',{displayName:' ',expectedDisplayName:created.data.displayName})).status,400);
+    const changes=await Promise.all(['First profile edit','Second profile edit'].map(displayName=>api(path,subject,'PATCH',{displayName,expectedDisplayName:created.data.displayName})));
+    assert.deepEqual(changes.map(result=>result.status).sort(),[200,409]);
+    const saved=await api(path,subject);assert.equal(saved.data.role,'customer');
+    const audit=await db.select().from(auditLogsTable).where(eq(auditLogsTable.resourceId,created.data.id));
+    assert.equal(audit.filter(row=>row.action==='profile.settings_updated').length,1);
+    await db.update(profilesTable).set({isActive:false}).where(eq(profilesTable.id,created.data.id));
+    assert.equal((await api(path,subject,'PATCH',{displayName:'Suspended edit',expectedDisplayName:saved.data.displayName})).status,403);
+    const owner=`user_QABefore${randomUUID().replaceAll('-','')}`;
+    const [pending]=await db.insert(profilesTable).values({clerkUserId:owner,displayName:'Owner before bootstrap',role:'customer'}).returning();
+    const previous=process.env.LOCALEATS_ADMIN_CLERK_USER_IDS;
+    try {
+      process.env.LOCALEATS_ADMIN_CLERK_USER_IDS=owner;
+      assert.equal((await api(`/admin/profiles/${pending.id}`,ids.admin,'PATCH',{isActive:false})).status,403);
+      assert.equal((await api(`/admin/profiles/${pending.id}`,ids.admin,'PATCH',{role:'driver'})).status,403);
+      const [unchanged]=await db.select().from(profilesTable).where(eq(profilesTable.id,pending.id));
+      assert.equal(unchanged.isActive,true);assert.equal(unchanged.role,'customer');
+      assert.equal((await api('/dashboard',owner)).data.role,'admin');
+      assert.equal((await api(path,owner,'PATCH',{displayName:'Owner business name',expectedDisplayName:pending.displayName})).status,200);
+    } finally {if(previous===undefined)delete process.env.LOCALEATS_ADMIN_CLERK_USER_IDS;else process.env.LOCALEATS_ADMIN_CLERK_USER_IDS=previous;}
+  });
   await t.test("first owner sign-in bootstraps once and self-only access diagnostics work across private admission", async () => {
     const previous = process.env.LOCALEATS_ADMIN_CLERK_USER_IDS;
     const previousDriver = process.env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS;

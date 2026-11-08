@@ -21,9 +21,20 @@ Authenticated diagnostics remain reachable when private staging admission is
 misconfigured; this grants no business API access and returns no configured IDs.
 Expose a validated release SHA in /livez for deployed revision checks.
 
-Next batch: protect configured owner records before their first bootstrap, improve
-account/operational navigation and the safe owner recovery path. Review the real
-four-role onboarding and execution path instead of recreating completed features.
+Batch 1 committed as 8d651fa; PostgreSQL/restore/container Validate CI 42463887908
+passed. Actual owner access remains deployment/session dependent.
+
+Batch 2: protect configured owner records before first bootstrap; add strict,
+audited own-profile settings with concurrent-edit protection and provider-managed
+sign-in/security controls; send new restaurant/driver registrations directly to
+their workspaces. Denied operations/driver pages link to setup/access recovery.
+The access page shows only the signed-in user's own Clerk ID with a copy action,
+so the owner can correct a Google-created identity mismatch without being able to
+load a business profile. Server diagnostics still return no configured IDs.
+
+Next priority: deploy these batches and verify both owner setting matches and
+positive owner/driver access on the actual site, then complete the real four-role
+Stripe TEST acceptance sequence. Do not recreate the implemented API foundation.
 
 ## Existing implemented foundation — preserve and verify on staging
 
@@ -71,6 +82,10 @@ four-role onboarding and execution path instead of recreating completed features
 - Native background lifecycle/device verification, commercial settlement/bank payout
   reconciliation, load/availability certification and launch policy review remain
   open. Expand this list with concrete failures from the actual staging exercises.
+- Administrator delegation/revocation UI remains restricted: administrator roles
+  cannot be changed through ordinary member updates; owner IDs are configured in
+  protected server settings. Design explicit owner-only delegation with audit and
+  custody safeguards before broadening administrator management.
 
 ## Resume and evidence discipline
 
