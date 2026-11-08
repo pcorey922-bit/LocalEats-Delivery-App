@@ -4,7 +4,7 @@ import { z } from "zod";
 import { audit } from "../lib/commerce";
 import { deliveriesTable, driverPresenceTable, driverApplicationsTable } from "@workspace/db";
 import { CommerceError, paymentMode } from "../lib/commerce-policy";
-import { and, count, desc, eq, inArray, sum } from "drizzle-orm";
+import { and, count, desc, eq, inArray, sum, sql } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
   GetAdminFinanceResponse,
@@ -31,17 +31,29 @@ import { getActiveProfile, requireRole } from "../lib/current-profile";
 import { requireAuth } from "../middlewares/require-auth";
 
 const router: IRouter = Router();
+const accessVersion=sql<string>`to_char(${profilesTable.updatedAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US')`;
+
+router.get("/admin/administrator-access", requireAuth, async (req,res) => {
+  const actor=await getActiveProfile(req,res);
+  if (!actor || !requireRole(actor,["admin"],res)) return;
+  if (!isConfiguredOwner(actor.clerkUserId)) throw new CommerceError(403,"Only a configured platform owner can manage administrators");
+  res.setHeader("Cache-Control","no-store");
+  res.json(await db.select({id:profilesTable.id,displayName:profilesTable.displayName,role:profilesTable.role,isActive:profilesTable.isActive,accessVersion})
+    .from(profilesTable).orderBy(desc(profilesTable.createdAt)).limit(1000));
+});
 
 router.put("/admin/administrator-access/:profileId", requireAuth, async (req,res) => {
   const actor=await getActiveProfile(req,res);
   if (!actor || !requireRole(actor,["admin"],res)) return;
   if (!isConfiguredOwner(actor.clerkUserId)) throw new CommerceError(403,"Only a configured platform owner can manage administrators");
   const id=z.string().uuid().parse(req.params.profileId);
-  const input=z.object({enabled:z.boolean(),expectedRole:z.enum(["customer","admin"]),reason:z.string().trim().min(10).max(500)}).strict().parse(req.body);
+  const input=z.object({enabled:z.boolean(),expectedRole:z.enum(["customer","admin"]),expectedVersion:z.string().min(1).max(80),reason:z.string().trim().min(10).max(500)}).strict().parse(req.body);
   const saved=await db.transaction(async tx=>{
     const [target]=await tx.select().from(profilesTable).where(eq(profilesTable.id,id)).for("update").limit(1);
     if(!target)throw new CommerceError(404,"Account not found");
     if(isConfiguredOwner(target.clerkUserId))throw new CommerceError(403,"Owner access is protected and managed in server configuration");
+    const [stamp]=await tx.select({accessVersion}).from(profilesTable).where(eq(profilesTable.id,id)).limit(1);
+    if(stamp.accessVersion!==input.expectedVersion)throw new CommerceError(409,"Account changed. Refresh before continuing.");
     if(target.role!==input.expectedRole)throw new CommerceError(409,"Account role changed. Refresh before continuing.");
     if(!target.isActive&&input.enabled)throw new CommerceError(409,"Activate the account before granting administrator access");
     if(input.enabled===(target.role==="admin"))return target;
@@ -57,7 +69,7 @@ router.put("/admin/administrator-access/:profileId", requireAuth, async (req,res
     // An administrator who subsequently enrolled as a driver retains that member
     // role/approval on revocation. Removing admin must never invent driver approval.
     const role=input.enabled?"admin":applications.length||target.driverApproved?"driver":"customer";
-    const [updated]=await tx.update(profilesTable).set({role,driverApproved:role==="driver"?target.driverApproved:false}).where(eq(profilesTable.id,id)).returning();
+    const [updated]=await tx.update(profilesTable).set({role,driverApproved:role==="driver"?target.driverApproved:false,updatedAt:sql`clock_timestamp()`}).where(eq(profilesTable.id,id)).returning();
     await tx.update(driverPresenceTable).set({available:false}).where(eq(driverPresenceTable.profileId,id));
     await tx.delete(driverDutyLocationsTable).where(eq(driverDutyLocationsTable.profileId,id));
     await audit(tx,actor.id,input.enabled?"administrator.access_granted":"administrator.access_revoked",id,{reason:input.reason,fromRole:target.role,toRole:role});

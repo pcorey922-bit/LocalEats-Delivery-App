@@ -5,7 +5,11 @@ enable live transactions, discard changes or claim launch readiness.
 
 ## Saved source and verification
 
-Current continuation: see the November 8 zero-cost staging section at the end of this file.
+Current continuation: read PRODUCTION_BACKLOG.md and the November 8 owner access/
+administrator delegation sections at the end of this file. Owner-assisted access
+checks passed on real staging revision 8d651fa; latest source is in git log.
+
+Historical baseline below (superseded by the current sections):
 Verified application revision `2c0877806045fe9b4ac01439ff3e0bb29464bba7` passed
 PostgreSQL/restore/container CI (42352071658; PR validation 42352068790) and
 unsigned native CI (42352071596). The following staging package and small error/
@@ -855,3 +859,12 @@ updates still cannot grant admin. 95 automated tests and complete production bui
 typechecks passed locally. Chromium component checks cover grant/revoke payloads
 at 390x844 with simulated auth/API; actual deployed delegation remains untested.
 No new services, dependencies, migrations, live payments or ordering activation.
+
+Administrator batch 4cf3216 passed PostgreSQL/restore/build/container CI 42465057837.
+Follow-up adds full-precision opaque version fencing for grant/revoke writes, using
+database clock timestamps. The regression explicitly grants, revokes, then retries
+the original customer-role grant: it stays rejected despite the role returning to
+customer. UI fetches owner-only account versions and can refresh conflicts. 95 tests,
+production build/typechecks and simulated phone-size component checks passed.
+Check this follow-up's pushed CI before deploying the final source. No owner session,
+provider secrets or paid infrastructure was added to the engineering environment.

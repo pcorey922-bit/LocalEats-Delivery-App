@@ -47,6 +47,11 @@ require dedicated active customer accounts without driver enrollment, restaurant
 ownership or active orders. Revocation fences delivery custody and retains ordinary
 driver enrollment/approval rather than inventing approval. Ordinary admins cannot
 delegate. No schema, hosting, payment or driver-approval bypass was introduced.
+Committed as 4cf3216; complete PostgreSQL/container CI 42465057837 passed.
+Follow-up fences writes with full-precision database versions and stamps role
+changes with the database clock: a delayed grant stays rejected even after an
+intervening grant/revoke cycle returns the account to its original role. Refresh
+the owner-only account list before retrying a conflict; never replay stale grants.
 
 Next priority: deploy latest account/permission batches; configure test pricing and
 Stripe signing secret in owner-controlled settings, then complete the real

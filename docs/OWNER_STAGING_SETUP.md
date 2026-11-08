@@ -2,8 +2,10 @@
 
 Owner-deployed staging: https://localeats-delivery-app.onrender.com/ . November 8
 checks verified liveness, protected anonymous/forged-header rejection and the Clerk
-Google sign-in screen at phone dimensions. Positive owner authentication remains
-unverified by engineering. After the owner-access update is deployed, sign in and
+Google sign-in screen at phone dimensions. The owner subsequently confirmed both
+owner matches and Administrator/Driver access; engineering correlated deployed
+revision 8d651fa. Direct authenticated owner API requests were not made by engineering.
+After any later owner-access update is deployed, sign in and
 open `/account/access`: both owner match rows must say Yes, with Super Administrator
 and Driver access. It returns match booleans, not configured IDs or secret keys.
 If Google created a different Clerk identity, compare your signed-in User ID on

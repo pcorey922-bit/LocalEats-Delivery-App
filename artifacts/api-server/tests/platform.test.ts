@@ -2866,10 +2866,12 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     try {
       process.env.LOCALEATS_ADMIN_CLERK_USER_IDS=owner;
       const ownerProfile=await api('/profiles/me',owner);assert.equal(ownerProfile.status,200);
+      const versionFor=async(id:string)=>(await api('/admin/administrator-access',owner)).data.find((member:any)=>member.id===id).accessVersion;
+      assert.equal((await api('/admin/administrator-access',ids.admin)).status,403);
       const staff=`user_QAStaff${randomUUID().replaceAll('-','')}`;
       const saved=await api('/profiles/me',staff,'POST',{role:'customer',displayName:'Dedicated staff fixture'});
       const path=`/admin/administrator-access/${saved.data.id}`;
-      const grant={enabled:true,expectedRole:'customer',reason:'Owner approved a dedicated staging operator'};
+      const grant={enabled:true,expectedRole:'customer',expectedVersion:await versionFor(saved.data.id),reason:'Owner approved a dedicated staging operator'};
       assert.equal((await api(path,null,'PUT',grant)).status,401);
       assert.equal((await api(path,ids.admin,'PUT',grant)).status,403);
       assert.equal((await api(path,staff,'PUT',grant)).status,403);
@@ -2880,23 +2882,25 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       assert.equal((await api('/admin/profiles',staff)).status,200);
       assert.equal((await api('/driver/availability',staff)).data.approved,false);
       assert.equal((await api(path,staff,'PUT',{enabled:false,expectedRole:'admin',reason:'A delegated admin cannot manage administrator authority'})).status,403);
-      assert.equal((await api(path,owner,'PUT',{enabled:false,expectedRole:'admin',reason:'Owner removed the temporary staging operator'})).data.role,'customer');
+      assert.equal((await api(path,owner,'PUT',{enabled:false,expectedRole:'admin',expectedVersion:await versionFor(saved.data.id),reason:'Owner removed the temporary staging operator'})).data.role,'customer');
+      assert.equal((await api(path,owner,'PUT',grant)).status,409); // Role returned to customer; the old version still cannot re-grant.
       assert.equal((await api('/admin/profiles',staff)).status,403);
       const rows=await db.select().from(auditLogsTable).where(eq(auditLogsTable.resourceId,saved.data.id));
       assert.equal(rows.filter(row=>row.action==='administrator.access_granted').length,1);
       assert.equal(rows.filter(row=>row.action==='administrator.access_revoked').length,1);
       const active=await create();
-      assert.equal((await api(`/admin/administrator-access/${ids.customer}`,owner,'PUT',grant)).status,409);
+      const blocked=await api(`/admin/administrator-access/${ids.customer}`,owner,'PUT',{...grant,expectedVersion:await versionFor(ids.customer)});
+      assert.equal(blocked.status,409);assert.match(blocked.data.error,/Finish active/);
       await api(`/orders/${active.id}/cancel`,ids.customer,'POST',{reason:'Close administrator eligibility test order'});
       for(const approved of [false,true]){
         const subject=`user_QAStaffDriver${randomUUID().replaceAll('-','')}`;
         const member=await api('/profiles/me',subject,'POST',{role:'customer',displayName:'Staff driver enrollment fixture'});
         const permissionPath=`/admin/administrator-access/${member.data.id}`;
-        assert.equal((await api(permissionPath,owner,'PUT',grant)).status,200);
+        assert.equal((await api(permissionPath,owner,'PUT',{...grant,expectedVersion:await versionFor(member.data.id)})).status,200);
         const application=await api('/driver/application',subject,'PUT',{phone:'+1 865 555 0199',vehicleMake:'Toyota',vehicleModel:'Corolla',vehicleYear:2022,licenseState:'TN',licenseExpiresOn:'2030-12-31',eligibilityAttested:true,insuranceAttested:true});
         assert.equal(application.status,200);
         if(approved)assert.equal((await api(`/admin/driver-applications/${member.data.id}/review`,owner,'POST',{version:application.data.version,approved:true,identityChecked:true,screeningChecked:true,insuranceChecked:true,note:'TEST external screening and insurance evidence checked'})).status,200);
-        const revoked=await api(permissionPath,owner,'PUT',{enabled:false,expectedRole:'admin',reason:'Remove administrator authority and retain driver application'});
+        const revoked=await api(permissionPath,owner,'PUT',{enabled:false,expectedRole:'admin',expectedVersion:await versionFor(member.data.id),reason:'Remove administrator authority and retain driver application'});
         assert.equal(revoked.status,200);assert.equal(revoked.data.role,'driver');
         assert.equal((await api('/driver/availability',subject)).data.approved,approved);
         assert.equal((await api('/admin/profiles',subject)).status,403);
