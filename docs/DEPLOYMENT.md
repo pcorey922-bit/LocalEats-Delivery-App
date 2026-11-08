@@ -90,7 +90,11 @@ schema followed by every incremental migration from scratch.
    and is mounted before JSON parsing and Clerk middleware.
 3. Subscribe to `checkout.session.completed`,
    `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `refund.created`, `refund.updated`,
-   and `refund.failed`. Completion pages never independently mark payment paid.
+   `refund.failed`, `charge.dispute.created`, `charge.dispute.updated`,
+   `charge.dispute.closed`, `charge.dispute.funds_withdrawn` and
+   `charge.dispute.funds_reinstated`. Use snapshot events from the platform
+   account at Stripe API version `2026-10-28.endive` (installed SDK version).
+   Completion pages never independently mark payment paid.
 4. On `/earnings`, onboard test restaurant/driver Connect accounts. Operations can
    transfer earned amounts after a paid, completed delivery. A connected account
    must have transfers active and payouts enabled.

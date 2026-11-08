@@ -5,7 +5,7 @@ enable live transactions, discard changes or claim launch readiness.
 
 ## Saved source and verification
 
-Current continuation: see the November 7 sections at the end of this file.
+Current continuation: see the November 8 Render staging section at the end of this file.
 Verified application revision `2c0877806045fe9b4ac01439ff3e0bb29464bba7` passed
 PostgreSQL/restore/container CI (42352071658; PR validation 42352068790) and
 unsigned native CI (42352071596). The following staging package and small error/
@@ -658,3 +658,55 @@ of owner-driver configuration. Real Clerk login requires the development publish
 secret keys and instance origins; test-only identity adapters do not verify personal
 Clerk sign-in. OWNER_STAGING_SETUP.md names the exact secure file, provider dashboard
 location and hosted runtime settings. Check this commit's PostgreSQL/native CI next.
+
+## November 8 — owner-controlled Render staging preparation
+
+Resumed exact remote `0cf0a53fb97fd5e8d6eac4ea80ac8585db2d3875` with the preserved
+uncommitted staging work; remote comparison showed no divergence. No redesign,
+architecture replacement, production DNS change, live transaction, account purchase
+or application publication was performed.
+
+- Root `render.yaml` provisions one same-origin Docker website/API and managed
+  PostgreSQL 17 in Ohio, with internal database connection, external database access
+  disabled, explicit 1 GB persistent storage, no storage autoscaling, migrations
+  before deploy, 60-second shutdown allowance and manual application deployment.
+- Protected initial environment prompts collect Clerk Development/public key,
+  Clerk secret, trusted owner/bootstrap subjects and Stripe test secret. No actual
+  owner subject, secret or banking detail is tracked. The local private environment
+  remains ignored, mode 0600, and is excluded from Docker context.
+- Container startup derives checkout/CORS origin from Render's assigned HTTPS
+  address and uses the same public Clerk key on frontend/backend. Private staging
+  validates test configuration and owner allowlists. No unsupported Clerk proxy
+  is used with Development keys. Optional BuildKit CA mounts support managed
+  development networks without weakening TLS or embedding session CA files.
+- Business APIs require a Clerk-verified subject in the server owner/tester list;
+  tester admission grants no business role or approval. Landing/sign-in assets are
+  public. Health endpoints and signature-protected Stripe webhook remain reachable.
+  Ordinary owner authorization, approval and owner-driver safeguards are preserved.
+- Ordering defaults off. Test ordering startup and both checkout request/worker
+  paths require a configured test webhook. Readiness now reports webhook readiness.
+  Stripe publishable keys are unnecessary for the existing hosted Checkout model.
+- `RENDER_STAGING_ANDROID.md` gives phone signup, Blueprint, protected environment,
+  webhook, tester admission, backup/update and owner-login steps. Budget approximately
+  $13–$14/month before tax/overages, subject to the owner's dashboard quote. Owner
+  must authorize any paid deployment. No Render account is connected here.
+
+Verification: 92 automated tests passed against disposable PostgreSQL 17 (zero
+failures/skips), plus 3 staging/runtime preflight tests; complete production build
+and typechecks passed; production dependency audit found no known vulnerabilities.
+The Blueprint passed Render's published JSON schema. Exact deploy migration command
+succeeded on a fresh separate database and on repeat. Built real server startup
+with synthetic provider settings served /, /sign-in, /admin, /restaurants, /driver
+and /orders; /livez passed; incomplete /readyz correctly returned 503; real Clerk
+middleware rejected anonymous and forged test-user/role header requests; hidden
+environment-file URL returned 404. These checks do not prove authenticated owner
+login, real Stripe calls or browser/device certification.
+
+Local Docker build hit the environment's 7.9 GB filesystem limit during layer
+creation; disposable failed build cache was cleared without deleting source.
+Use the pushed Validate workflow for final image build/container verification.
+No real HTTPS staging website exists yet. Minimum owner action: create their free
+Render account using the repository-owning GitHub account, then follow the phone
+guide and explicitly approve the displayed paid resources. Enter credentials only
+in Render's protected environment settings. After deployment, record the actual
+URL, deployed SHA, authenticated four-role checks and provider/device evidence.

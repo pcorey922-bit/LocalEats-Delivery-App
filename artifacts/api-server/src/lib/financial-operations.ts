@@ -54,7 +54,7 @@ import {
   queueSettlementRecovery,
 } from "./finance-queue";
 import { checkoutOrigin } from "./commerce-policy";
-import { stripeTest } from "./payment-provider";
+import { stripeTest, requireTestWebhook } from "./payment-provider";
 import { ensureAccepting } from "./restaurant-availability";
 export type FinancialOperation = typeof operations.$inferSelect;
 export type OperationResult = {
@@ -69,6 +69,7 @@ const retryWindowMs = 23 * 60 * 60 * 1000;
 const leaseMs = 120000;
 
 export async function requestProviderCheckout(orderId: string, actor: Profile) {
+  requireTestWebhook();
   return db.transaction(async (tx) => {
     const [order] = await tx
       .select()
@@ -587,6 +588,7 @@ export async function executeStripeOperation(
   const stripe = stripeTest();
   const p = job.payload;
   if (job.kind === "checkout") {
+    requireTestWebhook();
     const [payment] = await db
       .select()
       .from(paymentsTable)

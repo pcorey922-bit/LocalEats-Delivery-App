@@ -215,11 +215,43 @@ after(async () => {
 });
 test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
   t.afterEach(() => {
+    delete process.env.ROCOEATS_PRIVATE_STAGING;
+    delete process.env.ROCOEATS_STAGING_TESTER_CLERK_USER_IDS;
     process.env.ROCOEATS_ORDERING_ENABLED="true";
     process.env.PAYMENT_PROVIDER = "sandbox";
     delete process.env.STRIPE_SECRET_KEY;
     delete process.env.STRIPE_WEBHOOK_SECRET;
     process.env.API_MUTATION_LIMIT_PER_MINUTE = "10000";
+  });
+  await t.test("private staging admits only server-listed identities and preserves role checks and signed webhooks", async () => {
+    const previousOwners = process.env.LOCALEATS_ADMIN_CLERK_USER_IDS;
+    try {
+      process.env.ROCOEATS_PRIVATE_STAGING = "true";
+      delete process.env.LOCALEATS_ADMIN_CLERK_USER_IDS;
+      assert.equal((await api("/restaurants", null)).status, 401);
+      assert.equal((await api("/restaurants", ids.admin)).status, 403);
+      const forged = await fetch(`${origin}/api/restaurants`, {headers: {"x-test-user": ids.other, "x-role": "admin", "x-staging-access": "true"}});
+      assert.equal(forged.status, 403);
+      process.env.LOCALEATS_ADMIN_CLERK_USER_IDS = ids.admin;
+      assert.equal((await api("/restaurants", ids.admin)).status, 200);
+      process.env.ROCOEATS_STAGING_TESTER_CLERK_USER_IDS = ` ${ids.customer} `;
+      assert.equal((await api("/restaurants", ids.customer)).status, 200);
+      assert.equal((await api("/admin/profiles", ids.customer)).status, 403);
+      const webhook = await fetch(`${origin}/api/webhooks/stripe`, {method: "POST", headers: {"content-type":"application/json"}, body:"{}"});
+      assert.equal(webhook.status, 503); // Reached signature configuration check, not staging authentication.
+      assert.equal((await fetch(`${origin}/livez`)).status, 200);
+    } finally {
+      if (previousOwners === undefined) delete process.env.LOCALEATS_ADMIN_CLERK_USER_IDS;
+      else process.env.LOCALEATS_ADMIN_CLERK_USER_IDS = previousOwners;
+    }
+  });
+  await t.test("Stripe checkout refuses provider I/O until a test webhook is configured", async () => {
+    const { createTestCheckout } = await import("../src/lib/payment-provider");
+    const order = await create();
+    process.env.PAYMENT_PROVIDER = "stripe_test";
+    process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
+    await assert.rejects(createTestCheckout({id: randomUUID(), totalCents: 100}, 1), /webhook before checkout/);
+    assert.equal((await api(`/orders/${order.id}/checkout`, ids.customer, "POST")).status, 503);
   });
   await t.test("ordering defaults closed; receipts and cancellations recover while new orders and checkout are blocked",async()=>{
     const order=await create();const quote=await api('/orders/quote',ids.customer,'POST',input());
@@ -1363,6 +1395,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
         .set({ provider: "stripe_test" })
         .where(eq(paymentsTable.orderId, order.id));
       process.env.PAYMENT_PROVIDER = "stripe_test";
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_fixture";
       process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
       try {
         const queued = await api(
@@ -1487,6 +1520,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
           },
         });
       process.env.PAYMENT_PROVIDER = "stripe_test";
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_fixture";
       process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
       let release!: () => void;
       let began!: () => void;
@@ -1679,6 +1713,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
         displayName: "Provisioning test fixture",
       });
       process.env.PAYMENT_PROVIDER = "stripe_test";
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_fixture";
       process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
       try {
         assert.equal(
@@ -1760,6 +1795,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
         202,
       );
       process.env.PAYMENT_PROVIDER = "stripe_test";
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_fixture";
       process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
       await processWebhookInbox();
       process.env.PAYMENT_PROVIDER = "sandbox";
@@ -1810,6 +1846,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
         .set({ provider: "stripe_test" })
         .where(eq(paymentsTable.orderId, order.id));
       process.env.PAYMENT_PROVIDER = "stripe_test";
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_fixture";
       process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
       let release!: () => void;
       let began!: () => void;
@@ -1915,6 +1952,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
         .set({ provider: "stripe_test" })
         .where(eq(paymentsTable.orderId, order.id));
       process.env.PAYMENT_PROVIDER = "stripe_test";
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_fixture";
       process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
       try {
         const queued = await api(
@@ -2139,6 +2177,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
         })
         .where(eq(paymentsTable.orderId, order.id));
       process.env.PAYMENT_PROVIDER = "stripe_test";
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_fixture";
       process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
       try {
         const canceled = await api(

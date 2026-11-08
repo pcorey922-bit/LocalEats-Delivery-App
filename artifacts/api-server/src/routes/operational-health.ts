@@ -40,11 +40,13 @@ export const readiness: RequestHandler = async (_req, res) => {
     const authReady = Boolean(
       process.env.CLERK_SECRET_KEY && process.env.CLERK_PUBLISHABLE_KEY,
     );
+    const webhookReady = /^whsec_[A-Za-z0-9]+$/.test(process.env.STRIPE_WEBHOOK_SECRET || "");
     const ready =
       pricingReady &&
       provider === "stripe_test" &&
       workerReady &&
       authReady &&
+      webhookReady &&
       !process.env.ROCOEATS_DRAINING;
     res.status(ready ? 200 : 503).json({
       ready,
@@ -52,6 +54,7 @@ export const readiness: RequestHandler = async (_req, res) => {
       pricingReady,
       providerConfigured: provider === "stripe_test",
       authReady,
+      webhookReady,
       workerReady,
       liveChargesEnabled: false,
     });

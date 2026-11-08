@@ -18,6 +18,10 @@ export function requirePaymentProvider() {
     );
   return mode;
 }
+export function requireTestWebhook() {
+  if (!/^whsec_[A-Za-z0-9]+$/.test(process.env.STRIPE_WEBHOOK_SECRET || ""))
+    throw new CommerceError(503, "Configure the Stripe test webhook before checkout");
+}
 export function requireFreshOperation(createdAt: Date) {
   // Stripe can prune idempotency keys after 24 hours. An unresolved old operation
   // requires reconciliation rather than risking a duplicate external movement.
@@ -34,6 +38,7 @@ export async function createTestCheckout(
   const mode = requirePaymentProvider();
   if (mode === "sandbox")
     return { id: `sandbox_checkout_${order.id}_${attempt}`, url: null };
+  requireTestWebhook();
   const session = await stripeTest().checkout.sessions.create(
     {
       mode: "payment",

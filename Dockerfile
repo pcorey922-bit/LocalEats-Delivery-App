@@ -1,8 +1,13 @@
+# syntax=docker/dockerfile:1
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
-RUN npm install --global pnpm@11.25.0
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+    npm install --global pnpm@11.25.0
 COPY . .
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+    pnpm install --frozen-lockfile
 ARG VITE_CLERK_PUBLISHABLE_KEY
 ARG VITE_API_ORIGIN
 ARG VITE_CLERK_PROXY_URL
@@ -20,5 +25,5 @@ COPY --from=build --chown=node:node /app /app
 ENV NODE_ENV=production PORT=3001 PAYMENT_PROVIDER=disabled WEB_DIST_DIR=/app/artifacts/localeats/dist/public
 USER node
 EXPOSE 3001
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s CMD node -e "fetch('http://localhost:3001/livez').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-CMD ["node","--enable-source-maps","artifacts/api-server/dist/index.mjs"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s CMD node -e "fetch('http://localhost:'+process.env.PORT+'/livez').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node","--enable-source-maps","scripts/start-container.mjs"]

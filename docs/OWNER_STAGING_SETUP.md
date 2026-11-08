@@ -4,6 +4,11 @@ No hosting purchase, account connection, DNS change, live payment or application
 publication has been performed. Do not enter bank details or secrets into chat,
 GitHub files, frontend variables, or the local payment simulator.
 
+For the prepared owner-controlled Render deployment and step-by-step Android
+instructions, start with [RENDER_STAGING_ANDROID.md](RENDER_STAGING_ANDROID.md).
+The root `render.yaml` prepares the existing application and PostgreSQL without
+DNS changes. No hosting account or paid resources have been created by engineering.
+
 ## Accounts and deployment boundary
 
 Use business-owned accounts for the container host, PostgreSQL, Clerk, Stripe,
@@ -12,8 +17,8 @@ database and domains. The existing application needs a continuously running Node
 22 container and PostgreSQL, including its background workers. Static/Worker/D1
 hosting alone cannot run this backend. A paid container/database plan with backups
 is likely necessary for reliable business operation. Confirm current provider
-pricing and authorize the purchase before creating paid resources. No recurring
-cost quote has been verified in this session.
+pricing and authorize the purchase before creating paid resources. Current small
+staging pricing and explicit resource sizes are recorded in the Render guide.
 
 A private staging deployment is blocked until owner-controlled hosting, database,
 Clerk and Stripe test configuration are available through secure account settings.
@@ -57,8 +62,10 @@ simulations for QA and must not be offered as a transactional business demo.
    using the event subscriptions in DEPLOYMENT.md. Create restaurant and driver
    test accounts; complete their provider-hosted Connect test onboarding through
    `/earnings`. Bank-account collection remains inside Stripe. A connected-balance
-   transfer is not proof of a bank deposit. Software still needs partial refunds,
-   disputes and complete provider/bank reconciliation before commercial activation.
+   transfer is not proof of a bank deposit. Platform-funded partial credits,
+   dispute holds and provider charge/fee reconciliation are implemented; real
+   provider verification, bank settlement and remaining commercial requirements
+   still block live activation.
 8. Sign in as the owner, set reviewed test pricing/service ZIPs in administration,
    approve verified test restaurants/drivers, and configure restaurant hours, menus,
    modifiers, stock and optional capacity. Use clearly labeled test data. Only after

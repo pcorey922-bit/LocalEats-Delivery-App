@@ -18,6 +18,7 @@ import { readiness } from "./routes/operational-health";
 import { limitMutations } from "./lib/request-limits";
 import { randomUUID } from "node:crypto";
 import { webHosting } from "./lib/web-hosting";
+import { privateStaging } from "./middlewares/private-staging";
 const app: Express = express();
 
 app.use(
@@ -80,6 +81,7 @@ app.use(
   })),
 );
 
+app.use("/api", privateStaging);
 app.use("/api", (req, res, next) => {
   if (
     !["GET", "HEAD", "OPTIONS"].includes(req.method) &&
