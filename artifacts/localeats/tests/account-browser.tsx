@@ -7,6 +7,7 @@ import { AccountSettings } from "../src/pages/account-settings";
 import { AdministratorAccessManager } from "../src/pages/administrator-access";
 import { PaymentSetupChecks } from "../src/pages/payment-setup";
 import { OrderTracking } from "../src/pages/delivery-tracking";
+import { DeclinedOffers } from "../src/pages/declined-offers";
 declare global {
   interface Window {
     qaAccess: Record<string, string | boolean>;
@@ -20,6 +21,13 @@ declare global {
       accessVersion: string;
     };
     qaTracking: Record<string, unknown>;
+    qaDeclinedOffers: {
+      orderId: string;
+      restaurantName: string;
+      declineId: string;
+      declinedUntil: string;
+    }[];
+    qaReconsiderRequests: unknown[];
   }
 }
 window.qaAccess = {
@@ -35,6 +43,15 @@ window.qaAccess = {
 };
 window.qaWrites = [];
 window.qaAdminWrites = [];
+window.qaReconsiderRequests = [];
+window.qaDeclinedOffers = [
+  {
+    orderId: "fixture-offer",
+    restaurantName: "QA kitchen",
+    declineId: "11111111-1111-4111-8111-111111111111",
+    declinedUntil: new Date(Date.now() + 15 * 60000).toISOString(),
+  },
+];
 window.qaTracking = {
   status: "ready_for_pickup",
   driverAssigned: true,
@@ -54,6 +71,20 @@ window.qaStaff = {
   accessVersion: "v1",
 };
 window.fetch = async (url, options = {}) => {
+  if (String(url) === "/api/driver/offers?declined=true")
+    return new Response(JSON.stringify(window.qaDeclinedOffers), {
+      headers: { "content-type": "application/json" },
+    });
+  if (
+    String(url) === "/api/driver/orders/fixture-offer/decline-offer" &&
+    options.method === "DELETE"
+  ) {
+    window.qaReconsiderRequests.push(JSON.parse(String(options.body)));
+    window.qaDeclinedOffers = [];
+    return new Response(JSON.stringify({ reconsidered: true }), {
+      headers: { "content-type": "application/json" },
+    });
+  }
   if (String(url) === "/api/orders/fixture-tracking/tracking")
     return new Response(JSON.stringify(window.qaTracking), {
       headers: { "content-type": "application/json" },
@@ -129,5 +160,6 @@ createRoot(document.getElementById("root")!).render(
     <AccountSettings displayName="QA profile" />
     <PaymentSetupChecks />
     <OrderTracking orderId="fixture-tracking" />
+    <DeclinedOffers />
   </QueryClientProvider>,
 );

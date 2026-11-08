@@ -927,3 +927,21 @@ no mirror, TLS bypass, new service or paid cache was introduced. A standalone te
 verifies transient recovery, immediate compiler failure and original error codes
 after persistent outage. Check the new native CI; do not claim unsigned/native or
 actual-device readiness from these helper tests. Linux has no attached iOS device.
+
+## November 8 — driver offer decline/reconsider checkpoint
+
+Additive migration 0025 persists per-driver 15-minute offer declines with an expiry
+index. Approved available drivers can decline only paid/unassigned ready orders;
+claim and administrator dispatch respect active declines. Reconsider requires the
+current response UUID, preventing delayed requests from deleting a newer decline.
+Profile/order locks serialize races, retries preserve expiry, and audit records
+survive expired-row maintenance. Driver UI supports declined offers and recovery.
+101 automated tests pass on PGlite and fresh local PostgreSQL 17, including concurrent
+claim/decline, expiry, authorization and nonce fencing. Production build/typechecks
+and simulated phone-size browser tests pass. Owner Neon data was not changed.
+
+Owner says current Stripe checks have not yet been verified: do not infer results
+from older health responses. Ordering remains closed. Deploy the latest pushed
+branch, then use /operations for the real read-only Stripe check; private test
+payment/delivery acceptance is still pending. Native run 42468145201 failed before
+compilation on official binary download HTTP 504 despite bounded retries.

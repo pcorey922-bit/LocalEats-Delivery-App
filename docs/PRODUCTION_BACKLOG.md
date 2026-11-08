@@ -157,3 +157,28 @@ Run targeted checks first and necessary full/PG/container CI for changed batches
 Commit/push each verified batch; verify local HEAD equals remote before stopping.
 Record automated/simulated/browser/provider/device/deployed evidence separately.
 Use git log for exact batch SHAs; no optimistic percentages or launch-complete claim.
+
+## November 8 — durable driver offer responses
+
+Drivers can decline an unassigned, paid, ready-for-pickup offer for 15 minutes,
+review their own declined offers and explicitly reconsider. Declines persist across
+reloads; duplicate requests do not extend the window. Expiry uses the database
+clock, stale reconsideration tokens cannot erase newer responses, and profile/order
+locks serialize responses with claim and administrator assignment. Dispatch respects
+a driver's active decline. Other drivers remain eligible; customer addresses are
+not exposed in these lists. Assigned deliveries retain their existing release and
+custody rules. Maintenance prunes old expired responses while preserving audits.
+
+Migration 0025 is additive and runs through the existing staging migration startup;
+no Neon reset or manual SQL is required. All 101 API tests pass with both PGlite
+and a fresh disposable PostgreSQL 17 database, including concurrent response/claim,
+expiry, approval, privacy and stale-token checks. Production builds/typechecks and
+phone-size actual-component QA pass; browser identity/API fixtures are simulated.
+No actual Stripe payment, delivery, push or device GPS verification is claimed.
+The owner has not yet verified the four current /operations Stripe checks; their
+results remain unknown. Ordering remains disabled and Stripe remains TEST-only.
+
+Native run 42468145201 exhausted the bounded dependency retries on upstream HTTP
+504 downloading official Gradle/Capacitor binaries, before compilation. Validate
+42468140635 passed for f725251. Native builds/device acceptance remain blocked;
+no transport-security bypass or alternate binary mirror was introduced.

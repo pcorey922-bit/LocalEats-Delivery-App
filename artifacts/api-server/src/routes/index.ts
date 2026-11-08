@@ -1,5 +1,6 @@
 import supportRouter from "./support";
 import paymentSetupRouter from "./payment-setup";
+import driverOfferResponsesRouter from "./driver-offer-responses";
 import supportConversationsRouter from "./support-conversations";
 import financialReconciliationRouter from "./financial-reconciliation";
 import partialRefundsRouter from "./partial-refunds";
@@ -25,6 +26,7 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(paymentSetupRouter);
+router.use(driverOfferResponsesRouter);
 router.use(supportConversationsRouter);
 router.use(financialReconciliationRouter);
 router.use(partialRefundsRouter);

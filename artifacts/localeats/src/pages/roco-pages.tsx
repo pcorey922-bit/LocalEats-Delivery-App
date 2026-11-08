@@ -1,5 +1,6 @@
 import { RestaurantInventory } from "./inventory";
 import { AdministratorAccessManager } from "./administrator-access";
+import { DeclinedOffers } from "./declined-offers";
 import { dutyIntent } from "../lib/duty-intent";
 import { NavigationActions } from "./navigation-actions";
 import { useCustomerCart } from "../hooks/use-customer-cart";
@@ -192,7 +193,7 @@ export function DriverPage() {
   const deliveries = useQuery({ queryKey: ['driver-deliveries'], queryFn: () => customFetch<DriverDelivery[]>('/api/driver/deliveries'), enabled, refetchInterval: 15000 });
   const update = useMutation({
     mutationFn: ({ orderId, action }: { orderId: string; action: string }) => customFetch(`/api/driver/orders/${orderId}/${action}`, { method: 'POST' }),
-    onSuccess: () => { void client.invalidateQueries({queryKey:['driver-availability']}); void client.invalidateQueries({ queryKey: ['driver-offers'] }); void client.invalidateQueries({ queryKey: ['driver-deliveries'] }); },
+    onSuccess: () => { void client.invalidateQueries({queryKey:['driver-declined-offers']}); void client.invalidateQueries({queryKey:['driver-availability']}); void client.invalidateQueries({ queryKey: ['driver-offers'] }); void client.invalidateQueries({ queryKey: ['driver-deliveries'] }); },
   });
   if (profile.isLoading) return <Shell><Loading label="Checking driver access"/></Shell>;
   if (!enabled) return <Shell><main className="roco-main"><PageIntro eyebrow="Driver access" title="Your delivery workspace.">Sign in with an active, administrator-approved driver profile to view deliveries.</PageIntro><p><Link href="/account/access">Check owner-driver access</Link> · <Link href="/account/setup">Complete profile setup</Link></p></main></Shell>;
@@ -206,11 +207,13 @@ export function DriverPage() {
     {d.status==='assigned'&&(d.arrivedAt?<p role="status">Arrival reported at {new Date(d.arrivedAt).toLocaleTimeString()}</p>:<button className="roco-button" disabled={update.isPending} onClick={()=>update.mutate({orderId:d.orderId,action:'arrive'})}>I’m at the restaurant</button>)}
     {d.status==='assigned'&&<button className="roco-button" disabled={update.isPending} onClick={()=>{if(window.confirm('Release this delivery before pickup?'))update.mutate({orderId:d.orderId,action:'release'});}}>Release delivery</button>}
     {!offer&&['assigned','picked_up'].includes(d.status)&&<DriverLocationControl orderId={d.orderId}/>}
+    {offer&&<button className="roco-button" disabled={update.isPending} onClick={()=>update.mutate({orderId:d.orderId,action:'decline-offer'})}>Decline for 15 min</button>}
     {(offer || (d.status === 'assigned' && d.orderStatus === 'ready_for_pickup')) && <button className="roco-button primary" disabled={update.isPending} onClick={() => update.mutate({ orderId: d.orderId, action: offer ? 'claim' : d.status === 'assigned' ? 'pickup' : 'deliver' })}>{offer ? 'Claim delivery' : d.status === 'assigned' ? 'Confirm pickup' : 'Confirm delivered'}</button>}
   </article>;
   return <Shell><main className="roco-main"><PageIntro eyebrow="Driver" title="Local deliveries.">Paid orders ready for pickup appear here. Customer addresses are available after you claim a delivery.</PageIntro>
     {update.isError && <p className="roco-alert" role="alert">{update.error.message}</p>}
     {profile.data?.role==='admin'&&<p className="roco-notice">Administrator delivery workspace · Your administrator access stays active. Delivery eligibility is verified by the server. <Link href="/admin">Return to owner dashboard</Link></p>}<DriverApplication/><SupportDesk/><DriverAvailability/><h2>My deliveries</h2>{deliveries.isPending ? <Loading/> : deliveries.isError ? <LoadError retry={() => void deliveries.refetch()} message={deliveries.error.message}/> : <div className="roco-list">{deliveries.data?.length ? deliveries.data.map(d => card(d, false)) : <p>No assigned deliveries.</p>}</div>}
     <h2>Available offers</h2>{offers.isPending ? <Loading/> : offers.isError ? <LoadError retry={() => void offers.refetch()} message={offers.error.message}/> : <div className="roco-list">{offers.data?.length ? offers.data.map(d => card(d, true)) : <p>No paid deliveries available right now.</p>}</div>}
+    <DeclinedOffers/>
   </main></Shell>;
 }

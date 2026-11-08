@@ -2,12 +2,13 @@ import { pruneDutyLocations } from "./lib/duty-location";
 import { processReservationExpiry } from "./lib/reservation-expiry";
 import { processOrderTiming } from "./lib/order-timing";
 import { randomUUID } from "node:crypto";
-import { lt } from "drizzle-orm";
+import { lt, sql } from "drizzle-orm";
 import {
   db,
   pool,
   workerHeartbeatsTable,
   requestLimitsTable,
+  driverOfferDeclinesTable,
 } from "@workspace/db";
 import app from "./app";
 import { processWebhookInbox } from "./lib/webhook-worker";
@@ -90,6 +91,7 @@ const loops = [
   }),
   worker("maintenance", 60000, async () => {
     await pruneDutyLocations();
+    await db.delete(driverOfferDeclinesTable).where(lt(driverOfferDeclinesTable.expiresAt,sql`now()-interval '1 day'`));
     await db
       .delete(requestLimitsTable)
       .where(lt(requestLimitsTable.expiresAt, new Date()));

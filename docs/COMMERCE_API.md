@@ -176,3 +176,19 @@ current case state/version and `nextBeforeVersion`. POST the same path with
 reply. A same-ID/body/version retry returns its existing record; stale versions or
 conflicting IDs return 409. Replies reopen resolved cases while retaining previous
 operator decisions in immutable history. The original request stays on the case.
+
+### Driver offer responses
+
+`POST /api/driver/orders/:orderId/decline-offer` accepts an optional 5–300-character
+`reason`. Only an approved, online, fresh, otherwise available driver may decline
+an unassigned paid ready-for-pickup order. Returns `orderId`, `declineId`, `expiresAt`.
+Repeated requests preserve the current 15-minute expiry. No payment/stock/order
+state changes occur. Claim and administrator assignment reject active declines.
+
+`GET /api/driver/offers?declined=true` returns only this driver's still-eligible
+currently declined offers with `declineId` and `declinedUntil`; the ordinary list
+excludes them. Existing approval/availability checks apply. Responses are no-store.
+`DELETE /api/driver/orders/:orderId/decline-offer` requires JSON
+`{ "expectedDeclineId": "<current UUID>" }`; a stale UUID returns 409. It clears only
+the authenticated driver's response. Reconsidering does not claim the offer.
+Both mutations are audited; expiry automatically makes an eligible offer visible.

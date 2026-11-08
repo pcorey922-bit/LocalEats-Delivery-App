@@ -85,6 +85,18 @@ try {
   });
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await page.goto("http://127.0.0.1:" + server.address().port);
+  await page
+    .getByRole("button", { name: "Declined offers", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Reconsider offer", exact: true })
+    .click();
+  await page
+    .getByText("No declined unassigned offers.", { exact: true })
+    .waitFor();
+  assert.deepEqual(await page.evaluate(() => window.qaReconsiderRequests), [
+    { expectedDeclineId: "11111111-1111-4111-8111-111111111111" },
+  ]);
   await page.getByText("Driver: QA courier", { exact: true }).waitFor();
   await page.evaluate(() => {
     window.qaTracking = {

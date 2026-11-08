@@ -38,6 +38,7 @@ import {
   financialOperationsTable,
   driverPresenceTable,
   driverApplicationsTable,
+  driverOfferDeclinesTable,
   driverDutyLocationsTable,
   deliveryLocationsTable,
   deliveriesTable,
@@ -2874,6 +2875,42 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     await assert.rejects(engine.exec(`UPDATE support_messages SET body='rewritten' WHERE id='${reply.id}'`));await assert.rejects(engine.exec(`DELETE FROM support_messages WHERE id='${reply.id}'`));await assert.rejects(engine.exec('TRUNCATE support_messages'));
   });
 
+  await t.test("driver offer declines persist per courier, expire, fence stale reconsideration and serialize with claim/dispatch",async()=>{
+    const couriers=[randomUUID(),randomUUID()];
+    for(let i=0;i<couriers.length;i++)await db.insert(profilesTable).values({id:couriers[i],clerkUserId:couriers[i],displayName:`Decline fixture ${i}`,role:'driver',driverApproved:true});
+    const order=await create();await ready(order.id);const path=`/driver/orders/${order.id}/decline-offer`;
+    assert.equal((await api(path,ids.customer,'POST',{})).status,403);
+    assert.equal((await api(path,couriers[0],'POST',{})).status,409);
+    for(const courier of couriers)assert.equal((await api('/driver/availability',courier,'PUT',{available:true})).status,200);
+    const replies=await Promise.all([api(path,couriers[0],'POST',{}),api(path,couriers[0],'POST',{})]);
+    assert.ok(replies.every(reply=>reply.status===200));assert.equal(replies[0].data.declineId,replies[1].data.declineId);
+    assert.equal((await api('/driver/offers',couriers[0])).data.some((offer:any)=>offer.orderId===order.id),false);
+    const declined=await api('/driver/offers?declined=true',couriers[0]);const entry=declined.data.find((offer:any)=>offer.orderId===order.id);
+    assert.equal(entry.declineId,replies[0].data.declineId);assert.equal('deliveryAddress' in entry,false);
+    assert.equal((await api('/driver/offers',couriers[1])).data.some((offer:any)=>offer.orderId===order.id),true);
+    assert.equal((await api(`/driver/orders/${order.id}/claim`,couriers[0],'POST')).status,409);
+    const assigned=await api(`/admin/orders/${order.id}/assignment`,ids.admin,'POST',{driverProfileId:couriers[0],expectedDriverProfileId:null,expectedAssignedAt:null,reason:'Dispatch respects a courier declined offer'});
+    assert.equal(assigned.status,409);assert.match(assigned.data.error,/declined/);
+    await api(path,couriers[1],'DELETE',{expectedDeclineId:entry.declineId});
+    assert.equal((await api('/driver/offers?declined=true',couriers[0])).data.some((offer:any)=>offer.orderId===order.id),true);
+    assert.equal((await api(path,couriers[0],'DELETE',{expectedDeclineId:randomUUID()})).status,409);
+    assert.equal((await api(path,couriers[0],'DELETE',{expectedDeclineId:entry.declineId})).status,200);
+    const renewed=await api(path,couriers[0],'POST',{});assert.notEqual(renewed.data.declineId,entry.declineId);
+    assert.equal((await api(path,couriers[0],'DELETE',{expectedDeclineId:entry.declineId})).status,409);
+    await db.update(driverOfferDeclinesTable).set({declinedAt:new Date(Date.now()-20*60000),expiresAt:new Date(Date.now()-60000)}).where(eq(driverOfferDeclinesTable.id,renewed.data.declineId));
+    assert.equal((await api('/driver/offers',couriers[0])).data.some((offer:any)=>offer.orderId===order.id),true);
+    assert.equal((await api(`/driver/orders/${order.id}/claim`,couriers[0],'POST')).status,201);
+    assert.equal((await api(path,couriers[0],'POST',{})).status,409);
+    await api(`/driver/orders/${order.id}/release`,couriers[0],'POST',{reason:'Release declined-offer concurrency fixture before pickup'});
+    const raceOrder=await create();await ready(raceOrder.id);
+    const race=await Promise.all([api(`/driver/orders/${raceOrder.id}/decline-offer`,couriers[0],'POST',{}),api(`/driver/orders/${raceOrder.id}/claim`,couriers[0],'POST')]);
+    assert.ok(race.map(result=>result.status).sort().join(',')==='200,409'||race.map(result=>result.status).sort().join(',')==='201,409');
+    for(const created of [order,raceOrder])await api(`/orders/${created.id}/cancel`,ids.admin,'POST',{reason:'Finish declined-offer fixture and release delivery custody'});
+    for(const courier of couriers)await api('/driver/availability',courier,'PUT',{available:false});
+    const audits=await db.select().from(auditLogsTable).where(eq(auditLogsTable.resourceId,order.id));
+    assert.equal(audits.filter(row=>row.action==='delivery.offer_declined').length,2);
+    assert.equal(audits.filter(row=>row.action==='delivery.offer_reconsidered').length,1);
+  });
   await t.test("customer and restaurant tracking follows actual assignment, arrival, pickup and proof-confirmed completion without leaking driver identity or stale GPS",async()=>{
     const drivers=[randomUUID(),randomUUID()];
     for(let i=0;i<drivers.length;i++){

@@ -4,8 +4,9 @@ import { audit, notifyOrder } from "../lib/commerce";
 import {
   driverDutyLocationsTable,
   driverApplicationsTable,
+  driverOfferDeclinesTable,
 } from "@workspace/db";
-import { and, desc, eq, inArray, lt } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, gt, sql } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import {
@@ -385,6 +386,8 @@ router.post(
           Date.now() - presence.heartbeatAt.getTime() >= presenceFreshMs
         )
           throw new CommerceError(409, "The selected driver must be online");
+        const [decline]=await tx.select({id:driverOfferDeclinesTable.id}).from(driverOfferDeclinesTable).where(and(eq(driverOfferDeclinesTable.driverProfileId,driver.id),eq(driverOfferDeclinesTable.orderId,orderId),gt(driverOfferDeclinesTable.expiresAt,sql`now()`))).limit(1);
+        if(decline)throw new CommerceError(409,"This driver declined the offer. Choose another driver or ask them to reconsider.");
         const [busy] = await tx
           .select()
           .from(deliveriesTable)

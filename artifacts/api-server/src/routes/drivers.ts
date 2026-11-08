@@ -8,7 +8,8 @@ import { CommerceError } from "../lib/commerce-policy";
 import { hasDriverAccess } from "../lib/owner-access";
 import { notifyOrder, createEarnings, audit } from "../lib/commerce";
 import { driverDispatchState, presenceFreshMs } from "./dispatch";
-import { and, eq, isNull, desc, inArray } from "drizzle-orm";
+import { and, eq, isNull, isNotNull, desc, inArray, gt, sql } from "drizzle-orm";
+import { z } from "zod";
 import { Router, type IRouter } from "express";
 import {
   db,
@@ -22,6 +23,7 @@ import {
   deliveryLocationsTable,
   driverApplicationsTable,
   notificationsTable,
+  driverOfferDeclinesTable,
 } from "@workspace/db";
 import { getActiveProfile, requireRole } from "../lib/current-profile";
 import { requireAuth } from "../middlewares/require-auth";
@@ -115,6 +117,8 @@ router.get("/orders/:orderId/delivery-proof", requireAuth, async (req, res) => {
 // Drivers can see orders ready for pickup without seeing customer addresses
 // until they have successfully claimed a delivery.
 router.get("/driver/offers", requireAuth, async (req, res): Promise<void> => {
+  res.setHeader("Cache-Control","no-store");
+  const showDeclined=z.enum(["true"]).optional().parse(req.query.declined)==="true";
   const profile = await getActiveProfile(req, res);
   if (!profile || !requireRole(profile, ["driver", "admin"], res)) return;
   if (!profile.driverApproved)
@@ -141,6 +145,8 @@ router.get("/driver/offers", requireAuth, async (req, res): Promise<void> => {
       pickupPostalCode: restaurantsTable.postalCode,
       deliveryFeeCents: ordersTable.deliveryFeeCents,
       tipCents: ordersTable.tipCents,
+      declineId:driverOfferDeclinesTable.id,
+      declinedUntil:driverOfferDeclinesTable.expiresAt,
     })
     .from(ordersTable)
     .innerJoin(
@@ -155,10 +161,12 @@ router.get("/driver/offers", requireAuth, async (req, res): Promise<void> => {
       ),
     )
     .leftJoin(deliveriesTable, eq(deliveriesTable.orderId, ordersTable.id))
+    .leftJoin(driverOfferDeclinesTable,and(eq(driverOfferDeclinesTable.orderId,ordersTable.id),eq(driverOfferDeclinesTable.driverProfileId,profile.id),gt(driverOfferDeclinesTable.expiresAt,sql`now()`)))
     .where(
       and(
         eq(ordersTable.status, "ready_for_pickup"),
         isNull(deliveriesTable.driverProfileId),
+        showDeclined?isNotNull(driverOfferDeclinesTable.id):isNull(driverOfferDeclinesTable.id),
       ),
     )
     .limit(50);
@@ -294,6 +302,8 @@ router.post(
         )
         .limit(1);
       if (!order) return false;
+      const [decline]=await tx.select({id:driverOfferDeclinesTable.id}).from(driverOfferDeclinesTable).where(and(eq(driverOfferDeclinesTable.driverProfileId,profile.id),eq(driverOfferDeclinesTable.orderId,orderId),gt(driverOfferDeclinesTable.expiresAt,sql`now()`))).limit(1);
+      if(decline)throw new CommerceError(409,"Reconsider your declined offer before claiming this delivery");
       await tx
         .insert(deliveriesTable)
         .values({ orderId, status: "unassigned" })
