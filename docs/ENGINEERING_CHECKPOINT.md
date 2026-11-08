@@ -5,7 +5,7 @@ enable live transactions, discard changes or claim launch readiness.
 
 ## Saved source and verification
 
-Current continuation: see the November 8 Render staging section at the end of this file.
+Current continuation: see the November 8 zero-cost staging section at the end of this file.
 Verified application revision `2c0877806045fe9b4ac01439ff3e0bb29464bba7` passed
 PostgreSQL/restore/container CI (42352071658; PR validation 42352068790) and
 unsigned native CI (42352071596). The following staging package and small error/
@@ -710,3 +710,54 @@ Render account using the repository-owning GitHub account, then follow the phone
 guide and explicitly approve the displayed paid resources. Enter credentials only
 in Render's protected environment settings. After deployment, record the actual
 URL, deployed SHA, authenticated four-role checks and provider/device evidence.
+
+## November 8 — zero-cost staging supersedes paid deployment instructions
+
+Owner declined billing and requires $0/month, no card and no paid upgrades. The
+working tree was clean at remote `6a49caf60edd84f307ec646f6b3d751988c7e356` before
+this work. Preserve the paid root `render.yaml` unchanged for later authorization.
+
+Chosen intermittent owner-test deployment: Render **Free web service**, manually
+created via New > Web Service (not the paid Blueprint), plus Neon **Free PostgreSQL**.
+Current official plans were checked: Render sleeping free Docker/HTTPS service;
+Neon no-card/no-fixed-expiry free PostgreSQL, 1 GB/project, 100 CU-hours/month and
+5 GB transfer. Supabase Free DB was considered (500 MB/inactivity pause), Railway
+Free ($1 resource credit, inadequate guarantee for continuously polling workers),
+Koyeb (requires card) and static-only hosting (cannot run this backend). All are
+linked in FREE_STAGING_ANDROID.md. Specific owner-account availability is untested;
+if Render's manual Free flow still mandates a card, stop at that external blocker.
+
+`deploy/render-free.yaml` has one Free Docker web service, no paid datastore/disk/
+worker/pre-deploy command and protected environment placeholders. It reuses the
+Dockerfile, same-origin website/API, Clerk, owner access, Stripe test gate and SQL.
+`start-free-staging.mjs` validates explicit private/test configuration and a direct
+Neon TLS URL, serializes existing migrations with a session advisory lock, and
+starts the real server only on migration success. The direct connection avoids
+transaction-pooler loss of session locks. Persistent data stays in Neon, not Render's
+ephemeral filesystem. Runtime pool size is two; ordering starts disabled. No
+simulator, fake role identity or hardcoded owner subject was introduced.
+
+Focused verification: free environment rejection checks and migration failure/lock
+cleanup checks passed; real PostgreSQL 17 fresh migrations, competing startup
+migrations, repeat migration and persisted profile after reopening connections all
+passed (3 new tests). First connection attempt raced local Postgres recovery;
+rerun after its ready log passed. Free reference configuration passed Render's
+published JSON schema. CI runs these checks before the existing complete validation.
+The application/design, paid configuration and dependencies are unchanged; avoid
+repeating unrelated suites outside the final CI validation.
+
+This is not an always-on dispatch service: Render sleeps after idle and pauses
+workers; queued jobs/expiry/retries recover on wake using existing database state.
+Keep-alive pings are not configured or recommended. Continuous worker DB polling
+can consume Neon allowance while awake. Quota exhaustion suspends service/compute
+or blocks writes; no credit card, upgrades or bypasses are authorized. Backups and
+free quotas must be monitored by the owner. Push/maps/device/provider validation
+remain separate, and no Google billing activation is included in the $0 plan.
+
+No hosting resource was created and no real staging URL exists. No Render/Neon
+credentials or Clerk/Stripe secrets are available to this environment. Minimum next
+owner action: open console.neon.tech/signup on the phone and Continue with GitHub.
+Enter the future Neon connection string only in Render's protected DATABASE_URL
+setting. FREE_STAGING_ANDROID.md provides the remaining phone steps for one-at-a-time
+assistance. After owner provisioning, verify actual HTTPS access, Clerk owner login,
+restricted testers, database persistence and real Stripe TEST webhook/order flow.

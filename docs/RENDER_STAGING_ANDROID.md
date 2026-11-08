@@ -1,5 +1,9 @@
 # Put RoCoEats staging online from an Android phone
 
+**Paid option retained for future use. The owner's current budget is $0/no card:**
+use [FREE_STAGING_ANDROID.md](FREE_STAGING_ANDROID.md) instead. Do not deploy this
+paid Blueprint under the current authorization.
+
 Recommended: a business-owned **Render Hobby workspace**, one always-on Docker web
 service and one managed PostgreSQL database. The root `render.yaml` prepares both
 in Ohio, with PostgreSQL 17, private database networking, automatic migrations,

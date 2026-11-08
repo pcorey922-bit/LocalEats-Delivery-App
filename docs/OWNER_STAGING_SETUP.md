@@ -4,7 +4,12 @@ No hosting purchase, account connection, DNS change, live payment or application
 publication has been performed. Do not enter bank details or secrets into chat,
 GitHub files, frontend variables, or the local payment simulator.
 
-For the prepared owner-controlled Render deployment and step-by-step Android
+**Current owner budget: $0, no credit card.** Start with
+[FREE_STAGING_ANDROID.md](FREE_STAGING_ANDROID.md): Render Free web + Neon Free
+PostgreSQL for intermittent private testing. Do not deploy the paid root Blueprint.
+Continuous operation is not guaranteed on sleeping free tiers.
+
+For the preserved paid owner-controlled Render deployment and step-by-step Android
 instructions, start with [RENDER_STAGING_ANDROID.md](RENDER_STAGING_ANDROID.md).
 The root `render.yaml` prepares the existing application and PostgreSQL without
 DNS changes. No hosting account or paid resources have been created by engineering.
