@@ -1,7 +1,8 @@
 import { driverDutyLocationsTable } from "@workspace/db";
 import { isConfiguredOwner } from "../lib/owner-access";
+import { z } from "zod";
 import { audit } from "../lib/commerce";
-import { deliveriesTable, driverPresenceTable } from "@workspace/db";
+import { deliveriesTable, driverPresenceTable, driverApplicationsTable } from "@workspace/db";
 import { CommerceError, paymentMode } from "../lib/commerce-policy";
 import { and, count, desc, eq, inArray, sum } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
@@ -30,6 +31,40 @@ import { getActiveProfile, requireRole } from "../lib/current-profile";
 import { requireAuth } from "../middlewares/require-auth";
 
 const router: IRouter = Router();
+
+router.put("/admin/administrator-access/:profileId", requireAuth, async (req,res) => {
+  const actor=await getActiveProfile(req,res);
+  if (!actor || !requireRole(actor,["admin"],res)) return;
+  if (!isConfiguredOwner(actor.clerkUserId)) throw new CommerceError(403,"Only a configured platform owner can manage administrators");
+  const id=z.string().uuid().parse(req.params.profileId);
+  const input=z.object({enabled:z.boolean(),expectedRole:z.enum(["customer","admin"]),reason:z.string().trim().min(10).max(500)}).strict().parse(req.body);
+  const saved=await db.transaction(async tx=>{
+    const [target]=await tx.select().from(profilesTable).where(eq(profilesTable.id,id)).for("update").limit(1);
+    if(!target)throw new CommerceError(404,"Account not found");
+    if(isConfiguredOwner(target.clerkUserId))throw new CommerceError(403,"Owner access is protected and managed in server configuration");
+    if(target.role!==input.expectedRole)throw new CommerceError(409,"Account role changed. Refresh before continuing.");
+    if(!target.isActive&&input.enabled)throw new CommerceError(409,"Activate the account before granting administrator access");
+    if(input.enabled===(target.role==="admin"))return target;
+    const statuses=["placed","restaurant_received","pending","accepted","preparing","ready_for_pickup","out_for_delivery"] as const;
+    const [orders,deliveries,restaurants,applications]=await Promise.all([
+      tx.select({id:ordersTable.id}).from(ordersTable).where(and(eq(ordersTable.customerProfileId,id),inArray(ordersTable.status,statuses))).limit(1),
+      tx.select({id:deliveriesTable.id}).from(deliveriesTable).where(and(eq(deliveriesTable.driverProfileId,id),inArray(deliveriesTable.status,["assigned","picked_up"]))).limit(1),
+      tx.select({id:restaurantsTable.id}).from(restaurantsTable).where(eq(restaurantsTable.ownerProfileId,id)).limit(1),
+      tx.select({id:driverApplicationsTable.profileId}).from(driverApplicationsTable).where(eq(driverApplicationsTable.profileId,id)).limit(1),
+    ]);
+    if(orders.length||deliveries.length||restaurants.length||(input.enabled&&(applications.length||target.driverApproved)))
+      throw new CommerceError(409,"Finish active orders/deliveries first; grants require a dedicated account without restaurant ownership or driver enrollment");
+    // An administrator who subsequently enrolled as a driver retains that member
+    // role/approval on revocation. Removing admin must never invent driver approval.
+    const role=input.enabled?"admin":applications.length||target.driverApproved?"driver":"customer";
+    const [updated]=await tx.update(profilesTable).set({role,driverApproved:role==="driver"?target.driverApproved:false}).where(eq(profilesTable.id,id)).returning();
+    await tx.update(driverPresenceTable).set({available:false}).where(eq(driverPresenceTable.profileId,id));
+    await tx.delete(driverDutyLocationsTable).where(eq(driverDutyLocationsTable.profileId,id));
+    await audit(tx,actor.id,input.enabled?"administrator.access_granted":"administrator.access_revoked",id,{reason:input.reason,fromRole:target.role,toRole:role});
+    return updated;
+  });
+  res.json({id:saved.id,role:saved.role,isActive:saved.isActive});
+});
 
 async function requireAdmin(
   req: Request,
@@ -272,7 +307,7 @@ router.patch(
       if (target.role === "admin" || isConfiguredOwner(target.clerkUserId))
         throw new CommerceError(
           403,
-          "Administrator access is managed through the trusted server allowlist",
+          "Administrator access is managed through owner permission controls or trusted server configuration",
         );
       if (parsed.data.role && parsed.data.role !== target.role) {
         const activeStatuses = [

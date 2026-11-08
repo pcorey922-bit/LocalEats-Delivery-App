@@ -24,7 +24,8 @@ Expose a validated release SHA in /livez for deployed revision checks.
 Batch 1 committed as 8d651fa; PostgreSQL/restore/container Validate CI 42463887908
 passed. Actual owner access remains deployment/session dependent.
 
-Batch 2: protect configured owner records before first bootstrap; add strict,
+Batch 2 committed as 911ffad; complete PostgreSQL/container CI 42464424954 passed.
+Protect configured owner records before first bootstrap; add strict,
 audited own-profile settings with concurrent-edit protection and provider-managed
 sign-in/security controls; send new restaurant/driver registrations directly to
 their workspaces. Denied operations/driver pages link to setup/access recovery.
@@ -32,9 +33,24 @@ The access page shows only the signed-in user's own Clerk ID with a copy action,
 so the owner can correct a Google-created identity mismatch without being able to
 load a business profile. Server diagnostics still return no configured IDs.
 
-Next priority: deploy these batches and verify both owner setting matches and
-positive owner/driver access on the actual site, then complete the real four-role
-Stripe TEST acceptance sequence. Do not recreate the implemented API foundation.
+Owner-assisted staging check: owner replied Yes to both setting-match rows and
+Administrator/Driver access. Engineering correlated this with live revision
+8d651fa via /livez, not the later 911ffad batch. Ten deployed read-only HTTP/security
+checks passed; direct authenticated business requests were not made by engineering.
+Evidence: docs/verification/STAGING_HTTP_2026-11-08.json. Re-run
+`NODE_USE_ENV_PROXY=1 node scripts/verify-staging-http.mjs https://localeats-delivery-app.onrender.com/ <full-revision>`
+after deployment. It fails on revision mismatch and never signs in or mutates data.
+
+Batch 3: configured-owner-only administrator grant/revoke controls, expected-role
+concurrency guards, mandatory reasons/audit and protected owner records. Grants
+require dedicated active customer accounts without driver enrollment, restaurant
+ownership or active orders. Revocation fences delivery custody and retains ordinary
+driver enrollment/approval rather than inventing approval. Ordinary admins cannot
+delegate. No schema, hosting, payment or driver-approval bypass was introduced.
+
+Next priority: deploy latest account/permission batches; configure test pricing and
+Stripe signing secret in owner-controlled settings, then complete the real
+four-role Stripe TEST acceptance sequence. Do not recreate the implemented APIs.
 
 ## Existing implemented foundation — preserve and verify on staging
 
@@ -82,10 +98,9 @@ Stripe TEST acceptance sequence. Do not recreate the implemented API foundation.
 - Native background lifecycle/device verification, commercial settlement/bank payout
   reconciliation, load/availability certification and launch policy review remain
   open. Expand this list with concrete failures from the actual staging exercises.
-- Administrator delegation/revocation UI remains restricted: administrator roles
-  cannot be changed through ordinary member updates; owner IDs are configured in
-  protected server settings. Design explicit owner-only delegation with audit and
-  custody safeguards before broadening administrator management.
+- Administrator delegation is owner-only with audit/custody safeguards; configured
+  owners remain controlled through protected server settings. Deployed delegation
+  and step-up/MFA security policy review remain open before commercial launch.
 
 ## Resume and evidence discipline
 

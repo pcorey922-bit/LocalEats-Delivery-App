@@ -834,3 +834,24 @@ settings delegation and mobile layout with production CSS. Its auth/API are
 explicitly simulated, distinct from the actual deployed sign-in-screen checks.
 No authenticated real owner, Stripe, push or physical-device verification is claimed.
 Use the second batch's pushed PostgreSQL/container CI before redeployment.
+
+## November 8 — owner-confirmed staged access and administrator delegation
+
+Owner replied Yes to both owner identity-match settings and effective Administrator/
+Driver access on the actual staging site. Read-only /livez identifies deployed
+8d651fa04de9fd20e7016788a0f08cb42dcd5a93; do not assume the later 911ffad batch is
+deployed. Scripted ten-route HTTPS checks passed (including forged-role/unsigned
+API rejection and hidden-file protection); saved sanitized evidence in
+docs/verification/STAGING_HTTP_2026-11-08.json. Direct authenticated owner business
+API calls were not performed by engineering. Pricing/webhook remain unconfigured.
+
+Account controls batch 911ffad passed full PostgreSQL/restore/build/container CI
+42464424954. Next batch implements configured-owner-only administrator delegation,
+mandatory reasons/audit, expected-role concurrency, owner lockout protection and
+dedicated account/custody rules. Revocation preserves a subsequently enrolled
+driver's existing approval status, takes them off duty and clears duty GPS; grants
+never approve drivers. New owner controls are in Admin > Accounts. Ordinary member
+updates still cannot grant admin. 95 automated tests and complete production build/
+typechecks passed locally. Chromium component checks cover grant/revoke payloads
+at 390x844 with simulated auth/API; actual deployed delegation remains untested.
+No new services, dependencies, migrations, live payments or ordering activation.

@@ -9,6 +9,7 @@ administrator approval. No endpoint enables live charges.
 | --- | --- | --- |
 | `GET /session/access` | Verified Clerk session, self only | Redacted owner/owner-driver match flags and effective capabilities; no configured IDs or secrets. Available despite private admission mismatch. |
 | `PATCH /profiles/me` | Active self | Strict `{displayName,expectedDisplayName}`; compare-and-set name update and audit. No role, approval or identity changes. |
+| `PUT /admin/administrator-access/:profileId` | Active configured owner only | `{enabled,expectedRole:customer|admin,reason}`; audited dedicated staff grants/revocations, owner lockout protection, custody checks and stale-role conflict handling. Grants never approve drivers; revocation retains existing driver enrollment/approval. |
 | `GET /commerce/config` | Public | Test provider, illustrative pricing and service ZIPs |
 | `POST /orders/quote` | Customer | Calculate authoritative test fees/tax/tip; no order is created |
 | `POST /orders` | Customer | Create pending-payment order with reviewed total and UUID `Idempotency-Key` header |

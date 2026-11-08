@@ -2860,6 +2860,49 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     await assert.rejects(engine.exec(`UPDATE support_messages SET body='rewritten' WHERE id='${reply.id}'`));await assert.rejects(engine.exec(`DELETE FROM support_messages WHERE id='${reply.id}'`));await assert.rejects(engine.exec('TRUNCATE support_messages'));
   });
 
+  await t.test("only server-configured owners delegate administrators with audit, stale-role and custody guards; revocation preserves ordinary driver approval rules", async () => {
+    const owner=`user_QADelegator${randomUUID().replaceAll('-','')}`;
+    const previous=process.env.LOCALEATS_ADMIN_CLERK_USER_IDS;
+    try {
+      process.env.LOCALEATS_ADMIN_CLERK_USER_IDS=owner;
+      const ownerProfile=await api('/profiles/me',owner);assert.equal(ownerProfile.status,200);
+      const staff=`user_QAStaff${randomUUID().replaceAll('-','')}`;
+      const saved=await api('/profiles/me',staff,'POST',{role:'customer',displayName:'Dedicated staff fixture'});
+      const path=`/admin/administrator-access/${saved.data.id}`;
+      const grant={enabled:true,expectedRole:'customer',reason:'Owner approved a dedicated staging operator'};
+      assert.equal((await api(path,null,'PUT',grant)).status,401);
+      assert.equal((await api(path,ids.admin,'PUT',grant)).status,403);
+      assert.equal((await api(path,staff,'PUT',grant)).status,403);
+      assert.equal((await api(path,owner,'PUT',{...grant,reason:'short'})).status,400);
+      assert.equal((await api(`/admin/administrator-access/${ownerProfile.data.id}`,owner,'PUT',{...grant,enabled:false,expectedRole:'admin'})).status,403);
+      const results=await Promise.all([api(path,owner,'PUT',grant),api(path,owner,'PUT',grant)]);
+      assert.deepEqual(results.map(result=>result.status).sort(),[200,409]);
+      assert.equal((await api('/admin/profiles',staff)).status,200);
+      assert.equal((await api('/driver/availability',staff)).data.approved,false);
+      assert.equal((await api(path,staff,'PUT',{enabled:false,expectedRole:'admin',reason:'A delegated admin cannot manage administrator authority'})).status,403);
+      assert.equal((await api(path,owner,'PUT',{enabled:false,expectedRole:'admin',reason:'Owner removed the temporary staging operator'})).data.role,'customer');
+      assert.equal((await api('/admin/profiles',staff)).status,403);
+      const rows=await db.select().from(auditLogsTable).where(eq(auditLogsTable.resourceId,saved.data.id));
+      assert.equal(rows.filter(row=>row.action==='administrator.access_granted').length,1);
+      assert.equal(rows.filter(row=>row.action==='administrator.access_revoked').length,1);
+      const active=await create();
+      assert.equal((await api(`/admin/administrator-access/${ids.customer}`,owner,'PUT',grant)).status,409);
+      await api(`/orders/${active.id}/cancel`,ids.customer,'POST',{reason:'Close administrator eligibility test order'});
+      for(const approved of [false,true]){
+        const subject=`user_QAStaffDriver${randomUUID().replaceAll('-','')}`;
+        const member=await api('/profiles/me',subject,'POST',{role:'customer',displayName:'Staff driver enrollment fixture'});
+        const permissionPath=`/admin/administrator-access/${member.data.id}`;
+        assert.equal((await api(permissionPath,owner,'PUT',grant)).status,200);
+        const application=await api('/driver/application',subject,'PUT',{phone:'+1 865 555 0199',vehicleMake:'Toyota',vehicleModel:'Corolla',vehicleYear:2022,licenseState:'TN',licenseExpiresOn:'2030-12-31',eligibilityAttested:true,insuranceAttested:true});
+        assert.equal(application.status,200);
+        if(approved)assert.equal((await api(`/admin/driver-applications/${member.data.id}/review`,owner,'POST',{version:application.data.version,approved:true,identityChecked:true,screeningChecked:true,insuranceChecked:true,note:'TEST external screening and insurance evidence checked'})).status,200);
+        const revoked=await api(permissionPath,owner,'PUT',{enabled:false,expectedRole:'admin',reason:'Remove administrator authority and retain driver application'});
+        assert.equal(revoked.status,200);assert.equal(revoked.data.role,'driver');
+        assert.equal((await api('/driver/availability',subject)).data.approved,approved);
+        assert.equal((await api('/admin/profiles',subject)).status,403);
+      }
+    } finally {if(previous===undefined)delete process.env.LOCALEATS_ADMIN_CLERK_USER_IDS;else process.env.LOCALEATS_ADMIN_CLERK_USER_IDS=previous;}
+  });
   await t.test("account settings are self-only, audited, race-safe and cannot change privileges; configured owners are protected before bootstrap", async () => {
     const subject=`user_QASettings${randomUUID().replaceAll('-','')}`;
     const created=await api('/profiles/me',subject,'POST',{displayName:'Account settings fixture',role:'customer'});
