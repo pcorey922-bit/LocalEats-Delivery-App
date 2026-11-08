@@ -868,3 +868,9 @@ customer. UI fetches owner-only account versions and can refresh conflicts. 95 t
 production build/typechecks and simulated phone-size component checks passed.
 Check this follow-up's pushed CI before deploying the final source. No owner session,
 provider secrets or paid infrastructure was added to the engineering environment.
+
+The successful phone-size component fixture/runner is now preserved in
+artifacts/localeats/tests/account-browser.tsx and scripts/verify-account-browser.mjs,
+with developer-tool prerequisites in that tests directory's README. No substantive
+finished UI verification work is left only in a temporary workspace. The harness
+explicitly simulates identity/API and adds no runtime dependency or auth bypass.
