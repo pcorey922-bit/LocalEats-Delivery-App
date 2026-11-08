@@ -1,6 +1,11 @@
 # Test commerce API
 
 All paths below are relative to `/api`. JSON errors use `{error:string}`.
+Order tracking includes only the assigned courier's display name and saved arrival,
+pickup/delivery timestamps. Customer, restaurant owner, current assigned driver and
+admin may read it; other users/previous drivers cannot. GPS remains restricted to
+the existing active delivery phases, stale/mismatched positions are withheld, and
+responses use Cache-Control: no-store. Closed-order UI never implies GPS is live.
 Except config/approved availability and the signed Stripe webhook, endpoints
 require a Clerk session and active profile. Driver dispatch additionally requires
 administrator approval. No endpoint enables live charges.

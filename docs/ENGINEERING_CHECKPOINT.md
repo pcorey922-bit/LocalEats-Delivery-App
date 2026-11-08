@@ -896,3 +896,22 @@ component QA passes with simulated auth/API. Provider verification is not claime
 the owner must deploy, configure the webhook/pricing and invoke the check through
 the real authenticated app. PRIVATE_TEST_DELIVERY.md specifies setup, authorization,
 actual Checkout/delivery/proof/reconciliation and failure evidence requirements.
+
+## November 8 — restaurant/customer delivery progress
+
+Payment setup a0ee18d passed PostgreSQL/restore/build/container CI 42467372777.
+Native compile run 42467377086 failed on upstream HTTP 504 for the official Gradle
+distribution and Capacitor Swift binary archives before compilation; no device or
+unsigned-native success is claimed for that revision.
+
+Tracking now returns assigned courier display name and arrival/pickup/completion
+timestamps only to existing authorized order participants/admin. No internal driver
+IDs/contact details or broader GPS visibility are exposed. Coordinates remain limited
+to ready-for-pickup/out-for-delivery, stale/reassigned positions are withheld, and
+Cache-Control: no-store protects shared-device caching. Customer/restaurant expanded
+orders show tracking during preparation and after closure, with accurate ended-sharing
+text and manual refresh. The 100-test suite exercises assignment, restaurant arrival,
+fresh/stale sample GPS, reassignment access revocation, pickup, real relational handoff
+proof and completion using test-only payment/identity adapters. Production typechecks/
+build and simulated phone-size actual-component tests pass. Actual Stripe/device E2E
+is still blocked on the owner's sandbox webhook/pricing/accounts and authorization.

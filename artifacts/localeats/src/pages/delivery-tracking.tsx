@@ -182,6 +182,11 @@ export function OrderTracking({ orderId }: { orderId: string }) {
       customFetch<{
         status: string;
         driverAssigned: boolean;
+        assignedDriver: { displayName: string } | null;
+        deliveryStatus: string;
+        arrivedAt: string | null;
+        pickedUpAt: string | null;
+        deliveredAt: string | null;
         locationStatus: string;
         location: {
           latitude: number;
@@ -195,6 +200,41 @@ export function OrderTracking({ orderId }: { orderId: string }) {
   return (
     <section aria-label="Delivery tracking">
       <h3>Delivery tracking</h3>
+      <button
+        type="button"
+        className="roco-button"
+        disabled={tracking.isFetching}
+        onClick={() => void tracking.refetch()}
+      >
+        Refresh tracking
+      </button>
+      {tracking.isLoading && <p role="status">Loading delivery progress…</p>}
+      {tracking.data && (
+        <>
+          <p>Order: {tracking.data.status.replaceAll("_", " ")}</p>
+          {tracking.data.assignedDriver && (
+            <p>Driver: {tracking.data.assignedDriver.displayName}</p>
+          )}
+          {tracking.data.arrivedAt && (
+            <p>
+              Restaurant arrival confirmed:{" "}
+              {new Date(tracking.data.arrivedAt).toLocaleTimeString()}
+            </p>
+          )}
+          {tracking.data.pickedUpAt && (
+            <p>
+              Pickup confirmed:{" "}
+              {new Date(tracking.data.pickedUpAt).toLocaleTimeString()}
+            </p>
+          )}
+          {tracking.data.deliveredAt && (
+            <p>
+              Delivery completed:{" "}
+              {new Date(tracking.data.deliveredAt).toLocaleTimeString()}
+            </p>
+          )}
+        </>
+      )}
       {tracking.data?.location ? (
         <>
           <p>
@@ -212,15 +252,19 @@ export function OrderTracking({ orderId }: { orderId: string }) {
             View driver's reported location
           </a>
         </>
-      ) : (
+      ) : tracking.data ? (
         <p>
-          {tracking.data?.locationStatus === "stale"
-            ? "The last location is out of date. Waiting for a fresh update."
-            : tracking.data?.driverAssigned
-              ? "Driver assigned. Location has not been shared yet."
-              : "Waiting for a driver."}
+          {tracking.data.locationStatus === "not_active"
+            ? ["delivered", "cancelled"].includes(tracking.data.status)
+              ? "This order is closed. Live location sharing has ended."
+              : "Live delivery location is available when the order is ready for pickup or on its way."
+            : tracking.data.locationStatus === "stale"
+              ? "The last location is out of date. Waiting for a fresh update."
+              : tracking.data?.driverAssigned
+                ? "Driver assigned. Location has not been shared yet."
+                : "Waiting for a driver."}
         </p>
-      )}
+      ) : null}
       {tracking.error && (
         <p className="roco-alert" role="alert">
           Tracking is temporarily unavailable. Refreshing automatically.

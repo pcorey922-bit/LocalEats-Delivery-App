@@ -6,6 +6,7 @@ import { AccountAccess } from "../src/pages/account-access";
 import { AccountSettings } from "../src/pages/account-settings";
 import { AdministratorAccessManager } from "../src/pages/administrator-access";
 import { PaymentSetupChecks } from "../src/pages/payment-setup";
+import { OrderTracking } from "../src/pages/delivery-tracking";
 declare global {
   interface Window {
     qaAccess: Record<string, string | boolean>;
@@ -18,6 +19,7 @@ declare global {
       isActive: boolean;
       accessVersion: string;
     };
+    qaTracking: Record<string, unknown>;
   }
 }
 window.qaAccess = {
@@ -33,6 +35,17 @@ window.qaAccess = {
 };
 window.qaWrites = [];
 window.qaAdminWrites = [];
+window.qaTracking = {
+  status: "ready_for_pickup",
+  driverAssigned: true,
+  assignedDriver: { displayName: "QA courier" },
+  deliveryStatus: "assigned",
+  arrivedAt: "2026-11-08T12:00:00Z",
+  pickedUpAt: null,
+  deliveredAt: null,
+  locationStatus: "not_shared",
+  location: null,
+};
 window.qaStaff = {
   id: "staff-fixture",
   displayName: "QA staff",
@@ -41,6 +54,10 @@ window.qaStaff = {
   accessVersion: "v1",
 };
 window.fetch = async (url, options = {}) => {
+  if (String(url) === "/api/orders/fixture-tracking/tracking")
+    return new Response(JSON.stringify(window.qaTracking), {
+      headers: { "content-type": "application/json" },
+    });
   if (
     String(url) === "/api/admin/payment-setup" ||
     String(url) === "/api/admin/payment-setup/verify"
@@ -111,5 +128,6 @@ createRoot(document.getElementById("root")!).render(
     <AdministratorAccessManager />
     <AccountSettings displayName="QA profile" />
     <PaymentSetupChecks />
+    <OrderTracking orderId="fixture-tracking" />
   </QueryClientProvider>,
 );

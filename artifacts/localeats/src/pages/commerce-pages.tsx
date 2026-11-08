@@ -248,7 +248,7 @@ export function OrderActions({ order }: { order: Order }) {
           <p>
             {order.deliveryAddress.street1}, {order.deliveryAddress.city}
           </p>
-          {["ready_for_pickup", "out_for_delivery"].includes(order.status) && (
+          {["accepted", "preparing", "ready_for_pickup", "out_for_delivery", "delivered", "cancelled"].includes(order.status) && (
             <OrderTracking orderId={order.id} />
           )}
           <ol>

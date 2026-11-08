@@ -307,13 +307,23 @@ router.get("/orders/:orderId/tracking", requireAuth, async (req, res) => {
     : [];
   const active =
     order.status === "ready_for_pickup" || order.status === "out_for_delivery";
+  const [assignedDriver] = delivery?.driverProfileId
+    ? await db.select({displayName:profilesTable.displayName}).from(profilesTable).where(eq(profilesTable.id,delivery.driverProfileId)).limit(1)
+    : [];
+  const associated = Boolean(location && delivery?.driverProfileId===location.driverProfileId);
   const fresh = Boolean(
-    location && Date.now() - location.observedAt.getTime() <= 120000,
+    associated && location && Date.now() - location.observedAt.getTime() <= 120000,
   );
+  res.setHeader("Cache-Control","no-store");
   res.json({
     orderId,
     status: order.status,
     driverAssigned: Boolean(delivery?.driverProfileId),
+    assignedDriver: assignedDriver ?? null,
+    deliveryStatus: delivery?.status ?? "unassigned",
+    arrivedAt: delivery?.arrivedAt ?? null,
+    pickedUpAt: delivery?.pickedUpAt ?? null,
+    deliveredAt: delivery?.deliveredAt ?? null,
     location:
       active && delivery?.driverProfileId === location?.driverProfileId && fresh
         ? {
@@ -325,7 +335,7 @@ router.get("/orders/:orderId/tracking", requireAuth, async (req, res) => {
         : null,
     locationStatus: !active
       ? "not_active"
-      : !location
+      : !associated
         ? "not_shared"
         : fresh
           ? "current"

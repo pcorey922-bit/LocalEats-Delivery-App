@@ -2874,6 +2874,42 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     await assert.rejects(engine.exec(`UPDATE support_messages SET body='rewritten' WHERE id='${reply.id}'`));await assert.rejects(engine.exec(`DELETE FROM support_messages WHERE id='${reply.id}'`));await assert.rejects(engine.exec('TRUNCATE support_messages'));
   });
 
+  await t.test("customer and restaurant tracking follows actual assignment, arrival, pickup and proof-confirmed completion without leaking driver identity or stale GPS",async()=>{
+    const drivers=[randomUUID(),randomUUID()];
+    for(let i=0;i<drivers.length;i++){
+      await db.insert(profilesTable).values({id:drivers[i],clerkUserId:drivers[i],displayName:`Tracking courier ${i+1}`,role:'driver',driverApproved:true});
+      assert.equal((await api('/driver/availability',drivers[i],'PUT',{available:true})).status,200);
+    }
+    const order=await create();await ready(order.id);
+    assert.equal((await api(`/driver/orders/${order.id}/claim`,drivers[0],'POST')).status,201);
+    assert.equal((await api(`/driver/orders/${order.id}/arrive`,drivers[0],'POST')).status,200);
+    assert.equal((await api(`/driver/orders/${order.id}/location`,drivers[0],'POST',{latitude:35.88,longitude:-84.51,accuracyMeters:8,observedAt:new Date()})).status,202);
+    for(const actor of [ids.customer,ids.restaurant,ids.admin,drivers[0]]){
+      const tracking=await api(`/orders/${order.id}/tracking`,actor);assert.equal(tracking.status,200);
+      assert.equal(tracking.data.assignedDriver.displayName,'Tracking courier 1');assert.ok(tracking.data.arrivedAt);
+      assert.equal(tracking.data.locationStatus,'current');assert.equal(tracking.data.location.latitude,35.88);
+      assert.equal(JSON.stringify(tracking.data).includes('clerkUserId'),false);
+    }
+    assert.equal((await api(`/orders/${order.id}/tracking`,ids.other)).status,403);
+    const [trackedDelivery]=await db.select().from(deliveriesTable).where(eq(deliveriesTable.orderId,order.id));
+    await db.update(deliveryLocationsTable).set({observedAt:new Date(Date.now()-130000)}).where(eq(deliveryLocationsTable.deliveryId,trackedDelivery.id));
+    const stale=await api(`/orders/${order.id}/tracking`,ids.restaurant);assert.equal(stale.data.locationStatus,'stale');assert.equal(stale.data.location,null);
+    assert.equal((await api(`/driver/orders/${order.id}/release`,drivers[0],'POST',{reason:'Transfer this staging delivery to another eligible courier'})).status,200);
+    assert.equal((await api(`/driver/orders/${order.id}/claim`,drivers[1],'POST')).status,201);
+    const reassigned=await api(`/orders/${order.id}/tracking`,ids.restaurant);
+    assert.equal(reassigned.data.assignedDriver.displayName,'Tracking courier 2');assert.equal(reassigned.data.arrivedAt,null);
+    assert.equal(reassigned.data.locationStatus,'not_shared');
+    assert.equal((await api(`/orders/${order.id}/tracking`,drivers[0])).status,403);
+    assert.equal((await api(`/driver/orders/${order.id}/pickup`,drivers[1],'POST')).status,200);
+    assert.ok((await api(`/orders/${order.id}/tracking`,ids.customer)).data.pickedUpAt);
+    const handoff=await api(`/orders/${order.id}/delivery-code`,ids.customer,'POST');assert.equal(handoff.status,200);
+    assert.equal((await api(`/driver/orders/${order.id}/deliver`,drivers[1],'POST',{code:handoff.data.code})).status,200);
+    const ended=await api(`/orders/${order.id}/tracking`,ids.restaurant);
+    assert.equal(ended.data.status,'delivered');assert.ok(ended.data.deliveredAt);assert.equal(ended.data.location,null);assert.equal(ended.data.locationStatus,'not_active');
+    const response=await fetch(`${origin}/api/orders/${order.id}/tracking`,{headers:{'x-test-user':ids.customer}});
+    assert.equal(response.headers.get('cache-control'),'no-store');
+    for(const driver of drivers)await api('/driver/availability',driver,'PUT',{available:false});
+  });
   await t.test("only server-configured owners delegate administrators with audit, stale-role and custody guards; revocation preserves ordinary driver approval rules", async () => {
     const owner=`user_QADelegator${randomUUID().replaceAll('-','')}`;
     const previous=process.env.LOCALEATS_ADMIN_CLERK_USER_IDS;

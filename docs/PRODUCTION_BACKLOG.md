@@ -75,6 +75,20 @@ passes with explicit simulated auth/provider responses. Actual Stripe probe and
 signed checkout still require the owner-deployed endpoint and real owner session.
 Follow PRIVATE_TEST_DELIVERY.md for exact owner setup and the real acceptance path.
 
+Payment setup committed as a0ee18d; full PostgreSQL/restore/container CI
+42467372777 passed. Native CI 42467377086 failed before compilation on official
+Gradle/Capacitor GitHub release dependency downloads (HTTP 504), not app diagnostics.
+Do not claim the latest native build passed; handle dependency availability next.
+
+Tracking batch exposes authorized courier display name and saved arrival/pickup/
+completion times to customers and restaurants, throughout preparation and receipts.
+No driver IDs/contact details or GPS sharing permissions were broadened. Tracking
+responses are no-store; stale or reassigned positions stay hidden. Closed orders
+show ended sharing rather than waiting for a driver; manual refresh supports recovery.
+100 automated tests cover the full assignment/reassignment/pickup/handoff/completion
+path with test identities/payments and GPS samples. Phone UI fixture checks ended
+tracking; real device/background and actual-provider delivery remain unverified.
+
 ## Existing implemented foundation — preserve and verify on staging
 
 - Clerk authentication, server role/approval checks and explicit owner-driver access.

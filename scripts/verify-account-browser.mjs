@@ -85,6 +85,24 @@ try {
   });
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await page.goto("http://127.0.0.1:" + server.address().port);
+  await page.getByText("Driver: QA courier", { exact: true }).waitFor();
+  await page.evaluate(() => {
+    window.qaTracking = {
+      ...window.qaTracking,
+      status: "delivered",
+      deliveryStatus: "delivered",
+      locationStatus: "not_active",
+      deliveredAt: "2026-11-08T12:15:00Z",
+    };
+  });
+  await page
+    .getByRole("button", { name: "Refresh tracking", exact: true })
+    .click();
+  await page
+    .getByText("This order is closed. Live location sharing has ended.", {
+      exact: true,
+    })
+    .waitFor();
   await page
     .getByRole("button", { name: "Verify Stripe TEST connection", exact: true })
     .click();
