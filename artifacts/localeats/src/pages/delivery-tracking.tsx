@@ -45,7 +45,7 @@ export function DriverAvailability() {
       <h2>Your availability</h2>
       <p>
         Going online shares your current location with authorized dispatch while
-        the driver workspace is active. Going offline stops routine sharing and
+        the RoCoEats app is active and you choose to stay online. Going offline stops routine sharing and
         clears the dispatch position.
       </p>
 

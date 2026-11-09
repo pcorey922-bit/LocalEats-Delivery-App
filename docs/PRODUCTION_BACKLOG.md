@@ -517,3 +517,19 @@ launch, guest/sign-in screens, cold returns and invalid-link rejection. It recei
 no signing keys, accounts or guest capabilities, and creates no orders/payments.
 Shell/Python/YAML syntax reviewed; actual emulator results are pending its first run.
 ADB is confined to the disposable emulator; it is never used on the owner's phone.
+
+## Foreground location privacy and emulator consent checks
+
+Corrected iOS location permission wording and the shared driver disclosure to match
+actual behavior: user-chosen on-duty sharing with dispatch while RoCoEats is active,
+plus authorized order participants during active delivery. No background permission,
+tracking service or runtime capability was added. iOS plist parsing and frontend
+typecheck pass. The installed APK's earlier launch result remains valid, but these
+wording changes have not been physically verified or shipped in a new APK.
+
+Emulator attempt 42585658397 failed at boot deadline before installing/exercising the
+app. This is infrastructure evidence only; do not count any app checks from that run.
+Added isolated boot diagnostics, explicit KVM acceleration, headless Vulkan-off
+settings and an absolute eight-minute boot deadline. No Samsung settings are changed.
+The pending runtime suite also checks location/notification permissions are not
+pre-granted and reports incomplete runs explicitly rather than marking them passed.

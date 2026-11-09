@@ -7,6 +7,8 @@ package='com.rocoeats.app.staging'
 activity=package+'/com.rocoeats.app.MainActivity'
 output=pathlib.Path('android-smoke-evidence');output.mkdir(exist_ok=True)
 results=[]
+runtime_permissions={}
+completed=False
 def adb(*args,timeout=30):
  return subprocess.check_output(['adb','-e',*args],timeout=timeout,stderr=subprocess.STDOUT)
 def shell(*args,timeout=30):return adb('shell',*args,timeout=timeout).decode(errors='replace')
@@ -23,6 +25,7 @@ def wait_text(name,expected,attempts=18):
   if 'Something went wrong' in text:raise AssertionError('Application error boundary appeared; inspect anonymous screenshot')
   if expected.casefold() in text.casefold():return root
   time.sleep(2)
+ print('Anonymous emulator UI: '+re.sub(r'https?://\S+','[URL]',text)[:1000],flush=True)
  raise AssertionError('Expected UI did not appear: '+expected)
 def tap(root,text):
  candidates=[n for n in root.iter('node') if text in [n.get('text',''),n.get('content-desc','')]]
@@ -30,7 +33,8 @@ def tap(root,text):
  node=next((n for n in candidates if n.get('clickable')=='true'),candidates[0])
  values=list(map(int,re.findall(r'\d+',node.get('bounds',''))));assert len(values)==4,'UI bounds missing'
  shell('input','tap',str((values[0]+values[2])//2),str((values[1]+values[3])//2))
-def mark(name):results.append({'check':name,'passed':True})
+def mark(name):
+ results.append({'check':name,'passed':True});print('PASS: '+name,flush=True)
 def launch(uri=None):
  args=['am','start','-W']
  if uri:args+=['-a','android.intent.action.VIEW','-d',uri,'-p',package]
@@ -41,10 +45,16 @@ def crash_check():
  logs=adb('logcat','-d','-s','AndroidRuntime:E').decode(errors='replace')
  for block in logs.split('FATAL EXCEPTION:')[1:]:
   assert 'Process: '+package+',' not in block,'Native app crash recorded'
-mark('emulator-only test; no Samsung/Play Protect certification')
+
 try:
  adb('logcat','-c');adb('install','--no-streaming',str(pathlib.Path('smoke-input/RoCoEats-Android-Staging-Test.apk').resolve()),timeout=90)
  mark('signed staging package installed on Android emulator')
+ package_info=shell('dumpsys','package',package)
+ for permission in ['ACCESS_FINE_LOCATION','ACCESS_COARSE_LOCATION','POST_NOTIFICATIONS']:
+  matches=re.findall(r'android\.permission\.'+permission+r': granted=(true|false)',package_info)
+  runtime_permissions[permission]=matches[-1] if matches else 'not present in runtime permission state'
+  assert 'true' not in matches,'Runtime permission granted before user consent: '+permission
+ mark('location and notification runtime permissions are not pre-granted')
  launch();root=wait_text('01-launch','RoCoEats');root=wait_text('01-home','Find food')
  mark('real packaged application launched and rendered')
  tap(root,'Guest order');root=wait_text('02-guest','Use a private guest link')
@@ -60,8 +70,8 @@ try:
  mark('guest checkout contact form does not require registration')
  shell('am','force-stop',package);launch();wait_text('06-relaunch','Find food')
  mark('application relaunch succeeds')
- crash_check();mark('no native application crash found')
+ crash_check();mark('no native application crash found');completed=True
 finally:
- report={'package':package,'emulator':True,'physicalSamsung':False,'playProtectVerified':False,'authenticatedSignInVerified':False,'paymentTested':False,'checks':results}
+ report={'completed':completed,'runtimePermissions':runtime_permissions,'package':package,'emulator':True,'physicalSamsung':False,'playProtectVerified':False,'authenticatedSignInVerified':False,'paymentTested':False,'checks':results}
  (output/'results.json').write_text(json.dumps(report,indent=2))
 print(json.dumps({'passed':len(results),'emulator':True,'physicalDeviceVerified':False}))

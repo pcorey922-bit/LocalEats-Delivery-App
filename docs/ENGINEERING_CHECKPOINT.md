@@ -1119,3 +1119,13 @@ Samsung/Play Protect acceptance is awaiting the owner's physical-device results.
 Next: inspect owner evidence and fix actual device issues, then private sandbox E2E.
 This documentation-only checkpoint does not change the APK app source or require
 another native rebuild. Keep all signing/provider secrets out of source and chat.
+
+## Permission disclosure and emulator retry checkpoint
+
+Owner Samsung installation/launch/appearance PASSED; native authentication response
+is still awaited. Foreground/on-duty disclosure now accurately includes dispatch in
+shared UI/iOS permission text; no background capability or permission was added.
+Frontend types and iOS plist syntax pass. Initial emulator 42585658397 did not boot
+and ran no app checks. Retry adds bounded boot diagnostics/KVM/headless settings and
+explicit ungranted location/push checks. Preserve original signed APK source 5c687ac
+and owner key; no need to reinstall it for authentication verification.
