@@ -1087,3 +1087,11 @@ passed. Signing prerequisites passed; run 42582782177 failed because generic And
 classpath prefetch caused AGP artifact ambiguity. It is narrowed to kotlinCompilerClasspath
 only. Keep owner signing key unchanged and retry target=staging. Do not offer an APK
 until actual signature/manifest/secret scans and artifact upload pass.
+
+## Verified Gradle CLI checkpoint
+
+Official Gradle binary was actually downloaded/stream-hashed against the pinned
+vendor checksum and executed locally at version 8.14.3. CI now installs the same
+verified binary through Node before dependency prefetch/build, keeping wrapper
+validation and rejecting non-vendor/unpinned URLs. No transport security bypass.
+Run signed target=staging at latest HEAD; do not rotate the stable owner key.

@@ -7,7 +7,7 @@ export function nativeStagingEnvironment(config) {
  if(typeof key!=='string'||!/^pk_test_[A-Za-z0-9+/=_-]+$/.test(key))throw Error('A public Clerk development key is required');
  const host=Buffer.from(key.slice(8),'base64').toString();
  if(!/^[a-z0-9-]+\.clerk\.accounts\.dev\$$/.test(host))throw Error('Invalid Clerk development instance');
- return {VITE_API_ORIGIN:config.apiOrigin,VITE_CLERK_PUBLISHABLE_KEY:key,VITE_NATIVE_STAGING:'true',ROCOEATS_NATIVE_STAGING:'true'};
+ return {VITE_API_ORIGIN:config.apiOrigin,VITE_CLERK_PUBLISHABLE_KEY:key,VITE_NATIVE_STAGING:'true',VITE_DEMO_MODE:'false',ROCOEATS_NATIVE_STAGING:'true'};
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
  const env=nativeStagingEnvironment(JSON.parse(await readFile(new URL('../config/native-staging.json',import.meta.url),'utf8')));

@@ -447,3 +447,15 @@ an overbroad dependency-prefetch error: AGP project artifact variants are ambigu
 without task-specific artifact views. Prefetch now resolves only the external Kotlin
 compiler configuration, preserving Android's normal dependency/variant selection.
 No signing identity is rotated. Re-run target=staging and inspect actual artifacts.
+
+## Verified official Gradle CLI installation
+
+Java wrapper redirect downloads continued to return HTTP 504 before task execution.
+Added the standard official binary installation path using Node streaming download,
+three bounded transport attempts and the same source-pinned vendor SHA-256. Only
+verified official bytes are extracted/executed; wrapper validation remains enabled,
+no mirror/proxy/TLS override or private credential is used. A real local 137 MB archive
+was downloaded, SHA-256 verified, extracted and Gradle 8.14.3 executed successfully.
+CI uses this identical pinned CLI instead of repeating Java-wrapper downloads.
+Preflight tests reject missing checksum/non-vendor URLs; Android compilation errors
+still fail immediately. Real application mode is explicitly selected for staging.
