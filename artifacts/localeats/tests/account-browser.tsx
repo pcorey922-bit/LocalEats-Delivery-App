@@ -5,11 +5,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AccountAccess } from "../src/pages/account-access";
 import { AccountSettings } from "../src/pages/account-settings";
 import { AdministratorAccessManager } from "../src/pages/administrator-access";
+import { PricingSettings } from "../src/pages/commerce-pages";
 import { PaymentSetupChecks } from "../src/pages/payment-setup";
 import { OrderTracking } from "../src/pages/delivery-tracking";
 import { DeclinedOffers } from "../src/pages/declined-offers";
 declare global {
   interface Window {
+    qaPricingReady: boolean;
+    qaPricingWrites: unknown[];
+    qaSignedEventAt: string | null;
     qaAccess: Record<string, string | boolean>;
     qaWrites: unknown[];
     qaAdminWrites: unknown[];
@@ -41,6 +45,9 @@ window.qaAccess = {
   superAdministrator: true,
   driver: true,
 };
+window.qaPricingReady = false;
+window.qaPricingWrites = [];
+window.qaSignedEventAt = null;
 window.qaWrites = [];
 window.qaAdminWrites = [];
 window.qaReconsiderRequests = [];
@@ -71,6 +78,13 @@ window.qaStaff = {
   accessVersion: "v1",
 };
 window.fetch = async (url, options = {}) => {
+  if (String(url) === "/api/admin/pricing" && options.method === "PUT") {
+    window.qaPricingWrites.push(JSON.parse(String(options.body)));
+    window.qaPricingReady = true;
+    return new Response("{}", {
+      headers: { "content-type": "application/json" },
+    });
+  }
   if (String(url) === "/api/driver/offers?declined=true")
     return new Response(JSON.stringify(window.qaDeclinedOffers), {
       headers: { "content-type": "application/json" },
@@ -94,13 +108,13 @@ window.fetch = async (url, options = {}) => {
     String(url) === "/api/admin/payment-setup/verify"
   ) {
     const state = {
-      pricingReady: false,
+      pricingReady: window.qaPricingReady,
       testProviderConfigured: true,
       expectedWebhookUrl: "https://qa.onrender.com/api/webhooks/stripe",
       apiVersion: "fixture-version",
       requiredEvents: ["checkout.session.completed"],
       webhookSecretPresent: false,
-      lastAcceptedSignedEventAt: null,
+      lastAcceptedSignedEventAt: window.qaSignedEventAt,
       orderingEnabled: false,
     };
     return new Response(
@@ -159,6 +173,7 @@ createRoot(document.getElementById("root")!).render(
     <AdministratorAccessManager />
     <AccountSettings displayName="QA profile" />
     <PaymentSetupChecks />
+    <PricingSettings current={null} />
     <OrderTracking orderId="fixture-tracking" />
     <DeclinedOffers />
   </QueryClientProvider>,

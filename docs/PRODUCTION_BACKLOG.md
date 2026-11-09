@@ -182,3 +182,20 @@ Native run 42468145201 exhausted the bounded dependency retries on upstream HTTP
 504 downloading official Gradle/Capacitor binaries, before compilation. Validate
 42468140635 passed for f725251. Native builds/device acceptance remain blocked;
 no transport-security bypass or alternate binary mirror was introduced.
+
+## November 9 — interrupted pricing refresh recovered
+
+Recovered and verified the pricing/setup refresh fix left by the usage interruption.
+Saving reviewed pricing invalidates setup readiness as well as commerce configuration;
+Stripe verification refreshes local setup state, and a manual refresh retrieves recent
+signed-event status without reloading the page. Production build/typechecks passed
+November 8; recovered phone-size component QA passed November 9, exercising the
+actual pricing form payload, status refresh and existing owner/driver controls with
+explicitly simulated API/authentication. Commit 711e2d7 passed full Validate runs
+42469208537/42469212306; native run 42469212293 failed and remains unverified.
+
+New required launch work: anonymous customer browse/checkout/support with scoped,
+expiring/revocable guest capabilities shared by web/native; telephone restaurant
+confirmation with honest pending status, audited dispatcher actions, concurrent
+transition safety and payment rejection recovery. Neither new workflow is certified
+on staging or devices. Keep public ordering disabled and payments TEST-only.

@@ -115,6 +115,51 @@ try {
       exact: true,
     })
     .waitFor();
+  const pricingRow = page
+    .locator(".roco-row")
+    .filter({ has: page.locator("dt", { hasText: /^Pricing saved$/ }) });
+  await pricingRow.getByText("No", { exact: true }).waitFor();
+  for (const [label, value] of [
+    ["Delivery fee ($)", "5"],
+    ["Service fee (%)", "5"],
+    ["Configured tax rate (%)", "0"],
+    ["Restaurant commission (%)", "10"],
+    ["Driver share of delivery fee (%)", "100"],
+    ["Delivery ZIP codes, separated by commas", "37763"],
+  ])
+    await page.getByLabel(label, { exact: true }).fill(value);
+  await page
+    .getByRole("combobox", { name: /^Taxable charges/ })
+    .selectOption("food");
+  await page
+    .getByRole("button", {
+      name: "Save pricing policy for provider testing",
+      exact: true,
+    })
+    .click();
+  await pricingRow.getByText("Yes", { exact: true }).waitFor();
+  assert.deepEqual(await page.evaluate(() => window.qaPricingWrites), [
+    {
+      deliveryFeeCents: 500,
+      serviceFeeBps: 500,
+      taxBps: 0,
+      restaurantCommissionBps: 1000,
+      driverShareBps: 10000,
+      taxDeliveryAndService: false,
+      allowedPostalCodes: ["37763"],
+      testMode: true,
+    },
+  ]);
+  await page.evaluate(() => {
+    window.qaSignedEventAt = "2026-11-08T12:30:00Z";
+  });
+  await page
+    .getByRole("button", { name: "Refresh setup status", exact: true })
+    .click();
+  await page
+    .getByText(/^Last accepted signed event:/)
+    .filter({ hasText: "None yet" })
+    .waitFor({ state: "hidden" });
   await page
     .getByRole("button", { name: "Verify Stripe TEST connection", exact: true })
     .click();

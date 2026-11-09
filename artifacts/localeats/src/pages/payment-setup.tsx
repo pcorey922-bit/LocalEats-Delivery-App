@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 type Setup = {
   pricingReady: boolean;
@@ -22,6 +22,7 @@ type Setup = {
   };
 };
 export function PaymentSetupChecks() {
+  const client = useQueryClient();
   const state = useQuery({
     queryKey: ["payment-setup"],
     queryFn: () => customFetch<Setup>("/api/admin/payment-setup"),
@@ -33,6 +34,7 @@ export function PaymentSetupChecks() {
         method: "POST",
         body: "{}",
       }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["payment-setup"] }),
   });
   const current = state.data;
   return (
@@ -99,6 +101,13 @@ export function PaymentSetupChecks() {
               : "None yet"}
             . Historical receipt does not verify a newly changed signing secret.
           </p>
+          <button
+            className="roco-button"
+            onClick={() => void state.refetch()}
+            disabled={state.isFetching}
+          >
+            {state.isFetching ? "Refreshing setup…" : "Refresh setup status"}
+          </button>
           <button
             className="roco-button"
             onClick={() => check.mutate()}

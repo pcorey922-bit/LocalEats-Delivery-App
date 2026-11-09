@@ -945,3 +945,12 @@ from older health responses. Ordering remains closed. Deploy the latest pushed
 branch, then use /operations for the real read-only Stripe check; private test
 payment/delivery acceptance is still pending. Native run 42468145201 failed before
 compilation on official binary download HTTP 504 despite bounded retries.
+
+## November 9 — recovered setup refresh
+
+Interrupted four-file UI fix recovered. Pricing save and provider verification
+refresh setup readiness; explicit refresh reloads signed-event status. Actual-component
+390x844 browser QA passes with simulated API/auth, including the pricing policy
+payload. Prior production build/typechecks passed; 711e2d7 full Validate CI passed.
+Guest ordering and telephone confirmation are new launch-critical requirements;
+implement additive shared workflows, preserving private staging/TEST-only gates.

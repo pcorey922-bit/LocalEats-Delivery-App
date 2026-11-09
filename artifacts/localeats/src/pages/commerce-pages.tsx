@@ -248,9 +248,14 @@ export function OrderActions({ order }: { order: Order }) {
           <p>
             {order.deliveryAddress.street1}, {order.deliveryAddress.city}
           </p>
-          {["accepted", "preparing", "ready_for_pickup", "out_for_delivery", "delivered", "cancelled"].includes(order.status) && (
-            <OrderTracking orderId={order.id} />
-          )}
+          {[
+            "accepted",
+            "preparing",
+            "ready_for_pickup",
+            "out_for_delivery",
+            "delivered",
+            "cancelled",
+          ].includes(order.status) && <OrderTracking orderId={order.id} />}
           <ol>
             {order.events.map((event) => (
               <li key={event.id}>
@@ -479,7 +484,7 @@ export function OperationsCommerce() {
       <AdminSupport />
       <Link href="/admin">← Operations overview</Link>
       <h1>Test order operations</h1>
-      <PaymentSetupChecks/>
+      <PaymentSetupChecks />
       <CommerceBanner />
       {error && (
         <p role="alert" className="roco-alert">
@@ -845,7 +850,7 @@ function FinancialOperations() {
   );
 }
 
-function PricingSettings({ current }: { current: Pricing | null }) {
+export function PricingSettings({ current }: { current: Pricing | null }) {
   const client = useQueryClient();
   const save = useMutation({
     mutationFn: (policy: Pricing) =>
@@ -854,7 +859,10 @@ function PricingSettings({ current }: { current: Pricing | null }) {
         body: JSON.stringify(policy),
       }),
     onSuccess: () =>
-      void client.invalidateQueries({ queryKey: ["commerce-config"] }),
+      Promise.all([
+        client.invalidateQueries({ queryKey: ["commerce-config"] }),
+        client.invalidateQueries({ queryKey: ["payment-setup"] }),
+      ]),
   });
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
