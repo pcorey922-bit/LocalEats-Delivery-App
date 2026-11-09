@@ -1095,3 +1095,18 @@ vendor checksum and executed locally at version 8.14.3. CI now installs the same
 verified binary through Node before dependency prefetch/build, keeping wrapper
 validation and rejecting non-vendor/unpinned URLs. No transport security bypass.
 Run signed target=staging at latest HEAD; do not rotate the stable owner key.
+
+## Verified signed APK handoff checkpoint
+
+Application source 5c687ac102adfe622f11403239398ec43fc84e15: server CI 42583769000/
+42583776593 and BOTH native platforms 42583776579 PASSED. Actual configured owner-signed
+staging APK run 42583769896 PASSED all package/signature/credential/security gates;
+artifact 13658705753 is real and retained until Dec 9. See ANDROID_STAGING_TEST.md
+for direct link, certificate fingerprint and Samsung extraction/install instructions.
+Stable key is in owner encrypted GitHub secrets; never initialize/rotate it again.
+Owner deployment passed native protocol/Clerk/CORS/closed-ordering verification.
+112 tests pass; no actual payment or authenticated Google-device session was tested.
+Samsung/Play Protect acceptance is awaiting the owner's physical-device results.
+Next: inspect owner evidence and fix actual device issues, then private sandbox E2E.
+This documentation-only checkpoint does not change the APK app source or require
+another native rebuild. Keep all signing/provider secrets out of source and chat.

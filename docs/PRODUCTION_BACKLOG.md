@@ -459,3 +459,38 @@ was downloaded, SHA-256 verified, extracted and Gradle 8.14.3 executed successfu
 CI uses this identical pinned CLI instead of repeating Java-wrapper downloads.
 Preflight tests reject missing checksum/non-vendor URLs; Android compilation errors
 still fail immediately. Real application mode is explicitly selected for staging.
+
+## VERIFIED SIGNED ANDROID TEST APK — November 9
+
+APK app-code source 5c687ac102adfe622f11403239398ec43fc84e15 is pushed/verified.
+Signed staging workflow 42583769896 SUCCEEDED and uploaded actual artifact
+13658705753, RoCoEats-Android-Staging-Test-APK (4,486,617 bytes, expiry Dec 9).
+Download https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/42583769896/artifacts/13658705753
+Run https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/42583769896
+Archive digest sha256:56482fdacbf7d17798cb10fd32fc8158f031abbc238f9238929e11156982d575.
+APK v2 signature verifies, RSA-3072 certificate CN=RoCoEats Staging/O=RoCoEats/C=US;
+certificate SHA-256 f22e58f4da4e5d64f9ac5d4f0fc8abfe2595e395511552f7fb385205c7d18296.
+Actual packaged checks passed: staging package, non-debuggable, cleartext/backup off,
+no prohibited sensitive/background location permissions, no packaged server/private
+keys or signing password; approved public staging origin/Clerk key present. Reports
+and per-APK checksum are inside the artifact. Independent local artifact fetch was
+blocked by signed-storage access; compiled verification evidence was read from the
+successful CI logs. This is not a malware certification or Play Protect approval.
+
+5c687ac complete Validate 42583769000/42583776593 PASSED (PostgreSQL/migrations,
+concurrency, backup/restore, Docker/non-root/startup). Native 42583776579 PASSED BOTH
+Android debug/release/AAB/lint/staging variant and iOS simulator/unsigned release.
+112 app/API tests, public-config/installer tests and production builds pass. Actual
+live staging native contract/CORS/closed-ordering and pending/wrong-proof/forged-auth
+guards passed without creating an order/payment or authenticated user session.
+Phone-width actual component native signin/guest import was tested with explicit
+browser/API/Clerk simulations, not a real Google approval or Samsung session.
+
+Owner has the real artifact URL and was asked to try installation while keeping
+Play Protect/Auto Blocker enabled. Physical Samsung installation/launch, actual Clerk
+browser-to-app ticket consumption, guest/driver/admin/navigation, network/lifecycle,
+push/GPS and real Stripe sandbox checkout are still UNVERIFIED. No protections may
+be disabled or overridden. Owner should revoke the consumed temporary setup token;
+stable signing secrets must be preserved. Pricing (0% sandbox-only tax), TEST mode
+and ordering=false were preserved. PR stays draft. Next: owner device evidence,
+resolve concrete device/Google review findings, then real private TEST delivery.

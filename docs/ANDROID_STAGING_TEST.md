@@ -1,5 +1,21 @@
 # Owner-controlled Android staging test
 
+**Verified signed testing build is available.** Signing setup and native backend
+configuration are complete; do not repeat initialization below.
+
+- APK source: `5c687ac102adfe622f11403239398ec43fc84e15`.
+- Successful signed run: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/42583769896 .
+- Download: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/42583769896/artifacts/13658705753 .
+- Artifact: **RoCoEats-Android-Staging-Test-APK**, expires December 9, 2026.
+- App: **RoCoEats Staging**, package `com.rocoeats.app.staging`.
+- APK Signature Scheme v2 verified; RSA-3072 owner-controlled test identity.
+- Certificate SHA-256: `f22e58f4da4e5d64f9ac5d4f0fc8abfe2595e395511552f7fb385205c7d18296`.
+
+Open the ZIP in Samsung **My Files → Downloads → Extract**, then open
+`RoCoEats-Android-Staging-Test.apk`. Keep Play Protect/Auto Blocker enabled. Use a
+security scan if Google offers one; stop if installation is blocked. Signing/static
+checks do not mean Google has approved the developer or this APK.
+
 This is the real app, not the old interactive demonstration. Keep public ordering
 false and Stripe TEST. The owner's verified webhook and temporary 0% sandbox tax
 must not be changed. A real sandbox payment/signed event and device tests remain.
@@ -127,5 +143,4 @@ Signing initialization was completed successfully in run 42581883152. Do not rep
 initialization: the two stable encrypted signing secrets now exist and must be kept
 for staging updates. Revoke the temporary one-day personal token in GitHub Settings.
 Normal staging builds no longer need that token. The normal engineering integration
-still cannot read/manage those secrets. Current blocker is deploying the mobile
-backend in Render before the configured build's mandatory connectivity preflight.
+still cannot read/manage those secrets. The native backend is now deployed and the configured build's mandatory connectivity preflight passed.
