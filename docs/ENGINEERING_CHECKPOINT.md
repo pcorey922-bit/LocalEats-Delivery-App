@@ -1079,3 +1079,11 @@ wrapper validation. Wrapper JAR matches official vendor checksum. bf9e8c1 server
 passed; its iOS native job passed, Android hit upstream distribution HTTP 504 before
 compilation. Owner stable signing exists; Render mobile deployment is still needed
 before target=staging can create the real signed artifact.
+
+## Signed build retry checkpoint
+
+Deployed mobile contract/CORS and no-order/payment native negative-auth HTTP tests
+passed. Signing prerequisites passed; run 42582782177 failed because generic Android
+classpath prefetch caused AGP artifact ambiguity. It is narrowed to kotlinCompilerClasspath
+only. Keep owner signing key unchanged and retry target=staging. Do not offer an APK
+until actual signature/manifest/secret scans and artifact upload pass.

@@ -435,3 +435,15 @@ vendor SHA-256 and increased read timeout to 60 seconds. The checked-in wrapper 
 also matches Gradle's official published checksum; CI now runs official wrapper
 validation before native builds. No alternate mirror, TLS weakening or security
 bypass was used. Actual signed build remains gated on the deployed mobile backend.
+
+## Deployed native contract and signed-build recovery
+
+Actual deployed /mobile/readiness/CORS/public Clerk/closed-ordering checks now PASS.
+A real ephemeral auth grant verified start=201, pending=202, invalid proof=403,
+unsigned and forged identity approval=401; no account/order/payment was created.
+Authenticated Clerk approval/ticket redemption and physical-device acceptance remain
+unverified. Signed run 42582782177 passed signing/deployment prerequisites but exposed
+an overbroad dependency-prefetch error: AGP project artifact variants are ambiguous
+without task-specific artifact views. Prefetch now resolves only the external Kotlin
+compiler configuration, preserving Android's normal dependency/variant selection.
+No signing identity is rotated. Re-run target=staging and inspect actual artifacts.
