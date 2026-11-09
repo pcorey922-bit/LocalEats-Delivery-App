@@ -34,7 +34,8 @@ test("carts remain isolated across account switching and ignore legacy unscoped 
   assert.equal(a.getSnapshot().items.length, 1);
   assert.deepEqual(b.getSnapshot().items, []);
   guest.setItems([line]);
-  assert.deepEqual(guest.getSnapshot().items, []);
+  assert.equal(guest.getSnapshot().items.length, 1);
+  assert.equal(createCustomerCart(null,s).getSnapshot().items.length,1);
   assert.equal(
     createCustomerCart("customer-A", s).getSnapshot().items[0]
       .specialInstructions,

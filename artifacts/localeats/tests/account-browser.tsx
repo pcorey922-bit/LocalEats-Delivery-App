@@ -1,3 +1,5 @@
+import { GuestCheckoutAccess } from "../src/pages/guest-order";
+import { CartPage } from "../src/pages/roco-pages";
 // Isolated component fixture: simulated auth/API only; never a production route.
 import React from "react";
 import { createRoot } from "react-dom/client";
@@ -11,6 +13,9 @@ import { OrderTracking } from "../src/pages/delivery-tracking";
 import { DeclinedOffers } from "../src/pages/declined-offers";
 declare global {
   interface Window {
+    qaSignedIn: boolean;
+    qaGuestContacts: unknown[];
+    qaGuestAddresses: Record<string, unknown>[];
     qaPricingReady: boolean;
     qaPricingWrites: unknown[];
     qaSignedEventAt: string | null;
@@ -45,6 +50,9 @@ window.qaAccess = {
   superAdministrator: true,
   driver: true,
 };
+window.qaSignedIn = !location.search.includes("guest=true");
+window.qaGuestContacts = [];
+window.qaGuestAddresses = [];
 window.qaPricingReady = false;
 window.qaPricingWrites = [];
 window.qaSignedEventAt = null;
@@ -78,6 +86,43 @@ window.qaStaff = {
   accessVersion: "v1",
 };
 window.fetch = async (url, options = {}) => {
+  const json = (value: unknown) =>
+    new Response(JSON.stringify(value), {
+      headers: { "content-type": "application/json" },
+    });
+  if (String(url) === "/api/guest/sessions") {
+    window.qaGuestContacts.push(JSON.parse(String(options.body)));
+    return json({ token: "A".repeat(43) });
+  }
+  if (String(url) === "/api/commerce/config")
+    return json({
+      orderingEnabled: false,
+      testMode: true,
+      mode: "stripe_test",
+      liveChargesEnabled: false,
+      pricing: null,
+    });
+  if (String(url) === "/api/addresses/me") {
+    if (options.method === "POST") {
+      const value = {
+        ...JSON.parse(String(options.body)),
+        id: "11111111-1111-4111-8111-111111111112",
+      };
+      window.qaGuestAddresses.push(value);
+      return json(value);
+    }
+    return json(window.qaGuestAddresses);
+  }
+  if (String(url) === "/api/orders/quote")
+    return json({
+      subtotalCents: 1000,
+      deliveryFeeCents: 500,
+      serviceFeeCents: 50,
+      taxCents: 0,
+      tipCents: 0,
+      totalCents: 1550,
+    });
+
   if (String(url) === "/api/admin/pricing" && options.method === "PUT") {
     window.qaPricingWrites.push(JSON.parse(String(options.body)));
     window.qaPricingReady = true;
@@ -169,12 +214,20 @@ createRoot(document.getElementById("root")!).render(
     client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
   >
     <p>SIMULATED authentication and API: component QA only</p>
-    <AccountAccess />
-    <AdministratorAccessManager />
-    <AccountSettings displayName="QA profile" />
-    <PaymentSetupChecks />
-    <PricingSettings current={null} />
-    <OrderTracking orderId="fixture-tracking" />
-    <DeclinedOffers />
+    {!window.qaSignedIn ? (
+      <GuestCheckoutAccess>
+        <CartPage />
+      </GuestCheckoutAccess>
+    ) : (
+      <>
+        <AccountAccess />
+        <AdministratorAccessManager />
+        <AccountSettings displayName="QA profile" />
+        <PaymentSetupChecks />
+        <PricingSettings current={null} />
+        <OrderTracking orderId="fixture-tracking" />
+        <DeclinedOffers />
+      </>
+    )}
   </QueryClientProvider>,
 );

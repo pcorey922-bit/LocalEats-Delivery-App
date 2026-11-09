@@ -224,3 +224,28 @@ identity/payment adapters. Actual Stripe/deployed/native guest acceptance is pen
 Next: shared guest customer UI/persistence and telephone confirmation. Guest email
 tracking-link delivery requires a configured mail provider/outbox; no paid service
 has been added. Stripe receipt settings need owner verification.
+
+## November 9 — shared guest customer interface
+
+Web/native shared routes now offer Continue as Guest, contact collection, persistent
+anonymous cart, delivery address, server quote, unchanged closed-ordering gate,
+TEST checkout, current-order retrieval, scoped live tracking, handoff code, support,
+cancellation/refund details, optional possession-verified account linking and link
+revocation. Protected account/partner/admin routes are preserved. Private link tokens
+use URL fragments, are removed before requests, and are never sent to absolute
+third-party or privileged API URLs. Browser/device storage holds the bearer link;
+shared devices must revoke access when done. No email-only recovery or account merge.
+Operations can mint a private guest test link without storing it in the owner's
+browser session; open it signed out in a separate private browser. Creation does not
+enable ordering. Both direct and durable queued Stripe checkout paths use the guest
+receipt email and guest return route, with no access token in provider metadata/URLs.
+
+103 API/unit tests pass, including guest cart persistence and cross-origin token
+protection; full production build/typechecks and phone-size actual components pass.
+Browser QA covers contact submission, reload/persistent cart, address, quote and
+disabled order submission using simulated API/auth. Guest backend commit 0ce82fe
+passed full PostgreSQL/migration/restore/container Validate CI 42569873460.
+Actual Stripe/guest staged delivery, external receipt email and real Android/iOS
+interruptions are NOT verified. Native uses the shared routes and existing return
+scheme; unsigned compilation and physical-device acceptance remain separate blockers.
+Next: telephone confirmation before hosted payment, with no unapproved price increase.

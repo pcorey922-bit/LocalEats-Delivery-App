@@ -28,6 +28,7 @@ import {
 } from "drizzle-orm";
 import {
   db,
+  guestSessionsTable,
   financialOperationsTable as operations,
   ordersTable,
   paymentsTable,
@@ -594,12 +595,15 @@ export async function executeStripeOperation(
       .from(paymentsTable)
       .where(eq(paymentsTable.orderId, job.orderId))
       .limit(1);
+    const [guest]=await db.select({email:guestSessionsTable.email}).from(guestSessionsTable).where(eq(guestSessionsTable.orderId,job.orderId)).limit(1);
+    const returnPath=guest ? "/guest/order" : "/orders";
     const session = payment.checkoutSessionId
       ? await stripe.checkout.sessions.retrieve(payment.checkoutSessionId)
       : await stripe.checkout.sessions.create(
           {
             mode: "payment",
             client_reference_id: job.orderId,
+            ...(guest ? {customer_email:guest.email} : {}),
             line_items: [
               {
                 price_data: {
@@ -615,8 +619,8 @@ export async function executeStripeOperation(
               metadata: { orderId: job.orderId },
               transfer_group: job.orderId,
             },
-            success_url: `${p.origin}/orders?payment=returned`,
-            cancel_url: `${p.origin}/orders?payment=cancelled`,
+            success_url: `${p.origin}${returnPath}?payment=returned`,
+            cancel_url: `${p.origin}${returnPath}?payment=cancelled`,
           },
           { idempotencyKey: job.id },
         );

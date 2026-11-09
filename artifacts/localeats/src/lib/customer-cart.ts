@@ -37,7 +37,7 @@ const cartSchema = z
   );
 export type CartStorage = Pick<Storage, "getItem" | "setItem">;
 export function createCustomerCart(owner: string | null, storage: CartStorage) {
-  const key = owner ? `rocoeats-cart:v2:${owner}` : null;
+  const key = owner ? `rocoeats-cart:v2:${owner}` : "rocoeats-guest-cart:v1";
   type Snapshot = { items: CartEntry[]; warning: string };
   function read(): Snapshot {
     if (!key) return { items: [], warning: "" };

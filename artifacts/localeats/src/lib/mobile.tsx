@@ -1,3 +1,4 @@
+import { readGuestToken } from "./guest-session";
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -123,7 +124,7 @@ export function MobileLifecycle() {
           !url.password
         ) {
           await Browser.close().catch(() => {});
-          navigate(`/${url.hostname}`);
+          navigate(url.hostname==="orders" && readGuestToken() ? "/guest/order" : `/${url.hostname}`);
           void client.invalidateQueries();
         }
       }),

@@ -4,6 +4,7 @@ import {
   customFetch,
   setBaseUrl,
   setAuthTokenGetter,
+  setGuestTokenGetter,
   ApiError,
 } from "../../../lib/api-client-react/src/custom-fetch";
 const originalFetch = globalThis.fetch;
@@ -11,6 +12,7 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
   setBaseUrl(null);
   setAuthTokenGetter(null);
+  setGuestTokenGetter(null);
 });
 test("mobile requests use configured API origin and fresh bearer token", async () => {
   setBaseUrl("https://api.example.test/");
@@ -48,4 +50,17 @@ test("signed-out requests do not retain the previous bearer token", async () => 
     return new Response(null, { status: 204 });
   };
   assert.equal(await customFetch("/api/driver/offers"), null);
+});
+
+test("guest capabilities reach only relative customer APIs and never external or privileged destinations",async()=>{
+ setGuestTokenGetter(()=>"guest-capability-fixture");
+ const seen:Array<string|null>=[];
+ globalThis.fetch=async(_input,options)=>{seen.push(new Headers(options?.headers).get("X-RoCoEats-Guest-Token"));return Response.json({});};
+ await customFetch("/api/orders/fixture/tracking");
+ await customFetch("https://untrusted.example.test/api/orders/fixture/tracking");
+ await customFetch("/api/admin/dispatch");
+ await customFetch("/api/driver/offers");
+ setBaseUrl("https://api.example.test"); await customFetch("/api/guest/session");
+ setAuthTokenGetter(()=>"clerk-fixture");await customFetch("/api/orders/me");
+ assert.deepEqual(seen,["guest-capability-fixture",null,null,null,"guest-capability-fixture",null]);
 });

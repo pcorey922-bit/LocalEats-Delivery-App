@@ -1,3 +1,4 @@
+import { GuestCheckoutAccess, GuestOrderPage } from "./pages/guest-order";
 import { DriverDutySession } from "./pages/driver-duty-session";
 import { AccountAccess } from "./pages/account-access";
 import { AccountSettings } from "./pages/account-settings";
@@ -354,14 +355,14 @@ function Protected({ children }: { children: ReactNode }) {
 function SignInPage() {
   return <div className="portal-auth-backdrop" data-testid="page-sign-in">
     <section className="portal-auth-story"><BrandLink /><div className="portal-auth-copy"><div className="portal-eyebrow" style={{ color: '#e8b35e' }}>A neighborly start</div><h1>Good food,<br />closer to <em>home.</em></h1><p>Your RoCoEats account is the first step toward a more connected food community in Roane County.</p></div><div className="portal-auth-foot">ROANE COUNTY, TENNESSEE · LOCAL FOOD, LOCAL PEOPLE</div></section>
-    <section className="portal-auth-form"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} /></section>
+    <section className="portal-auth-form"><a className="roco-button" href="/cart">Continue as Guest</a><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} /></section>
   </div>;
 }
 
 function SignUpPage() {
   return <div className="portal-auth-backdrop" data-testid="page-sign-up">
     <section className="portal-auth-story"><BrandLink /><div className="portal-auth-copy"><div className="portal-eyebrow" style={{ color: '#e8b35e' }}>Made for Roane County</div><h1>There’s room<br />at the <em>table.</em></h1><p>Create an account, then tell us how you’d like to be part of RoCoEats. Ordering and partner operations are not active yet.</p></div><div className="portal-auth-foot">A LOCAL IDEA TAKING SHAPE IN ROANE COUNTY</div></section>
-    <section className="portal-auth-form"><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} /></section>
+    <section className="portal-auth-form"><a className="roco-button" href="/cart">Continue as Guest</a><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} /></section>
   </div>;
 }
 
@@ -457,7 +458,8 @@ function Router() {
   return <RoutedErrorBoundary><Switch>
     <Route path="/" component={DiscoveryPage} />
     <Route path="/restaurants/:restaurantId" component={RestaurantMenuPage} />
-    <Route path="/cart" component={() => <Protected><CartPage /></Protected>} />
+    <Route path="/cart" component={() => <GuestCheckoutAccess><CartPage /></GuestCheckoutAccess>} />
+    <Route path="/guest/order" component={GuestOrderPage} />
     <Route path="/orders" component={() => <Protected><OrdersPage /></Protected>} />
     <Route path="/restaurant" component={() => <Protected><RestaurantPage /></Protected>} />
     <Route path="/account/delete" component={() => <Protected><DeletionRequest /></Protected>} />

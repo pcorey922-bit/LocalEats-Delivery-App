@@ -17,6 +17,8 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _guestTokenGetter: AuthTokenGetter | null = null;
+export function setGuestTokenGetter(getter: AuthTokenGetter | null): void { _guestTokenGetter=getter; }
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -326,6 +328,7 @@ export async function customFetch<T = unknown>(
   input: RequestInfo | URL,
   options: CustomFetchOptions = {},
 ): Promise<T> {
+  const relativeCustomerPath = /^\/api\/(?:guest(?:\/|$)|orders(?:\/|$)|addresses(?:\/|$)|support(?:\/|$)|restaurants(?:\/|$)|commerce\/config$|healthz$)/.test(resolveUrl(input));
   input = applyBaseUrl(input);
   const { responseType = "auto", headers: headersInit, ...init } = options;
 
@@ -358,6 +361,10 @@ export async function customFetch<T = unknown>(
     }
   }
 
+  // A guest capability is never sent to absolute/untrusted URLs or privileged APIs.
+  if(relativeCustomerPath && !headers.has("authorization") && _guestTokenGetter){
+    const token=await _guestTokenGetter(); if(token) headers.set("X-RoCoEats-Guest-Token",token);
+  }
   const requestInfo = { method, url: resolveUrl(input) };
 
   const response = await fetch(input, { ...init, method, headers });

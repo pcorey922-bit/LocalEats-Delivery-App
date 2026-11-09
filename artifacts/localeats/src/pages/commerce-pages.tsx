@@ -1,3 +1,4 @@
+import { GuestTestInvitation } from "./guest-test-invitation";
 import { SupportDesk, AdminSupport } from "./support-desk";
 import { DriverApplicationReviews } from "./driver-onboarding";
 import { OrderTracking, DispatchOperations } from "./delivery-tracking";
@@ -485,6 +486,7 @@ export function OperationsCommerce() {
       <Link href="/admin">← Operations overview</Link>
       <h1>Test order operations</h1>
       <PaymentSetupChecks />
+      <GuestTestInvitation />
       <CommerceBanner />
       {error && (
         <p role="alert" className="roco-alert">

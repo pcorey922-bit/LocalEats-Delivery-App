@@ -31,7 +31,7 @@ await build({
           namespace: "qa",
         }));
         b.onLoad({ filter: /.*/, namespace: "qa" }, () => ({
-          contents: `export const useAuth=()=>({isSignedIn:true,userId:'user_QA'});export const useClerk=()=>({openUserProfile:()=>{window.securityOpened=true}});`,
+          contents: `export const useAuth=()=>({isSignedIn:window.qaSignedIn,userId:window.qaSignedIn?'user_QA':null});export const useClerk=()=>({openUserProfile:()=>{window.securityOpened=true}});`,
           loader: "js",
         }));
       },
@@ -83,6 +83,73 @@ try {
     headless: true,
     args: ["--no-sandbox"],
   });
+  const guestPage = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+  });
+  await guestPage.goto(
+    "http://127.0.0.1:" + server.address().port + "/?guest=true",
+  );
+  await guestPage.evaluate(() =>
+    localStorage.setItem(
+      "rocoeats-guest-cart:v1",
+      JSON.stringify([
+        {
+          menuItemId: "11111111-1111-4111-8111-111111111110",
+          restaurantId: "11111111-1111-4111-8111-111111111111",
+          restaurantName: "QA guest kitchen",
+          name: "QA guest meal",
+          priceCents: 1000,
+          quantity: 1,
+        },
+      ]),
+    ),
+  );
+  await guestPage.getByLabel("Your name", { exact: true }).fill("Guest QA");
+  await guestPage
+    .getByLabel("Receipt email", { exact: true })
+    .fill("guest-ui@example.test");
+  await guestPage
+    .getByLabel("Delivery phone", { exact: true })
+    .fill("8655550100");
+  await guestPage
+    .getByRole("button", { name: "Continue as Guest", exact: true })
+    .click();
+  await guestPage.getByText("QA guest meal", { exact: true }).waitFor();
+  assert.deepEqual(await guestPage.evaluate(() => window.qaGuestContacts), [
+    { name: "Guest QA", email: "guest-ui@example.test", phone: "8655550100" },
+  ]);
+  await guestPage.reload();
+  await guestPage.getByText("QA guest meal", { exact: true }).waitFor();
+  await guestPage
+    .getByRole("button", { name: "Add address", exact: true })
+    .click();
+  await guestPage
+    .getByLabel("Street address", { exact: true })
+    .fill("QA guest street");
+  await guestPage.getByLabel("City", { exact: true }).fill("Kingston");
+  await guestPage.getByLabel("ZIP code", { exact: true }).fill("37854");
+  await guestPage
+    .getByRole("button", { name: "Save address", exact: true })
+    .click();
+  await guestPage
+    .getByRole("button", { name: "Calculate test total", exact: true })
+    .click();
+  await guestPage
+    .getByRole("button", { name: "Create order · $15.50", exact: true })
+    .waitFor();
+  assert.equal(
+    await guestPage
+      .getByRole("button", { name: "Create order · $15.50", exact: true })
+      .isDisabled(),
+    true,
+  );
+  assert.equal(
+    await guestPage.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+    true,
+  );
+  await guestPage.close();
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await page.goto("http://127.0.0.1:" + server.address().port);
   await page

@@ -966,3 +966,16 @@ Private staging remains closed to anonymous session creation; owner can mint a
 guest test capability while authenticated, and only customer routes admit it.
 Next checkpoint must add shared guest UI/cart/session recovery, then telephone
 confirmation. Real sandbox/device acceptance remains pending; ordering is disabled.
+
+## November 9 — shared guest screens checkpoint
+
+Guest UI now reuses customer cart/address/quote/checkout APIs, with anonymous cart
+persistence, scoped current-order/support/tracking/handoff access, revocation and
+optional capability-verified account linking. Operations provides private guest test
+links; ordering remains closed. Guest tokens are fragments stripped before requests,
+not provider metadata; customFetch limits automatic attachment to relative customer
+APIs. Queued Stripe worker and direct checkout both use guest receipt/return routing.
+103 automated API/unit tests and actual-component phone QA pass (simulated auth/API),
+full production build passes; backend 0ce82fe Validate 42569873460 passed PostgreSQL,
+migrations, restore and container validation. No deployed/real-provider/device guest
+workflow is certified. Next is safe telephone confirmation before taking payment.
