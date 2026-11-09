@@ -1,3 +1,5 @@
+import { NativeSignIn } from "../src/pages/native-sign-in";
+import { ImportGuestLink } from "../src/pages/import-guest-link";
 import { NextGuestOrder } from "../src/pages/next-guest-order";
 import { TelephoneDispatch } from "../src/pages/telephone-dispatch";
 import { RestaurantConfirmation } from "../src/pages/restaurant-confirmation";
@@ -16,6 +18,10 @@ import { OrderTracking } from "../src/pages/delivery-tracking";
 import { DeclinedOffers } from "../src/pages/declined-offers";
 declare global {
   interface Window {
+    qaNativeStart: Record<string, unknown> | null;
+    qaNativeTickets: string[];
+    qaNativeOpened: string[];
+    qaGuestImportHeaders: string[];
     qaNextGuestWrites: unknown[];
     qaTelephoneStatus: string;
     qaTelephoneVersion: number;
@@ -57,11 +63,17 @@ window.qaAccess = {
   superAdministrator: true,
   driver: true,
 };
+window.qaNativeStart = null;
+window.qaNativeTickets = [];
+window.qaNativeOpened = [];
+window.qaGuestImportHeaders = [];
 window.qaNextGuestWrites = [];
 window.qaTelephoneStatus = "pending";
 window.qaTelephoneVersion = 1;
 window.qaTelephoneWrites = [];
-window.qaSignedIn = !location.search.includes("guest=true");
+window.qaSignedIn = !["guest=true", "native=true", "importGuest=true"].some(
+  (v) => location.search.includes(v),
+);
 window.qaGuestContacts = [];
 window.qaGuestAddresses = [];
 window.qaPricingReady = false;
@@ -160,6 +172,26 @@ window.fetch = async (url, options = {}) => {
           ? "rejected"
           : "contacted";
     return json({});
+  }
+  if (String(url) === "/api/mobile/auth/start") {
+    window.qaNativeStart = JSON.parse(String(options.body));
+    return json({
+      id: "11111111-1111-4111-8111-111111111115",
+      expiresAt: new Date(Date.now() + 300000).toISOString(),
+      authorizationUrl:
+        "https://qa.onrender.com/mobile/authorize#flow=fixture&state=fixture",
+    });
+  }
+  if (String(url) === "/api/mobile/auth/redeem")
+    return json({ ticket: "qa-one-use-ticket" });
+  if (String(url) === "/api/guest/session") {
+    window.qaGuestImportHeaders.push(
+      new Headers(options.headers).get("X-RoCoEats-Guest-Token") || "",
+    );
+    return json({
+      orderId: null,
+      expiresAt: new Date(Date.now() + 86400000).toISOString(),
+    });
   }
   if (String(url) === "/api/guest/sessions") {
     window.qaGuestContacts.push(JSON.parse(String(options.body)));
@@ -285,7 +317,11 @@ createRoot(document.getElementById("root")!).render(
     client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
   >
     <p>SIMULATED authentication and API: component QA only</p>
-    {!window.qaSignedIn ? (
+    {location.search.includes("native=true") ? (
+      <NativeSignIn />
+    ) : location.search.includes("importGuest=true") ? (
+      <ImportGuestLink />
+    ) : !window.qaSignedIn ? (
       <GuestCheckoutAccess>
         <CartPage />
       </GuestCheckoutAccess>

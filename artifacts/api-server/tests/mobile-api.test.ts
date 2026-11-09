@@ -70,3 +70,10 @@ test("mobile return links contain navigation only and reject malformed or author
  assert.equal(mobileReturnRoute("rocoeats://orders",true),"/guest/order");assert.equal(mobileReturnRoute("rocoeats://auth"),"/sign-in");
  for(const value of ["bad","https://evil.example.test/orders","rocoeats://orders?token=secret","rocoeats://orders#access=secret","rocoeats://admin","rocoeats://user:pass@orders"])assert.equal(mobileReturnRoute(value),null);
 });
+
+test("native Clerk bearer tokens are never automatically attached to third-party URLs",async()=>{
+ setBaseUrl("https://api.example.test");setAuthTokenGetter(()=>"private-session-fixture");
+ const seen:Array<string|null>=[];globalThis.fetch=async(_input,options)=>{seen.push(new Headers(options?.headers).get("authorization"));return Response.json({});};
+ await customFetch("https://untrusted.example.test/api/orders");await customFetch("/api/orders/me");await customFetch("https://api.example.test/api/orders/me");await customFetch("https://api.example.test/assets/icon.png");
+ assert.deepEqual(seen,[null,"Bearer private-session-fixture","Bearer private-session-fixture",null]);
+});

@@ -1057,3 +1057,16 @@ now verifies real deployed native protocol/CORS, public Clerk match and closed o
 and Samsung tests are still required. Stable signing is externally blocked until the
 owner completes ANDROID_STAGING_TEST.md; probe 42580742817 correctly stops there.
 Keep source saved before any more work; no payment or pricing settings were changed.
+
+## Stable staging signer checkpoint
+
+Owner setup completed: bootstrap 42581883152 passed; private key/password live only
+in owner repository encrypted Actions secrets. Bootstrap secret was removed. Do not
+rotate or recreate it. 0937bd9 server PostgreSQL/restore/container CI passed.
+112 tests plus production build/typechecks pass; native bearer tokens are destination
+scoped, expanded browser QA is saved, APK review retains public signing metadata.
+Android lazy Kotlin dependencies now prefetch before the compiler under bounded retry.
+Next: owner Render deploy, verify /api/mobile/readiness and both native CORS origins,
+run native-validation target=staging, inspect actual signed artifact/security gates,
+then Samsung/Play Protect and real Clerk/Stripe device acceptance. Signing setup is
+no longer blocked; deployment and real-device verification remain owner-dependent.

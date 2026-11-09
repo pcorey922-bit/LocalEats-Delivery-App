@@ -329,6 +329,11 @@ export async function customFetch<T = unknown>(
   options: CustomFetchOptions = {},
 ): Promise<T> {
   const relativeCustomerPath = /^\/api\/(?:guest(?:\/|$)|orders(?:\/|$)|addresses(?:\/|$)|support(?:\/|$)|restaurants(?:\/|$)|commerce\/config$|healthz$)/.test(resolveUrl(input));
+  const originalUrl=resolveUrl(input);
+  const trustedApiRequest=originalUrl.startsWith("/api/") || (()=>{
+    if(!_baseUrl)return false;
+    try{const target=new URL(originalUrl),base=new URL(_baseUrl);return target.origin===base.origin&&target.pathname.startsWith("/api/");}catch{return false;}
+  })();
   input = applyBaseUrl(input);
   const { responseType = "auto", headers: headersInit, ...init } = options;
 
@@ -354,7 +359,7 @@ export async function customFetch<T = unknown>(
 
   // Attach bearer token when an auth getter is configured and no
   // Authorization header has been explicitly provided.
-  if (_authTokenGetter && !headers.has("authorization")) {
+  if (trustedApiRequest && _authTokenGetter && !headers.has("authorization")) {
     const token = await _authTokenGetter();
     if (token) {
       headers.set("authorization", `Bearer ${token}`);

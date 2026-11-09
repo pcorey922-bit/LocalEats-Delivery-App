@@ -122,3 +122,10 @@ saved. Guest capabilities are never transferred using an interceptable custom sc
 The signed build refuses packaging until the real deployed mobile contract, Clerk
 public key, native CORS and closed ordering are verified. This prevents another
 apparently configured APK being handed off against an incompatible backend.
+
+Signing initialization was completed successfully in run 42581883152. Do not repeat
+initialization: the two stable encrypted signing secrets now exist and must be kept
+for staging updates. Revoke the temporary one-day personal token in GitHub Settings.
+Normal staging builds no longer need that token. The normal engineering integration
+still cannot read/manage those secrets. Current blocker is deploying the mobile
+backend in Render before the configured build's mandatory connectivity preflight.

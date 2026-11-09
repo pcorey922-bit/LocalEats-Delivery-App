@@ -398,3 +398,29 @@ Google ticket redemption/Samsung behavior remain unverified. Signing probe run
 Kotlin/Capacitor HTTP 504 dependency downloads, not a source compilation error.
 Next: owner signing setup + latest Render deploy, then configured APK and real-device
 acceptance. Preserve the owner's verified Stripe TEST/pricing settings unchanged.
+
+## Stable Android signing initialized; native transport safety — November 9
+
+Owner saved the one-time setup token through protected GitHub settings. Bootstrap
+workflow 42581883152 SUCCEEDED at 0937bd9: stable RSA-3072 staging keystore/password
+are now encrypted repository secrets, bootstrap secret removed, no private artifact.
+The engineer never read token/key/password values. Owner should revoke the temporary
+personal token. Signing-secret management still correctly remains unavailable to the
+normal integration. Do NOT rerun initialization or rotate installed signing identity.
+
+Native API client now attaches Clerk bearer tokens only to trusted API destinations;
+external URLs/static assets cannot receive automatic sessions. 112 API/unit tests
+and full production build/typechecks pass. Expanded phone component fixture (native
+browser handoff and guest import) is saved with the source, with simulated adapters.
+Packaged APK checks also reject sensitive permissions and any embedded signing
+password, retaining public certificate fingerprints/checksum for owner review.
+
+Native CI's Gradle help task did not prefetch lazily resolved Kotlin compiler jars;
+Android 7e4fa7b failed on an official Kotlin JAR HTTP 504 during compilation. Added
+an explicit concrete Android/Kotlin configuration prefetch task under the existing
+bounded transport retry helper. Compilation/lint errors remain unwrapped; no mirror,
+TLS bypass or paid cache. Actual task/variant validation requires the new native CI.
+0937bd9 full PostgreSQL/migration/restore/Docker Validate 42581477537 PASSED. Owner must
+deploy latest source in Render so native CORS/readiness and migration 0028 are live,
+then target=staging can build the installable APK. A successful signed artifact and
+Play Protect/Samsung acceptance must still be verified; no APK URL is invented.

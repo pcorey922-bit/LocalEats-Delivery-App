@@ -34,7 +34,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @workspace/localeats mobile:sync
       - name: Resolve Gradle dependencies with bounded transport retries
-        run: bash ../../../scripts/retry-native-dependencies.sh ./gradlew help --no-daemon
+        run: bash ../../../scripts/retry-native-dependencies.sh ./gradlew -I ../../../scripts/resolve-native-dependencies.gradle prefetchRoCoEatsDependencies --no-daemon
         working-directory: artifacts/localeats/android
       - run: ./gradlew assembleDebug --no-daemon
         working-directory: artifacts/localeats/android
@@ -139,7 +139,7 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0'
       - name: Resolve official Gradle dependencies
-        run: bash ../../../scripts/retry-native-dependencies.sh ./gradlew help --no-daemon
+        run: bash ../../../scripts/retry-native-dependencies.sh ./gradlew -I ../../../scripts/resolve-native-dependencies.gradle prefetchRoCoEatsDependencies --no-daemon
         working-directory: artifacts/localeats/android
       - name: Build signed non-debuggable staging APK
         env:
@@ -149,6 +149,8 @@ jobs:
         run: ./gradlew assembleStaging lintStaging --no-daemon
         working-directory: artifacts/localeats/android
       - name: Verify signature, package, permissions and absence of packaged server credentials
+        env:
+          ROCOEATS_STAGING_KEYSTORE_PASSWORD: ${{ secrets.ROCOEATS_STAGING_KEYSTORE_PASSWORD }}
         run: |
           mkdir -p staging-apk
           cp artifacts/localeats/android/app/build/outputs/apk/staging/app-staging.apk staging-apk/RoCoEats-Android-Staging-Test.apk

@@ -1,0 +1,25 @@
+// Gradle resolves Kotlin compiler/runtime jars lazily. Prefetch only concrete
+// Android variant/compiler configurations so transport retries occur before any
+// compiler/lint task. Do not alter vendor repositories, TLS or checksum policy.
+gradle.projectsEvaluated {
+    def root = gradle.rootProject
+    root.tasks.register('prefetchRoCoEatsDependencies') {
+        doLast {
+            root.allprojects.each { project ->
+                project.configurations.findAll { configuration ->
+                    configuration.canBeResolved && (
+                        configuration.name.toLowerCase().startsWith('kotlincompiler') ||
+                        configuration.name in [
+                            'debugCompileClasspath', 'debugRuntimeClasspath',
+                            'releaseCompileClasspath', 'releaseRuntimeClasspath',
+                            'stagingCompileClasspath', 'stagingRuntimeClasspath'
+                        ]
+                    )
+                }.each { configuration ->
+                    logger.lifecycle("Prefetch ${project.path}:${configuration.name}")
+                    configuration.resolve()
+                }
+            }
+        }
+    }
+}
