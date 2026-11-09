@@ -294,3 +294,17 @@ Never put Stripe secrets, bank details or server credentials in VITE variables.
 No map SDK loads while these settings are missing; authenticated dispatch status and
 coordinate lists remain available. Map provider/real-device rendering is not certified
 by mocked or fixture tests. External navigation uses provider-hosted HTTPS links.
+
+## Guest and telephone staging acceptance
+
+Migrations 0026/0027 add guest capabilities and telephone receipt-mode snapshots;
+existing startup migrations apply them additively. No database reset/manual table
+replacement is required. Keep ordering disabled pending private-test authorization.
+See PRIVATE_TEST_DELIVERY.md for guest invitations, contact/token privacy, genuine
+telephone acceptance before hosted payment, and provider/device evidence requirements.
+Shared Android/iOS guest screens require the real HTTPS VITE_API_ORIGIN and Clerk
+publishable key already described above. Copied links deliberately use that real
+site rather than the native localhost origin. Unconfigured native CI artifacts cannot
+be used to certify staging authentication, guest checkout, push or background GPS.
+Native run 42570932127 (c732e83) passed both platforms including unsigned release
+compilation; later dependency downloads remain intermittent. Signing is still absent.

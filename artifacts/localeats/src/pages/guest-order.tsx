@@ -6,6 +6,7 @@ import type { Order } from "@workspace/api-client-react";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 import {
   readGuestToken,
+  privateGuestLink,
   saveGuestToken,
   useGuestToken,
 } from "../lib/guest-session";
@@ -161,20 +162,18 @@ export function GuestOrderPage() {
         <>
           <button
             className="roco-button"
-            onClick={() => {
-              const url = `${location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/guest/order#access=${token}`;
-              void navigator.clipboard
-                .writeText(url)
-                .then(() =>
-                  setMessage(
-                    "Private tracking link copied. Do not share it publicly.",
-                  ),
-                )
-                .catch(() =>
-                  setMessage(
-                    "Clipboard unavailable. Keep this browser and its saved access available; contact dispatch if access is lost.",
-                  ),
+            onClick={async () => {
+              try {
+                const url = privateGuestLink(token);
+                await navigator.clipboard.writeText(url);
+                setMessage(
+                  "Private tracking link copied. Do not share it publicly.",
                 );
+              } catch {
+                setMessage(
+                  "Private link could not be copied. Check the app's HTTPS staging configuration and clipboard permission. Keep this device's saved access available.",
+                );
+              }
             }}
           >
             Copy private tracking link

@@ -1007,3 +1007,17 @@ still deploys 711e2d7; November 9 HTTP evidence is checked in. /readyz reports m
 pricing/webhook; this does not substitute for owner's authenticated Stripe checks.
 Next owner step: deploy latest pushed branch, then verify Operations setup without
 sharing keys. Ordering stays false. Actual guest/phone/Stripe/device acceptance pending.
+
+## November 9 — final guest mobile link checkpoint
+
+107 API/unit tests plus production build/typechecks pass. Native private links use
+the configured HTTPS site, never webview localhost; malformed/untrusted origins
+fail closed and tokens remain fragments. 70889fb full Validate 42571305415 passed.
+Native c732e83 run 42570932127 passed Android debug/release/AAB/lint and iOS simulator/
+unsigned device release, with unconfigured artifacts. 70889fb iOS again failed during
+package resolution. Native transport is intermittent; signing, configured device
+builds, OAuth/push/background GPS and guest physical-device acceptance remain open.
+No actual Stripe E2E was performed. Preserve ordering=false/TEST mode. Next: deploy
+latest branch, verify Operations Stripe settings, and run PRIVATE_TEST_DELIVERY.md
+with authorized private accounts/guest capability. Guest email delivery/recovery,
+commercial operations and device acceptance remain launch blockers.

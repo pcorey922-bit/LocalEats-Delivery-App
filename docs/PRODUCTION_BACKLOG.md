@@ -311,3 +311,23 @@ Next: deploy latest branch, verify protected Stripe setup, then execute a real p
 guest/electronic/telephone TEST delivery. Guest mail/recovery channels, production
 capacity/load, native official dependency availability and physical devices remain
 launch blockers. Nothing is production-certified from the relational test simulator.
+
+## November 9 — native guest link correctness and build evidence
+
+Copied guest links now use the configured HTTPS website/API origin rather than a
+native webview's localhost origin. Unconfigured native builds refuse to manufacture
+an unusable tracking URL. Origin credentials, non-HTTPS remote destinations, path
+injection and malformed tokens fail closed; capabilities remain fragments only.
+107 API/unit tests and complete production build/typechecks pass. Link-copy failures
+show a recoverable message. Native account/device acceptance is still not certified.
+
+Updated CI evidence: 70889fb complete PostgreSQL/restore/Docker Validate 42571305415
+passed. c732e83 native run 42570932127 PASSED Android debug, release APK/AAB/lint,
+iOS simulator and unsigned device release builds. Its four retained artifacts are
+explicitly named unconfigured: they prove compilation, not usable authenticated
+staging apps, store signing or device behavior. Configure a real HTTPS VITE_API_ORIGIN,
+Clerk publishable key and permitted native CORS/Clerk origins before device builds
+(DEPLOYMENT.md). Latest 70889fb native iOS job failed at package resolution again;
+upstream availability remains intermittent. Earlier runs documented official binary
+HTTP 504. Do not describe native compilation as uniformly passing or claim physical
+GPS/push/guest acceptance. Use the latest Actions run for current exact status.

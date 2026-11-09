@@ -1,3 +1,4 @@
+import { privateGuestLink } from "../lib/guest-session";
 import { useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
@@ -14,9 +15,7 @@ export function GuestTestInvitation() {
         "/api/guest/sessions",
         { method: "POST", body: JSON.stringify(input) },
       );
-      setLink(
-        `${location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/guest/order#access=${result.token}`,
-      );
+      setLink(privateGuestLink(result.token));
     },
   });
   return (

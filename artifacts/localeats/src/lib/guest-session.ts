@@ -1,3 +1,5 @@
+import { Capacitor } from "@capacitor/core";
+import { guestAccessLink } from "./guest-access-link";
 import { useSyncExternalStore } from "react";
 import { setGuestTokenGetter } from "../../../../lib/api-client-react/src/custom-fetch";
 const key = "rocoeats-guest-access:v1";
@@ -53,4 +55,14 @@ if (typeof window !== "undefined") {
     }
   }
   setGuestTokenGetter(readGuestToken);
+}
+
+export function privateGuestLink(token: string) {
+  return guestAccessLink({
+    token,
+    pageOrigin: location.origin,
+    apiOrigin: import.meta.env.VITE_API_ORIGIN,
+    basePath: import.meta.env.BASE_URL,
+    native: Capacitor.isNativePlatform(),
+  });
 }
