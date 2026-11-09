@@ -1,3 +1,4 @@
+import { GuestDeliveryContact } from "./guest-delivery-contact";
 import { RestaurantConfirmation } from "./restaurant-confirmation";
 import { readGuestToken } from "../lib/guest-session";
 import { RestaurantInventory } from "./inventory";
@@ -206,6 +207,7 @@ export function DriverPage() {
     {d.deliveryAddress && <><p>Deliver to: {d.deliveryAddress.street1} {d.deliveryAddress.street2}, {d.deliveryAddress.city}, {d.deliveryAddress.region} {d.deliveryAddress.postalCode}</p><p>{d.deliveryAddress.deliveryInstructions}</p></>}
     <NavigationActions label="Navigate to Restaurant" address={{street1:d.pickupStreet,city:d.pickupCity,region:d.pickupRegion,postalCode:d.pickupPostalCode}}/>
     {!offer&&d.deliveryAddress&&<NavigationActions label="Navigate to Customer" address={d.deliveryAddress}/>}
+    {!offer&&!["delivered","cancelled"].includes(d.status)&&<GuestDeliveryContact orderId={d.orderId}/>}
 
     {d.status==='assigned'&&(d.arrivedAt?<p role="status">Arrival reported at {new Date(d.arrivedAt).toLocaleTimeString()}</p>:<button className="roco-button" disabled={update.isPending} onClick={()=>update.mutate({orderId:d.orderId,action:'arrive'})}>I’m at the restaurant</button>)}
     {d.status==='assigned'&&<button className="roco-button" disabled={update.isPending} onClick={()=>{if(window.confirm('Release this delivery before pickup?'))update.mutate({orderId:d.orderId,action:'release'});}}>Release delivery</button>}

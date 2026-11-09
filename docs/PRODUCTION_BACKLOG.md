@@ -6,8 +6,8 @@ Never enable public ordering, add billing or publish native apps without approva
 
 ## Current priority: real private TEST payment and delivery acceptance
 
-Staging: https://localeats-delivery-app.onrender.com/ (verified deployed 6cad154 on
-November 8). Owner has confirmed Google sign-in and administrator controls.
+Staging: https://localeats-delivery-app.onrender.com/ (read-only verified deployed
+711e2d7 on November 9; new guest/telephone commits still require deployment). Owner has confirmed Google sign-in and administrator controls.
 Read-only deployed checks November 8: /livez 200; /readyz reports DB/auth/provider/
 workers ready, pricing and webhook missing; unsigned profile and forged admin
 requests return 401. No authenticated Clerk session or Render/Neon secret access
@@ -282,3 +282,32 @@ Next priority: verify latest deployment and Stripe setup, perform a real private
 telephone/electronic test delivery, harden guest recovery/contact/notification delivery,
 and resolve native dependency availability before device acceptance. Public ordering
 remains disabled. No costs, live transactions, owner secrets or Neon resets introduced.
+
+## November 9 — guest delivery coordination and combined acceptance regression
+
+Guest contact details are available on demand only to authenticated dispatch/admin
+or the owning restaurant/assigned driver during active fulfillment. Reads are audited
+and no-store. Ordinary customers, unassigned drivers and guest tokens cannot retrieve
+this endpoint; active couriers receive phone/name, never receipt email, and lose access
+after completion. The driver workspace and telephone queue expose the authorized
+contact control. When a guest securely links an order, its support cases and order
+notifications follow the registered customer; historical message authors are preserved.
+
+105 API/unit tests pass. The combined regression submits an anonymous telephone order,
+confirms exact-price acceptance, obtains checkout, simulates only provider payment,
+then uses actual relational HTTP operations for restaurant preparation, driver duty/
+claim/arrival/pickup, guest tracking/handoff code, duplicate-safe proof delivery,
+restaurant/driver earnings and balanced ledger. Contact denial/redaction/completion
+revocation and support after optional association are tested. Production builds and
+phone-size actual-component browser QA pass (simulated auth/API). Telephone c732e83
+passed complete PostgreSQL/restore/container Validate CI 42570925118.
+
+Read-only real staging check November 9: ten HTTP checks passed at deployed 711e2d7;
+/livez 200, unsigned/forged admin APIs rejected, /readyz 503 reports pricingReady=false
+and webhookReady=false, DB/auth/provider configuration/workers present, live charges
+false. This is NOT a real authenticated Stripe verification. Owner's four Operations
+checks remain unverified. Evidence: verification/STAGING_HTTP_2026-11-09.json.
+Next: deploy latest branch, verify protected Stripe setup, then execute a real private
+guest/electronic/telephone TEST delivery. Guest mail/recovery channels, production
+capacity/load, native official dependency availability and physical devices remain
+launch blockers. Nothing is production-certified from the relational test simulator.

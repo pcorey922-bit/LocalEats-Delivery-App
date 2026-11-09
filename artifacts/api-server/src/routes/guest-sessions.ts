@@ -7,6 +7,8 @@ import {
   guestSessionsTable,
   profilesTable,
   ordersTable,
+  supportCasesTable,
+  notificationsTable,
 } from "@workspace/db";
 import {
   guestRateLimit,
@@ -123,6 +125,8 @@ router.post("/guest/claim", requireAuth, async (req, res) => {
       .update(guestSessionsTable)
       .set({ revokedAt: now })
       .where(eq(guestSessionsTable.id, session.id));
+    await tx.update(supportCasesTable).set({createdBy:profile.id}).where(and(eq(supportCasesTable.createdBy,session.profileId),eq(supportCasesTable.orderId,order.id)));
+    await tx.update(notificationsTable).set({profileId:profile.id}).where(and(eq(notificationsTable.profileId,session.profileId),eq(notificationsTable.orderId,order.id)));
     await audit(tx, profile.id, "guest.order.claimed", order.id, {
       guestSessionId: session.id,
     });

@@ -1,3 +1,4 @@
+import guestContactRouter from "./guest-contact";
 import telephoneConfirmationRouter from "./telephone-confirmation";
 import guestSessionsRouter from "./guest-sessions";
 import supportRouter from "./support";
@@ -28,6 +29,7 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(guestSessionsRouter);
+router.use(guestContactRouter);
 router.use(telephoneConfirmationRouter);
 router.use(paymentSetupRouter);
 router.use(driverOfferResponsesRouter);

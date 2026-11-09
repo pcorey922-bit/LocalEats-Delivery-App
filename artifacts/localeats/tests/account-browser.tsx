@@ -98,6 +98,12 @@ window.fetch = async (url, options = {}) => {
     new Response(JSON.stringify(value), {
       headers: { "content-type": "application/json" },
     });
+  if (String(url) === "/api/orders/fixture-telephone/guest-contact")
+    return json({
+      name: "QA telephone guest",
+      phone: "8655550199",
+      email: "guest-ui@example.test",
+    });
   if (String(url) === "/api/admin/telephone-restaurants") return json([]);
   if (String(url) === "/api/orders/fixture-telephone/confirmation")
     return json({

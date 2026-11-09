@@ -1,3 +1,4 @@
+import { GuestDeliveryContact } from "./guest-delivery-contact";
 import { useState, type FormEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
@@ -77,6 +78,7 @@ function TelephoneOrder({ entry }: { entry: Entry }) {
         {entry.restaurant.name} · {entry.confirmation.status}
       </h3>
       <p>Order reference: {entry.order.id}</p>
+      <GuestDeliveryContact orderId={entry.order.id}/>
       <p>
         Pending age:{" "}
         {Math.max(

@@ -301,6 +301,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     const claim=await fetch(`${origin}/api/guest/claim`,{method:"POST",headers:{"x-test-user":ids.other,"X-RoCoEats-Guest-Token":token}});assert.equal(claim.status,200);
     assert.equal((await guest("/guest/session",token)).status,401);
     assert.equal((await api(`/orders/${order.id}`,ids.other)).status,200);
+    assert.equal((await api("/support/cases",ids.other)).data.some((c:any)=>c.id===support.data.id),true);
     const second=await api("/guest/sessions",null,"POST",{name:"Expiry fixture",email:"expiry@example.test",phone:"8655550102"});
     await db.update(guestSessionsTable).set({createdAt:new Date(Date.now()-2*86400000),expiresAt:new Date(Date.now()-86400000)}).where(eq(guestSessionsTable.email,"expiry@example.test"));
     assert.equal((await guest("/guest/session",second.data.token)).status,401);
@@ -359,6 +360,47 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     assert.equal((await api(`/orders/${pending.id}`,ids.customer)).data.status,"cancelled");
     await api(`/admin/restaurants/${ids.business}/receipt-mode`,ids.admin,"PUT",{mode:"electronic",expectedMode:"telephone"});
     assert.equal((await db.select().from(notificationsTable).where(eq(notificationsTable.orderId,pending.id))).some(n=>n.title==="Call restaurant to confirm order"),true);
+  });
+  await t.test("guest telephone delivery reaches real restaurant, driver handoff, earnings and ledger while restricting guest contact",async()=>{
+    const start=await api("/guest/sessions",null,"POST",{name:"Delivery guest",email:"delivery-guest@example.test",phone:"8655550199"});assert.equal(start.status,201);
+    const token=start.data.token;
+    const guest=async(path:string,method="GET",data?:unknown,key?:string)=>{
+      const r=await fetch(`${origin}/api${path}`,{method,headers:{"X-RoCoEats-Guest-Token":token,...(data?{"Content-Type":"application/json"}:{}),...(key?{"Idempotency-Key":key}:{})},body:data?JSON.stringify(data):undefined});return {status:r.status,data:await r.json()};
+    };
+    await api(`/admin/restaurants/${ids.business}/receipt-mode`,ids.admin,"PUT",{mode:"telephone",expectedMode:"electronic"});
+    const address=await guest("/addresses/me","POST",{street1:"Private guest destination",city:"Kingston",region:"TN",postalCode:"37854",isDefault:true,deliveryInstructions:"Call on arrival"});assert.equal(address.status,201);
+    const value={...input(),addressId:address.data.id};const quote=await guest("/orders/quote","POST",value);assert.equal(quote.status,200);
+    const saved=await guest("/orders","POST",{...value,expectedTotalCents:quote.data.totalCents},randomUUID());assert.equal(saved.status,201);const order=saved.data;
+    assert.equal((await guest(`/orders/${order.id}/confirmation`)).data.status,"pending");
+    assert.equal((await guest(`/orders/${order.id}/checkout`,"POST")).status,409);
+    await api(`/admin/orders/${order.id}/telephone-confirmation`,ids.admin,"POST",{requestId:randomUUID(),version:1,action:"contact",note:"Telephone guest fixture restaurant reached"});
+    assert.equal((await api(`/admin/orders/${order.id}/telephone-confirmation`,ids.admin,"POST",{requestId:randomUUID(),version:2,action:"accept",note:"Restaurant confirms every item and modifier at approved price",preparationMinutes:15,confirmedSubtotalCents:order.subtotalCents,allItemsAvailable:true})).status,200);
+    assert.equal((await guest(`/orders/${order.id}/checkout`,"POST")).status,200);
+    // Only the provider adapter is simulated. Order, dispatch, proof and accounting use actual relational HTTP operations.
+    await db.transaction(tx=>recordPayment(tx,order.id,`sandbox_guest_delivery_${order.id}`,order.totalCents,"usd"));
+    for(const status of ["preparing","ready_for_pickup"])assert.equal((await api(`/orders/${order.id}`,ids.restaurant,"PATCH",{status})).status,200);
+    const driver=randomUUID();await db.insert(profilesTable).values({id:driver,clerkUserId:driver,displayName:"Guest delivery courier",role:"driver",driverApproved:true});
+    assert.equal((await api("/driver/availability",driver,"PUT",{available:true})).status,200);
+    assert.equal((await api(`/orders/${order.id}/guest-contact`,driver)).status,403);
+    assert.equal((await api(`/driver/orders/${order.id}/claim`,driver,"POST")).status,201);
+    const contact=await api(`/orders/${order.id}/guest-contact`,driver);assert.equal(contact.status,200);assert.equal(contact.data.phone,"8655550199");assert.equal("email" in contact.data,false);
+    assert.equal((await api(`/orders/${order.id}/guest-contact`,ids.other)).status,403);
+    assert.equal((await guest(`/orders/${order.id}/guest-contact`)).status,401);
+    assert.equal((await api(`/orders/${order.id}/guest-contact`,ids.admin)).data.email,"delivery-guest@example.test");
+    assert.equal((await api(`/driver/orders/${order.id}/arrive`,driver,"POST")).status,200);
+    assert.equal((await guest(`/orders/${order.id}/tracking`)).data.assignedDriver.displayName,"Guest delivery courier");
+    assert.equal((await api(`/driver/orders/${order.id}/pickup`,driver,"POST")).status,200);
+    const code=await guest(`/orders/${order.id}/delivery-code`,"POST");assert.equal(code.status,200);
+    const delivered=await api(`/driver/orders/${order.id}/deliver`,driver,"POST",{code:code.data.code});assert.equal(delivered.status,200);
+    assert.equal((await api(`/driver/orders/${order.id}/deliver`,driver,"POST",{code:code.data.code})).status,200);
+    assert.equal((await guest(`/orders/${order.id}`)).data.status,"delivered");
+    assert.equal((await guest(`/orders/${order.id}/delivery-proof`)).data.method,"customer_code");
+    assert.equal((await api(`/orders/${order.id}/guest-contact`,driver)).status,403);
+    const earnings=await db.select().from(payoutsTable).where(eq(payoutsTable.orderId,order.id));assert.equal(earnings.length,2);assert.equal(earnings.find(e=>e.kind==="driver")?.recipientProfileId,driver);
+    const journals=await db.select({line:ledgerLinesTable}).from(ledgerLinesTable).innerJoin(ledgerTransactionsTable,eq(ledgerTransactionsTable.id,ledgerLinesTable.transactionId)).where(eq(ledgerTransactionsTable.orderId,order.id));assert.ok(journals.length>0);assert.equal(journals.reduce((n,e)=>n+e.line.amountCents,0),0);
+    const support=await guest("/support/cases","POST",{id:randomUUID(),orderId:order.id,category:"delivery",subject:"Delivered guest order support",message:"Please confirm my test delivery receipt details."});assert.equal(support.status,201);
+    await api("/driver/availability",driver,"PUT",{available:false});
+    await api(`/admin/restaurants/${ids.business}/receipt-mode`,ids.admin,"PUT",{mode:"electronic",expectedMode:"telephone"});
   });
   await t.test("Stripe checkout refuses provider I/O until a test webhook is configured", async () => {
     const { createTestCheckout } = await import("../src/lib/payment-provider");

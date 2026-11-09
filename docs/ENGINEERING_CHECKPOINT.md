@@ -994,3 +994,16 @@ are covered. Customer status messages use real confirmation/order records.
 Private Stripe/provider delivery and device tests still require owner setup/access.
 Guest 3e97fc4 complete PostgreSQL/restore/container CI passed; native dependencies
 still return upstream HTTP 504. Read PRIVATE_TEST_DELIVERY.md for exact staging flows.
+
+## November 9 — combined guest delivery checkpoint
+
+105 automated tests pass including a complete relational guest + telephone + driver
+proof/earnings/ledger workflow (only identity/payment adapters simulated). On-demand
+audited guest contact is limited to admin and active fulfillment; drivers never see
+email and lose access after delivery. Secure optional account association now preserves
+order support and notifications. Build/typechecks and simulated phone browser QA pass.
+c732e83 complete PostgreSQL/restore/Docker Validate 42570925118 passed. Real staging
+still deploys 711e2d7; November 9 HTTP evidence is checked in. /readyz reports missing
+pricing/webhook; this does not substitute for owner's authenticated Stripe checks.
+Next owner step: deploy latest pushed branch, then verify Operations setup without
+sharing keys. Ordering stays false. Actual guest/phone/Stripe/device acceptance pending.

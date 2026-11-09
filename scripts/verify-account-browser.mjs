@@ -159,6 +159,15 @@ try {
     )
     .waitFor();
   await page
+    .getByRole("button", { name: "Guest delivery contact", exact: true })
+    .click();
+  assert.equal(
+    await page
+      .getByRole("link", { name: "Call guest", exact: true })
+      .getAttribute("href"),
+    "tel:8655550199",
+  );
+  await page
     .getByLabel("Call notes / unavailable items / price discrepancies", {
       exact: true,
     })
