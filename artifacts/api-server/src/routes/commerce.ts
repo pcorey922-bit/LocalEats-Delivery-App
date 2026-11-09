@@ -1,3 +1,4 @@
+import { requireCustomerAuth } from "../lib/guest-access";
 import { isOwnerDriver } from "../lib/owner-access";
 import { restaurantCapacity } from "../lib/restaurant-availability";
 import { expireReservation } from "../lib/reservation-expiry";
@@ -86,7 +87,7 @@ router.get("/commerce/config", async (_req, res) => {
       "Pricing and tax policy must be explicitly configured. Provider test mode does not certify production tax accuracy.",
   });
 });
-router.post("/orders/:orderId/checkout", requireAuth, async (req, res) => {
+router.post("/orders/:orderId/checkout", requireCustomerAuth, async (req, res) => {
   const owned = await ownedOrder(req, res);
   if (!owned) return;
   requireOrderingEnabled();
@@ -219,7 +220,7 @@ router.post(
     res.json({ status: "succeeded", testMode: true, moneyMoved: false });
   },
 );
-router.post("/orders/:orderId/cancel", requireAuth, async (req, res) => {
+router.post("/orders/:orderId/cancel", requireCustomerAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
   if (!profile) return;
   const id = uuid.parse(req.params.orderId);
@@ -229,7 +230,7 @@ router.post("/orders/:orderId/cancel", requireAuth, async (req, res) => {
     .parse(req.body);
   res.json(await cancelOrRefundOrder(id, profile, reason));
 });
-router.get("/orders/:orderId/payment", requireAuth, async (req, res) => {
+router.get("/orders/:orderId/payment", requireCustomerAuth, async (req, res) => {
   const owned = await ownedOrder(req, res);
   if (!owned) return;
   const [payment] = await db
@@ -482,7 +483,7 @@ router.get("/admin/drivers", requireAuth, async (req, res) => {
 });
 router.get(
   "/orders/:orderId/financial-operations",
-  requireAuth,
+  requireCustomerAuth,
   async (req, res) => {
     const owned = await ownedOrder(req, res);
     if (!owned) return;

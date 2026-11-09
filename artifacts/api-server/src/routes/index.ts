@@ -1,3 +1,4 @@
+import guestSessionsRouter from "./guest-sessions";
 import supportRouter from "./support";
 import paymentSetupRouter from "./payment-setup";
 import driverOfferResponsesRouter from "./driver-offer-responses";
@@ -25,6 +26,7 @@ import ledgerRouter from "./ledger";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(guestSessionsRouter);
 router.use(paymentSetupRouter);
 router.use(driverOfferResponsesRouter);
 router.use(supportConversationsRouter);

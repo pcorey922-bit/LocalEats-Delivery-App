@@ -1,3 +1,4 @@
+import { requireCustomerAuth } from "../lib/guest-access";
 import { Router } from "express";
 import { and, desc, eq, lt } from "drizzle-orm";
 import { z } from "zod";
@@ -14,7 +15,7 @@ import { audit } from "../lib/commerce";
 import { CommerceError } from "../lib/commerce-policy";
 import { databaseNow } from "../lib/database-clock";
 const router = Router();
-router.get("/support/cases/:id/messages", requireAuth, async (req, res) => {
+router.get("/support/cases/:id/messages", requireCustomerAuth, async (req, res) => {
   const p = await getActiveProfile(req, res);
   if (!p) return;
   const id = z.string().uuid().parse(req.params.id),
@@ -57,7 +58,7 @@ router.get("/support/cases/:id/messages", requireAuth, async (req, res) => {
     nextBeforeVersion: rows.length > 30 ? rows[29].caseVersion : null,
   });
 });
-router.post("/support/cases/:id/messages", requireAuth, async (req, res) => {
+router.post("/support/cases/:id/messages", requireCustomerAuth, async (req, res) => {
   const p = await getActiveProfile(req, res);
   if (!p) return;
   const id = z.string().uuid().parse(req.params.id),

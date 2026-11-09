@@ -14,6 +14,7 @@ import app from "../src/app";
 import {
   engine,
   db,
+  guestSessionsTable,
   profilesTable,
   restaurantsTable,
   menuCategoriesTable,
@@ -245,6 +246,66 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       if (previousOwners === undefined) delete process.env.LOCALEATS_ADMIN_CLERK_USER_IDS;
       else process.env.LOCALEATS_ADMIN_CLERK_USER_IDS = previousOwners;
     }
+  });
+  await t.test("guest capabilities reuse real quote, reservation, payment, support and cancellation while isolating orders", async()=>{
+    const guest=async(path:string,token:string|null,method="GET",data?:unknown,key?:string)=>{
+      const r=await fetch(`${origin}/api${path}`,{method,headers:{...(token?{"X-RoCoEats-Guest-Token":token}:{}),...(data?{"Content-Type":"application/json"}:{}),...(key?{"Idempotency-Key":key}:{})},body:data?JSON.stringify(data):undefined});
+      assert.equal(r.headers.get("cache-control"),"no-store");
+      return {status:r.status,data:await r.json()};
+    };
+    assert.equal((await api("/restaurants",null)).status,200);
+    assert.equal((await api("/guest/sessions",null,"POST",{name:"Guest fixture",email:"invalid",phone:"1234567890"})).status,400);
+    const start=await api("/guest/sessions",null,"POST",{name:"Guest fixture",email:"guest@example.test",phone:"8655550100"});
+    assert.equal(start.status,201); const token=start.data.token;
+    assert.match(token,/^[A-Za-z0-9_-]{43}$/); assert.equal(JSON.stringify(start.data).includes("phone"),false);
+    const [session]=await db.select().from(guestSessionsTable).where(eq(guestSessionsTable.email,"guest@example.test"));
+    assert.notEqual(session.tokenHash,token); assert.equal(session.tokenHash.length,64);
+    assert.equal((await guest("/guest/session",token)).data.orderId,null);
+    assert.equal((await guest("/orders/me",null)).status,401);
+    assert.equal((await guest("/guest/session","a".repeat(43))).status,401);
+    assert.equal((await api("/admin/payment-setup",null)).status,401);
+    const privileged=await fetch(`${origin}/api/admin/payment-setup`,{headers:{"X-RoCoEats-Guest-Token":token}});assert.equal(privileged.status,401);
+    process.env.ROCOEATS_PRIVATE_STAGING="true";
+    assert.equal((await api("/guest/sessions",null,"POST",{name:"Blocked",email:"blocked@example.test",phone:"8655550101"})).status,401);
+    assert.equal((await guest("/guest/session",token)).status,200);
+    assert.equal((await fetch(`${origin}/api/restaurants`,{headers:{"X-RoCoEats-Guest-Token":token}})).status,200);
+    delete process.env.ROCOEATS_PRIVATE_STAGING;
+    const address=await guest("/addresses/me",token,"POST",{street1:"Guest delivery street",city:"Kingston",region:"TN",postalCode:"37854",isDefault:true});
+    assert.equal(address.status,201,JSON.stringify(address.data));
+    const value={...input(),addressId:address.data.id};
+    const quote=await guest("/orders/quote",token,"POST",value);assert.equal(quote.status,200);
+    process.env.ROCOEATS_ORDERING_ENABLED="false";
+    assert.equal((await guest("/orders",token,"POST",{...value,expectedTotalCents:quote.data.totalCents},randomUUID())).status,503);
+    process.env.ROCOEATS_ORDERING_ENABLED="true";
+    const key=randomUUID(), body={...value,expectedTotalCents:quote.data.totalCents};
+    const results=await Promise.all([guest("/orders",token,"POST",body,key),guest("/orders",token,"POST",body,key)]);
+    assert.deepEqual(results.map(r=>r.status).sort(),[200,201]);const order=results[0].data;
+    assert.equal(results[1].data.id,order.id);
+    assert.equal((await guest("/guest/session",token)).data.orderId,order.id);
+    assert.equal((await guest("/orders",token,"POST",body,randomUUID())).status,409);
+    assert.equal((await guest(`/orders/${randomUUID()}`,token)).status,404);
+    assert.equal((await api(`/orders/${order.id}`,ids.other)).status,403);
+    assert.equal((await guest(`/orders/${order.id}/checkout`,token,"POST")).status,200);
+    // Provider and identity adapters are simulated here. Production guests cannot invoke the simulator.
+    await db.transaction(tx=>recordPayment(tx,order.id,`sandbox_guest_${order.id}`,order.totalCents,"usd"));
+    assert.equal((await guest(`/orders/${order.id}/payment`,token)).data.payment.status,"succeeded");
+    const support=await guest("/support/cases",token,"POST",{id:randomUUID(),orderId:order.id,category:"delivery",subject:"Guest question",message:"Please confirm the delivery details."});assert.equal(support.status,201);
+    assert.equal((await guest("/support/cases",token)).data.length,1);
+    assert.equal((await guest(`/orders/${order.id}/cancel`,token,"POST",{reason:"Guest changed plans before acceptance"})).status,200);
+    assert.equal((await guest(`/orders/${order.id}`,token)).data.status,"cancelled");
+    const [payment]=await db.select().from(paymentsTable).where(eq(paymentsTable.orderId,order.id));assert.equal(payment.status,"refunded");
+    const [profile]=await db.select().from(profilesTable).where(eq(profilesTable.id,session.profileId));
+    assert.equal(profile.role,"customer");assert.equal(profile.clerkUserId.startsWith("guest_"),true);
+    // Verified capability possession AND a real authenticated customer are necessary for association.
+    const claim=await fetch(`${origin}/api/guest/claim`,{method:"POST",headers:{"x-test-user":ids.other,"X-RoCoEats-Guest-Token":token}});assert.equal(claim.status,200);
+    assert.equal((await guest("/guest/session",token)).status,401);
+    assert.equal((await api(`/orders/${order.id}`,ids.other)).status,200);
+    const second=await api("/guest/sessions",null,"POST",{name:"Expiry fixture",email:"expiry@example.test",phone:"8655550102"});
+    await db.update(guestSessionsTable).set({createdAt:new Date(Date.now()-2*86400000),expiresAt:new Date(Date.now()-86400000)}).where(eq(guestSessionsTable.email,"expiry@example.test"));
+    assert.equal((await guest("/guest/session",second.data.token)).status,401);
+    const third=await api("/guest/sessions",null,"POST",{name:"Revoked fixture",email:"revoke@example.test",phone:"8655550103"});
+    assert.equal((await guest("/guest/session",third.data.token,"DELETE")).status,200);
+    assert.equal((await guest("/guest/session",third.data.token)).status,401);
   });
   await t.test("Stripe checkout refuses provider I/O until a test webhook is configured", async () => {
     const { createTestCheckout } = await import("../src/lib/payment-provider");

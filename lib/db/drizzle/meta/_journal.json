@@ -183,6 +183,13 @@
       "when": 1794028000000,
       "tag": "0025_driver_offer_declines",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794114000000,
+      "tag": "0026_guest_sessions",
+      "breakpoints": true
     }
   ]
 }

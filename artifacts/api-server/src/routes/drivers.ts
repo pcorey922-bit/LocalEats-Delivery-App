@@ -1,3 +1,4 @@
+import { requireCustomerAuth } from "../lib/guest-access";
 import {
   randomInt,
   randomUUID,
@@ -33,7 +34,7 @@ const router: IRouter = Router();
 // Codes are returned only to the order's customer, never to drivers or notifications.
 const handoffDigest = (orderId: string, salt: string, code: string) =>
   createHash("sha256").update(`${orderId}:${salt}:${code}`).digest("hex");
-router.post("/orders/:orderId/delivery-code", requireAuth, async (req, res) => {
+router.post("/orders/:orderId/delivery-code", requireCustomerAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
   if (!profile || !requireRole(profile, ["customer"], res)) return;
   const orderId = String(req.params.orderId);
@@ -80,7 +81,7 @@ router.post("/orders/:orderId/delivery-code", requireAuth, async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.json({ code, expiresAt });
 });
-router.get("/orders/:orderId/delivery-proof", requireAuth, async (req, res) => {
+router.get("/orders/:orderId/delivery-proof", requireCustomerAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
   if (!profile) return;
   const orderId = String(req.params.orderId);

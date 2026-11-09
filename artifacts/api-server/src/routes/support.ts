@@ -1,3 +1,4 @@
+import { requireCustomerAuth } from "../lib/guest-access";
 import { Router } from "express";
 import { z } from "zod";
 import { createHash, randomUUID } from "node:crypto";
@@ -17,7 +18,7 @@ import { getActiveProfile, requireRole } from "../lib/current-profile";
 import { audit } from "../lib/commerce";
 import { CommerceError } from "../lib/commerce-policy";
 const router = Router();
-router.get("/support/cases", requireAuth, async (req, res) => {
+router.get("/support/cases", requireCustomerAuth, async (req, res) => {
   const p = await getActiveProfile(req, res);
   if (!p) return;
   res.setHeader("Cache-Control", "no-store");
@@ -30,7 +31,7 @@ router.get("/support/cases", requireAuth, async (req, res) => {
       .limit(100),
   );
 });
-router.post("/support/cases", requireAuth, async (req, res) => {
+router.post("/support/cases", requireCustomerAuth, async (req, res) => {
   const p = await getActiveProfile(req, res);
   if (!p) return;
   const parsed = z

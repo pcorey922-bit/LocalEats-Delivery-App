@@ -1,4 +1,6 @@
 import Stripe from "stripe";
+import { db, guestSessionsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import { CommerceError, checkoutOrigin, paymentMode } from "./commerce-policy";
 
 export function stripeTest() {
@@ -39,10 +41,13 @@ export async function createTestCheckout(
   if (mode === "sandbox")
     return { id: `sandbox_checkout_${order.id}_${attempt}`, url: null };
   requireTestWebhook();
+  const [guest]=await db.select({email:guestSessionsTable.email}).from(guestSessionsTable).where(eq(guestSessionsTable.orderId,order.id)).limit(1);
+  const returnPath=guest ? "/guest/order" : "/orders";
   const session = await stripeTest().checkout.sessions.create(
     {
       mode: "payment",
       client_reference_id: order.id,
+      ...(guest ? {customer_email:guest.email} : {}),
       line_items: [
         {
           price_data: {
@@ -60,8 +65,8 @@ export async function createTestCheckout(
         metadata: { orderId: order.id },
         transfer_group: order.id,
       },
-      success_url: `${checkoutOrigin()}/orders?payment=returned`,
-      cancel_url: `${checkoutOrigin()}/orders?payment=cancelled`,
+      success_url: `${checkoutOrigin()}${returnPath}?payment=returned`,
+      cancel_url: `${checkoutOrigin()}${returnPath}?payment=cancelled`,
     },
     { idempotencyKey: `checkout:${order.id}:${attempt}` },
   );

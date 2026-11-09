@@ -954,3 +954,15 @@ refresh setup readiness; explicit refresh reloads signed-event status. Actual-co
 payload. Prior production build/typechecks passed; 711e2d7 full Validate CI passed.
 Guest ordering and telephone confirmation are new launch-critical requirements;
 implement additive shared workflows, preserving private staging/TEST-only gates.
+
+## November 9 — guest backend checkpoint
+
+Migration 0026 and guest-sessions/guest-access implement scoped expiring capabilities,
+server-side customer authorization and one-order transactional binding. Customer
+checkout/financial-operations/tracking/support/cancellation reuse existing logic;
+all privileged routes retain Clerk auth. Registered-customer regression preserved.
+102 local relational API tests pass; identity/payment adapters are simulated.
+Private staging remains closed to anonymous session creation; owner can mint a
+guest test capability while authenticated, and only customer routes admit it.
+Next checkpoint must add shared guest UI/cart/session recovery, then telephone
+confirmation. Real sandbox/device acceptance remains pending; ordering is disabled.

@@ -1,14 +1,16 @@
+import { readGuest, guestStagingPath } from "../lib/guest-access";
 import { getAuth } from "@clerk/express";
 import type { RequestHandler } from "express";
 
 // Admission is separate from roles: admitted testers still need ordinary approval.
 // Stripe's signed raw webhook is mounted before this middleware intentionally.
-export const privateStaging: RequestHandler = (req, res, next) => {
+export const privateStaging: RequestHandler = async (req, res, next) => {
   // Signed-in users may inspect only their own access, including an identity
   // accidentally omitted from staging. The handler still requires real auth.
   if (req.method === "GET" && req.path === "/session/access") return next();
   if (process.env.ROCOEATS_PRIVATE_STAGING !== "true") return next();
   const userId = getAuth(req).userId;
+  if (!userId && req.header("X-RoCoEats-Guest-Token") && guestStagingPath(req.method,req.path)) { await readGuest(req); next(); return; }
   if (!userId) {
     res.status(401).json({ error: "Sign in to access private RoCoEats staging" });
     return;

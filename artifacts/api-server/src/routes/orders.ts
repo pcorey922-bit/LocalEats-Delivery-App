@@ -1,3 +1,6 @@
+import { guestSessionsTable } from "@workspace/db";
+import type { GuestRequest } from "../lib/guest-access";
+import { requireCustomerAuth } from "../lib/guest-access";
 import { requireOrderingEnabled } from "../lib/commerce-policy";
 import { readTimingPolicy } from "../lib/order-timing";
 import { databaseNow } from "../lib/database-clock";
@@ -151,7 +154,7 @@ async function readOrders(orderIds: string[]) {
 
 router.post(
   ["/orders", "/orders/quote"],
-  requireAuth,
+  requireCustomerAuth,
   async (req, res): Promise<void> => {
     const profile = await getActiveProfile(req, res);
     if (!profile || !requireRole(profile, ["customer"], res)) return;
@@ -325,6 +328,16 @@ router.post(
     let createdNewOrder = true;
     const createdOrderId = await db.transaction(async (tx) => {
       requireOrderingEnabled();
+      const guest=(req as GuestRequest).guestSession;
+      if(guest){
+        const [locked]=await tx.select().from(guestSessionsTable).where(eq(guestSessionsTable.id,guest.id)).for("update");
+        if(locked.revokedAt || locked.expiresAt<=await databaseNow(tx)) throw new CommerceError(401,"Guest access expired");
+        if(locked.orderId){
+          const [existing]=await tx.select().from(ordersTable).where(eq(ordersTable.id,locked.orderId));
+          if(existing.requestKey!==requestKey || existing.requestHash!==requestHash) throw new CommerceError(409,"This guest access already has an order. Retrieve it before starting another checkout.");
+          createdNewOrder=false; return existing.id;
+        }
+      }
       // Lock checkout inputs until the immutable order snapshot is committed.
       // Availability/menu/address/settings may have changed since the quote read.
       const [lockedCustomer] = await tx
@@ -450,6 +463,7 @@ router.post(
         return existing.id;
       }
 
+      if(guest) await tx.update(guestSessionsTable).set({orderId:order.id}).where(eq(guestSessionsTable.id,guest.id));
       const quantities = inventoryQuantities(parsed.data.items);
       for (const item of lockedItems) {
         if (item.stockOnHand === null) continue;
@@ -504,7 +518,7 @@ router.post(
   },
 );
 
-router.get("/orders/me", requireAuth, async (req, res): Promise<void> => {
+router.get("/orders/me", requireCustomerAuth, async (req, res): Promise<void> => {
   const profile = await getActiveProfile(req, res);
   if (!profile) return;
 
@@ -545,7 +559,7 @@ router.get("/orders/me", requireAuth, async (req, res): Promise<void> => {
   res.json(ListMyOrdersResponse.parse(views));
 });
 
-router.get("/orders/:orderId", requireAuth, async (req, res): Promise<void> => {
+router.get("/orders/:orderId", requireCustomerAuth, async (req, res): Promise<void> => {
   const profile = await getActiveProfile(req, res);
   if (!profile) return;
   const params = GetMyOrderParams.safeParse(req.params);

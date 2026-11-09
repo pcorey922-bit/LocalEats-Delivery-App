@@ -199,3 +199,28 @@ expiring/revocable guest capabilities shared by web/native; telephone restaurant
 confirmation with honest pending status, audited dispatcher actions, concurrent
 transition safety and payment rejection recovery. Neither new workflow is certified
 on staging or devices. Keep public ordering disabled and payments TEST-only.
+
+## November 9 — guest backend access foundation
+
+Additive migration 0026 creates guest sessions, each owning exactly one order and
+an internal customer fulfillment record (no Clerk account or password). Only a
+SHA-256 digest of a random 256-bit capability is stored; access expires in seven
+days and can be revoked. Existing customer pricing, address ownership, immutable
+snapshots, capacity/inventory, checkout queue, tracking, handoff, support and refund
+logic are reused. Privileged endpoints retain Clerk-only authentication. A live
+guest capability plus authenticated customer is necessary to associate an order;
+email matching never grants access. Contact email is passed to Stripe hosted TEST
+Checkout; return URLs contain no guest capability. No raw cards are collected.
+
+Anonymous session creation is rate-limited; private staging still requires an
+invited authenticated user to mint a test guest session. Valid capabilities admit
+only customer/browsing paths through private staging, not admin/driver APIs. Ordering
+and Stripe TEST gates are unchanged. The relational guest regression passes:
+anonymous browsing, invalid tokens/contact, concurrent duplicate creation, one-order
+scope, address/quote checks, closed-ordering gate, simulated payment/refund, support,
+expiry/revocation, privileged denial and possession-verified account association.
+All 102 API tests and backend build/typechecks passed locally with simulated
+identity/payment adapters. Actual Stripe/deployed/native guest acceptance is pending.
+Next: shared guest customer UI/persistence and telephone confirmation. Guest email
+tracking-link delivery requires a configured mail provider/outbox; no paid service
+has been added. Stripe receipt settings need owner verification.

@@ -1,3 +1,4 @@
+import { requireCustomerAuth } from "../lib/guest-access";
 import { randomUUID } from "node:crypto";
 import { hasDriverAccess, isOwnerDriver } from "../lib/owner-access";
 import { audit, notifyOrder } from "../lib/commerce";
@@ -272,7 +273,7 @@ router.post(
     res.status(202).json(result);
   },
 );
-router.get("/orders/:orderId/tracking", requireAuth, async (req, res) => {
+router.get("/orders/:orderId/tracking", requireCustomerAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
   if (!profile) return;
   const orderId = uuid.parse(req.params.orderId);
