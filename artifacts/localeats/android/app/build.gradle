@@ -7,7 +7,8 @@ android {
         applicationId "com.rocoeats.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        manifestPlaceholders = [rocoeatsScheme: "rocoeats"]
+        versionCode Integer.parseInt(System.getenv("ROCOEATS_ANDROID_VERSION_CODE") ?: "1")
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
@@ -17,6 +18,15 @@ android {
         }
     }
     signingConfigs {
+        staging {
+            if (System.getenv("ROCOEATS_STAGING_KEYSTORE_PATH")) {
+                storeFile file(System.getenv("ROCOEATS_STAGING_KEYSTORE_PATH"))
+                storePassword System.getenv("ROCOEATS_STAGING_KEYSTORE_PASSWORD")
+                keyAlias "rocoeats-staging"
+                keyPassword System.getenv("ROCOEATS_STAGING_KEYSTORE_PASSWORD")
+                storeType "PKCS12"
+            }
+        }
         release {
             def keyPath = System.getenv('ROCOEATS_KEYSTORE_PATH')
             if (keyPath) {
@@ -32,6 +42,17 @@ android {
             if (System.getenv('ROCOEATS_KEYSTORE_PATH')) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+        staging {
+            initWith release
+            applicationIdSuffix ".staging"
+            versionNameSuffix "-staging"
+            resValue "string", "app_name", "RoCoEats Staging"
+            resValue "string", "title_activity_main", "RoCoEats Staging"
+            debuggable false
+            jniDebuggable false
+            matchingFallbacks = ["release"]
+            if (System.getenv("ROCOEATS_STAGING_KEYSTORE_PATH")) signingConfig signingConfigs.staging
         }
     }
 }

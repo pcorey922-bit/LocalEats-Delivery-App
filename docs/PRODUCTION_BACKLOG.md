@@ -350,3 +350,27 @@ Latest verified CI before this batch: dfe72bf full PostgreSQL/restore/Docker Val
 and iOS simulator/unsigned device release. Artifacts remain unconfigured and device
 acceptance/signing remain open. Intermittent prior dependency failures are historical,
 not a claim that this successful run failed. Do not infer real-device/provider readiness.
+
+## Android staging preparation — November 9
+
+Owner confirms Stripe TEST/endpoint/events/signing secret and sandbox pricing saved;
+0% tax is only a temporary test placeholder, not production-approved. Read-only
+staging 61eefcd now reports ready=true, DB/auth/pricing/webhook/workers configured,
+live charges false. No configuration or business data was changed. Native OPTIONS
+checks show current Android/iOS CORS absent; latest source adds native origins only
+for private Stripe TEST staging, without bypassing any server identity/role checks.
+
+Native staging build now has approved public HTTPS/Clerk Development configuration,
+non-debuggable separate Android staging package/label, versioning, stable owner-secret
+signing workflow and APK signature/manifest/credential scan gates. Broad external
+FileProvider access was removed; backup/device transfer is excluded. Existing native
+compile validation retains unconfigured labels and adds staging-variant compilation.
+Owner-only signing setup is blocked by GitHub integration HTTP 403 for Secrets. See
+ANDROID_STAGING_TEST.md for a one-day, one-repository Secrets-only bootstrap token.
+No signing key is committed or uploaded as an artifact. A signed staging artifact
+must not be claimed until that workflow actually succeeds. Play Protect reputation
+is separate from signing/static review; never disable Play Protect/Auto Blocker.
+108 application tests and production typechecks/build pass locally; native preflight
+unit checks pass. Native variant compilation/security review still require CI/APK
+inspection, and the Samsung has not been tested. Next: native auth/guest access and
+cold-start return recovery, then configured APK after protected signing setup.

@@ -1,3 +1,4 @@
+import { stagingNativeOrigins } from "./lib/native-origins";
 import express, { type Express, type ErrorRequestHandler } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
@@ -63,7 +64,7 @@ const allowedOrigins = (process.env.CORS_ORIGINS || "")
 app.use(
   cors({
     credentials: true,
-    origin: process.env.NODE_ENV === "production" ? allowedOrigins : true,
+    origin: (origin, callback) => callback(null, process.env.NODE_ENV !== "production" || (!!origin && [...allowedOrigins, ...stagingNativeOrigins()].includes(origin))),
   }),
 );
 app.post(

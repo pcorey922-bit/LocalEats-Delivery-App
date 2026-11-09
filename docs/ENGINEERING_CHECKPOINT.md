@@ -1034,3 +1034,14 @@ artifacts are unconfigured; no physical-device, signed release or real Stripe cl
 Next: deploy latest branch, verify Operations/Stripe TEST configuration, execute
 actual authorized private guest + telephone/electronic test deliveries, then address
 secure email/recovery and configured native/device acceptance. Keep ordering closed.
+
+## Android staging checkpoint
+
+Read docs/ANDROID_STAGING_TEST.md. Owner Stripe settings are verified/configured,
+sandbox 0% tax remains temporary, ordering is closed; do not overwrite them.
+Versioned public native config, private TEST CORS, staging Android variant, signing
+bootstrap/build targets and packaged APK verification are prepared. Source permissions
+hardened; no test private key exists in source/artifacts. GitHub Secrets access is
+HTTP 403: owner must supply one temporary narrowly scoped bootstrap token via GitHub
+Secrets, never chat, before stable signing can run. Native Google/guest integration,
+actual APK/device/Play Protect acceptance remain to verify. Preserve all prior flows.

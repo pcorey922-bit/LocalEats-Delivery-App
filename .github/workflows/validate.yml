@@ -31,7 +31,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm audit --prod --audit-level=moderate
       - name: Validate secure staging configuration preflight
-        run: node --test scripts/check-staging-environment.test.mjs scripts/container-environment.test.mjs scripts/free-staging.test.mjs scripts/retry-native-dependencies.test.mjs
+        run: node --test scripts/check-staging-environment.test.mjs scripts/container-environment.test.mjs scripts/free-staging.test.mjs scripts/retry-native-dependencies.test.mjs scripts/prepare-native-staging.test.mjs
       - name: Validate staging Compose configuration with test placeholders
         env:
           ROCOEATS_DB_PASSWORD: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

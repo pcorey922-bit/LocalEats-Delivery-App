@@ -2,10 +2,17 @@ name: Native compile validation (unsigned)
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      target:
+        description: Compile only, create staging APK, or initialize owner signing
+        type: choice
+        options: [compile, staging, initialize-staging-signing]
+        default: compile
 permissions:
   contents: read
 jobs:
   android:
+    if: github.event_name != 'workflow_dispatch' || inputs.target == 'compile'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -34,6 +41,9 @@ jobs:
       - name: Validate unsigned release APK and Android App Bundle
         run: ./gradlew assembleRelease bundleRelease lintRelease --no-daemon
         working-directory: artifacts/localeats/android
+      - name: Validate staging variant without packaging an install artifact
+        run: ./gradlew assembleStaging lintStaging --no-daemon
+        working-directory: artifacts/localeats/android
       - uses: actions/upload-artifact@v4
         with:
           name: RoCoEats-Android-release-unsigned-unconfigured
@@ -45,6 +55,7 @@ jobs:
           name: RoCoEats-Android-debug-unconfigured
           path: artifacts/localeats/android/app/build/outputs/apk/debug/app-debug.apk
   ios:
+    if: github.event_name != 'workflow_dispatch' || inputs.target == 'compile'
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
@@ -75,3 +86,77 @@ jobs:
         with:
           name: RoCoEats-iOS-simulator-unconfigured
           path: ${{ runner.temp }}/RoCoEats-iOS-simulator.zip
+
+  initialize-staging-signing:
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'initialize-staging-signing'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Create stable owner-controlled test identity in repository secrets
+        env:
+          GH_TOKEN: ${{ secrets.ROCOEATS_SIGNING_SETUP_TOKEN }}
+        run: bash .github/scripts/bootstrap-staging-signing.sh
+  android-staging:
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'staging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require owner-managed signing before installing dependencies
+        env:
+          KEYSTORE: ${{ secrets.ROCOEATS_STAGING_KEYSTORE_BASE64 }}
+          PASSWORD: ${{ secrets.ROCOEATS_STAGING_KEYSTORE_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE" && test -n "$PASSWORD" || { echo 'Owner signing setup is required. See docs/ANDROID_STAGING_TEST.md'; exit 1; }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: node scripts/prepare-native-staging.mjs --github-env
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @workspace/localeats mobile:sync
+      - name: Restore signing key only into private runner temporary storage
+        env:
+          KEYSTORE: ${{ secrets.ROCOEATS_STAGING_KEYSTORE_BASE64 }}
+        run: |
+          umask 077
+          printf '%s' "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/rocoeats-staging.p12"
+      - name: Install current Android SDK
+        run: |
+          set +o pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Resolve official Gradle dependencies
+        run: bash ../../../scripts/retry-native-dependencies.sh ./gradlew help --no-daemon
+        working-directory: artifacts/localeats/android
+      - name: Build signed non-debuggable staging APK
+        env:
+          ROCOEATS_STAGING_KEYSTORE_PATH: ${{ runner.temp }}/rocoeats-staging.p12
+          ROCOEATS_STAGING_KEYSTORE_PASSWORD: ${{ secrets.ROCOEATS_STAGING_KEYSTORE_PASSWORD }}
+          ROCOEATS_ANDROID_VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew assembleStaging lintStaging --no-daemon
+        working-directory: artifacts/localeats/android
+      - name: Verify signature, package, permissions and absence of packaged server credentials
+        run: |
+          mkdir -p staging-apk
+          cp artifacts/localeats/android/app/build/outputs/apk/staging/app-staging.apk staging-apk/RoCoEats-Android-Staging-Test.apk
+          python3 scripts/verify-staging-apk.py staging-apk/RoCoEats-Android-Staging-Test.apk "$ANDROID_HOME/build-tools/36.0.0" staging-apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RoCoEats-Android-Staging-Test-APK
+          path: staging-apk/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Remove temporary signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/rocoeats-staging.p12"

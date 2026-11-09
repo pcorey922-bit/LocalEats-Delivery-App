@@ -226,6 +226,19 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     delete process.env.STRIPE_WEBHOOK_SECRET;
     process.env.API_MUTATION_LIMIT_PER_MINUTE = "10000";
   });
+  await t.test("native staging CORS admits only explicit app origins without granting business authorization",async()=>{
+    const prior=process.env.NODE_ENV;process.env.NODE_ENV="production";process.env.ROCOEATS_PRIVATE_STAGING="true";process.env.PAYMENT_PROVIDER="stripe_test";process.env.STRIPE_SECRET_KEY="sk_test_fixture";
+    try{
+      for(const originHeader of ["https://localhost","capacitor://localhost"]){
+        const r=await fetch(origin+"/api/profiles/me",{method:"OPTIONS",headers:{origin:originHeader,"access-control-request-method":"GET","access-control-request-headers":"authorization,x-rocoeats-guest-token"}});
+        assert.equal(r.status,204);assert.equal(r.headers.get("access-control-allow-origin"),originHeader);
+        assert.equal((await fetch(origin+"/api/profiles/me",{headers:{origin:originHeader}})).status,401);
+      }
+      const r=await fetch(origin+"/api/profiles/me",{method:"OPTIONS",headers:{origin:"https://evil.example.test","access-control-request-method":"GET"}});assert.equal(r.headers.get("access-control-allow-origin"),null);
+      process.env.ROCOEATS_PRIVATE_STAGING="false";
+      const closed=await fetch(origin+"/api/profiles/me",{method:"OPTIONS",headers:{origin:"https://localhost","access-control-request-method":"GET"}});assert.equal(closed.headers.get("access-control-allow-origin"),null);
+    }finally{process.env.NODE_ENV=prior;}
+  });
   await t.test("private staging admits only server-listed identities and preserves role checks and signed webhooks", async () => {
     const previousOwners = process.env.LOCALEATS_ADMIN_CLERK_USER_IDS;
     try {
