@@ -3,6 +3,15 @@
 Continue GitHub PR #1 on `feature/rocoeats-launch-readiness`. Do not merge,
 enable live transactions, discard changes or claim launch readiness.
 
+## Current physical-device evidence — November 9
+
+Owner confirms signed APK source 5c687ac102adfe622f11403239398ec43fc84e15, run
+42583769896, installed on Samsung Galaxy S22 Ultra, Play Protect allowed it, app
+launched successfully and appearance matched the website. Record these as owner-
+verified physical tests. OS/One UI version, auth, maps, permissions, notifications,
+payments and delivery are not verified. Do not repeat signing setup or ask the
+owner to reinstall this same tested APK. Ordering remains closed.
+
 ## Saved source and verification
 
 Current continuation: read PRODUCTION_BACKLOG.md and the November 8 owner access/

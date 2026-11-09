@@ -494,3 +494,26 @@ be disabled or overridden. Owner should revoke the consumed temporary setup toke
 stable signing secrets must be preserved. Pricing (0% sandbox-only tax), TEST mode
 and ordering=false were preserved. PR stays draft. Next: owner device evidence,
 resolve concrete device/Google review findings, then real private TEST delivery.
+
+## PHYSICAL SAMSUNG TEST PASSED — owner confirmation November 9
+
+Device: Samsung Galaxy S22 Ultra. Exact signed APK: source
+5c687ac102adfe622f11403239398ec43fc84e15 / signed run 42583769896 / artifact
+13658705753. Owner reports: installation succeeded, Google Play Protect allowed it,
+app opens successfully, appearance matches the website. These four observations
+are physical-device evidence supplied by the owner, not emulator or mocked tests.
+OS/One UI version and screenshots were not supplied. Do not generalize this into
+Google developer certification or assume future APKs receive the same verdict.
+
+Native Clerk/browser-to-app approval, guest access, admin/driver role access, Maps,
+location permissions/denials, push, background/lifecycle behavior and Stripe TEST
+payment/delivery are still UNVERIFIED on Samsung. Public ordering remains false.
+Next: verify actual native sign-in/role handling, then navigation/permissions and
+notification configuration/device checks. Preserve design and stable signing key.
+
+Prepared an isolated CI Android-emulator smoke target that downloads this exact
+signed APK, validates its checksum/owner certificate, and exercises real native
+launch, guest/sign-in screens, cold returns and invalid-link rejection. It receives
+no signing keys, accounts or guest capabilities, and creates no orders/payments.
+Shell/Python/YAML syntax reviewed; actual emulator results are pending its first run.
+ADB is confined to the disposable emulator; it is never used on the owner's phone.

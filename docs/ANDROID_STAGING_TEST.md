@@ -1,5 +1,12 @@
 # Owner-controlled Android staging test
 
+**Physical Samsung installation and launch passed (owner-confirmed, November 9).**
+The owner installed this exact signed APK on a Samsung Galaxy S22 Ultra; Play Protect
+allowed installation, the app opened, and appearance matched the website. Android/
+One UI versions were not supplied. This verifies only installation, launch and the
+reported appearance—not native sign-in, maps, permissions, push, payment or delivery,
+and not general Google developer certification. Keep security protections enabled.
+
 **Verified signed testing build is available.** Signing setup and native backend
 configuration are complete; do not repeat initialization below.
 
