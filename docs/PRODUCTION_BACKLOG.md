@@ -249,3 +249,36 @@ Actual Stripe/guest staged delivery, external receipt email and real Android/iOS
 interruptions are NOT verified. Native uses the shared routes and existing return
 scheme; unsigned compilation and physical-device acceptance remain separate blockers.
 Next: telephone confirmation before hosted payment, with no unapproved price increase.
+
+## November 9 — telephone restaurant confirmation before payment
+
+Additive migration 0027 snapshots electronic/telephone receipt mode per order and
+stores durable versioned phone confirmation. Admin-only Operations has receipt-mode
+configuration, pending-age queue, restaurant phone/hours, full ordered modifiers and
+instructions, contact/accept/reject actions, exact food-price attestation and prep
+estimate. Customer messages remain pending/contacting until genuine acceptance;
+confirmed-but-unpaid orders explicitly wait for payment. Direct and queued checkout
+refuse telephone orders without acceptance. Verified payment activates ordinary
+accepted/preparing/ready/driver fulfillment. Generic status updates cannot bypass it.
+
+No manual Stripe authorization/capture state was invented: confirmation occurs before
+requesting hosted payment. Unavailable items/price discrepancies require unpaid
+cancellation and a fresh approved quote. Rejection, stock release, expiry, duplicate
+commands and conflicting dispatchers are transaction-safe/audited; existing late
+payment refunds remain. Unpaid call waits join existing response-time escalation.
+New orders alert active admins through the durable notification system. Free hosting
+sleep and real push/provider/device verification remain limitations.
+
+104 API/unit tests pass with relational state and simulated identity/payment adapters;
+production build/typechecks and phone-size actual guest/dispatcher/status components
+pass with simulated APIs. Includes exact-price refusal, bypass denial, acceptance
+before checkout, deterministic payment activation, conflicting decisions, rejection,
+escalation and expiry. Guest screens commit 3e97fc4 passed full PostgreSQL/migration/
+restore/Docker CI 42570260849 and 42570266443. Native 42570266453 failed before
+compilation on official Gradle/Capacitor HTTP 504. Actual private guest + telephone +
+Stripe TEST delivery, email receipts and physical devices remain unverified.
+
+Next priority: verify latest deployment and Stripe setup, perform a real private guest
+telephone/electronic test delivery, harden guest recovery/contact/notification delivery,
+and resolve native dependency availability before device acceptance. Public ordering
+remains disabled. No costs, live transactions, owner secrets or Neon resets introduced.

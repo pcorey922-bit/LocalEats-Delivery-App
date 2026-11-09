@@ -979,3 +979,18 @@ APIs. Queued Stripe worker and direct checkout both use guest receipt/return rou
 full production build passes; backend 0ce82fe Validate 42569873460 passed PostgreSQL,
 migrations, restore and container validation. No deployed/real-provider/device guest
 workflow is certified. Next is safe telephone confirmation before taking payment.
+
+## November 9 — telephone dispatch checkpoint
+
+Migration 0027 adds receipt-mode snapshots and versioned audited phone confirmation.
+Operations now configures future receipt modes and provides a pending-call queue
+with phone/hours/items/modifiers, call notes, exact-price acceptance/prep estimate
+and unpaid rejection. Confirmation precedes hosted payment; no invented manual
+capture/authorization. Direct/queued checkout and generic status endpoints enforce
+this. Verified payment activates accepted; original electronic ordering remains.
+Stock release, pending escalation, expiry and idempotent/conflicting command recovery
+are covered. Customer status messages use real confirmation/order records.
+104 API/unit tests, production build/typechecks and simulated phone component QA pass.
+Private Stripe/provider delivery and device tests still require owner setup/access.
+Guest 3e97fc4 complete PostgreSQL/restore/container CI passed; native dependencies
+still return upstream HTTP 504. Read PRIVATE_TEST_DELIVERY.md for exact staging flows.

@@ -1,3 +1,4 @@
+import { requireTelephoneAcceptance } from "./telephone-confirmation";
 import { databaseNow } from "./database-clock";
 import { requireNoFinancialHold } from "./financial-holds";
 import { alias } from "drizzle-orm/pg-core";
@@ -88,6 +89,7 @@ export async function requestProviderCheckout(orderId: string, actor: Profile) {
       };
     if (order.status !== "placed")
       throw new CommerceError(409, "Order cannot enter checkout");
+    await requireTelephoneAcceptance(tx, order);
     const [payment] = await tx
       .select()
       .from(paymentsTable)

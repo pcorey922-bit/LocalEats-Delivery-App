@@ -153,6 +153,63 @@ try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await page.goto("http://127.0.0.1:" + server.address().port);
   await page
+    .getByText(
+      "Your order has been received. We're contacting the restaurant to confirm it.",
+      { exact: true },
+    )
+    .waitFor();
+  await page
+    .getByLabel("Call notes / unavailable items / price discrepancies", {
+      exact: true,
+    })
+    .fill("Reached restaurant for order review");
+  await page
+    .getByRole("button", { name: "Save telephone response", exact: true })
+    .click();
+  await page
+    .getByText("We're confirming your order with the restaurant.", {
+      exact: true,
+    })
+    .waitFor();
+  await page
+    .getByRole("combobox", { name: /^Telephone action/ })
+    .selectOption("accept");
+  await page
+    .getByLabel("Call notes / unavailable items / price discrepancies", {
+      exact: true,
+    })
+    .fill("Restaurant confirms all items; preparation waits for payment");
+  await page
+    .getByLabel("Preparation estimate (minutes, acceptance only)", {
+      exact: true,
+    })
+    .fill("20");
+  await page
+    .getByLabel("Restaurant-confirmed food subtotal ($, acceptance only)", {
+      exact: true,
+    })
+    .fill("10");
+  await page
+    .getByLabel(
+      "Restaurant verified every item, quantity, modifier and price; preparation waits for payment",
+      { exact: true },
+    )
+    .check();
+  await page
+    .getByRole("button", { name: "Save telephone response", exact: true })
+    .click();
+  await page
+    .getByText(
+      "The restaurant has confirmed your order. Complete test payment before preparation begins.",
+      { exact: true },
+    )
+    .waitFor();
+  const phoneRequests = await page.evaluate(() => window.qaTelephoneWrites);
+  assert.equal(phoneRequests.length, 2);
+  assert.equal(phoneRequests[1].version, 2);
+  assert.equal(phoneRequests[1].confirmedSubtotalCents, 1000);
+  assert.equal(phoneRequests[1].allItemsAvailable, true);
+  await page
     .getByRole("button", { name: "Declined offers", exact: true })
     .click();
   await page

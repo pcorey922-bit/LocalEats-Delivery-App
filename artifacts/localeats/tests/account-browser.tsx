@@ -1,3 +1,5 @@
+import { TelephoneDispatch } from "../src/pages/telephone-dispatch";
+import { RestaurantConfirmation } from "../src/pages/restaurant-confirmation";
 import { GuestCheckoutAccess } from "../src/pages/guest-order";
 import { CartPage } from "../src/pages/roco-pages";
 // Isolated component fixture: simulated auth/API only; never a production route.
@@ -13,6 +15,9 @@ import { OrderTracking } from "../src/pages/delivery-tracking";
 import { DeclinedOffers } from "../src/pages/declined-offers";
 declare global {
   interface Window {
+    qaTelephoneStatus: string;
+    qaTelephoneVersion: number;
+    qaTelephoneWrites: unknown[];
     qaSignedIn: boolean;
     qaGuestContacts: unknown[];
     qaGuestAddresses: Record<string, unknown>[];
@@ -50,6 +55,9 @@ window.qaAccess = {
   superAdministrator: true,
   driver: true,
 };
+window.qaTelephoneStatus = "pending";
+window.qaTelephoneVersion = 1;
+window.qaTelephoneWrites = [];
 window.qaSignedIn = !location.search.includes("guest=true");
 window.qaGuestContacts = [];
 window.qaGuestAddresses = [];
@@ -90,6 +98,56 @@ window.fetch = async (url, options = {}) => {
     new Response(JSON.stringify(value), {
       headers: { "content-type": "application/json" },
     });
+  if (String(url) === "/api/admin/telephone-restaurants") return json([]);
+  if (String(url) === "/api/orders/fixture-telephone/confirmation")
+    return json({
+      mode: "telephone",
+      status: window.qaTelephoneStatus,
+      orderStatus: "placed",
+      preparationMinutes: window.qaTelephoneStatus === "accepted" ? 20 : null,
+    });
+  if (String(url) === "/api/admin/telephone-orders")
+    return json([
+      {
+        order: {
+          id: "fixture-telephone",
+          placedAt: new Date().toISOString(),
+          reservationExpiresAt: new Date(Date.now() + 600000).toISOString(),
+          subtotalCents: 1000,
+          totalCents: 1550,
+        },
+        restaurant: { name: "QA telephone kitchen", phone: "8655550100" },
+        confirmation: {
+          status: window.qaTelephoneStatus,
+          version: window.qaTelephoneVersion,
+        },
+        items: [
+          {
+            id: "fixture-line",
+            itemNameSnapshot: "QA phone meal",
+            quantity: 1,
+            unitPriceCents: 1000,
+            specialInstructions: "No onions",
+            modifierSnapshot: [{ option: "Extra sauce" }],
+          },
+        ],
+        hours: [],
+      },
+    ]);
+  if (
+    String(url) === "/api/admin/orders/fixture-telephone/telephone-confirmation"
+  ) {
+    const input = JSON.parse(String(options.body));
+    window.qaTelephoneWrites.push(input);
+    window.qaTelephoneVersion++;
+    window.qaTelephoneStatus =
+      input.action === "accept"
+        ? "accepted"
+        : input.action === "reject"
+          ? "rejected"
+          : "contacted";
+    return json({});
+  }
   if (String(url) === "/api/guest/sessions") {
     window.qaGuestContacts.push(JSON.parse(String(options.body)));
     return json({ token: "A".repeat(43) });
@@ -227,6 +285,8 @@ createRoot(document.getElementById("root")!).render(
         <PricingSettings current={null} />
         <OrderTracking orderId="fixture-tracking" />
         <DeclinedOffers />
+        <TelephoneDispatch />
+        <RestaurantConfirmation orderId="fixture-telephone" />
       </>
     )}
   </QueryClientProvider>,

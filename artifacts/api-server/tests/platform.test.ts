@@ -15,6 +15,7 @@ import {
   engine,
   db,
   guestSessionsTable,
+  telephoneConfirmationsTable,
   profilesTable,
   restaurantsTable,
   menuCategoriesTable,
@@ -306,6 +307,58 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     const third=await api("/guest/sessions",null,"POST",{name:"Revoked fixture",email:"revoke@example.test",phone:"8655550103"});
     assert.equal((await guest("/guest/session",third.data.token,"DELETE")).status,200);
     assert.equal((await guest("/guest/session",third.data.token)).status,401);
+  });
+  await t.test("telephone dispatch confirms exact approved food before checkout, fences conflicts and activates fulfillment only after payment",async()=>{
+    await db.update(restaurantsTable).set({phone:"8655550100"}).where(eq(restaurantsTable.id,ids.business));
+    assert.equal((await api(`/admin/restaurants/${ids.business}/receipt-mode`,ids.restaurant,"PUT",{mode:"telephone",expectedMode:"electronic"})).status,403);
+    assert.equal((await api(`/admin/restaurants/${ids.business}/receipt-mode`,ids.admin,"PUT",{mode:"telephone",expectedMode:"electronic"})).status,200);
+    const order=await create();
+    const [snapshot]=await db.select().from(ordersTable).where(eq(ordersTable.id,order.id));assert.equal(snapshot.confirmationMode,"telephone");
+    assert.equal((await api(`/orders/${order.id}/confirmation`,ids.other)).status,404);
+    assert.equal((await api(`/orders/${order.id}/confirmation`,ids.customer)).data.status,"pending");
+    assert.equal((await api(`/orders/${order.id}/checkout`,ids.customer,"POST")).status,409);
+    assert.equal((await api(`/orders/${order.id}`,ids.admin,"PATCH",{status:"accepted"})).status,409);
+    assert.equal((await api(`/admin/orders/${order.id}/telephone-confirmation`,ids.driver,"POST",{})).status,403);
+    const queue=await api("/admin/telephone-orders",ids.admin);assert.equal(queue.status,200);assert.equal(queue.data.some((o:any)=>o.order.id===order.id && o.items.length===1 && o.restaurant.phone==="8655550100"),true);
+    const note="Spoke with restaurant; checking all modifiers and availability";
+    const contact={requestId:randomUUID(),version:1,action:"contact",note};
+    const contactResult=await api(`/admin/orders/${order.id}/telephone-confirmation`,ids.admin,"POST",contact);assert.equal(contactResult.status,200);
+    assert.equal((await api(`/admin/orders/${order.id}/telephone-confirmation`,ids.admin,"POST",contact)).status,200);
+    const accept={requestId:randomUUID(),version:2,action:"accept",note:"Restaurant confirms all items at the approved food price; wait for payment",preparationMinutes:20,confirmedSubtotalCents:order.subtotalCents,allItemsAvailable:true};
+    assert.equal((await api(`/admin/orders/${order.id}/telephone-confirmation`,ids.admin,"POST",{...accept,confirmedSubtotalCents:order.subtotalCents+1})).status,409);
+    const race=await Promise.all([api(`/admin/orders/${order.id}/telephone-confirmation`,ids.admin,"POST",accept),api(`/admin/orders/${order.id}/telephone-confirmation`,ids.admin,"POST",{requestId:randomUUID(),version:2,action:"reject",note:"Conflicting dispatcher response"})]);
+    assert.equal(race[0].status===200||race[1].status===200,true);assert.deepEqual(race.map(r=>r.status).sort(),[200,409]);
+    const confirmation=await api(`/orders/${order.id}/confirmation`,ids.customer);
+    if(confirmation.data.status==="accepted"){
+      assert.equal((await api(`/orders/${order.id}`,ids.customer)).data.status,"placed");
+      await pay(order.id);
+      assert.equal((await api(`/orders/${order.id}`,ids.customer)).data.status,"accepted");
+      assert.equal((await api(`/orders/${order.id}`,ids.restaurant,"PATCH",{status:"preparing"})).status,200);
+      await api(`/orders/${order.id}/cancel`,ids.admin,"POST",{reason:"Telephone fixture cleanup after payment"});
+    } else {
+      assert.equal((await api(`/orders/${order.id}`,ids.customer)).data.status,"cancelled");
+      assert.equal((await api(`/orders/${order.id}/checkout`,ids.customer,"POST")).status,409);
+    }
+    const confirmed=await create();
+    assert.equal((await api(`/admin/orders/${confirmed.id}/telephone-confirmation`,ids.admin,"POST",{requestId:randomUUID(),version:1,action:"contact",note:"Reached restaurant contact"})).status,200);
+    assert.equal((await api(`/admin/orders/${confirmed.id}/telephone-confirmation`,ids.admin,"POST",{...accept,requestId:randomUUID()})).status,200);
+    assert.equal((await api(`/orders/${confirmed.id}`,ids.customer)).data.status,"placed");
+    await pay(confirmed.id);
+    assert.equal((await api(`/orders/${confirmed.id}`,ids.customer)).data.status,"accepted");
+    assert.equal((await api(`/orders/${confirmed.id}`,ids.restaurant,"PATCH",{status:"preparing"})).status,200);
+    await api(`/orders/${confirmed.id}/cancel`,ids.admin,"POST",{reason:"Confirmed telephone fixture cleanup"});
+    const rejected=await create();
+    const result=await api(`/admin/orders/${rejected.id}/telephone-confirmation`,ids.admin,"POST",{requestId:randomUUID(),version:1,action:"reject",note:"Restaurant item unavailable; no price substitution approved"});assert.equal(result.status,200);
+    assert.equal((await api(`/orders/${rejected.id}`,ids.customer)).data.status,"cancelled");
+    const pending=await create();
+    await db.update(ordersTable).set({placedAt:new Date(Date.now()-10*60000),timingReviewAt:new Date(Date.now()-1)}).where(eq(ordersTable.id,pending.id));
+    for(let i=0;i<100;i++){const [incident]=await db.select().from(orderIncidentsTable).where(eq(orderIncidentsTable.orderId,pending.id));if(incident)break;if(!await processOrderTiming())break;}
+    assert.equal((await db.select().from(orderIncidentsTable).where(eq(orderIncidentsTable.orderId,pending.id))).some(i=>i.kind==="restaurant_response"),true);
+    await db.update(ordersTable).set({reservationExpiresAt:new Date(Date.now()-1)}).where(eq(ordersTable.id,pending.id));
+    const expired=await api(`/admin/orders/${pending.id}/telephone-confirmation`,ids.admin,"POST",{requestId:randomUUID(),version:1,action:"contact",note:"Restaurant call reached after reservation expiry"});assert.equal(expired.status,410);
+    assert.equal((await api(`/orders/${pending.id}`,ids.customer)).data.status,"cancelled");
+    await api(`/admin/restaurants/${ids.business}/receipt-mode`,ids.admin,"PUT",{mode:"electronic",expectedMode:"telephone"});
+    assert.equal((await db.select().from(notificationsTable).where(eq(notificationsTable.orderId,pending.id))).some(n=>n.title==="Call restaurant to confirm order"),true);
   });
   await t.test("Stripe checkout refuses provider I/O until a test webhook is configured", async () => {
     const { createTestCheckout } = await import("../src/lib/payment-provider");

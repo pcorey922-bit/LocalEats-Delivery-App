@@ -13,6 +13,7 @@ export const ordersTable = pgTable("orders", {
   restaurantId: uuid("restaurant_id").notNull().references(() => restaurantsTable.id, { onDelete: "restrict" }),
   deliveryAddressId: uuid("delivery_address_id").references(() => addressesTable.id, { onDelete: "set null" }),
   addressSnapshot: jsonb("address_snapshot").$type<Record<string, string | null>>(),
+  confirmationMode: text("confirmation_mode").$type<"electronic"|"telephone">().notNull().default("electronic"),
   requestKey: text("request_key").unique(),
   requestHash: text("request_hash"),
   pricingSnapshot: jsonb("pricing_snapshot").$type<{ restaurantCommissionBps: number; driverShareBps: number; taxBps: number; testMode: true }>(),

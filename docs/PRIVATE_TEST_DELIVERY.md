@@ -86,3 +86,64 @@ owner-assisted, HTTP, automated and simulated-component results distinct in
 PRODUCTION_BACKLOG.md. No complete delivery is verified until all real steps pass.
 Free Render sleeps and pauses workers; keep the browser active during a supervised
 test, without adding keep-alive services. Never reset Neon to resolve a failure.
+
+## Guest and telephone-managed restaurant acceptance (November 9)
+
+These are real shared application workflows, not the old interactive demo. They
+still require deployed/provider/device acceptance. Keep ordering closed until the
+existing private-test safeguards are reviewed and explicitly authorized.
+
+In Operations, create **Private guest test access** with safe test contact details.
+Copy the link and open it in a separate private browser with no Clerk session.
+The capability is in the fragment (not an HTTP query); the app strips it and saves
+it on that device. It expires after seven days. Anyone holding it can access and
+request permitted changes to that single order. Do not post it publicly. Revoke
+it when done. Guest cart storage is separate from every registered account. Do
+not delete browser/app storage during an active test without saving the link.
+Email alone never retrieves or associates orders. Optional account association
+requires both authenticated customer access and possession of the live capability.
+
+Guest API authentication does not authorize restaurant/driver/admin APIs. Private
+staging accepts guest capabilities only on listed customer/browsing routes. Normal
+anonymous visitors cannot mint sessions in private staging. In-app support and
+tracking do not depend on push. Guest email-link delivery and verified receipt mail
+remain external setup work; no mail/SMS subscription was activated. Stripe receives
+the guest receipt email, but actual receipt delivery needs owner/provider testing.
+Android/iOS use the same guest screens and saved app-webview access. After hosted
+Stripe checkout use **Return to mobile app**; the existing `rocoeats://orders` route
+returns to guest tracking when saved guest access exists. This requires real device
+verification, including suspended/restarted apps. No native success is inferred
+from the browser fixture or CI typecheck.
+
+For a restaurant preferring phone orders, save its real test contact phone in the
+restaurant profile, then use Operations → Telephone restaurant confirmation →
+Configure restaurant receipt modes. The switch affects future orders only.
+Existing orders retain their original mode. Electronic confirmation stays intact.
+
+Telephone orders reserve stock and enter the durable queue **before payment**.
+Dispatch must call and record contact, verify every item/quantity/modifier and the
+exact approved food subtotal, then record genuine acceptance plus preparation
+estimate. Tell the kitchen to wait for verified payment before preparation. The
+customer sees pending/contacting messages until that action. Checkout is blocked
+server-side until acceptance. Once payment is verified, the same order enters
+accepted → preparing → ready → driver pickup/delivery. Operators may use existing
+order controls for preparation/readiness and normal cancellation/refund recovery.
+
+This implementation deliberately requests no card authorization or capture before
+the phone confirmation. It does not claim Stripe manual-capture authorization,
+funds reservation or automatic authorization extension. Existing TEST hosted Checkout
+captures only after genuine confirmation. If a restaurant cannot wait for payment,
+do not represent that restaurant's workflow as supported without an agreed policy.
+Price discrepancies/unavailable items must be noted and the unpaid order rejected;
+the customer must approve a fresh quote/order. No silent substitution or increased
+charge is supported. Rejection releases reserved stock once and records no payment;
+late payments on cancelled orders retain existing refund recovery. After acceptance
+use existing cancellation controls, never overwrite the confirmation decision.
+
+Pending-call ages, contact/decision timestamps, dispatcher identity, command versions
+and audit records persist. Conflicting actions return 409; identical last-command
+retries replay safely. Existing restaurant-response escalation now includes unpaid
+pending phone confirmation, and ordinary reservation expiry releases unconfirmed
+orders. Render Free sleeping delays workers and alerts: this remains private testing,
+not always-on production telephone dispatch. Keep the queue open and reconcile it
+on wake. No proprietary tablets, automated paid calls or SMS are required.

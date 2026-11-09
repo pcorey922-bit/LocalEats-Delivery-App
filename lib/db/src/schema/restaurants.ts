@@ -31,6 +31,7 @@ export const restaurantsTable = pgTable(
     city: varchar("city", { length: 100 }).notNull(),
     region: varchar("region", { length: 80 }).notNull().default("Tennessee"),
     postalCode: varchar("postal_code", { length: 20 }).notNull(),
+    receiptMode: text("receipt_mode").$type<"electronic"|"telephone">().notNull().default("electronic"),
     maxOpenOrders: integer("max_open_orders"),
     acceptingOrders: boolean("accepting_orders").notNull().default(false),
     status: restaurantStatusEnum("status").notNull().default("pending"),

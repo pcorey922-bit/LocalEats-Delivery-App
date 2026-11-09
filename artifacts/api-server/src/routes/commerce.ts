@@ -1,3 +1,4 @@
+import { requireTelephoneAcceptance } from "../lib/telephone-confirmation";
 import { requireCustomerAuth } from "../lib/guest-access";
 import { isOwnerDriver } from "../lib/owner-access";
 import { restaurantCapacity } from "../lib/restaurant-availability";
@@ -116,6 +117,7 @@ router.post("/orders/:orderId/checkout", requireCustomerAuth, async (req, res) =
         409,
         "Only an unpaid placed order can enter checkout",
       );
+    await requireTelephoneAcceptance(tx, order);
     const [payment] = await tx
       .select()
       .from(paymentsTable)

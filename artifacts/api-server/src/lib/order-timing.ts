@@ -1,3 +1,4 @@
+import { telephoneConfirmationsTable } from "@workspace/db";
 import { and, asc, desc, eq, exists, inArray, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
@@ -127,6 +128,7 @@ export async function processOrderTiming() {
                 "ready_for_pickup",
               ]),
             ),
+            and(eq(ordersTable.confirmationMode,"telephone"),eq(ordersTable.status,"placed")),
             exists(unresolved),
           ),
         ),
@@ -150,13 +152,14 @@ export async function processOrderTiming() {
       .select()
       .from(deliveriesTable)
       .where(eq(deliveriesTable.orderId, order.id));
+    const [telephone]=order.confirmationMode==="telephone" ? await tx.select().from(telephoneConfirmationsTable).where(eq(telephoneConfirmationsTable.orderId,order.id)) : [];
     const activeKeys = new Set<string>();
     const overdue = (time: Date | null | undefined, minutes: number) =>
       !!time && now.getTime() - time.getTime() >= minutes * 60000;
     if (
-      payment?.status === "succeeded" &&
+      (payment?.status === "succeeded" || (telephone && ["pending","contacted"].includes(telephone.status))) &&
       ["placed", "pending", "restaurant_received"].includes(order.status) &&
-      overdue(payment.processedAt, policy.restaurantResponseMinutes)
+      overdue(telephone ? order.placedAt : payment?.processedAt, policy.restaurantResponseMinutes)
     ) {
       activeKeys.add("restaurant_response:acceptance");
       await openIncident(

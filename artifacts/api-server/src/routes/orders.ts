@@ -1,3 +1,4 @@
+import { telephoneConfirmationsTable, notificationsTable } from "@workspace/db";
 import { guestSessionsTable } from "@workspace/db";
 import type { GuestRequest } from "../lib/guest-access";
 import { requireCustomerAuth } from "../lib/guest-access";
@@ -441,6 +442,7 @@ router.post(
           pricingSnapshot: { ...pricing },
           customerProfileId: profile.id,
           restaurantId: restaurant.id,
+          confirmationMode: lockedRestaurant.receiptMode,
           deliveryAddressId: address.id,
           addressSnapshot,
           status: "placed",
@@ -463,6 +465,11 @@ router.post(
         return existing.id;
       }
 
+      if(lockedRestaurant.receiptMode==="telephone"){
+        await tx.insert(telephoneConfirmationsTable).values({orderId:order.id});
+        const admins=await tx.select({id:profilesTable.id}).from(profilesTable).where(and(eq(profilesTable.role,"admin"),eq(profilesTable.isActive,true)));
+        for(const admin of admins) await tx.insert(notificationsTable).values({profileId:admin.id,orderId:order.id,eventKey:`telephone:${order.id}:pending`,title:"Call restaurant to confirm order",body:"An unpaid telephone-managed order needs confirmation. Open the telephone dispatch queue."}).onConflictDoNothing();
+      }
       if(guest) await tx.update(guestSessionsTable).set({orderId:order.id}).where(eq(guestSessionsTable.id,guest.id));
       const quantities = inventoryQuantities(parsed.data.items);
       for (const item of lockedItems) {
@@ -682,6 +689,7 @@ router.patch(
         .for("update")
         .limit(1);
       if (locked.status !== order.status) return false;
+      if(locked.confirmationMode==="telephone" && ["accepted","restaurant_received"].includes(nextStatus)) throw new CommerceError(409,"Use audited telephone confirmation before payment; fulfillment starts only after verified payment");
       const [payment] = await tx
         .select()
         .from(paymentsTable)

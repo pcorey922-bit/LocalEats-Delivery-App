@@ -1,3 +1,5 @@
+import { TelephoneDispatch } from "./telephone-dispatch";
+import { RestaurantConfirmation, useRestaurantConfirmation } from "./restaurant-confirmation";
 import { GuestTestInvitation } from "./guest-test-invitation";
 import { SupportDesk, AdminSupport } from "./support-desk";
 import { DriverApplicationReviews } from "./driver-onboarding";
@@ -94,6 +96,7 @@ export function CheckoutPanel({
   onDone?: () => void;
 }) {
   const config = useCommerce();
+  const confirmation = useRestaurantConfirmation(orderId);
   const [operationId, setOperationId] = useState<string | null>(null);
   const reservation = useQuery({
     queryKey: ["reservation", orderId],
@@ -135,6 +138,7 @@ export function CheckoutPanel({
   );
   return (
     <section aria-label="Secure payment">
+      {confirmation.data?.mode==="telephone"&&confirmation.data.status!=="accepted"&&<p>Waiting for genuine restaurant confirmation. No payment can be requested yet.</p>}
       <p>
         Unpaid reservations release their stock at expiry
         {reservation.data
@@ -146,7 +150,7 @@ export function CheckoutPanel({
       <button
         className="roco-button primary"
         disabled={
-          !config.data?.orderingEnabled || checkout.isPending || waiting
+          !config.data?.orderingEnabled || checkout.isPending || waiting || confirmation.isPending || confirmation.isError || (confirmation.data?.mode==="telephone" && confirmation.data.status!=="accepted")
         }
         onClick={() => checkout.mutate()}
       >
@@ -207,6 +211,7 @@ export function OrderActions({ order }: { order: Order }) {
     ["placed", "restaurant_received", "pending"].includes(order.status);
   return (
     <div style={{ marginTop: 12 }}>
+      <RestaurantConfirmation orderId={order.id}/>
       {order.status === "placed" &&
         !order.paymentCollected &&
         order.paymentStatus === "pending" && (
@@ -487,6 +492,7 @@ export function OperationsCommerce() {
       <h1>Test order operations</h1>
       <PaymentSetupChecks />
       <GuestTestInvitation />
+      <TelephoneDispatch />
       <CommerceBanner />
       {error && (
         <p role="alert" className="roco-alert">

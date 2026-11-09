@@ -1,3 +1,4 @@
+import { telephoneConfirmationsTable } from "@workspace/db";
 import { restoreUnacceptedInventory } from "./inventory";
 import { expireReservation } from "./reservation-expiry";
 import { databaseNow } from "./database-clock";
@@ -177,6 +178,13 @@ export async function recordPayment(
         payload: { paymentId: providerId, amount, currency: "usd" },
       });
   }
+  if(order.confirmationMode==="telephone" && order.status==="placed"){
+    const [confirmation]=await tx.select().from(telephoneConfirmationsTable).where(eq(telephoneConfirmationsTable.orderId,order.id));
+    if(confirmation?.status!=="accepted" || confirmation.confirmedSubtotalCents!==order.subtotalCents)
+      throw new CommerceError(409,"Telephone acceptance is missing; payment requires reconciliation");
+    await tx.update(ordersTable).set({status:"accepted"}).where(eq(ordersTable.id,order.id));
+    await tx.insert(orderEventsTable).values({orderId:order.id,actorProfileId:confirmation.dispatcherId,fromStatus:"placed",toStatus:"accepted",note:"Telephone restaurant acceptance activated after verified payment"});
+  }
   await audit(tx, null, "payment.succeeded", orderId, { providerId, amount });
   await notifyOrder(
     tx,
@@ -185,7 +193,7 @@ export async function recordPayment(
     "Test payment confirmed",
     order.status === "cancelled"
       ? "A late test payment requires a refund. The order remains cancelled."
-      : "Your test payment was confirmed. The restaurant can now accept the order.",
+      : order.confirmationMode==="telephone" ? "Your test payment was confirmed. Telephone restaurant acceptance is recorded; preparation can begin." : "Your test payment was confirmed. The restaurant can now accept the order.",
   );
 }
 export async function createEarnings(tx: Transaction, orderId: string) {
