@@ -101,7 +101,7 @@ export function guestStagingPath(method: string, path: string) {
       (/^\/restaurants(?:\/[0-9a-f-]+(?:\/availability)?)?$/.test(path) ||
         path === "/commerce/config" ||
         path === "/healthz")) ||
-    /^\/(?:guest\/session|addresses\/me(?:\/[0-9a-f-]+)?|orders(?:\/(?:me|quote|[0-9a-f-]+)(?:\/(?:checkout|payment|cancel|tracking|delivery-code|delivery-proof|financial-operations|confirmation))?)?|support\/cases(?:\/[0-9a-f-]+(?:\/messages)?)?)$/.test(
+    /^\/(?:guest\/session(?:\/next)?|addresses\/me(?:\/[0-9a-f-]+)?|orders(?:\/(?:me|quote|[0-9a-f-]+)(?:\/(?:checkout|payment|cancel|tracking|delivery-code|delivery-proof|financial-operations|confirmation))?)?|support\/cases(?:\/[0-9a-f-]+(?:\/messages)?)?)$/.test(
       path,
     )
   );

@@ -1,3 +1,4 @@
+import { NextGuestOrder } from "./next-guest-order";
 import { type FormEvent, useState } from "react";
 import { useAuth } from "@clerk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -256,6 +257,12 @@ export function GuestOrderPage() {
           )}
         </article>
       )}
+      {token &&
+        !isSignedIn &&
+        order.data &&
+        ["cancelled", "delivered"].includes(order.data.status) && (
+          <NextGuestOrder token={token} />
+        )}
       <p>
         <Link href="/sign-up">Optional: create an account</Link> ·{" "}
         <Link href="/orders">Registered order history</Link>

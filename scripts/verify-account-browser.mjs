@@ -21,7 +21,11 @@ await build({
   format: "esm",
   platform: "browser",
   jsx: "automatic",
-  define: { "process.env.NODE_ENV": '"development"' },
+  define: {
+    "process.env.NODE_ENV": '"development"',
+    "import.meta.env.VITE_API_ORIGIN": '"https://qa.onrender.com"',
+    "import.meta.env.BASE_URL": '"/"',
+  },
   plugins: [
     {
       name: "qa-clerk",
@@ -389,6 +393,48 @@ try {
       .getByRole("link", { name: "Administrator controls", exact: true })
       .count(),
     0,
+  );
+  const nextButton = page.getByRole("button", {
+    name: "Start fresh guest checkout",
+    exact: true,
+  });
+  assert.equal(await nextButton.isDisabled(), true);
+  assert.equal(
+    new URL(
+      await page
+        .getByLabel("Previous order's private tracking link", { exact: true })
+        .inputValue(),
+    ).origin,
+    "https://qa.onrender.com",
+  );
+  await page
+    .getByLabel(
+      "I saved the previous order's private tracking link somewhere safe",
+      { exact: true },
+    )
+    .check();
+  await page
+    .getByLabel("Name for the next order", { exact: true })
+    .fill("Returning QA guest");
+  await page
+    .getByLabel("Email for the next receipt", { exact: true })
+    .fill("returning-ui@example.test");
+  await page
+    .getByLabel("Phone for the next delivery", { exact: true })
+    .fill("8655550100");
+  await nextButton.click();
+  await page.waitForURL("**/cart");
+  assert.deepEqual(await page.evaluate(() => window.qaNextGuestWrites), [
+    {
+      name: "Returning QA guest",
+      email: "returning-ui@example.test",
+      phone: "8655550100",
+      previousLinkSaved: true,
+    },
+  ]);
+  assert.equal(
+    await page.evaluate(() => localStorage.getItem("rocoeats-guest-access:v1")),
+    "B".repeat(43),
   );
   await page.screenshot({ path: target + "/account-ui.png", fullPage: true });
   assert.equal(

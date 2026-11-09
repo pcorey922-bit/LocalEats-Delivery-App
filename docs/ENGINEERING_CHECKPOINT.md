@@ -1021,3 +1021,16 @@ No actual Stripe E2E was performed. Preserve ordering=false/TEST mode. Next: dep
 latest branch, verify Operations Stripe settings, and run PRIVATE_TEST_DELIVERY.md
 with authorized private accounts/guest capability. Guest email delivery/recovery,
 commercial operations and device acceptance remain launch blockers.
+
+## November 9 — final repeat-checkout checkpoint
+
+Closed guest orders now support fresh guest checkout without revoking previous
+tracking/refund links. Active/revoked/expired access is guarded, new capability
+scope is independent, contact is revalidated and actions are audited/rate-limited.
+107 tests and production build/typechecks pass; phone-size actual form QA verifies
+saved-link consent, payload, fresh token storage and /cart navigation with simulated
+API/auth. dfe72bf full Validate 42571799623 AND native 42571804960 passed. Native
+artifacts are unconfigured; no physical-device, signed release or real Stripe claim.
+Next: deploy latest branch, verify Operations/Stripe TEST configuration, execute
+actual authorized private guest + telephone/electronic test deliveries, then address
+secure email/recovery and configured native/device acceptance. Keep ordering closed.

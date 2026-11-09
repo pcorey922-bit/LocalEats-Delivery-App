@@ -147,3 +147,9 @@ pending phone confirmation, and ordinary reservation expiry releases unconfirmed
 orders. Render Free sleeping delays workers and alerts: this remains private testing,
 not always-on production telephone dispatch. Keep the queue open and reconcile it
 on wake. No proprietary tablets, automated paid calls or SMS are required.
+
+After rejection, expiry or delivery, use **Start another guest order** on the guest
+tracking page. Save the previous private link first, then enter contact details for
+the next order. The new token cannot retrieve the previous order; the previous link
+remains valid for support/refund updates. Active orders must finish or cancel before
+restarting. This does not create a charge, enable ordering or reopen a cancelled order.

@@ -331,3 +331,22 @@ Clerk publishable key and permitted native CORS/Clerk origins before device buil
 upstream availability remains intermittent. Earlier runs documented official binary
 HTTP 504. Do not describe native compilation as uniformly passing or claim physical
 GPS/push/guest acceptance. Use the latest Actions run for current exact status.
+
+## November 9 — guest repeat checkout without lost refund access
+
+After a cancelled/expired or delivered guest order, a guest can start a fresh checkout
+without Clerk registration or revoking the previous order's tracking/refund access.
+The previous private link must be saved first. A fresh capability/customer fulfillment
+record cannot access the previous order; the old link stays valid until its own
+expiry/revocation. Active orders cannot restart, and revoked/expired access cannot
+mint another session. Private staging admits this only through an existing valid
+guest capability; creation is rate-limited and audited. Contact fields are revalidated,
+including usable phone digits. All 107 tests, production build/typechecks and actual
+phone-size restart form/persistence QA pass (simulated auth/API); relational tests
+exercise closed vs active order guards and independent old/new capabilities.
+
+Latest verified CI before this batch: dfe72bf full PostgreSQL/restore/Docker Validate
+42571799623 PASSED; native 42571804960 PASSED BOTH Android debug/release APK/AAB/lint
+and iOS simulator/unsigned device release. Artifacts remain unconfigured and device
+acceptance/signing remain open. Intermittent prior dependency failures are historical,
+not a claim that this successful run failed. Do not infer real-device/provider readiness.

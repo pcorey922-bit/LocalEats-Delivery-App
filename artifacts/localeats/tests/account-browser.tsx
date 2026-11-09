@@ -1,3 +1,4 @@
+import { NextGuestOrder } from "../src/pages/next-guest-order";
 import { TelephoneDispatch } from "../src/pages/telephone-dispatch";
 import { RestaurantConfirmation } from "../src/pages/restaurant-confirmation";
 import { GuestCheckoutAccess } from "../src/pages/guest-order";
@@ -15,6 +16,7 @@ import { OrderTracking } from "../src/pages/delivery-tracking";
 import { DeclinedOffers } from "../src/pages/declined-offers";
 declare global {
   interface Window {
+    qaNextGuestWrites: unknown[];
     qaTelephoneStatus: string;
     qaTelephoneVersion: number;
     qaTelephoneWrites: unknown[];
@@ -55,6 +57,7 @@ window.qaAccess = {
   superAdministrator: true,
   driver: true,
 };
+window.qaNextGuestWrites = [];
 window.qaTelephoneStatus = "pending";
 window.qaTelephoneVersion = 1;
 window.qaTelephoneWrites = [];
@@ -104,6 +107,10 @@ window.fetch = async (url, options = {}) => {
       phone: "8655550199",
       email: "guest-ui@example.test",
     });
+  if (String(url) === "/api/guest/session/next") {
+    window.qaNextGuestWrites.push(JSON.parse(String(options.body)));
+    return json({ token: "B".repeat(43) });
+  }
   if (String(url) === "/api/admin/telephone-restaurants") return json([]);
   if (String(url) === "/api/orders/fixture-telephone/confirmation")
     return json({
@@ -293,6 +300,7 @@ createRoot(document.getElementById("root")!).render(
         <DeclinedOffers />
         <TelephoneDispatch />
         <RestaurantConfirmation orderId="fixture-telephone" />
+        <NextGuestOrder token={"A".repeat(43)} />
       </>
     )}
   </QueryClientProvider>,

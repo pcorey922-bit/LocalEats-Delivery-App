@@ -22,6 +22,34 @@ import { audit } from "../lib/commerce";
 import { databaseNow } from "../lib/database-clock";
 import { CommerceError } from "../lib/commerce-policy";
 const router = Router();
+async function mintGuest(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  input: { name: string; email: string; phone: string },
+) {
+  const token = randomBytes(32).toString("base64url"),
+    now = await databaseNow(tx);
+  const [profile] = await tx
+    .insert(profilesTable)
+    .values({
+      clerkUserId: `guest_${randomUUID()}`,
+      displayName: input.name,
+      role: "customer",
+    })
+    .returning();
+  const [session] = await tx
+    .insert(guestSessionsTable)
+    .values({
+      profileId: profile.id,
+      tokenHash: guestTokenHash(token),
+      email: input.email,
+      phone: input.phone,
+      expiresAt: new Date(now.getTime() + 7 * 86400000),
+    })
+    .returning();
+  await audit(tx, profile.id, "guest.session.created", session.id);
+  return { token, expiresAt: session.expiresAt };
+}
+
 router.post("/guest/sessions", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   await guestRateLimit(
@@ -38,35 +66,73 @@ router.post("/guest/sessions", async (req, res) => {
         .trim()
         .min(7)
         .max(30)
-        .regex(/^[+()0-9 .-]+$/),
+        .regex(/^[+()0-9 .-]+$/)
+        .refine((value) => {
+          const n = value.replace(/\D/g, "").length;
+          return n >= 10 && n <= 15;
+        }, "Enter a delivery phone with area code"),
     })
     .strict()
     .parse(req.body);
-  const token = randomBytes(32).toString("base64url");
-  const session = await db.transaction(async (tx) => {
-    const now = await databaseNow(tx);
-    const [profile] = await tx
-      .insert(profilesTable)
-      .values({
-        clerkUserId: `guest_${randomUUID()}`,
-        displayName: input.name,
-        role: "customer",
-      })
-      .returning();
-    const [created] = await tx
-      .insert(guestSessionsTable)
-      .values({
-        profileId: profile.id,
-        tokenHash: guestTokenHash(token),
-        email: input.email,
-        phone: input.phone,
-        expiresAt: new Date(now.getTime() + 7 * 86400000),
-      })
-      .returning();
-    await audit(tx, profile.id, "guest.session.created", created.id);
-    return created;
+  const result = await db.transaction((tx) => mintGuest(tx, input));
+  res.status(201).json(result);
+});
+router.post("/guest/session/next", requireCustomerAuth, async (req, res) => {
+  const guest = (req as GuestRequest).guestSession;
+  if (!guest)
+    throw new CommerceError(
+      400,
+      "Use guest access to start another guest checkout",
+    );
+  const input = z
+    .object({
+      name: z.string().trim().min(2).max(120),
+      email: z.string().trim().email().max(254),
+      phone: z
+        .string()
+        .trim()
+        .min(7)
+        .max(30)
+        .regex(/^[+()0-9 .-]+$/)
+        .refine((value) => {
+          const n = value.replace(/\D/g, "").length;
+          return n >= 10 && n <= 15;
+        }, "Enter a delivery phone with area code"),
+      previousLinkSaved: z.literal(true),
+    })
+    .strict()
+    .parse(req.body);
+  await guestRateLimit(`next:${guest.id}`, 20, 3600);
+  const result = await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(guestSessionsTable)
+      .where(eq(guestSessionsTable.id, guest.id))
+      .for("update");
+    if (
+      current.revokedAt ||
+      current.expiresAt <= (await databaseNow(tx)) ||
+      !current.orderId
+    )
+      throw new CommerceError(
+        409,
+        "Guest order access changed or no completed/cancelled order exists",
+      );
+    const [order] = await tx
+      .select()
+      .from(ordersTable)
+      .where(eq(ordersTable.id, current.orderId))
+      .for("update");
+    if (!["cancelled", "delivered"].includes(order.status))
+      throw new CommerceError(
+        409,
+        "Complete or cancel this order before starting another guest checkout",
+      );
+    const next = await mintGuest(tx, input);
+    await audit(tx, guest.profileId, "guest.next_checkout.created", order.id);
+    return next;
   });
-  res.status(201).json({ token, expiresAt: session.expiresAt });
+  res.status(201).json(result);
 });
 router.get("/guest/session", requireCustomerAuth, async (req, res) => {
   const session = (req as GuestRequest).guestSession;
@@ -125,8 +191,24 @@ router.post("/guest/claim", requireAuth, async (req, res) => {
       .update(guestSessionsTable)
       .set({ revokedAt: now })
       .where(eq(guestSessionsTable.id, session.id));
-    await tx.update(supportCasesTable).set({createdBy:profile.id}).where(and(eq(supportCasesTable.createdBy,session.profileId),eq(supportCasesTable.orderId,order.id)));
-    await tx.update(notificationsTable).set({profileId:profile.id}).where(and(eq(notificationsTable.profileId,session.profileId),eq(notificationsTable.orderId,order.id)));
+    await tx
+      .update(supportCasesTable)
+      .set({ createdBy: profile.id })
+      .where(
+        and(
+          eq(supportCasesTable.createdBy, session.profileId),
+          eq(supportCasesTable.orderId, order.id),
+        ),
+      );
+    await tx
+      .update(notificationsTable)
+      .set({ profileId: profile.id })
+      .where(
+        and(
+          eq(notificationsTable.profileId, session.profileId),
+          eq(notificationsTable.orderId, order.id),
+        ),
+      );
     await audit(tx, profile.id, "guest.order.claimed", order.id, {
       guestSessionId: session.id,
     });

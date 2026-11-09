@@ -256,6 +256,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     };
     assert.equal((await api("/restaurants",null)).status,200);
     assert.equal((await api("/guest/sessions",null,"POST",{name:"Guest fixture",email:"invalid",phone:"1234567890"})).status,400);
+    assert.equal((await api("/guest/sessions",null,"POST",{name:"Guest fixture",email:"bad-phone@example.test",phone:"+++++++"})).status,400);
     const start=await api("/guest/sessions",null,"POST",{name:"Guest fixture",email:"guest@example.test",phone:"8655550100"});
     assert.equal(start.status,201); const token=start.data.token;
     assert.match(token,/^[A-Za-z0-9_-]{43}$/); assert.equal(JSON.stringify(start.data).includes("phone"),false);
@@ -286,6 +287,8 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     assert.equal((await guest("/orders",token,"POST",body,randomUUID())).status,409);
     assert.equal((await guest(`/orders/${randomUUID()}`,token)).status,404);
     assert.equal((await api(`/orders/${order.id}`,ids.other)).status,403);
+    const nextInput={name:"Returning guest",email:"returning@example.test",phone:"8655550100",previousLinkSaved:true};
+    assert.equal((await guest("/guest/session/next",token,"POST",nextInput)).status,409);
     assert.equal((await guest(`/orders/${order.id}/checkout`,token,"POST")).status,200);
     // Provider and identity adapters are simulated here. Production guests cannot invoke the simulator.
     await db.transaction(tx=>recordPayment(tx,order.id,`sandbox_guest_${order.id}`,order.totalCents,"usd"));
@@ -295,6 +298,13 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     assert.equal((await guest(`/orders/${order.id}/cancel`,token,"POST",{reason:"Guest changed plans before acceptance"})).status,200);
     assert.equal((await guest(`/orders/${order.id}`,token)).data.status,"cancelled");
     const [payment]=await db.select().from(paymentsTable).where(eq(paymentsTable.orderId,order.id));assert.equal(payment.status,"refunded");
+    process.env.ROCOEATS_PRIVATE_STAGING="true";
+    const next=await guest("/guest/session/next",token,"POST",nextInput);assert.equal(next.status,201);
+    assert.notEqual(next.data.token,token);
+    assert.equal((await guest("/guest/session",next.data.token)).data.orderId,null);
+    assert.equal((await guest(`/orders/${order.id}`,next.data.token)).status,404);
+    assert.equal((await guest(`/orders/${order.id}`,token)).data.status,"cancelled");
+    delete process.env.ROCOEATS_PRIVATE_STAGING;
     const [profile]=await db.select().from(profilesTable).where(eq(profilesTable.id,session.profileId));
     assert.equal(profile.role,"customer");assert.equal(profile.clerkUserId.startsWith("guest_"),true);
     // Verified capability possession AND a real authenticated customer are necessary for association.
