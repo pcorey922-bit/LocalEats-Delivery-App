@@ -1,3 +1,4 @@
+import mobileAuthRouter from "./mobile-auth";
 import guestContactRouter from "./guest-contact";
 import telephoneConfirmationRouter from "./telephone-confirmation";
 import guestSessionsRouter from "./guest-sessions";
@@ -28,6 +29,7 @@ import ledgerRouter from "./ledger";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(mobileAuthRouter);
 router.use(guestSessionsRouter);
 router.use(guestContactRouter);
 router.use(telephoneConfirmationRouter);

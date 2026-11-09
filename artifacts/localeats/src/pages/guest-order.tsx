@@ -1,3 +1,4 @@
+import { ImportGuestLink } from "./import-guest-link";
 import { NextGuestOrder } from "./next-guest-order";
 import { type FormEvent, useState } from "react";
 import { useAuth } from "@clerk/react";
@@ -195,6 +196,7 @@ export function GuestOrderPage() {
           </button>
         </>
       )}
+      {!token&&!isSignedIn&&<ImportGuestLink/>}
       {!token && (
         <p>
           No guest access is saved on this device. Open your private tracking

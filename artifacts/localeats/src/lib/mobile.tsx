@@ -1,5 +1,7 @@
+import { mobileReturnRoute } from "./mobile-return";
 import { readGuestToken } from "./guest-session";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useAuth } from "@clerk/react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { App } from "@capacitor/app";
@@ -96,6 +98,8 @@ export async function unregisterPush() {
   }
 }
 export function MobileLifecycle() {
+  const {isSignedIn}=useAuth();
+  const signedIn=useRef(isSignedIn);signedIn.current=isSignedIn;
   const [, navigate] = useLocation();
   const client = useQueryClient();
   useEffect(() => {
@@ -114,21 +118,13 @@ export function MobileLifecycle() {
         if (state.isActive) void client.invalidateQueries();
       }),
     );
-    void retain(
-      App.addListener("appUrlOpen", async (event) => {
-        const url = new URL(event.url);
-        if (
-          url.protocol === "rocoeats:" &&
-          ["orders", "earnings"].includes(url.hostname) &&
-          !url.username &&
-          !url.password
-        ) {
-          await Browser.close().catch(() => {});
-          navigate(url.hostname==="orders" && readGuestToken() ? "/guest/order" : `/${url.hostname}`);
-          void client.invalidateQueries();
-        }
-      }),
-    );
+    const returnToApp=async(raw:string)=>{
+      const route=mobileReturnRoute(raw,!!readGuestToken()&&!signedIn.current);if(!route)return;
+      await Browser.close().catch(()=>{});if(disposed)return;
+      navigate(route);void client.invalidateQueries();
+    };
+    void retain(App.addListener("appUrlOpen",event=>returnToApp(event.url)));
+    void App.getLaunchUrl().then(result=>{if(result&&!disposed)void returnToApp(result.url);}).catch(()=>{});
     void retain(
       PushNotifications.addListener(
         "pushNotificationReceived",

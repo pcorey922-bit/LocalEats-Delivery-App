@@ -39,3 +39,23 @@ export function guestAccessLink({
   link.hash = `access=${token}`;
   return link.toString();
 }
+
+export function tokenFromGuestLink(
+  raw: string,
+  expectedOrigin: string,
+  basePath = "/",
+) {
+  const url = new URL(raw),
+    expected = new URL(expectedOrigin);
+  if (
+    url.origin !== expected.origin ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.pathname !== `${basePath.replace(/\/$/, "")}/guest/order`
+  )
+    throw Error("Use your private RoCoEats guest tracking link");
+  const match = /^#access=([A-Za-z0-9_-]{43})$/.exec(url.hash);
+  if (!match) throw Error("Guest link is invalid or expired");
+  return match[1];
+}

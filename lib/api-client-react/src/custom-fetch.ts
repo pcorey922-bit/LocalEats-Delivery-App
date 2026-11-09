@@ -362,7 +362,7 @@ export async function customFetch<T = unknown>(
   }
 
   // A guest capability is never sent to absolute/untrusted URLs or privileged APIs.
-  if(relativeCustomerPath && !headers.has("authorization") && _guestTokenGetter){
+  if(relativeCustomerPath && !headers.has("authorization") && !headers.has("X-RoCoEats-Guest-Token") && _guestTokenGetter){
     const token=await _guestTokenGetter(); if(token) headers.set("X-RoCoEats-Guest-Token",token);
   }
   const requestInfo = { method, url: resolveUrl(input) };

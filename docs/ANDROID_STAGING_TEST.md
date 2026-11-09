@@ -14,7 +14,7 @@ establish Google reputation, prove absence of malware, or remove a warning. The
 exact warning classification has not been inspected on the owner's Samsung.
 Official references (read November 9):
 https://support.google.com/googleplay/answer/2812853 and
-https://developers.google.com/android/play-protect/warning-cls .
+https://developers.google.com/android/play-protect .
 
 ## Signing setup — owner-only, no passwords or tokens in chat
 
@@ -101,3 +101,24 @@ Stripe TEST browser return, guest tracking/handoff and no live/unauthorized orde
 Push and background location remain unverified and must not be described as working
 from compile/static tests. iOS still requires signing/provisioning and physical-device
 verification; unsigned compilation is not App Store or TestFlight readiness.
+
+## Native sign-in and guest access
+
+Native sign-in deliberately uses the system browser so Google authentication is not
+performed in an embedded WebView. The app creates a random PKCE verifier/challenge;
+the browser explicitly approves the currently signed-in Clerk identity using a
+separate protected state value. The app alone redeems its proof. A database-locked,
+five-minute grant is consumed once, then the server requests a 60-second Clerk
+sign-in ticket outside the SQL transaction. No JWT/ticket/verifier appears in a
+return URL; `rocoeats://auth` only navigates back. Transport failures require restarting
+sign-in rather than duplicating credentials. Existing role/approval/owner checks
+remain server-side. This needs deployed migration 0028 and real Clerk/device testing.
+
+The app handles both warm links and cold launch URLs, refreshing records on resume.
+Native guest testers can open **Guest order → Use a private guest link** and paste
+the owner's safe test invitation without signing in. Only the exact approved HTTPS
+origin/path and fragment token are accepted; the API verifies access before it is
+saved. Guest capabilities are never transferred using an interceptable custom scheme.
+The signed build refuses packaging until the real deployed mobile contract, Clerk
+public key, native CORS and closed ordering are verified. This prevents another
+apparently configured APK being handed off against an incompatible backend.

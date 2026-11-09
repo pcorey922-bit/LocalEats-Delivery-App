@@ -5,3 +5,5 @@ export const clerkMiddleware =
 export const getAuth = (req: {
   get: (name: string) => string | undefined;
 }) => ({ userId: req.get("x-test-user") || null });
+
+export const clerkClient={signInTokens:{createSignInToken:async({userId}:{userId:string})=>({token:`ticket_fixture_${userId}`})}};

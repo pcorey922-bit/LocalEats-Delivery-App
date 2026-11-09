@@ -1045,3 +1045,15 @@ hardened; no test private key exists in source/artifacts. GitHub Secrets access 
 HTTP 403: owner must supply one temporary narrowly scoped bootstrap token via GitHub
 Secrets, never chat, before stable signing can run. Native Google/guest integration,
 actual APK/device/Play Protect acceptance remain to verify. Preserve all prior flows.
+
+## Native sign-in checkpoint
+
+Migration 0028 implements state/PKCE-bound, five-minute, one-use browser sign-in grants.
+Tickets last 60 seconds and are issued outside SQL transactions. Native Google sign-in
+uses the system browser; no roles/tokens are accepted from a deep link. Warm/cold app
+returns and validated private guest-link import are implemented. Configured APK build
+now verifies real deployed native protocol/CORS, public Clerk match and closed ordering.
+111 tests, build/typechecks and simulated actual-component phone QA pass. Real Clerk
+and Samsung tests are still required. Stable signing is externally blocked until the
+owner completes ANDROID_STAGING_TEST.md; probe 42580742817 correctly stops there.
+Keep source saved before any more work; no payment or pricing settings were changed.

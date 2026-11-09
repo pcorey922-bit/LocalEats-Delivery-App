@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { guestAccessLink } from "../../localeats/src/lib/guest-access-link";
+import { guestAccessLink, tokenFromGuestLink } from "../../localeats/src/lib/guest-access-link";
 const token = "A".repeat(43);
 test("native guest links use the actual HTTPS staging site and keep capabilities out of queries", () => {
   const link = new URL(
@@ -64,4 +64,9 @@ test("guest links reject credential-bearing origins, path injection and malforme
     }),
   );
   assert.equal(link.pathname, "/staging/guest/order");
+});
+
+test("guest import is origin/path scoped and accepts tokens only in the fragment",()=>{
+ const origin="https://staging.example.test",link=guestAccessLink({token,pageOrigin:origin});assert.equal(tokenFromGuestLink(link,origin),token);
+ for(const raw of [link.replace("staging.example.test","evil.example.test"),link.replace("/guest/order","/admin"),link.replace("#access=","?access="),link+"&extra=1",link.replace("https://","https://user:pass@")])assert.throws(()=>tokenFromGuestLink(raw,origin));
 });

@@ -9,6 +9,8 @@ export const privateStaging: RequestHandler = async (req, res, next) => {
   // accidentally omitted from staging. The handler still requires real auth.
   if (req.method === "GET" && req.path === "/session/access") return next();
   if (process.env.ROCOEATS_PRIVATE_STAGING !== "true") return next();
+  if(req.method==="GET" && req.path==="/mobile/readiness")return next();
+  if(req.method==="POST" && ["/mobile/auth/start","/mobile/auth/redeem"].includes(req.path)) return next();
   const userId = getAuth(req).userId;
   if (!userId && req.header("X-RoCoEats-Guest-Token") && guestStagingPath(req.method,req.path)) { await readGuest(req); next(); return; }
   if (!userId) {

@@ -9,6 +9,7 @@ import {
   workerHeartbeatsTable,
   requestLimitsTable,
   driverOfferDeclinesTable,
+  mobileAuthFlowsTable,
 } from "@workspace/db";
 import app from "./app";
 import { processWebhookInbox } from "./lib/webhook-worker";
@@ -91,6 +92,7 @@ const loops = [
   }),
   worker("maintenance", 60000, async () => {
     await pruneDutyLocations();
+    await db.delete(mobileAuthFlowsTable).where(lt(mobileAuthFlowsTable.expiresAt,new Date(Date.now()-86400000)));
     await db.delete(driverOfferDeclinesTable).where(lt(driverOfferDeclinesTable.expiresAt,sql`now()-interval '1 day'`));
     await db
       .delete(requestLimitsTable)

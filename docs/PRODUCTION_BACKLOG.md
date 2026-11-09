@@ -374,3 +374,27 @@ is separate from signing/static review; never disable Play Protect/Auto Blocker.
 unit checks pass. Native variant compilation/security review still require CI/APK
 inspection, and the Samsung has not been tested. Next: native auth/guest access and
 cold-start return recovery, then configured APK after protected signing setup.
+
+## Native authentication and guest recovery — November 9
+
+Added migration 0028 and a durable PKCE/state-bound browser-to-app sign-in exchange.
+Google/registration use the system browser; explicit authenticated consent approves
+only that browser identity. Five-minute grants expire and are consumed transactionally
+once; 60-second Clerk tickets are minted outside DB locks and never placed in URLs.
+Client-supplied user/role fields, invalid state/proof, approval identity changes,
+expiry and replay are rejected. App restart recovery handles warm/cold return links;
+registered checkout returns are not diverted into a stale guest token. Guest testers
+can import an exact-origin private link in the native app without registering; backend
+access is checked before saving. No private guest capability travels through a custom
+URL scheme. Existing permissions, ordering and payments remain server-controlled.
+
+Added a safe public native-readiness contract and configured-build deployment/CORS/
+Clerk-key checks. An APK cannot be published by this job against the old backend.
+111 API/unit tests, production build/typechecks and phone-size real-component native
+sign-in/guest-import QA pass. Browser/Clerk/provider adapters are simulated; real
+Google ticket redemption/Samsung behavior remain unverified. Signing probe run
+42580742817 failed at the intended preflight because owner signing secrets are absent.
+7e4fa7b server PostgreSQL/restore/container CI passed; its native jobs hit upstream
+Kotlin/Capacitor HTTP 504 dependency downloads, not a source compilation error.
+Next: owner signing setup + latest Render deploy, then configured APK and real-device
+acceptance. Preserve the owner's verified Stripe TEST/pricing settings unchanged.

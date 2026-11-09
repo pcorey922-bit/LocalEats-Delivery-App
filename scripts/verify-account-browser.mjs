@@ -28,6 +28,19 @@ await build({
   },
   plugins: [
     {
+      name: "qa-browser",
+      setup(b) {
+        b.onResolve({ filter: /^@capacitor\/browser$/ }, () => ({
+          path: "browser",
+          namespace: "qa-browser",
+        }));
+        b.onLoad({ filter: /.*/, namespace: "qa-browser" }, () => ({
+          contents: `export const Browser={open:async({url})=>{window.qaNativeOpened.push(url)},close:async()=>{}};`,
+          loader: "js",
+        }));
+      },
+    },
+    {
       name: "qa-clerk",
       setup(b) {
         b.onResolve({ filter: /^@clerk\/react$/ }, () => ({
@@ -35,7 +48,7 @@ await build({
           namespace: "qa",
         }));
         b.onLoad({ filter: /.*/, namespace: "qa" }, () => ({
-          contents: `export const useAuth=()=>({isSignedIn:window.qaSignedIn,userId:window.qaSignedIn?'user_QA':null});export const useClerk=()=>({openUserProfile:()=>{window.securityOpened=true}});`,
+          contents: `export const useSignIn=()=>({signIn:{ticket:async({ticket})=>{window.qaNativeTickets.push(ticket);return{error:null}},finalize:async()=>{window.qaSignedIn=true;return{error:null}}}});export const useAuth=()=>({isLoaded:true,isSignedIn:window.qaSignedIn,userId:window.qaSignedIn?'user_QA':null});export const useClerk=()=>({openUserProfile:()=>{window.securityOpened=true}});`,
           loader: "js",
         }));
       },
@@ -87,6 +100,68 @@ try {
     headless: true,
     args: ["--no-sandbox"],
   });
+  const nativePage = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+  });
+  await nativePage.goto(
+    "http://127.0.0.1:" + server.address().port + "/?native=true",
+  );
+  await nativePage
+    .getByRole("button", {
+      name: "Sign in or create account in browser",
+      exact: true,
+    })
+    .click();
+  await nativePage.waitForURL("**/account");
+  assert.deepEqual(await nativePage.evaluate(() => window.qaNativeTickets), [
+    "qa-one-use-ticket",
+  ]);
+  const opened = await nativePage.evaluate(() => window.qaNativeOpened);
+  assert.equal(opened.length, 1);
+  assert.equal(new URL(opened[0]).origin, "https://qa.onrender.com");
+  assert.equal(opened[0].includes("ticket"), false);
+  assert.equal(
+    (await nativePage.evaluate(() => window.qaNativeStart)).challenge.length,
+    43,
+  );
+  assert.equal(
+    await nativePage.evaluate(() =>
+      localStorage.getItem("rocoeats-native-auth:v1"),
+    ),
+    null,
+  );
+  await nativePage.close();
+  const importPage = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+  });
+  await importPage.goto(
+    "http://127.0.0.1:" + server.address().port + "/?importGuest=true",
+  );
+  await importPage
+    .getByLabel("Private guest tracking link", { exact: true })
+    .fill("https://evil.example.test/guest/order#access=" + "A".repeat(43));
+  await importPage
+    .getByRole("button", { name: "Open my private guest order", exact: true })
+    .click();
+  await importPage.getByRole("alert").waitFor();
+  assert.deepEqual(
+    await importPage.evaluate(() => window.qaGuestImportHeaders),
+    [],
+  );
+  await importPage
+    .getByLabel("Private guest tracking link", { exact: true })
+    .fill("https://qa.onrender.com/guest/order#access=" + "A".repeat(43));
+  await importPage
+    .getByRole("button", { name: "Open my private guest order", exact: true })
+    .click();
+  await importPage.waitForFunction(
+    () => localStorage.getItem("rocoeats-guest-access:v1") === "A".repeat(43),
+  );
+  assert.deepEqual(
+    await importPage.evaluate(() => window.qaGuestImportHeaders),
+    ["A".repeat(43)],
+  );
+  await importPage.close();
   const guestPage = await browser.newPage({
     viewport: { width: 390, height: 844 },
   });

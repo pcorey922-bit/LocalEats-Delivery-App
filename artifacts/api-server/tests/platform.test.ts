@@ -7,7 +7,7 @@ import { pruneDutyLocations } from "../src/lib/duty-location";
 import assert from "node:assert/strict";
 import { before, after, test } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
-import { randomUUID } from "node:crypto";
+import { randomUUID,createHash } from "node:crypto";
 import Stripe from "stripe";
 import { eq, sql } from "drizzle-orm";
 import app from "../src/app";
@@ -15,6 +15,7 @@ import {
   engine,
   db,
   guestSessionsTable,
+  mobileAuthFlowsTable,
   telephoneConfirmationsTable,
   profilesTable,
   restaurantsTable,
@@ -225,6 +226,29 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     delete process.env.STRIPE_SECRET_KEY;
     delete process.env.STRIPE_WEBHOOK_SECRET;
     process.env.API_MUTATION_LIMIT_PER_MINUTE = "10000";
+  });
+  await t.test("native browser sign-in binds approval to state and PKCE, expires and consumes once without trusting client identities",async()=>{
+    const oldOrigin=process.env.PUBLIC_APP_URL;
+    process.env.PUBLIC_APP_URL="https://localeats-delivery-app.onrender.com";process.env.ROCOEATS_PRIVATE_STAGING="true";process.env.ROCOEATS_STAGING_TESTER_CLERK_USER_IDS=[ids.customer,ids.other].join(",");process.env.PAYMENT_PROVIDER="stripe_test";process.env.STRIPE_SECRET_KEY="sk_test_fixture";
+    try{
+      const originalPublic=process.env.CLERK_PUBLISHABLE_KEY;
+      process.env.CLERK_PUBLISHABLE_KEY="pk_test_fixture";process.env.ROCOEATS_ORDERING_ENABLED="false";
+      const readiness=await api("/mobile/readiness",null);assert.equal(readiness.status,200);assert.equal(readiness.data.privateTestStaging,true);assert.equal(readiness.data.orderingEnabled,false);assert.equal("secretKey" in readiness.data,false);
+      process.env.ROCOEATS_ORDERING_ENABLED="true";if(originalPublic===undefined)delete process.env.CLERK_PUBLISHABLE_KEY;else process.env.CLERK_PUBLISHABLE_KEY=originalPublic;
+      const verifier="A".repeat(43),challenge=createHash("sha256").update(verifier).digest("base64url");
+      const start=await api("/mobile/auth/start",null,"POST",{challenge});assert.equal(start.status,201,JSON.stringify(start.data));
+      const id=start.data.id,url=new URL(start.data.authorizationUrl),state=new URLSearchParams(url.hash.slice(1)).get("state")!;
+      assert.equal(url.origin,process.env.PUBLIC_APP_URL);assert.equal(url.search,"");
+      assert.equal((await api("/mobile/auth/redeem",null,"POST",{id,verifier})).status,202);
+      assert.equal((await api("/mobile/auth/approve",null,"POST",{id,state})).status,401);
+      assert.equal((await api("/mobile/auth/approve",ids.customer,"POST",{id,state:"B".repeat(43)})).status,410);
+      assert.equal((await api("/mobile/auth/approve",ids.customer,"POST",{id,state,userId:ids.admin})).status,400);
+      assert.equal((await api("/mobile/auth/approve",ids.customer,"POST",{id,state})).status,200);
+      assert.equal((await api("/mobile/auth/approve",ids.other,"POST",{id,state})).status,409);
+      assert.equal((await api("/mobile/auth/redeem",null,"POST",{id,verifier:"C".repeat(43)})).status,403);
+      const results=await Promise.all([api("/mobile/auth/redeem",null,"POST",{id,verifier}),api("/mobile/auth/redeem",null,"POST",{id,verifier})]);assert.deepEqual(results.map(r=>r.status).sort(),[200,410]);assert.equal(results.find(r=>r.status===200)!.data.ticket,`ticket_fixture_${ids.customer}`);
+      const expired=await api("/mobile/auth/start",null,"POST",{challenge});await db.update(mobileAuthFlowsTable).set({expiresAt:new Date(Date.now()-1000)}).where(eq(mobileAuthFlowsTable.id,expired.data.id));assert.equal((await api("/mobile/auth/redeem",null,"POST",{id:expired.data.id,verifier})).status,410);
+    }finally{if(oldOrigin===undefined)delete process.env.PUBLIC_APP_URL;else process.env.PUBLIC_APP_URL=oldOrigin;}
   });
   await t.test("native staging CORS admits only explicit app origins without granting business authorization",async()=>{
     const prior=process.env.NODE_ENV;process.env.NODE_ENV="production";process.env.ROCOEATS_PRIVATE_STAGING="true";process.env.PAYMENT_PROVIDER="stripe_test";process.env.STRIPE_SECRET_KEY="sk_test_fixture";

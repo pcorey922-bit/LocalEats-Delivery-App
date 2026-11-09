@@ -64,3 +64,9 @@ test("guest capabilities reach only relative customer APIs and never external or
  setAuthTokenGetter(()=>"clerk-fixture");await customFetch("/api/orders/me");
  assert.deepEqual(seen,["guest-capability-fixture",null,null,null,"guest-capability-fixture",null]);
 });
+
+test("mobile return links contain navigation only and reject malformed or authority-bearing URLs",async()=>{
+ const {mobileReturnRoute}=await import("../../localeats/src/lib/mobile-return");
+ assert.equal(mobileReturnRoute("rocoeats://orders",true),"/guest/order");assert.equal(mobileReturnRoute("rocoeats://auth"),"/sign-in");
+ for(const value of ["bad","https://evil.example.test/orders","rocoeats://orders?token=secret","rocoeats://orders#access=secret","rocoeats://admin","rocoeats://user:pass@orders"])assert.equal(mobileReturnRoute(value),null);
+});

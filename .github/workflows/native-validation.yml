@@ -123,6 +123,8 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: node scripts/prepare-native-staging.mjs --github-env
+      - name: Require deployed safe native backend before packaging
+        run: node scripts/verify-native-staging.mjs
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @workspace/localeats mobile:sync
       - name: Restore signing key only into private runner temporary storage
