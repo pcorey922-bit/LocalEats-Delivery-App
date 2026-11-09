@@ -1070,3 +1070,12 @@ Next: owner Render deploy, verify /api/mobile/readiness and both native CORS ori
 run native-validation target=staging, inspect actual signed artifact/security gates,
 then Samsung/Play Protect and real Clerk/Stripe device acceptance. Signing setup is
 no longer blocked; deployment and real-device verification remain owner-dependent.
+
+## Official Gradle transport checkpoint
+
+Use downloads.gradle.org Gradle 8.14.3 bin.zip with verified vendor SHA-256 rather
+than the failing all.zip; same toolchain version, 60-second read timeout, explicit
+wrapper validation. Wrapper JAR matches official vendor checksum. bf9e8c1 server CI
+passed; its iOS native job passed, Android hit upstream distribution HTTP 504 before
+compilation. Owner stable signing exists; Render mobile deployment is still needed
+before target=staging can create the real signed artifact.

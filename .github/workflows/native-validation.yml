@@ -17,6 +17,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - uses: gradle/actions/wrapper-validation@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -107,6 +108,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - uses: gradle/actions/wrapper-validation@v4
       - name: Require owner-managed signing before installing dependencies
         env:
           KEYSTORE: ${{ secrets.ROCOEATS_STAGING_KEYSTORE_BASE64 }}

@@ -424,3 +424,14 @@ TLS bypass or paid cache. Actual task/variant validation requires the new native
 deploy latest source in Render so native CORS/readiness and migration 0028 are live,
 then target=staging can build the installable APK. A successful signed artifact and
 Play Protect/Samsung acceptance must still be verified; no APK URL is invented.
+
+## Official Android distribution recovery — November 9
+
+bf9e8c1 server Validate passed; iOS compiled. Android stopped before any task because
+Gradle's official all.zip returned HTTP 504 through all retries. The official
+Gradle 8.14.3 binary distribution endpoint returned HTTP 200 and its published SHA-256
+was verified. Switched to the same version's smaller official bin.zip, pinned the
+vendor SHA-256 and increased read timeout to 60 seconds. The checked-in wrapper JAR
+also matches Gradle's official published checksum; CI now runs official wrapper
+validation before native builds. No alternate mirror, TLS weakening or security
+bypass was used. Actual signed build remains gated on the deployed mobile backend.
