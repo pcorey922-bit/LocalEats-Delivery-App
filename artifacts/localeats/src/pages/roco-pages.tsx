@@ -122,21 +122,42 @@ export function CartPage() {
   const [addressId, setAddressId] = useState(''); const [showAddress, setShowAddress] = useState(false);
   const [tipCents, setTipCents] = useState(0); const [placed, setPlaced] = useState<Order | null>(null);
   type Quote = {subtotalCents:number;deliveryFeeCents:number;serviceFeeCents:number;taxCents:number;tipCents:number;totalCents:number};
-  const [review, setReview] = useState<{quote:Quote;key:string}|null>(null);
   const addresses = useListMyAddresses({ query: { queryKey: getListMyAddressesQueryKey(), retry:false } });
-  const input = () => ({restaurantId:cart[0]?.restaurantId,addressId,tipCents,items:cart.map(i=>({menuItemId:i.menuItemId,quantity:i.quantity,modifiers:i.modifiers??{},specialInstructions:i.specialInstructions}))});
-  const quote = useMutation({mutationFn:()=>customFetch<Quote>('/api/orders/quote',{method:'POST',body:JSON.stringify(input())}),onSuccess:q=>setReview({quote:q,key:crypto.randomUUID()})});
-  const order = useMutation({mutationFn:()=>customFetch<Order>('/api/orders',{method:'POST',headers:{'Idempotency-Key':review!.key},body:JSON.stringify({...input(),expectedTotalCents:review!.quote.totalCents})}),onSuccess:result=>{setPlaced(result);setCart([]);invalidate(client,getListMyOrdersQueryKey());}});
-  const save=(next:typeof cart)=>{setReview(null);setCart(next);};
-  useEffect(()=>{setReview(null);},[addressId,tipCents]);
+  const inputFor = (items: typeof cart) => ({
+    restaurantId: items[0]?.restaurantId, addressId, tipCents,
+    items: items.map(i => ({ menuItemId: i.menuItemId, quantity: i.quantity, modifiers: i.modifiers ?? {}, specialInstructions: i.specialInstructions })),
+  });
+  const input = inputFor(cart);
+  type Review = { input: typeof input; quote: Quote; key: string };
+  const quote = useMutation({
+    mutationFn: async ({ snapshot, previous }: { snapshot: typeof input; previous?: Review }): Promise<Review> => {
+      const quote = await customFetch<Quote>('/api/orders/quote', { method: 'POST', body: JSON.stringify(snapshot) });
+      return { input: snapshot, quote, key: previous?.quote.totalCents === quote.totalCents ? previous.key : crypto.randomUUID() };
+    },
+  });
+  const review = quote.data && JSON.stringify(quote.data.input) === JSON.stringify(input) ? quote.data : undefined;
+  const order = useMutation({
+    mutationFn: (reviewed: Review) => customFetch<Order>('/api/orders', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': reviewed.key },
+      body: JSON.stringify({ ...reviewed.input, expectedTotalCents: reviewed.quote.totalCents }),
+    }),
+    onSuccess: (result, reviewed) => {
+      setPlaced(result);
+      setCart(current => JSON.stringify(inputFor(current).items) === JSON.stringify(reviewed.input.items) &&
+        current[0]?.restaurantId === reviewed.input.restaurantId ? [] : current);
+      invalidate(client, getListMyOrdersQueryKey());
+    },
+  });
+  const save = (next: typeof cart) => setCart(next);
   const totals=(q:Quote)=><dl>{([['Food',q.subtotalCents],['Delivery',q.deliveryFeeCents],['Service',q.serviceFeeCents],['Illustrative test tax',q.taxCents],['Tip',q.tipCents],['Total',q.totalCents]] as const).map(([label,value])=><div className="roco-row" key={label}><dt>{label}</dt><dd>{money(value)}</dd></div>)}</dl>;
   return <Shell><main className="roco-main"><PageIntro eyebrow="Customer · test checkout" title={placed?'Order saved. Complete test payment.':'Review your delivery.'}>All checkout and settlement activity is test mode. Live charges are disabled.</PageIntro>
     {!commerce.data?.orderingEnabled&&<p className="roco-notice">Ordering is not open yet. You can browse menus and review a quote.</p>}{cartWarning&&<p role="alert">{cartWarning}</p>}{placed?<section className="roco-card">{totals(placed)}<RestaurantConfirmation orderId={placed.id}/><CheckoutPanel orderId={placed.id}/><Link href={!isSignedIn&&readGuestToken()?"/guest/order":"/orders"} className="roco-button">Track order</Link></section>:<div className="roco-two-col"><section className="roco-card"><h2>Your items</h2>{cart.length?cart.map(i=><div className="roco-menu-item" key={i.lineId??i.menuItemId}><div><strong>{i.name}</strong><p>{i.customization}</p><p>{i.specialInstructions}</p><p>{i.restaurantName} · {money(i.priceCents*i.quantity)}</p></div><div><button className="roco-button" aria-label={`Remove one ${i.name}`} onClick={()=>save(i.quantity>1?cart.map(x=>(x.lineId??x.menuItemId)===(i.lineId??i.menuItemId)?{...x,quantity:x.quantity-1}:x):cart.filter(x=>(x.lineId??x.menuItemId)!==(i.lineId??i.menuItemId)))}>−</button> {i.quantity} <button className="roco-button" aria-label={`Add one ${i.name}`} onClick={()=>save(cart.map(x=>(x.lineId??x.menuItemId)===(i.lineId??i.menuItemId)?{...x,quantity:x.quantity+1}:x))}>+</button></div></div>):<p>Your cart is empty. <Link href="/">Find food</Link></p>}</section>
       <section className="roco-card"><h2>Delivery address</h2>{addresses.isError?<LoadError retry={()=>void addresses.refetch()}/>:<select aria-label="Delivery address" className="roco-select" value={addressId} onChange={e=>setAddressId(e.target.value)}><option value="">Choose a saved address</option>{addresses.data?.map(a=><option key={a.id} value={a.id}>{a.street1}, {a.city}</option>)}</select>}
       <button className="roco-button" onClick={()=>setShowAddress(!showAddress)}>Add address</button>{showAddress&&<AddressForm onCreated={a=>{setAddressId(a.id);setShowAddress(false);}}/>}
       <label className="roco-field">Driver tip (dollars)<input className="roco-input" type="number" min="0" max="1000" step="0.01" value={(tipCents/100).toString()} onChange={e=>setTipCents(Math.round(Number(e.target.value)*100))}/></label>
-      <button className="roco-button" disabled={!cart.length||!addressId||quote.isPending||order.isPending} onClick={()=>quote.mutate()}>Calculate test total</button>
-      {review&&<>{totals(review.quote)}<button className="roco-button primary" disabled={!commerce.data?.orderingEnabled||order.isPending} onClick={()=>order.mutate()}>Create order · {money(review.quote.totalCents)}</button></>}
+      <button className="roco-button" disabled={!cart.length||!addressId||quote.isPending||order.isPending} onClick={()=>quote.mutate({ snapshot: input, previous: review })}>Calculate test total</button>
+      {review&&<>{totals(review.quote)}<button className="roco-button primary" disabled={!commerce.data?.orderingEnabled||order.isPending||quote.isPending} onClick={()=>order.mutate(review)}>Create order · {money(review.quote.totalCents)}</button></>}
       {quote.isError&&<p role="alert" className="roco-alert">{quote.error.message}</p>}{order.isError&&<p role="alert" className="roco-alert">{order.error.message}</p>}</section></div>}
   </main></Shell>;
 }

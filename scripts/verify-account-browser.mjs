@@ -201,8 +201,32 @@ try {
   assert.equal(await cartSignup.evaluate(() => JSON.parse(localStorage.getItem("rocoeats-guest-cart:v1")).length), 0);
   await cartSignup.reload();
   await cartSignup.getByText("Guest cart fixture", { exact: true }).waitFor();
+  await cartSignup.getByLabel("Delivery address").selectOption("fixture-address");
+  await cartSignup.evaluate(() => sessionStorage.setItem("qa-hold-quote", "1"));
+  await cartSignup.getByRole("button", { name: "Calculate test total" }).click();
+  await cartSignup.waitForFunction(() => typeof window.qaReleaseQuote === "function");
+  await cartSignup.getByRole("button", { name: "Add one Guest cart fixture" }).click();
+  await cartSignup.evaluate(() => {
+    sessionStorage.removeItem("qa-hold-quote");
+    window.qaReleaseQuote();
+  });
+  await cartSignup.getByRole("button", { name: "Calculate test total" }).waitFor();
+  await cartSignup.waitForFunction(() => !Array.from(document.querySelectorAll("button")).find(button => button.textContent === "Calculate test total")?.disabled);
+  assert.equal(await cartSignup.getByRole("button", { name: /Create order/ }).count(), 0);
+  await cartSignup.getByRole("button", { name: "Calculate test total" }).click();
+  const createOrder = cartSignup.getByRole("button", { name: "Create order · $17.98" });
+  await createOrder.click();
+  await cartSignup.getByRole("alert").filter({ hasText: "Simulated order retry" }).waitFor();
+  await cartSignup.getByRole("button", { name: "Calculate test total" }).click();
+  await createOrder.click();
+  await cartSignup.waitForFunction(() => JSON.parse(sessionStorage.getItem("qa-order-writes") ?? "[]").length === 2);
+  const writes = await cartSignup.evaluate(() => JSON.parse(sessionStorage.getItem("qa-order-writes")));
+  assert.deepEqual(writes[0], writes[1]);
+  assert.ok(writes[0].key);
+  assert.equal(writes[0].body.items[0].quantity, 2);
+  assert.equal(writes[0].body.expectedTotalCents, 1798);
   await cartSignup.close();
-  console.log("Signup UI: expired-session recovery and guest cart restoration passed (simulated Clerk/API)");
+  console.log("Signup UI: expired-session recovery, guest cart restoration and checkout quote races passed (simulated Clerk/API)");
 
   const nativePage = await browser.newPage({
     viewport: { width: 390, height: 844 },

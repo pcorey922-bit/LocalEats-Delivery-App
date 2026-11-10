@@ -143,6 +143,24 @@ window.fetch = async (url, options = {}) => {
       ...window.qaAccess, privateStaging: true, stagingAdmitted: !denied,
       profileStatus: saved ? "active" : "setup_required", role: saved?.role ?? null,
     });
+    if (path === "/api/commerce/config") return json({ orderingEnabled: true, testMode: true, liveChargesEnabled: false });
+    if (path === "/api/addresses/me") return json([{ id: "fixture-address", street1: "100 Test Way", city: "Kingston" }]);
+    if (path === "/api/orders/quote") {
+      const input = JSON.parse(String(options.body));
+      if (sessionStorage.getItem("qa-hold-quote") === "1") {
+        await new Promise<void>(resolve => {
+          Object.assign(window, { qaReleaseQuote: resolve });
+        });
+      }
+      const subtotalCents = input.items[0].quantity * 899;
+      return json({ subtotalCents, deliveryFeeCents: 0, serviceFeeCents: 0, taxCents: 0, tipCents: 0, totalCents: subtotalCents });
+    }
+    if (path === "/api/orders" && options.method === "POST") {
+      const writes = JSON.parse(sessionStorage.getItem("qa-order-writes") ?? "[]");
+      writes.push({ body: JSON.parse(String(options.body)), key: new Headers(options.headers).get("idempotency-key") });
+      sessionStorage.setItem("qa-order-writes", JSON.stringify(writes));
+      return Response.json({ error: "Simulated order retry" }, { status: 503 });
+    }
     if (path === "/api/dashboard") return json({ ...saved, sections: [] });
     if (path === "/api/restaurants/me") return Response.json({ error: "No restaurant" }, { status: 404 });
     if (path === "/api/driver/availability") return json({ available: false, approved: false, online: false });

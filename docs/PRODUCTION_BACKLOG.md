@@ -785,3 +785,14 @@ transfer, and native handoff. All 121 local API tests and the production build
 passed. Real Clerk registration and the reported Gmail alias on deployed
 private staging remain unverified. Signed native builds, physical-device
 coverage and real provider acceptance remain open. Ordering gates were not changed.
+
+### Checkout quote consistency
+
+The customer can now place only the exact cart, address and tip snapshot
+that was quoted. A response that arrives after an edit stays hidden until
+the current inputs are quoted. The same reviewed request and idempotency
+key are retained across a retry, including recalculating unchanged inputs
+with the same total. Order completion does not erase a cart changed while
+the request was pending. The mobile-width browser fixture tested delayed
+quote response, requote, and identical submission retries using simulated
+API responses. This exercise created no staging order or Stripe payment.
