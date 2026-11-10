@@ -481,6 +481,29 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     assert.equal(JSON.stringify(state.data).includes('STRIPE_SECRET_KEY'),false);
     assert.equal((await api('/admin/payment-setup/verify',ids.admin,'POST',{secretKey:'sk_test_do_not_accept'})).status,400);
     assert.equal((await api('/admin/payment-setup/verify',ids.admin,'POST',{})).status,503);
+    const id = "evt_setup_metadata_fixture";
+    const receivedAt = new Date();
+    await db.insert(webhookInboxTable).values({
+      id, eventType: "checkout.session.completed", receivedAt,
+      payload: { fixture: "payload-must-stay-in-inbox" },
+    });
+    try {
+      const received = (await api("/admin/payment-setup", ids.admin)).data;
+      assert.deepEqual(received.latestSignedEvent, {
+        id, type: "checkout.session.completed", state: "received",
+        receivedAt: receivedAt.toISOString(), processedAt: null,
+      });
+      assert.equal(received.lastAcceptedSignedEventAt, receivedAt.toISOString());
+      assert.equal(JSON.stringify(received).includes("payload-must-stay-in-inbox"), false);
+      const processedAt = new Date();
+      await db.update(webhookInboxTable).set({ state: "processed", processedAt })
+        .where(eq(webhookInboxTable.id, id));
+      const processed = (await api("/admin/payment-setup", ids.admin)).data.latestSignedEvent;
+      assert.equal(processed.state, "processed");
+      assert.equal(processed.processedAt, processedAt.toISOString());
+    } finally {
+      await db.delete(webhookInboxTable).where(eq(webhookInboxTable.id, id));
+    }
     assert.equal(state.data.orderingEnabled,false);
     assert.equal(process.env.ROCOEATS_ORDERING_ENABLED,'false');
   });

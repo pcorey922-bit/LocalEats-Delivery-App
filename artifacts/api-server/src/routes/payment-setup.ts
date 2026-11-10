@@ -35,9 +35,15 @@ async function summary() {
     testProviderConfigured = paymentMode() === "stripe_test";
   } catch {}
   const [last] = await db
-    .select({ receivedAt: webhookInboxTable.receivedAt })
+    .select({
+      id: webhookInboxTable.id,
+      type: webhookInboxTable.eventType,
+      state: webhookInboxTable.state,
+      receivedAt: webhookInboxTable.receivedAt,
+      processedAt: webhookInboxTable.processedAt,
+    })
     .from(webhookInboxTable)
-    .orderBy(desc(webhookInboxTable.receivedAt))
+    .orderBy(desc(webhookInboxTable.receivedAt), desc(webhookInboxTable.id))
     .limit(1);
   return {
     pricingReady,
@@ -49,6 +55,7 @@ async function summary() {
       process.env.STRIPE_WEBHOOK_SECRET || "",
     ),
     lastAcceptedSignedEventAt: last?.receivedAt ?? null,
+    latestSignedEvent: last ?? null,
     orderingEnabled: orderingEnabled(),
     liveChargesEnabled: false,
   };

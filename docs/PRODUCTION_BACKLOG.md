@@ -676,3 +676,25 @@ the required headers, anonymous profile requests remained denied, and an
 untrusted origin received no CORS grant. This verifies the live server contract.
 Authenticated native sign-in, push, background GPS, Play AAB and signed iOS
 device acceptance remain open.
+
+## Private Stripe acceptance preparation — November 10 (Eastern time)
+
+On exact revision `5d9374c87a83a37c3986b38f7bc301c5705dcb04`, web Validate
+42762375054 passed and native 42762375059 passed the Android/iOS compile jobs.
+Signed packaging and Android emulator jobs were skipped. This revision is
+verified for closed private Render staging. At the time of checking, Render
+still served `fdb0c9f` and passed all 16 closed-staging HTTP checks.
+
+Owner reported the staging Operations probe confirmed Stripe TEST mode and the
+enabled webhook URL, API version and required subscriptions. The dashboard had no
+accepted signed event yet. This is owner-observed provider configuration evidence.
+A signed checkout event, collected TEST payment and four-role delivery remain open.
+
+Operations now reports the latest signed event's ID, type, inbox state and
+processing time without returning its payload. Use the Stripe event ID and
+matching order payment record for reconciliation. The read-only staging verifier
+can also validate the open private test window with an exact deployed SHA while
+requiring public ordering and live charges to remain off. Local app/API tests,
+build and typechecks passed. Seven verifier fixture scenarios passed. Live
+private-window verification still requires the supporting Render deployment and
+the owner-controlled test setting. No staging settings were changed.

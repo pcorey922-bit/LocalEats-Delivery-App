@@ -8,6 +8,12 @@ type Setup = {
   requiredEvents: string[];
   webhookSecretPresent: boolean;
   lastAcceptedSignedEventAt: string | null;
+  latestSignedEvent?: {
+    id: string;
+    type: string;
+    state: string;
+    processedAt: string | null;
+  } | null;
   orderingEnabled: boolean;
   provider?: {
     testModeConfirmed: boolean;
@@ -101,6 +107,17 @@ export function PaymentSetupChecks() {
               : "None yet"}
             . Historical receipt does not verify a newly changed signing secret.
           </p>
+          {current.latestSignedEvent && (
+            <p>
+              Latest event <code>{current.latestSignedEvent.id}</code>{" "}
+              (<code>{current.latestSignedEvent.type}</code>) ·{" "}
+              {current.latestSignedEvent.state}
+              {current.latestSignedEvent.processedAt &&
+                ` at ${new Date(current.latestSignedEvent.processedAt).toLocaleString()}`}
+              . Match this event ID in Stripe and verify the payment on the
+              corresponding order.
+            </p>
+          )}
           <button
             className="roco-button"
             onClick={() => void state.refetch()}

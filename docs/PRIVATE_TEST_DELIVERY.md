@@ -50,7 +50,9 @@ or the component fixtures. Keep live keys, real bank details and paid services o
    `PAYMENT_PROVIDER=stripe_test`. Leave all credentials as configured. Before
    submitting, verify `/api/mobile/readiness` reports `privateTestStaging: true`,
    `publicOrderingEnabled: false`, `privateTestOrderingEnabled: true` and
-   `liveChargesEnabled: false`. Verify an uninvited identity is denied.
+   `liveChargesEnabled: false`. Verify an uninvited identity is denied. The read-only
+   staging verifier accepts `--private-test-window` after the exact deployment SHA
+   to check this state without credentials or test transactions.
 
 ## Complete the actual business workflow
 
@@ -60,7 +62,10 @@ or the component fixtures. Keep live keys, real bank details and paid services o
   Checkout in TEST mode with Stripe's documented sandbox payment methods. Do not
   submit real card information or claim a simulated return page proves payment.
 - Stripe's signed event must match the saved session, order, total and currency.
-  Confirm collected payment and a processed inbox event. A browser redirect alone
+  Confirm collected payment and a processed inbox event. When the latest signed
+  event in Operations matches the Stripe event ID, its state distinguishes
+  receipt from processing. If a later event supersedes it, use the relevant event
+  in the Stripe dashboard and the matching order payment record. A browser redirect alone
   cannot mark an order paid. Record the real test payment/order IDs privately.
 - Restaurant accepts the paid order, prepares it and marks it ready. Owner dispatch
   assigns an eligible online driver, or the driver claims the offer. Confirm there
