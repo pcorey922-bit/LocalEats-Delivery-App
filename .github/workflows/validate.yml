@@ -51,6 +51,13 @@ jobs:
           PGPASSWORD: rocoeats_test_only
         run: bash scripts/verify-postgres-recovery.sh
       - run: pnpm build
+      - name: Verify mobile-width signup and account flows with simulated Clerk
+        timeout-minutes: 5
+        run: |
+          npm install --prefix "$RUNNER_TEMP/rocoeats-browser" --no-save --ignore-scripts playwright-core@1.62.1
+          PLAYWRIGHT_CORE_PATH="$RUNNER_TEMP/rocoeats-browser/node_modules/playwright-core" \
+            CHROMIUM_PATH="$(command -v google-chrome)" \
+            node scripts/verify-account-browser.mjs
       - name: Build deployable website and API container
         run: docker build --tag rocoeats:ci .
       - name: Verify packaged migrations as non-root without pnpm on PATH
