@@ -379,8 +379,8 @@ function useJoinLinks() {
 }
 
 function SignInPage() {
-  const { query, setup } = useJoinLinks();
-  if(Capacitor.isNativePlatform())return <NativeSignIn/>;
+  const { role, checkout, query, setup } = useJoinLinks();
+  if(Capacitor.isNativePlatform())return <NativeSignIn role={role} checkout={checkout}/>;
   return <div className="portal-auth-backdrop" data-testid="page-sign-in">
     <section className="portal-auth-story"><BrandLink /><div className="portal-auth-copy"><div className="portal-eyebrow" style={{ color: '#e8b35e' }}>A neighborly start</div><h1>Good food,<br />closer to <em>home.</em></h1><p>Your RoCoEats account is the first step toward a more connected food community in Roane County.</p></div><div className="portal-auth-foot">ROANE COUNTY, TENNESSEE · LOCAL FOOD, LOCAL PEOPLE</div></section>
     <section className="portal-auth-form"><a className="roco-button" href="/cart">Continue as Guest</a><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up${query}`} forceRedirectUrl={`${basePath}${setup}`} signUpForceRedirectUrl={`${basePath}${setup}`} /></section>
@@ -388,8 +388,8 @@ function SignInPage() {
 }
 
 function SignUpPage() {
-  const { query, setup } = useJoinLinks();
-  if(Capacitor.isNativePlatform())return <NativeSignIn/>;
+  const { role, checkout, query, setup } = useJoinLinks();
+  if(Capacitor.isNativePlatform())return <NativeSignIn role={role} checkout={checkout}/>;
   return <div className="portal-auth-backdrop" data-testid="page-sign-up">
     <section className="portal-auth-story"><BrandLink /><div className="portal-auth-copy"><div className="portal-eyebrow" style={{ color: '#e8b35e' }}>Made for Roane County</div><h1>There’s room<br />at the <em>table.</em></h1><p>Create your account to continue.</p></div><div className="portal-auth-foot">A LOCAL IDEA TAKING SHAPE IN ROANE COUNTY</div></section>
     <section className="portal-auth-form"><a className="roco-button" href="/cart">Continue as Guest</a><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in${query}`} forceRedirectUrl={`${basePath}${setup}`} signInForceRedirectUrl={`${basePath}${setup}`} /></section>
@@ -400,6 +400,7 @@ function SignUpPage() {
 function AccountSetup() {
   const { role, checkout, query } = useJoinLinks();
   const { user, isLoaded } = useUser();
+  const { signOut } = useClerk();
   const { userId } = useAuth();
   const [, setLocation] = useLocation();
   const client = useQueryClient();
@@ -435,7 +436,7 @@ function AccountSetup() {
     return <main className="portal"><div className="portal-shell"><PortalHeader active="account"/><section className="portal-main">
       <h1>Let’s finish your setup</h1>
       {status === 403 ? <><p role="alert">This account does not have access to the workspace. Private staging requires an invitation.</p><a href={`${basePath}/account/access`}>Check account access</a></> :
-        status === 401 ? <a href={`${basePath}/sign-in${query}`}>Sign in again to continue</a> :
+        status === 401 ? <button className="roco-button" onClick={() => void signOut({ redirectUrl: `${basePath}/sign-in${query}` }).catch(() => window.location.reload())}>Sign in again to continue</button> :
         <QueryError retry={() => provision.isError ? start() : void profile.refetch()} message="We couldn’t finish connecting your account. Check your connection and try again." />}
     </section></div></main>;
   }

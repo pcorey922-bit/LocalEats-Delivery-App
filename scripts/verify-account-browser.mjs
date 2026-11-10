@@ -104,7 +104,7 @@ try {
     viewport: { width: 390, height: 844 },
   });
   await nativePage.goto(
-    "http://127.0.0.1:" + server.address().port + "/?native=true",
+    "http://127.0.0.1:" + server.address().port + "/?native=true&join=restaurant",
   );
   await nativePage
     .getByRole("button", {
@@ -112,7 +112,7 @@ try {
       exact: true,
     })
     .click();
-  await nativePage.waitForURL("**/account");
+  await nativePage.waitForURL(url => url.pathname === "/account/setup" && url.searchParams.get("join") === "restaurant");
   assert.deepEqual(await nativePage.evaluate(() => window.qaNativeTickets), [
     "qa-one-use-ticket",
   ]);

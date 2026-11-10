@@ -107,3 +107,12 @@ test("signup intent only accepts member roles and routes existing roles to their
   assert.equal(accountDestination("driver", false), "/driver");
   assert.equal(accountDestination("admin", false), "/admin");
 });
+
+test("native signup resumes only fixed role and checkout routes after browser sign-in", async () => {
+  const { nativeAccountReturn } = await import("../../localeats/src/lib/account-entry");
+  assert.equal(nativeAccountReturn("restaurant"), "/account/setup?join=restaurant");
+  assert.equal(nativeAccountReturn("driver"), "/account/setup?join=driver");
+  assert.equal(nativeAccountReturn("customer", true), "/account/setup?join=customer&checkout=1");
+  assert.equal(nativeAccountReturn("https://untrusted.example/admin"), "/account");
+  assert.equal(nativeAccountReturn("admin"), "/account");
+});

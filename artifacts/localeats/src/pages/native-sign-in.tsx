@@ -1,9 +1,10 @@
+import { nativeAccountReturn, type JoinRole } from "../lib/account-entry";
 import { useEffect, useRef, useState } from "react";
 import { useAuth, useSignIn } from "@clerk/react";
 import { Browser } from "@capacitor/browser";
 import { Link, useLocation } from "wouter";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
-type Pending = { id: string; verifier: string; expiresAt: string };
+type Pending = { id: string; verifier: string; expiresAt: string; role?: JoinRole; checkout?: boolean };
 const storageKey = "rocoeats-native-auth:v1";
 function previous(): Pending | null {
   try {
@@ -23,7 +24,7 @@ const encoded = (v: Uint8Array) =>
     .replace(/=/g, "")
     .replace(/\+/g, "-")
     .replace(/\//g, "_");
-export function NativeSignIn() {
+export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; checkout?: boolean } = {}) {
   const [pending, setPending] = useState<Pending | null>(previous),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -65,7 +66,7 @@ export function NativeSignIn() {
             localStorage.removeItem(storageKey);
             setPending(null);
             await Browser.close().catch(() => {});
-            navigate("/account");
+            navigate(nativeAccountReturn(pending.role, pending.checkout === true));
             return;
           }
           if (!response.pending)
@@ -123,6 +124,8 @@ export function NativeSignIn() {
         id: response.id,
         expiresAt: response.expiresAt,
         verifier,
+        role,
+        checkout,
       };
       localStorage.setItem(storageKey, JSON.stringify(saved));
       setPending(saved);
@@ -147,7 +150,7 @@ export function NativeSignIn() {
           driver access.
         </p>
         {isSignedIn ? (
-          <Link href="/account">Open account</Link>
+          <Link href={nativeAccountReturn(role, checkout)}>Open account</Link>
         ) : (
           <button
             className="roco-button primary"

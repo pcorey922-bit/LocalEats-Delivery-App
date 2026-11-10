@@ -318,7 +318,7 @@ createRoot(document.getElementById("root")!).render(
   >
     <p>SIMULATED authentication and API: component QA only</p>
     {location.search.includes("native=true") ? (
-      <NativeSignIn />
+      <NativeSignIn role={location.search.includes("join=restaurant") ? "restaurant" : undefined} />
     ) : location.search.includes("importGuest=true") ? (
       <ImportGuestLink />
     ) : !window.qaSignedIn ? (

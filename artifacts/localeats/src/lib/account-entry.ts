@@ -14,3 +14,8 @@ export function accountDestination(role: string, checkout: boolean) {
   if (role === "driver") return "/driver";
   return checkout ? "/cart?restore=1" : "/dashboard";
 }
+
+export function nativeAccountReturn(role?: string, checkout = false) {
+  if (role === "restaurant" || role === "driver") return `/account/setup?join=${role}`;
+  return checkout ? "/account/setup?join=customer&checkout=1" : "/account";
+}

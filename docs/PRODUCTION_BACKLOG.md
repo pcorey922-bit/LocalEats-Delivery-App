@@ -756,3 +756,12 @@ verify restaurant creation. API tests cover a stuck token lookup and join
 intent restrictions. Build/typechecks passed. Clerk provider registration,
 Gmail alias reproduction in deployed Incognito, Apple availability and
 physical mobile acceptance remain unverified. Owner-led checkout is deferred.
+
+Native browser handoff now retains a fixed member signup or checkout
+destination through ticket redemption. Recovery of an expired web session
+signs out before restarting the intended path. Added route tests and extended
+the existing simulated mobile-width browser fixture. All 121 local tests and
+the production build/typechecks passed. The Chromium runner was blocked before
+navigation by a denied process socket, so the browser fixture is unverified.
+Read-only Render checks passed all 16 on 5d9374c with both ordering gates closed.
+No production settings or Stripe transactions were changed.
