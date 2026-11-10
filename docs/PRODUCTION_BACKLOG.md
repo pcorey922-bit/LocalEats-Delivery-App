@@ -698,3 +698,23 @@ requiring public ordering and live charges to remain off. Local app/API tests,
 build and typechecks passed. Seven verifier fixture scenarios passed. Live
 private-window verification still requires the supporting Render deployment and
 the owner-controlled test setting. No staging settings were changed.
+
+## Private staging deployment and first-order rehearsal — November 10
+
+At 1:42 a.m. Eastern, Render returned exact revision
+`5d9374c87a83a37c3986b38f7bc301c5705dcb04`. All 16 staging checks passed.
+Database, authentication, pricing, Stripe TEST configuration, webhook
+configuration and workers reported ready. Private staging was on, and both
+ordering switches and live charges were off. PR commit `3a83f97` also passed
+Validate 42769283979 and native workflow 42769284602. Its latest-signed-event
+details are available after deploying that revision.
+
+Extended the existing signed Stripe webhook relational test to follow one
+order through signed receipt and payment, restaurant preparation, administrator
+assignment, driver arrival and pickup, customer handoff, exact restaurant and
+driver allocations, Stripe fee/net reconciliation and balanced ledger journals.
+The webhook signature and provider charge response use fixtures. This rehearsal
+made no Stripe request and created no staging order or payout. The real
+four-role acceptance is still pending authenticated tester sessions and the
+owner opening the private TEST window. Keep public ordering and live charges
+off throughout and close the private window when the test ends.

@@ -1612,6 +1612,69 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
         body: JSON.stringify(event),
       });
       assert.equal(unsigned.status, 400);
+      const [receipt] = await db.select().from(webhookInboxTable)
+        .where(eq(webhookInboxTable.id, event.id));
+      assert.equal(receipt.state, "processed");
+      assert.ok(receipt.processedAt);
+      assert.equal(payment.providerPaymentId, event.data.object.payment_intent);
+
+      const orderPath = `/orders/${order.id}`;
+      const driverPath = `/driver${orderPath}`;
+      for (const status of ["accepted", "preparing", "ready_for_pickup"]) {
+        assert.equal((await api(orderPath, ids.restaurant, "PATCH", { status })).status, 200);
+      }
+      assert.equal((await api("/driver/availability", ids.driver, "PUT", { available: true })).status, 200);
+      const assignment = await api(`/admin${orderPath}/assignment`, ids.admin, "POST", {
+        driverProfileId: ids.driver,
+        expectedDriverProfileId: null,
+        expectedAssignedAt: null,
+        reason: "Assign driver for signed checkout fixture",
+      });
+      assert.equal(assignment.status, 200);
+      assert.equal((await api(`${driverPath}/arrive`, ids.driver, "POST")).status, 200);
+      assert.equal((await api(`${driverPath}/pickup`, ids.driver, "POST")).status, 200);
+      const handoff = await api(`${orderPath}/delivery-code`, ids.customer, "POST");
+      assert.equal(handoff.status, 200);
+      assert.equal((await api(`${driverPath}/deliver`, ids.driver, "POST", { code: handoff.data.code })).status, 200);
+
+      const payouts = await db.select().from(payoutsTable).where(eq(payoutsTable.orderId, order.id));
+      assert.equal(payouts.length, 2);
+      const restaurant = payouts.find((row) => row.kind === "restaurant");
+      const driver = payouts.find((row) => row.kind === "driver");
+      assert.equal(restaurant?.recipientProfileId, ids.restaurant);
+      assert.equal(restaurant?.amountCents, 1800);
+      assert.equal(driver?.recipientProfileId, ids.driver);
+      assert.equal(driver?.amountCents, 699);
+
+      const [actor] = await db.select().from(profilesTable).where(eq(profilesTable.id, ids.admin));
+      const proof = {
+        id: event.data.object.payment_intent,
+        amountReceived: order.totalCents,
+        currency: "usd",
+        livemode: false,
+        status: "succeeded",
+        chargeId: "ch_signed_delivery_fixture",
+        chargePaymentId: event.data.object.payment_intent,
+        chargeAmount: order.totalCents,
+        chargePaid: true,
+        balance: {
+          id: "txn_signed_delivery_fixture", sourceId: "ch_signed_delivery_fixture",
+          kind: "charge", amountCents: order.totalCents, feeCents: 100,
+          netCents: order.totalCents - 100, currency: "usd", status: "available",
+        },
+      } as const;
+      const reconciled = await reconcilePayment(order.id, actor, "Verify signed delivery fixture charge", async () => proof);
+      assert.equal(reconciled.feeCents, 100);
+      assert.equal(reconciled.netCents, order.totalCents - 100);
+      const journal = await db.select({ kind: ledgerTransactionsTable.kind, cents: ledgerLinesTable.amountCents })
+        .from(ledgerLinesTable)
+        .innerJoin(ledgerTransactionsTable, eq(ledgerTransactionsTable.id, ledgerLinesTable.transactionId))
+        .where(eq(ledgerTransactionsTable.orderId, order.id));
+      for (const kind of ["payment", "allocation", "provider_fee"]) {
+        const lines = journal.filter((line) => line.kind === kind);
+        assert.ok(lines.length > 0, `Missing ${kind} journal`);
+        assert.equal(lines.reduce((sum, line) => sum + line.cents, 0), 0);
+      }
       process.env.PAYMENT_PROVIDER = "sandbox";
       delete process.env.STRIPE_SECRET_KEY;
     },
