@@ -3593,4 +3593,37 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     }
   });
 
+  await t.test("a new Clerk identity distinguishes a staging invitation from missing profile and provisions only the requested member role", async () => {
+    const subjects = { customer: randomUUID(), restaurant: randomUUID(), driver: randomUUID() };
+    process.env.ROCOEATS_PRIVATE_STAGING = "true";
+    const profilePath = "/profiles/me";
+    const create = (subject: string, role: string) => api(profilePath, subject, "POST", { role, displayName: "Signup fixture" });
+    const subject = subjects.restaurant;
+    assert.equal((await api(profilePath, null)).status, 401);
+    assert.equal((await api(profilePath, subject)).status, 403);
+    assert.equal((await create(subject, "restaurant")).status, 403);
+    const before = await api("/session/access", subject);
+    assert.equal(before.status, 200);
+    assert.equal(before.data.stagingAdmitted, false);
+    assert.equal(before.data.profileStatus, "setup_required");
+
+    process.env.ROCOEATS_STAGING_TESTER_CLERK_USER_IDS = Object.values(subjects).join(",");
+    for (const [role, identity] of Object.entries(subjects)) {
+      const access = await api("/session/access", identity);
+      assert.equal(access.data.stagingAdmitted, true);
+      assert.equal((await api(profilePath, identity)).status, 404);
+      assert.equal((await create(identity, "admin")).status, 400);
+      const results = await Promise.all([create(identity, role), create(identity, role)]);
+      assert.deepEqual(results.map(result => result.status).sort(), [201, 409]);
+      assert.equal((await api(profilePath, identity)).data.role, role);
+      assert.equal((await create(identity, "driver")).status, 409);
+      assert.equal((await api("/session/access", identity)).data.administrator, false);
+      assert.equal((await api("/session/access", identity)).data.driver, false);
+    }
+    assert.equal((await api("/restaurants/me", subject, "POST", {
+      name: "Signup fixture kitchen", street1: "100 Test Kitchen Way",
+      city: "Kingston", region: "TN", postalCode: "37854",
+    })).status, 201);
+  });
+
 });

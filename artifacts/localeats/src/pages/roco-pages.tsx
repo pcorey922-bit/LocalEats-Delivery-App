@@ -1,3 +1,4 @@
+import { accountStatus } from "../lib/account-entry";
 import { GuestDeliveryContact } from "./guest-delivery-contact";
 import { RestaurantConfirmation } from "./restaurant-confirmation";
 import { readGuestToken } from "../lib/guest-session";
@@ -6,7 +7,7 @@ import { AdministratorAccessManager } from "./administrator-access";
 import { DeclinedOffers } from "./declined-offers";
 import { dutyIntent } from "../lib/duty-intent";
 import { NavigationActions } from "./navigation-actions";
-import { useCustomerCart } from "../hooks/use-customer-cart";
+import { useCartForOwner, useCustomerCart } from "../hooks/use-customer-cart";
 import { cartLineKey } from "../lib/cart-line";
 import { SupportDesk } from "./support-desk";
 import { CustomerHandoff, DriverHandoff } from "./delivery-handoff";
@@ -16,12 +17,12 @@ import { DriverAvailability, DriverLocationControl } from './delivery-tracking';
 import { useEffect, useState, type FormEvent } from 'react';
 import { unregisterPush } from '../lib/mobile';
 import { useCommerce, CommerceBanner, OrderActions, CheckoutPanel, RestaurantAvailability } from './commerce-pages';
-import { Link, useLocation, useParams } from 'wouter';
+import { Link, Redirect, useLocation, useParams, useSearch } from 'wouter';
 import { useAuth, useClerk } from '@clerk/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, ClipboardList, MapPin, Plus, RefreshCw, ShieldCheck, ShoppingBag, Utensils } from 'lucide-react';
 import {
-  getGetAdminFinanceQueryKey, getGetAdminOverviewQueryKey, getGetMyOrderQueryKey, getGetMyRestaurantQueryKey, getGetRestaurantQueryKey,
+  getGetAdminFinanceQueryKey, getGetAdminOverviewQueryKey, getGetMyOrderQueryKey, getGetMyProfileQueryKey, getGetMyRestaurantQueryKey, getGetRestaurantQueryKey,
   getListAdminProfilesQueryKey, getListAdminRestaurantsQueryKey, getListMyAddressesQueryKey,
   getListMyOrdersQueryKey, getListRestaurantsQueryKey, useCreateMyAddress, useCreateMyOrder,
   useCreateMyRestaurant, useCreateMyRestaurantCategory, useCreateMyRestaurantMenuItem, useDeleteMyRestaurantCategory,
@@ -44,7 +45,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const { isSignedIn, userId } = useAuth(); const { signOut } = useClerk();
   return <div className="roco-page"><header className="roco-header roco-wrap"><Logo/><nav className="roco-nav" aria-label="Main navigation">
     <Link href="/">Find food</Link>{isSignedIn && <><Link href="/dashboard">Dashboard</Link><Link href="/orders">Orders</Link><Link href="/restaurant">Restaurant</Link><Link href="/driver">Driver</Link><Link href="/account">Account</Link><Link href="/admin">Operations</Link><button onClick={async () => { if(userId)dutyIntent.set(userId,false); await customFetch('/api/driver/availability',{method:'PUT',body:JSON.stringify({available:false})}).catch(()=>{}); await unregisterPush().catch(()=>{}); await signOut({ redirectUrl: '/' }); }}>Sign out</button></>}
-    {!isSignedIn && <><Link href="/cart">Continue as Guest</Link><Link href="/guest/order">Guest order</Link><Link href="/sign-in">Sign in</Link><Link href="/sign-up">Create account</Link></>}
+    {!isSignedIn && <><Link href="/cart">Continue as Guest</Link><Link href="/guest/order">Guest order</Link><Link href="/sign-in">Sign in</Link><Link href="/sign-up">Create account</Link><Link href="/sign-up?join=restaurant">Partner With RoCoEats</Link><Link href="/sign-up?join=driver">Drive With RoCoEats</Link></>}
   </nav></header><CommerceBanner/>{children}</div>;
 }
 function PageIntro({ eyebrow, title, children }: { eyebrow: string; title: string; children?: React.ReactNode }) {
@@ -52,7 +53,10 @@ function PageIntro({ eyebrow, title, children }: { eyebrow: string; title: strin
 }
 function Loading({ label = 'Loading records' }: { label?: string }) { return <div className="roco-main" role="status" aria-label={label}><div className="portal-skeleton portal-loading-block" style={{ width: 170 }}/><div className="portal-skeleton portal-loading-block" style={{ width: 'min(520px,90%)', height: 52 }}/><div className="roco-grid">{[1,2,3].map(i => <div className="roco-card" key={i}><div className="portal-skeleton portal-loading-block"/><div className="portal-skeleton portal-loading-block" style={{ height: 90 }}/></div>)}</div></div>; }
 function LoadError({ retry, message = 'We could not load this information.' }: { retry: () => void; message?: string }) { return <div className="roco-alert" role="alert">{message}<button className="roco-button" style={{ marginLeft: 12 }} onClick={retry}><RefreshCw size={14}/> Retry</button></div>; }
-function useMyProfile() { return useGetMyProfile({ query: { queryKey: ['/api/profiles/me'], retry: false } }); }
+function useMyProfile() {
+  const { isLoaded, isSignedIn, userId } = useAuth();
+  return useGetMyProfile({ query: { queryKey: [...getGetMyProfileQueryKey(), userId], enabled: !!isLoaded && !!isSignedIn, networkMode: 'always', retry: false } });
+}
 function RoleGate({ allowed }: { allowed: string[] }) {
   const profile = useMyProfile();
   if (profile.isLoading) return <Loading label="Checking account permissions"/>;
@@ -96,10 +100,25 @@ function AddressForm({ onCreated }: { onCreated: (a: Address) => void }) {
   return <form className="roco-card roco-form-grid" onSubmit={submit}><label className="roco-field">Label<input name="label" className="roco-input" defaultValue="Home"/></label><label className="roco-field">Street address<input required name="street1" className="roco-input"/></label><label className="roco-field">City<input required name="city" className="roco-input"/></label><label className="roco-field">State<input name="region" className="roco-input" defaultValue="TN"/></label><label className="roco-field">ZIP code<input required name="postalCode" className="roco-input"/></label><label className="roco-field">Delivery instructions<textarea name="deliveryInstructions" className="roco-input" maxLength={1000}/></label><label className="roco-field" style={{ display: 'flex', alignItems: 'center' }}><span>Set as default address</span><input type="checkbox" name="isDefault"/></label><button className="roco-button primary" disabled={create.isPending}>Save address</button>{create.isError && <p className="roco-alert">Address could not be saved. Check the fields and retry.</p>}</form>;
 }
 export function CartPage() {
-  const {isSignedIn}=useAuth();
+  const {isSignedIn,userId}=useAuth();
+  const restore = new URLSearchParams(useSearch()).get('restore') === '1';
+  const [guestCart, clearGuestCart] = useCartForOwner(null);
+  const [, navigate] = useLocation();
   const client = useQueryClient();
   const commerce=useCommerce();
   const [cart, setCart, cartWarning] = useCustomerCart();
+  useEffect(() => {
+    if (!isSignedIn || !restore) return;
+    if (!cart.length && guestCart.length) {
+      setCart(guestCart);
+      // Keep the guest copy if browser storage could not persist the transfer.
+      try {
+        const saved = window.localStorage.getItem(`rocoeats-cart:v2:${userId}`);
+        if (saved === JSON.stringify(guestCart)) clearGuestCart([]);
+      } catch {}
+    }
+    navigate('/cart', { replace: true });
+  }, [isSignedIn, restore, guestCart, cart.length, setCart, clearGuestCart, navigate, userId]);
   const [addressId, setAddressId] = useState(''); const [showAddress, setShowAddress] = useState(false);
   const [tipCents, setTipCents] = useState(0); const [placed, setPlaced] = useState<Order | null>(null);
   type Quote = {subtotalCents:number;deliveryFeeCents:number;serviceFeeCents:number;taxCents:number;tipCents:number;totalCents:number};
@@ -133,13 +152,15 @@ function RestaurantOnboarding() {
   return <section className="roco-card"><div className="roco-kicker">Restaurant partner</div><h2 style={{ marginTop: 12 }}>Submit your business for review</h2><p>Submitting a profile does not publish a listing. An administrator must approve it before it appears in discovery.</p><form className="roco-form-grid" onSubmit={submit}><label className="roco-field">Business name<input required minLength={2} name="name" className="roco-input"/></label><label className="roco-field">Phone<input name="phone" className="roco-input"/></label><label className="roco-field full">Description<textarea name="description" className="roco-textarea"/></label><label className="roco-field full">Street address<input required name="street1" className="roco-input"/></label><label className="roco-field">Address line 2<input name="street2" className="roco-input"/></label><label className="roco-field">City<input required name="city" className="roco-input"/></label><label className="roco-field">State<input name="region" defaultValue="TN" className="roco-input"/></label><label className="roco-field">ZIP code<input required name="postalCode" className="roco-input"/></label><button disabled={create.isPending} className="roco-button primary">{create.isPending ? 'Submitting…' : 'Submit for review'}</button></form>{create.isError && <div className="roco-alert" style={{ marginTop: 12 }}>Business profile submission failed. Check required details and account permissions.</div>}</section>;
 }
 export function RestaurantPage() {
-  const profile = useMyProfile(); const client = useQueryClient(); const mine = useGetMyRestaurant({ query: { queryKey: getGetMyRestaurantQueryKey(), enabled: profile.data?.role === 'restaurant', retry: false, refetchOnMount: 'always' } });
+  const profile = useMyProfile(); const client = useQueryClient(); const mine = useGetMyRestaurant({ query: { queryKey: getGetMyRestaurantQueryKey(), networkMode: 'always', enabled: profile.data?.role === 'restaurant', retry: false, refetchOnMount: 'always' } });
   const [section, setSection] = useState<'profile'|'menu'|'incoming'>('profile');
   const update = useUpdateMyRestaurant(); const newCat = useCreateMyRestaurantCategory(); const editCat = useUpdateMyRestaurantCategory(); const removeCat = useDeleteMyRestaurantCategory(); const newItem = useCreateMyRestaurantMenuItem(); const editItem = useUpdateMyRestaurantMenuItem(); const removeItem = useDeleteMyRestaurantMenuItem(); const status = useUpdateOrderStatus();
   const orders = useListMyOrders({ query: { queryKey: getListMyOrdersQueryKey(), enabled: profile.data?.role === 'restaurant', retry: false, refetchOnMount: 'always', refetchInterval:10000 } });
   const reload = () => { invalidate(client, getGetMyRestaurantQueryKey(), getListMyOrdersQueryKey()); };
   if (profile.isLoading || (profile.data?.role === 'restaurant' && mine.isLoading)) return <Shell><Loading/></Shell>;
-  if (profile.isError || profile.data?.role !== 'restaurant') return <Shell><main className="roco-main"><PageIntro eyebrow="Restaurant access" title="Your restaurant workspace.">Sign in with an account whose profile role is restaurant. Restaurant endpoints enforce ownership and role permissions.</PageIntro>{profile.isError ? <LoadError retry={() => void profile.refetch()} message="Sign in and complete restaurant account setup first."/> : <Link className="roco-button primary" href="/account/setup" style={{ marginTop: 20 }}>Set up an account</Link>}</main></Shell>;
+  if (profile.isError && accountStatus(profile.error) === 404) return <Redirect to="/account/setup?join=restaurant" />;
+  if (profile.isError) return <Shell><main className="roco-main"><PageIntro eyebrow="Restaurant access" title="We couldn’t open your workspace."/><LoadError retry={() => void profile.refetch()} message={accountStatus(profile.error) === 403 ? "This account does not have restaurant workspace access. Private staging requires an invitation." : "Check your connection or sign in again."}/><p><Link href="/account/access">Check account access</Link> · <Link href="/sign-in?join=restaurant">Sign in again</Link></p></main></Shell>;
+  if (profile.data?.role !== 'restaurant') return <Shell><main className="roco-main"><PageIntro eyebrow="Restaurant access" title="Your restaurant workspace.">Sign in with your restaurant partner account.</PageIntro><Link href="/account/access">Check account access</Link></main></Shell>;
   if (mine.isError && (mine.error as {status?: number})?.status === 404) return <Shell><main className="roco-main"><PageIntro eyebrow="Restaurant onboarding" title="Bring your business to the table."/> <RestaurantOnboarding/></main></Shell>;
   if (mine.isError) return <Shell><main className="roco-main"><LoadError retry={() => void mine.refetch()} message="Your restaurant profile is unavailable or this role is not permitted."/></main></Shell>;
   const restaurant = mine.data;

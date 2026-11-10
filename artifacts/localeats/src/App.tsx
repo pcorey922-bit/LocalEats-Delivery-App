@@ -1,3 +1,4 @@
+import { accountDestination, accountStatus, joinRole } from "./lib/account-entry";
 import { NativeSignIn } from "./pages/native-sign-in";
 import { MobileAuthorize } from "./pages/mobile-authorize";
 import { Capacitor } from "@capacitor/core";
@@ -10,12 +11,12 @@ import { NotificationsPage, EarningsPage, OperationsCommerce, DeletionRequest } 
 import { MobileLifecycle, unregisterPush } from './lib/mobile';
 import { useState } from 'react';
 import { ArrowDown, ArrowRight, Menu, X, UserRound, Store, Bike, MapPin, ShieldCheck, LogOut, CircleAlert, UtensilsCrossed, RefreshCw } from 'lucide-react';
-import { type FormEvent, type ReactNode, useEffect, useRef } from 'react';
-import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { type ReactNode, useEffect, useRef } from 'react';
+import { QueryClient, QueryClientProvider, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ClerkProvider, SignIn, SignUp, useClerk, useAuth, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
-import { setAuthTokenGetter, getGetMyProfileQueryKey, getGetMyDashboardQueryKey, useGetMyProfile, useCreateMyProfile, useGetMyDashboard } from '@workspace/api-client-react';
+import { setAuthTokenGetter, getGetMyProfileQueryKey, getGetMyDashboardQueryKey, useGetMyProfile, createMyProfile, getMyProfile, useGetMyDashboard } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -26,6 +27,7 @@ import {
   Redirect,
   Switch,
   useLocation,
+  useSearch,
   Router as WouterRouter,
 } from 'wouter';
 
@@ -319,13 +321,13 @@ function LoadingView({ label = 'Loading your RoCoEats account' }: { label?: stri
   return <main className="portal"><div className="portal-shell"><div className="portal-topbar"><BrandLink /></div><section className="portal-main" aria-label={label} data-testid="status-loading"><div className="portal-skeleton portal-loading-block" style={{ width: 130 }} /><div className="portal-skeleton portal-loading-block" style={{ width: 'min(480px, 90%)', height: 48 }} /><div className="portal-skeleton portal-loading-block" style={{ width: 'min(610px, 95%)' }} /><div className="portal-grid"><div className="portal-panel"><div className="portal-skeleton portal-loading-block" /><div className="portal-skeleton portal-loading-block" /><div className="portal-skeleton portal-loading-block" style={{ height: 140 }} /></div><div className="portal-aside"><div className="portal-skeleton portal-loading-block" /><div className="portal-skeleton portal-loading-block" /></div></div></section></div></main>;
 }
 
-function QueryError({ retry, message = 'We couldn’t load this part of your account.' }: { retry: () => void; message?: string }) {
-  return <div className="portal-empty-error" role="alert" data-testid="status-load-error"><CircleAlert size={17} style={{ verticalAlign: 'middle', marginRight: 8 }} />{message}<div style={{ marginTop: 14 }}><button className="portal-primary" type="button" onClick={retry} data-testid="button-retry"><RefreshCw size={14} /> Try again</button></div></div>;
+function QueryError({ retry, message = 'We couldn’t load this part of your account. Check your connection or account access.' }: { retry: () => void; message?: string }) {
+  return <div className="portal-empty-error" role="alert" data-testid="status-load-error"><CircleAlert size={17} style={{ verticalAlign: 'middle', marginRight: 8 }} />{message}<div style={{ marginTop: 14 }}><button className="portal-primary" type="button" onClick={retry} data-testid="button-retry"><RefreshCw size={14} /> Try again</button> <a href={`${basePath}/account/access`}>Check account access</a></div></div>;
 }
 
 function useProfileQuery() {
-  const { isSignedIn } = useAuth();
-  return useGetMyProfile({ query: { queryKey: getGetMyProfileQueryKey(), enabled: !!isSignedIn, staleTime: 0, refetchOnMount: 'always', retry: false } });
+  const { isLoaded, isSignedIn, userId } = useAuth();
+  return useGetMyProfile({ query: { queryKey: [...getGetMyProfileQueryKey(), userId], enabled: !!isLoaded && !!isSignedIn, networkMode: 'always', retry: false } });
 }
 
 function isNotFound(error: unknown) {
@@ -342,79 +344,102 @@ function HomeRedirect() {
     if (profile.data) setLocation('/dashboard', { replace: true });
     else if (profile.isError && isNotFound(profile.error)) setLocation('/account/setup', { replace: true });
   }, [isLoaded, isSignedIn, profile.data, profile.isError, profile.error, setLocation]);
-  if (!isLoaded) return <LoadingView />;
+  if (!isLoaded) return <SessionLoading />;
   if (isSignedIn && profile.isError && !isNotFound(profile.error)) return <main className="portal"><div className="portal-shell"><div className="portal-topbar"><BrandLink /></div><section className="portal-main"><div className="portal-eyebrow">Your RoCoEats account</div><h1 className="portal-title">One moment, <em>neighbor.</em></h1><QueryError retry={() => profile.refetch()} message="We couldn’t check your RoCoEats profile." /></section></div></main>;
   if (isSignedIn) return <LoadingView />;
   return <Home />;
 }
 
+function SessionLoading() {
+  const [timedOut, setTimedOut] = useState(false);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setTimedOut(true), 15000);
+    return () => window.clearTimeout(timeout);
+  }, []);
+  if (!timedOut) return <LoadingView label="Connecting to sign-in" />;
+  return <main className="roco-main"><h1>Sign-in is taking longer than expected</h1>
+    <p role="alert">Check your connection, then reload this page to try again.</p>
+    <button className="roco-button" onClick={() => window.location.reload()}>Reload page</button>
+  </main>;
+}
+
 function Protected({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn } = useAuth();
-  if (!isLoaded) return <LoadingView />;
+  if (!isLoaded) return <SessionLoading />;
   if (!isSignedIn) return <Redirect to="/" />;
   return <>{children}</>;
 }
 
+function useJoinLinks() {
+  const params = new URLSearchParams(useSearch());
+  const role = joinRole(params.get('join'));
+  const checkout = role === 'customer' && params.get('checkout') === '1';
+  const query = `?join=${role}${checkout ? '&checkout=1' : ''}`;
+  return { role, checkout, query, setup: `/account/setup${query}` };
+}
+
 function SignInPage() {
+  const { query, setup } = useJoinLinks();
   if(Capacitor.isNativePlatform())return <NativeSignIn/>;
   return <div className="portal-auth-backdrop" data-testid="page-sign-in">
     <section className="portal-auth-story"><BrandLink /><div className="portal-auth-copy"><div className="portal-eyebrow" style={{ color: '#e8b35e' }}>A neighborly start</div><h1>Good food,<br />closer to <em>home.</em></h1><p>Your RoCoEats account is the first step toward a more connected food community in Roane County.</p></div><div className="portal-auth-foot">ROANE COUNTY, TENNESSEE · LOCAL FOOD, LOCAL PEOPLE</div></section>
-    <section className="portal-auth-form"><a className="roco-button" href="/cart">Continue as Guest</a><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} /></section>
+    <section className="portal-auth-form"><a className="roco-button" href="/cart">Continue as Guest</a><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up${query}`} forceRedirectUrl={`${basePath}${setup}`} signUpForceRedirectUrl={`${basePath}${setup}`} /></section>
   </div>;
 }
 
 function SignUpPage() {
+  const { query, setup } = useJoinLinks();
   if(Capacitor.isNativePlatform())return <NativeSignIn/>;
   return <div className="portal-auth-backdrop" data-testid="page-sign-up">
-    <section className="portal-auth-story"><BrandLink /><div className="portal-auth-copy"><div className="portal-eyebrow" style={{ color: '#e8b35e' }}>Made for Roane County</div><h1>There’s room<br />at the <em>table.</em></h1><p>Create an account, then tell us how you’d like to be part of RoCoEats. Ordering and partner operations are not active yet.</p></div><div className="portal-auth-foot">A LOCAL IDEA TAKING SHAPE IN ROANE COUNTY</div></section>
-    <section className="portal-auth-form"><a className="roco-button" href="/cart">Continue as Guest</a><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} /></section>
+    <section className="portal-auth-story"><BrandLink /><div className="portal-auth-copy"><div className="portal-eyebrow" style={{ color: '#e8b35e' }}>Made for Roane County</div><h1>There’s room<br />at the <em>table.</em></h1><p>Create your account to continue.</p></div><div className="portal-auth-foot">A LOCAL IDEA TAKING SHAPE IN ROANE COUNTY</div></section>
+    <section className="portal-auth-form"><a className="roco-button" href="/cart">Continue as Guest</a><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in${query}`} forceRedirectUrl={`${basePath}${setup}`} signInForceRedirectUrl={`${basePath}${setup}`} /></section>
   </div>;
 }
 
+
 function AccountSetup() {
-  const [role, setRole] = useState<'customer' | 'restaurant' | 'driver'>('customer');
-  const [displayName, setDisplayName] = useState('');
-  const [errorText, setErrorText] = useState('');
+  const { role, checkout, query } = useJoinLinks();
+  const { user, isLoaded } = useUser();
+  const { userId } = useAuth();
   const [, setLocation] = useLocation();
-  const queryClient = useQueryClient();
+  const client = useQueryClient();
   const profile = useProfileQuery();
-  const createProfile = useCreateMyProfile();
+  const provision = useMutation({
+    networkMode: 'always',
+    mutationFn: async (displayName: string) => {
+      try { return await createMyProfile({ role, displayName }); }
+      catch (error) {
+        if (accountStatus(error) !== 409) throw error;
+        return getMyProfile();
+      }
+    },
+    onSuccess: (saved) => {
+      client.setQueryData([...getGetMyProfileQueryKey(), userId], saved);
+    },
+  });
+  const attempted = useRef(false);
+  const missing = profile.isError && isNotFound(profile.error);
+  const start = () => provision.mutate((user?.fullName?.trim() || (role === 'restaurant' ? 'Restaurant partner' : role === 'driver' ? 'RoCoEats driver' : 'RoCoEats customer')).slice(0, 120));
   useEffect(() => {
-    if (profile.data) setLocation('/dashboard', { replace: true });
-  }, [profile.data, setLocation]);
-  const roles = [
-    { id: 'customer' as const, label: 'Neighbor', detail: 'Here to discover local food', Icon: UserRound },
-    { id: 'restaurant' as const, label: 'Restaurant', detail: 'Apply and manage your restaurant', Icon: Store },
-    { id: 'driver' as const, label: 'Driver', detail: 'Apply to deliver with RoCoEats', Icon: Bike },
-  ];
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const cleanName = displayName.trim();
-    if (!cleanName) { setErrorText('Add a display name to continue.'); return; }
-    setErrorText('');
-    createProfile.mutate({ data: { role, displayName: cleanName } }, {
-      onSuccess: (saved) => {
-        queryClient.invalidateQueries({ queryKey: getGetMyProfileQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetMyDashboardQueryKey() });
-        setLocation(saved.role === 'admin' ? '/admin' : saved.role === 'restaurant' ? '/restaurant' : saved.role === 'driver' ? '/driver' : '/dashboard');
-      },
-      onError: () => setErrorText('We couldn’t save your profile just now. Please try again.'),
-    });
-  };
-  if (profile.isLoading || profile.data) return <LoadingView label="Checking your profile" />;
-  return <Protected><main className="portal" data-testid="page-account-setup"><div className="portal-shell"><PortalHeader active="account" /><section className="portal-main">
-    {profile.isError && !isNotFound(profile.error) ? <><div className="portal-eyebrow">Welcome to the neighborhood</div><h1 className="portal-title">Let’s make this <em>yours.</em></h1><div style={{ marginTop: 28 }}><QueryError retry={() => profile.refetch()} /></div></> : <>
-    <div className="portal-eyebrow">Welcome to the neighborhood</div><h1 className="portal-title">Let’s make this <em>yours.</em></h1><p className="portal-lede">Choose the role that best fits you and add a display name. This helps personalize your LocalEats account; it does not enroll you or activate services.</p>
-    <div className="portal-grid"><form className="portal-panel" onSubmit={submit} data-testid="form-account-setup">
-      <h2>Set up your profile</h2><p className="portal-panel-intro">You can only choose a member role here. Admin access is never offered during public setup.</p>
-      <span className="portal-field-label">I’m joining as</span><div className="portal-role-grid" role="group" aria-label="Choose your role" data-testid="group-profile-roles">
-        {roles.map(({ id, label, detail, Icon }) => <button type="button" key={id} className={`portal-role${role === id ? ' selected' : ''}`} aria-pressed={role === id} onClick={() => setRole(id)} data-testid={`button-role-${id}`}><span className="portal-role-icon"><Icon size={16} /></span><strong>{label}</strong><small>{detail}</small></button>)}
-      </div>
-      <label className="portal-field-label" htmlFor="display-name">Display name</label><input id="display-name" className="portal-input" type="text" maxLength={120} autoComplete="name" placeholder="How should we address you?" value={displayName} onChange={(event) => setDisplayName(event.target.value)} data-testid="input-display-name" />
-      {errorText && <p className="portal-error" role="alert" data-testid="text-setup-error">{errorText}</p>}
-      <div className="portal-form-actions"><button className="portal-primary" type="submit" disabled={createProfile.isPending} data-testid="button-save-profile">{createProfile.isPending ? 'Saving profile…' : 'Continue to your dashboard'} <ArrowRight size={15} /></button></div>
-    </form><aside className="portal-aside"><div className="portal-aside-mark"><MapPin size={18} /></div><h3>Local by design.</h3><p>LocalEats is being built for neighbors, restaurants, and drivers across Roane County, Tennessee.</p><div className="portal-aside-rule" /><div className="portal-aside-foot"><ShieldCheck size={15} />Your profile records your display name and role. It does not sign you up for deliveries or business enrollment.</div></aside></div>
-  </>}</section></div></main></Protected>;
+    if (profile.data) setLocation(accountDestination(profile.data.role, checkout), { replace: true });
+    else if (missing && isLoaded && userId && !attempted.current) {
+      attempted.current = true;
+      start();
+    }
+  }, [profile.data, checkout, missing, isLoaded, userId, setLocation]);
+  if (!isLoaded) return <SessionLoading />;
+  if (!userId) return <Redirect to={`/sign-in${query}`} />;
+  if (provision.isError || profile.isError && !missing) {
+    const error = provision.error ?? profile.error;
+    const status = accountStatus(error);
+    return <main className="portal"><div className="portal-shell"><PortalHeader active="account"/><section className="portal-main">
+      <h1>Let’s finish your setup</h1>
+      {status === 403 ? <><p role="alert">This account does not have access to the workspace. Private staging requires an invitation.</p><a href={`${basePath}/account/access`}>Check account access</a></> :
+        status === 401 ? <a href={`${basePath}/sign-in${query}`}>Sign in again to continue</a> :
+        <QueryError retry={() => provision.isError ? start() : void profile.refetch()} message="We couldn’t finish connecting your account. Check your connection and try again." />}
+    </section></div></main>;
+  }
+  return <LoadingView label="Preparing your workspace" />;
 }
 
 function AccountPage() {
@@ -442,7 +467,7 @@ function AccountPage() {
 function DashboardPage() {
   const [, setLocation] = useLocation();
   const profile = useProfileQuery();
-  const dashboard = useGetMyDashboard({ query: { queryKey: getGetMyDashboardQueryKey(), enabled: !!profile.data, staleTime: 0, refetchOnMount: 'always' } });
+  const dashboard = useGetMyDashboard({ query: { queryKey: [...getGetMyDashboardQueryKey(), profile.data?.id], enabled: !!profile.data, networkMode: 'always', retry: false } });
   useEffect(() => {
     if (!profile.data && profile.isError && isNotFound(profile.error)) setLocation('/account/setup', { replace: true });
   }, [profile.data, profile.isError, profile.error, setLocation]);
@@ -459,11 +484,23 @@ function DashboardPage() {
   </section></div></main></Protected>;
 }
 
+function SignedInCheckout() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const profile = useProfileQuery();
+  if (!isLoaded) return <SessionLoading />;
+  if (isSignedIn && profile.isLoading) return <LoadingView label="Preparing checkout" />;
+  if (isSignedIn && profile.isError) {
+    if (isNotFound(profile.error)) return <Redirect to="/account/setup?join=customer&checkout=1" />;
+    return <main className="roco-main"><h1>Checkout</h1><QueryError retry={() => void profile.refetch()} /></main>;
+  }
+  return <GuestCheckoutAccess><CartPage /></GuestCheckoutAccess>;
+}
+
 function Router() {
   return <RoutedErrorBoundary><Switch>
     <Route path="/" component={DiscoveryPage} />
     <Route path="/restaurants/:restaurantId" component={RestaurantMenuPage} />
-    <Route path="/cart" component={() => <GuestCheckoutAccess><CartPage /></GuestCheckoutAccess>} />
+    <Route path="/cart" component={SignedInCheckout} />
     <Route path="/mobile/authorize" component={MobileAuthorize} />
     <Route path="/guest/order" component={GuestOrderPage} />
     <Route path="/orders" component={() => <Protected><OrdersPage /></Protected>} />
@@ -478,8 +515,8 @@ function Router() {
     <Route path="/sign-in/*?" component={SignInPage} />
     <Route path="/sign-up/*?" component={SignUpPage} />
     <Route path="/account/setup" component={AccountSetup} />
-    <Route path="/account" component={AccountPage} />
-    <Route path="/dashboard" component={DashboardPage} />
+    <Route path="/account" component={() => <Protected><AccountPage /></Protected>} />
+    <Route path="/dashboard" component={() => <Protected><DashboardPage /></Protected>} />
     <Route component={NotFound} />
   </Switch></RoutedErrorBoundary>;
 }

@@ -77,3 +77,33 @@ test("native Clerk bearer tokens are never automatically attached to third-party
  await customFetch("https://untrusted.example.test/api/orders");await customFetch("/api/orders/me");await customFetch("https://api.example.test/api/orders/me");await customFetch("https://api.example.test/assets/icon.png");
  assert.deepEqual(seen,[null,"Bearer private-session-fixture","Bearer private-session-fixture",null]);
 });
+
+test("aborting a stuck session token lookup releases the caller and prevents a late request", async () => {
+  const controller = new AbortController();
+  let finishToken!: (token: string) => void;
+  setAuthTokenGetter(() => new Promise<string>(resolve => { finishToken = resolve; }));
+  let called = false;
+  globalThis.fetch = async () => {
+    called = true;
+    return Response.json({});
+  };
+  const request = customFetch("/api/profiles/me", { signal: controller.signal });
+  const reason = new Error("Profile request canceled");
+  controller.abort(reason);
+  await assert.rejects(request, error => error === reason);
+  finishToken("stale-token");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(called, false);
+});
+
+test("signup intent only accepts member roles and routes existing roles to their own workspace", async () => {
+  const { joinRole, accountDestination } = await import("../../localeats/src/lib/account-entry");
+  for (const role of ["customer", "restaurant", "driver"]) assert.equal(joinRole(role), role);
+  for (const role of [null, "admin", "/admin", "https://example.test"]) {
+    assert.equal(joinRole(role), "customer");
+  }
+  assert.equal(accountDestination("customer", true), "/cart?restore=1");
+  assert.equal(accountDestination("restaurant", true), "/restaurant");
+  assert.equal(accountDestination("driver", false), "/driver");
+  assert.equal(accountDestination("admin", false), "/admin");
+});

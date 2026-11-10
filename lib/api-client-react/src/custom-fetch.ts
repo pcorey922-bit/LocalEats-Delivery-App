@@ -328,6 +328,31 @@ export async function customFetch<T = unknown>(
   input: RequestInfo | URL,
   options: CustomFetchOptions = {},
 ): Promise<T> {
+  const source = options.signal ?? (isRequest(input) ? input.signal : undefined);
+  const controller = new AbortController();
+  const abort = () => controller.abort(source?.reason);
+  if (source?.aborted) abort();
+  else source?.addEventListener("abort", abort, { once: true });
+  const timer = setTimeout(() => {
+    controller.abort(new DOMException("The request timed out. Please try again.", "TimeoutError"));
+  }, 35000);
+  const signal = controller.signal;
+  let rejectOnAbort: (() => void) | undefined;
+  try {
+    signal.throwIfAborted();
+    const canceled = new Promise<never>((_, reject) => {
+      rejectOnAbort = () => reject(signal.reason);
+      signal.addEventListener("abort", rejectOnAbort, { once: true });
+    });
+    return await Promise.race([fetchApi<T>(input, { ...options, signal }), canceled]);
+  } finally {
+    clearTimeout(timer);
+    source?.removeEventListener("abort", abort);
+    if (rejectOnAbort) signal.removeEventListener("abort", rejectOnAbort);
+  }
+}
+
+async function fetchApi<T>(input: RequestInfo | URL, options: CustomFetchOptions): Promise<T> {
   const relativeCustomerPath = /^\/api\/(?:guest(?:\/|$)|orders(?:\/|$)|addresses(?:\/|$)|support(?:\/|$)|restaurants(?:\/|$)|commerce\/config$|healthz$)/.test(resolveUrl(input));
   const originalUrl=resolveUrl(input);
   const trustedApiRequest=originalUrl.startsWith("/api/") || (()=>{
@@ -372,6 +397,7 @@ export async function customFetch<T = unknown>(
   }
   const requestInfo = { method, url: resolveUrl(input) };
 
+  init.signal?.throwIfAborted();
   const response = await fetch(input, { ...init, method, headers });
 
   if (!response.ok) {

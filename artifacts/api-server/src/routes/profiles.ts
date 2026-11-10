@@ -1,3 +1,4 @@
+import { stagingAdmits } from "../middlewares/private-staging";
 import { isConfiguredOwner } from "../lib/owner-access";
 import { getActiveProfile } from "../lib/current-profile";
 import { audit } from "../lib/commerce";
@@ -43,6 +44,7 @@ router.get("/session/access", requireAuth, async (req, res) => {
     superAdministrator: Boolean(profile?.isActive && profile.role === "admin" && ownerMatched),
     driver: Boolean(profile?.isActive && ["driver", "admin"].includes(profile.role) && profile.driverApproved),
     privateStaging: process.env.ROCOEATS_PRIVATE_STAGING === "true",
+    stagingAdmitted: stagingAdmits(subject),
   });
 });
 

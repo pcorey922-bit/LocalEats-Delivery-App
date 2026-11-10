@@ -41,7 +41,10 @@ export function GuestCheckoutAccess({
   return (
     <main className="roco-main">
       <section className="roco-card">
-        <h1>Continue as Guest</h1>
+        <h1>Continue to checkout</h1>
+        <p><Link className="roco-button primary" href="/sign-in?checkout=1">Sign in</Link>{" "}
+          <Link className="roco-button" href="/sign-up?checkout=1">Create account</Link></p>
+        <h2>Continue as Guest</h2>
         <p>
           No account or password required. We need your contact details to
           fulfill your order. Cards are entered only in secure Stripe TEST

@@ -731,3 +731,28 @@ set tracked stock and hours, verified the $14.48 quote and denied checkout
 while the window was closed. The invited fixture driver went online.
 The deployed listing, invited accounts and actual owner's driver status
 still require authenticated owner checks. No live staging records changed.
+
+## Signup and account recovery
+
+Private staging checks membership before profile provisioning. The previous
+restaurant screen displayed the same setup error for a denied staging identity
+and a missing profile. An authenticated identity may also have no RoCoEats
+profile yet. The new flow uses separate recovery paths: report denied access
+without provisioning, and automatically provision an admitted missing profile
+with the member role selected by the signup entry point. Concurrent signup
+recovers the existing profile instead of rewriting its role. Administrator
+bootstrap and owner-driver approval remain controlled by server configuration.
+
+Account queries are keyed by authenticated identity. Protected sign-in loading
+has a recovery screen, and the API client bounds requests including token
+lookup. Checkout signup returns to the cart and can carry the device guest cart
+to an empty customer cart. Public discovery behavior is unchanged outside
+private staging, and staging admission, both ordering switches and Stripe TEST
+mode remain enforced.
+
+Local relational tests distinguish anonymous, denied and unprovisioned
+identities, provision all three member roles, reject admin injection and
+verify restaurant creation. API tests cover a stuck token lookup and join
+intent restrictions. Build/typechecks passed. Clerk provider registration,
+Gmail alias reproduction in deployed Incognito, Apple availability and
+physical mobile acceptance remain unverified. Owner-led checkout is deferred.
