@@ -31,6 +31,10 @@ try {
   const readiness = await (await request("/readyz", [200, 503])).json();
   assert.equal(readiness.liveChargesEnabled, false);
   assert.equal(readiness.database, true);
+  const mobile = await (await request("/api/mobile/readiness", [200])).json();
+  assert.equal(mobile.privateTestStaging, true, "Staging is not restricted to private testers");
+  assert.equal(mobile.orderingEnabled, false, "Ordering must be closed for deployment verification");
+  assert.equal(mobile.liveChargesEnabled, false, "Live charges must be disabled");
   for (const path of ["/api/profiles/me", "/api/session/access", "/api/restaurants", "/api/admin/profiles"])
     await request(path, [401]);
   await request("/api/admin/profiles", [401], { "x-test-user": "user_QASpoof", "x-role": "admin" });
@@ -40,6 +44,7 @@ try {
   console.log(JSON.stringify({
     origin, observedAt: new Date().toISOString(), revision: live.revision ?? null,
     readiness: Object.fromEntries(["ready", "database", "authReady", "pricingReady", "providerConfigured", "webhookReady", "workerReady", "liveChargesEnabled"].map(key => [key,readiness[key]])),
+    privateTestStaging: true, orderingEnabled: false,
     checks, authenticatedOwnerTested: false,
   }, null, 2));
 } catch (error) {

@@ -593,3 +593,26 @@ both ordering and live charges disabled. For the next owner-assisted test, use
 a manually deployed, CI-verified PR revision in Render, leave ordering closed
 while checking the owner and tester roles, and follow PRIVATE_TEST_DELIVERY.md.
 No signed Play release AAB or signed iOS release was produced in this session.
+
+## Staging deployment handoff — November 9 (Eastern time)
+
+Fetched and verified `fdb0c9f90679822217f9fb7da6537acb01de8329` on draft PR #1.
+It includes `98ed8af` (Samsung evidence), `50ebfae` (runtime dispatch map), and
+`fdb0c9f` (custody and earnings race). Web Validate 42757767621 passed.
+Native run 42757767506 passed Android/iOS compilation; the signing and emulator
+jobs were skipped.
+
+Render currently serves `bf9e8c1`. Eleven read-only HTTP checks passed for that
+revision, including private staging, ordering closed, live charges disabled,
+dependency readiness and anonymous access denial. The verifier now checks these
+ordering and staging safety flags in addition to the revision. It performs no
+authenticated actions or transactions. Use the existing free service in Render
+Dashboard → Deploys → Manual Deploy → Deploy a specific commit and enter the
+verified SHA above. Preserve the connected Neon database, existing environment and
+Docker command. After Live, run the HTTP verifier against that exact SHA and
+confirm owner/tester access before the authorized private Stripe TEST order.
+
+Hosted access and authenticated Clerk tester sessions were unavailable in this
+session. No deployment, customer order, Stripe webhook processing, refund or
+payout was exercised. Use PRIVATE_TEST_DELIVERY.md for the four-role run and
+capture test-only payment and accounting evidence there or in the operator record.
