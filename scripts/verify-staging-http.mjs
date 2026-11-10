@@ -18,10 +18,10 @@ try {
   process.exit(1);
 }
 const checks = [];
-async function request(path, expected, headers = {}) {
-  const response = await fetch(origin + path, { headers, redirect: "manual", signal: AbortSignal.timeout(45000) });
+async function request(path, expected, headers = {}, method = "GET") {
+  const response = await fetch(origin + path, { method, headers, redirect: "manual", signal: AbortSignal.timeout(45000) });
   assert.ok(expected.includes(response.status), `${path}: unexpected HTTP ${response.status}`);
-  checks.push({ path, status: response.status });
+  checks.push({ path, status: response.status, ...(headers.origin && { method, origin: headers.origin }) });
   return response;
 }
 try {
@@ -35,6 +35,26 @@ try {
   assert.equal(mobile.privateTestStaging, true, "Staging is not restricted to private testers");
   assert.equal(mobile.orderingEnabled, false, "Ordering must be closed for deployment verification");
   assert.equal(mobile.liveChargesEnabled, false, "Live charges must be disabled");
+  assert.equal(mobile.nativeProtocolVersion, 1, "Unexpected native protocol version");
+  for (const key of ["publicOrderingEnabled", "privateTestOrderingEnabled"]) {
+    if (key in mobile) assert.equal(mobile[key], false, `Expected ${key} to be off`);
+  }
+  const nativeOrigins = ["https://localhost", "capacitor://localhost"];
+  for (const nativeOrigin of [...nativeOrigins, "https://untrusted.example"]) {
+    const allowed = nativeOrigins.includes(nativeOrigin);
+    const preflight = await request("/api/profiles/me", allowed ? [204] : [401, 403], {
+      origin: nativeOrigin,
+      "access-control-request-method": "GET",
+      "access-control-request-headers": "authorization,x-rocoeats-guest-token",
+    }, "OPTIONS");
+    assert.equal(preflight.headers.get("access-control-allow-origin"), allowed ? nativeOrigin : null);
+    if (allowed) {
+      const allowedHeaders = (preflight.headers.get("access-control-allow-headers") || "")
+        .toLowerCase().split(",").map(value => value.trim());
+      assert.ok(allowedHeaders.includes("authorization") && allowedHeaders.includes("x-rocoeats-guest-token"));
+      await request("/api/profiles/me", [401], { origin: nativeOrigin });
+    }
+  }
   for (const path of ["/api/profiles/me", "/api/session/access", "/api/restaurants", "/api/admin/profiles"])
     await request(path, [401]);
   await request("/api/admin/profiles", [401], { "x-test-user": "user_QASpoof", "x-role": "admin" });

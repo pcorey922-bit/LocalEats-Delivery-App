@@ -668,3 +668,11 @@ typechecks and the build passed. Deployment and authenticated Stripe acceptance
 for this new path remain pending. Follow PRIVATE_TEST_DELIVERY.md using the
 existing owner and invited tester sessions. No environment or credentials were
 changed in this session.
+
+The deployment verifier now includes five native-origin HTTP checks and expects
+native protocol version 1. All 16 checks passed against the deployed fdb0c9f.
+Android `https://localhost` and iOS `capacitor://localhost` preflights allowed
+the required headers, anonymous profile requests remained denied, and an
+untrusted origin received no CORS grant. This verifies the live server contract.
+Authenticated native sign-in, push, background GPS, Play AAB and signed iOS
+device acceptance remain open.
