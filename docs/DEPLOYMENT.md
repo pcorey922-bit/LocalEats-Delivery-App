@@ -210,11 +210,8 @@ The root Dockerfile builds the API and website together and serves both on port
 VITE_API_ORIGIN for same-origin web requests. Mobile builds still require the
 public HTTPS API origin. Only publishable frontend values belong in build args.
 Runtime secrets belong in the host's secret environment, never in image layers.
-Configured dispatch maps require build arguments `VITE_GOOGLE_MAPS_API_KEY` and
-`VITE_GOOGLE_MAPS_MAP_ID`; setting them only at container runtime cannot change
-the already-built frontend. These are public browser settings. Restrict the key
-to the staging/production web origins and the Maps JavaScript API, and approve
-Google billing before enabling the integration.
+For dispatch maps, prefer the runtime environment values described under driver
+location and dispatch below. Existing frontend build arguments remain supported.
 The image runs as the non-root node user and defaults to disabled payments.
 
 The hosting account needs a Node-compatible container service, HTTPS and a
@@ -288,9 +285,16 @@ sharing remains an explicitly controlled, narrowly scoped alternative.
 
 Live map rendering is optional until configured: use an owner-controlled Google Maps
 project, enable Maps JavaScript API, configure a map ID and API/referrer restrictions,
-quotas and billing approvals. Set only the public browser key in
-`VITE_GOOGLE_MAPS_API_KEY` and public map ID in `VITE_GOOGLE_MAPS_MAP_ID` before building.
-Never put Stripe secrets, bank details or server credentials in VITE variables.
+quotas and billing approvals. On Render, set `ROCOEATS_GOOGLE_MAPS_BROWSER_KEY`
+and `ROCOEATS_GOOGLE_MAPS_MAP_ID` together in the existing service's Environment
+settings. Use the restricted public browser key and a real map ID. The web admin
+dispatch response supplies these two values at runtime, so they do not have to be
+compiled into the website or Android/iOS packages. The settings apply when the
+updated service starts. With both runtime variables absent, legacy builds still
+use `VITE_GOOGLE_MAPS_API_KEY` and `VITE_GOOGLE_MAPS_MAP_ID` if present. A partial
+runtime configuration disables the embedded map. Verify the map from the staging
+website in an administrator session. Native WebView rendering needs separate
+origin/referrer verification. Never use a server key for this integration.
 No map SDK loads while these settings are missing; authenticated dispatch status and
 coordinate lists remain available. Map provider/real-device rendering is not certified
 by mocked or fixture tests. External navigation uses provider-hosted HTTPS links.

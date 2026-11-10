@@ -3,7 +3,11 @@ import { dutyIntent } from "../lib/duty-intent";
 import { NavigationActions } from "./navigation-actions";
 import type { NavigationAddress } from "../lib/navigation";
 import { useAuth } from "@clerk/react";
-import { DispatchMap, type DispatchDriver } from "./dispatch-map";
+import {
+  DispatchMap,
+  type DispatchDriver,
+  type DispatchMapConfig,
+} from "./dispatch-map";
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Geolocation } from "@capacitor/geolocation";
@@ -416,13 +420,19 @@ export function DispatchOperations() {
           deliveryAddress: NavigationAddress;
         }>;
         drivers: DispatchDriver[];
+        mapConfig?: DispatchMapConfig | null;
       }>("/api/admin/dispatch"),
     refetchInterval: 10000,
   });
   return (
     <section>
       <h2>Dispatch oversight</h2>
-      {dispatch.data && <DispatchMap drivers={dispatch.data.drivers} />}
+      {dispatch.data && (
+        <DispatchMap
+          drivers={dispatch.data.drivers}
+          config={dispatch.data.mapConfig}
+        />
+      )}
       {dispatch.error && (
         <p role="alert" className="roco-alert">
           {dispatch.error.message}

@@ -592,8 +592,19 @@ router.get("/admin/dispatch", requireAuth, async (req, res) => {
           ),
         )
     : [];
+  const mapKey = process.env.ROCOEATS_GOOGLE_MAPS_BROWSER_KEY?.trim();
+  const mapId = process.env.ROCOEATS_GOOGLE_MAPS_MAP_ID?.trim();
+  // Only the browser-restricted key and map ID belong in this admin response.
+  // Omit when unset so previously configured web bundles keep working.
+  const mapConfig =
+    mapKey === undefined && mapId === undefined
+      ? undefined
+      : mapKey && mapId && mapId !== "DEMO_MAP_ID"
+        ? { browserKey: mapKey, mapId }
+        : null;
   res.setHeader("Cache-Control", "no-store");
   res.json({
+    mapConfig,
     orders: orders.map((o) => ({
       ...o,
       waitingMinutes: Math.floor((Date.now() - o.placedAt.getTime()) / 60000),

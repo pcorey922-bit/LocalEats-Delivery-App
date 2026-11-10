@@ -558,3 +558,23 @@ pre-granted and reports incomplete runs explicitly rather than marking them pass
   staging APK is suitable for device testing. Play submission still requires a
   signed Android release AAB, and iOS distribution requires signing/provisioning.
   Keep public ordering disabled pending explicit launch authorization.
+
+### Runtime dispatch map configuration
+
+The web administrator dispatch can receive the restricted browser key and map ID
+from the server environment. Both settings must be present and the map ID must be
+a real ID. Unconfigured deployments retain the coordinate list and Google Maps
+links. Existing frontend build settings still work when runtime settings are
+absent. See DEPLOYMENT.md for the Render variables and verification steps.
+
+113 local app/API tests passed using PGlite, nine staging/release script checks
+passed, and the production build and typechecks passed. The map tests exercise
+configuration and role restrictions with fixtures. Actual map rendering awaits
+the restricted Google Maps configuration and an authenticated staging check.
+
+Read-only staging checks observed `bf9e8c1` deployed. Ten HTTP checks passed,
+including readiness, anonymous denial and configuration-file protection. The
+service reported database, auth, pricing, TEST provider, webhook configuration
+and workers ready with live charges disabled. No authenticated checkout or signed
+provider event was exercised. Deploy the verified PR revision and follow
+PRIVATE_TEST_DELIVERY.md for private acceptance after explicit authorization.

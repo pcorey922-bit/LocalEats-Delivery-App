@@ -14,6 +14,7 @@ export type DispatchDriver = {
     observedAt: string;
   } | null;
 };
+export type DispatchMapConfig = { browserKey: string; mapId: string };
 type MapInstance = { fitBounds: (bounds: unknown, padding: number) => void };
 type MarkerInstance = { map: MapInstance | null };
 type MapsRuntime = {
@@ -66,12 +67,24 @@ function loadMaps(key: string) {
   });
   return loader;
 }
-export function DispatchMap({ drivers }: { drivers: DispatchDriver[] }) {
+export function DispatchMap({
+  drivers,
+  config,
+}: {
+  drivers: DispatchDriver[];
+  config?: DispatchMapConfig | null;
+}) {
   const element = useRef<HTMLDivElement>(null),
     map = useRef<MapInstance | null>(null),
     [error, setError] = useState("");
-  const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim(),
-    mapId = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID?.trim();
+  const key =
+    config === undefined
+      ? import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim()
+      : config?.browserKey;
+  const mapId =
+    config === undefined
+      ? import.meta.env.VITE_GOOGLE_MAPS_MAP_ID?.trim()
+      : config?.mapId;
   const configured = !!key && !!mapId && mapId !== "DEMO_MAP_ID";
   const visible = drivers.filter((d) => d.online && d.location);
   useEffect(() => {

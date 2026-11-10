@@ -537,6 +537,40 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     assert.equal((await api(`/admin/drivers/${ids.admin}/approval`,ids.admin,'PATCH',{approved:false})).status,200);
     assert.equal((await api('/admin/profiles',ids.admin)).status,200);
   });
+  await t.test("dispatch map runtime settings are private and require a complete configuration", async () => {
+    const keyName = "ROCOEATS_GOOGLE_MAPS_BROWSER_KEY";
+    const mapName = "ROCOEATS_GOOGLE_MAPS_MAP_ID";
+    const previousKey = process.env[keyName];
+    const previousMap = process.env[mapName];
+    try {
+      delete process.env[keyName];
+      delete process.env[mapName];
+      const baseline = await api("/admin/dispatch", ids.admin);
+      assert.equal(baseline.status, 200);
+      assert.equal("mapConfig" in baseline.data, false);
+
+      process.env[keyName] = " fixture_browser_key ";
+      assert.equal((await api("/admin/dispatch", ids.admin)).data.mapConfig, null);
+      process.env[mapName] = "DEMO_MAP_ID";
+      assert.equal((await api("/admin/dispatch", ids.admin)).data.mapConfig, null);
+      process.env[mapName] = " fixture_map_id ";
+      const configured = await api("/admin/dispatch", ids.admin);
+      assert.deepEqual(configured.data.mapConfig, {
+        browserKey: "fixture_browser_key",
+        mapId: "fixture_map_id",
+      });
+      for (const actor of [null, ids.customer, ids.driver, ids.restaurant]) {
+        const denied = await api("/admin/dispatch", actor);
+        assert.equal(denied.status, actor ? 403 : 401);
+        assert.equal("mapConfig" in denied.data, false);
+      }
+    } finally {
+      if (previousKey === undefined) delete process.env[keyName];
+      else process.env[keyName] = previousKey;
+      if (previousMap === undefined) delete process.env[mapName];
+      else process.env[mapName] = previousMap;
+    }
+  });
   await t.test("on-duty GPS is private, monotonic, freshness-aware and cleared on offline or revocation",async()=>{
     const position={latitude:35.88,longitude:-84.69,accuracyMeters:8,observedAt:new Date(Date.now()-1000).toISOString()};
     assert.equal((await api('/driver/location',ids.customer,'POST',position)).status,403);
