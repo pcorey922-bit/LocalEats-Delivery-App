@@ -3528,4 +3528,69 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     }
   });
 
+  await t.test("an invited operator can prepare the Test Kitchen while staging checkout stays closed", async () => {
+    const operator = randomUUID();
+    await db.insert(profilesTable).values({
+      id: operator, clerkUserId: operator, role: "restaurant", displayName: "Test Kitchen operator",
+    });
+    process.env.ROCOEATS_PRIVATE_STAGING = "true";
+    process.env.ROCOEATS_ORDERING_ENABLED = "false";
+    process.env.ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED = "false";
+    process.env.ROCOEATS_STAGING_TESTER_CLERK_USER_IDS = [operator, ids.customer, ids.driver, ids.admin].join(",");
+    try {
+      const created = await api("/restaurants/me", operator, "POST", {
+        name: "RoCoEats Test Kitchen", street1: "100 Test Kitchen Way",
+        city: "Kingston", region: "TN", postalCode: "37854",
+      });
+      assert.equal(created.status, 201, JSON.stringify(created.data));
+      assert.equal(created.data.status, "pending");
+      const restaurantId = created.data.id;
+      const restaurantPath = `/restaurants/${restaurantId}`;
+      const reviewPath = `/admin${restaurantPath}/status`;
+      assert.equal((await api(restaurantPath, ids.customer)).status, 404);
+      assert.equal((await api(reviewPath, operator, "PATCH", { status: "approved" })).status, 403);
+      assert.equal((await api(reviewPath, ids.admin, "PATCH", { status: "approved" })).status, 200);
+
+      const category = await api("/restaurants/me/categories", operator, "POST", { name: "Test Menu" });
+      assert.equal(category.status, 201);
+      const items = [];
+      for (const [name, priceCents] of [["Cheeseburger", 899], ["French Fries", 349], ["Soda", 200]] as const) {
+        const item = await api("/restaurants/me/menu-items", operator, "POST", {
+          categoryId: category.data.id, name, priceCents, isAvailable: true,
+        });
+        assert.equal(item.status, 201, JSON.stringify(item.data));
+        items.push({ menuItemId: item.data.id, quantity: 1 });
+        const inventory = (await api("/restaurants/me/inventory", operator)).data;
+        const stock = inventory.find((row: { id: string }) => row.id === item.data.id);
+        const saved = await api(`/restaurants/me/inventory/${item.data.id}`, operator, "PUT", {
+          stockOnHand: 5, expectedRevision: stock.revision, reason: "Initial staging fixture stock",
+        });
+        assert.equal(saved.status, 200);
+        assert.equal(saved.data.stockOnHand, 5);
+      }
+      assert.equal((await api("/restaurants/me/availability/settings", operator, "PUT", {
+        acceptingOrders: true, maxOpenOrders: 1,
+        hours: Array.from({ length: 7 }, (_, weekday) => ({ weekday, isClosed: false, openTime: "00:00", closeTime: "24:00" })),
+      })).status, 200);
+      assert.equal((await api(restaurantPath, ids.other)).status, 403);
+      assert.equal((await api(restaurantPath, ids.customer)).status, 200);
+
+      const cart = { ...input(), restaurantId, items };
+      const quote = await api("/orders/quote", ids.customer, "POST", cart);
+      assert.equal(quote.status, 200, JSON.stringify(quote.data));
+      assert.equal(quote.data.subtotalCents, 1448);
+      assert.equal((await api("/orders", ids.customer, "POST", {
+        ...cart, expectedTotalCents: quote.data.totalCents,
+      }, randomUUID())).status, 503);
+      assert.equal((await api("/driver/availability", ids.driver, "PUT", { available: true })).status, 200);
+      const driver = (await api("/driver/availability", ids.driver)).data;
+      assert.equal(driver.approved, true);
+      assert.equal(driver.online, true);
+      assert.equal(driver.activeOrderId, null);
+      await api("/driver/availability", ids.driver, "PUT", { available: false });
+    } finally {
+      delete process.env.ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED;
+    }
+  });
+
 });

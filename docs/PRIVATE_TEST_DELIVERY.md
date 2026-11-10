@@ -4,6 +4,41 @@ Use https://localeats-delivery-app.onrender.com/ with real Clerk sessions and th
 persistent staging database. This procedure must not be replaced with the old demo
 or the component fixtures. Keep live keys, real bank details and paid services out.
 
+## Set up RoCoEats Test Kitchen with both ordering switches off
+
+1. Use separate browser sessions for the customer, restaurant operator and owner.
+   Sign the customer and operator into staging. At `/account/access`, copy each
+   Clerk User ID. Add those IDs, comma-separated, to the existing
+   `ROCOEATS_STAGING_TESTER_CLERK_USER_IDS` in Render and apply the changes.
+   Preserve existing invitees. Keep both ordering switches false. If using a
+   separate driver rather than the owner-driver, invite that account too.
+2. In the operator session, select **Restaurant** during account setup. Open
+   `/restaurant`, enter **RoCoEats Test Kitchen**, description
+   **Fictional staging test only**, and a fictional address such as
+   **100 Test Kitchen Way, Kingston, TN 37854**. Leave phone blank and select
+   **Submit for review**. This account owns the listing automatically.
+3. In the administrator session, open `/admin` → **Restaurants**, find the
+   Test Kitchen, verify the displayed owner, and select **approved**.
+4. In the operator session, open **Menu management** → **Add category** and
+   name it **Test Menu**. Use **Add item** three times with prices in dollars.
+   Add Cheeseburger at 8.99, French Fries at 3.49, and Soda at 2.00. A visible
+   item has a **Hide** button. In **Menu inventory**, enter 5 available units
+   and reason **Initial staging test stock** for each item, then **Save stock**.
+5. Under **Business profile** → **Ordering and opening hours**, set the test
+   day's hours to cover the supervised run (Eastern time), clear **Closed**
+   for that day, select **Accept test orders during opening hours**, set
+   **Maximum open orders** to 1, and select **Save opening hours**.
+6. Use the owner account at `/driver` to **Go online** or **Reconnect on this
+   device**. Check Operations dispatch shows that driver available with no
+   active assignment. If blocked, check owner-driver access at
+   `/account/access`. A separate ordinary driver must have an approved
+   application before going online.
+7. As the invited customer, open the menu and review a quote using a fictional
+   address in an enabled ZIP. One of each item should show a $14.48 food
+   subtotal before fees, tax and tip. Ordering should still be disabled.
+   Leave the gates closed until the owner verifies these prerequisites.
+   Simulate arrival and handoff without traveling to the fictional address.
+
 ## Owner setup before an order
 
 1. Deploy the latest verified branch in Render. Leave

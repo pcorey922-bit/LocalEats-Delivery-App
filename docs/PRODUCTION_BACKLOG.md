@@ -718,3 +718,16 @@ made no Stripe request and created no staging order or payout. The real
 four-role acceptance is still pending authenticated tester sessions and the
 owner opening the private TEST window. Keep public ordering and live charges
 off throughout and close the private window when the test ends.
+
+### Test Kitchen preparation
+
+The staging health verifier passed all 16 checks at 5d9374c with private
+staging active, both ordering switches off and live charges disabled.
+Existing onboarding, administrator review, operator menu and inventory
+controls, opening hours and driver availability cover the test setup.
+Documented the exact owner steps in PRIVATE_TEST_DELIVERY.md. A relational
+test used the requested fictional menu and prices, approved the listing,
+set tracked stock and hours, verified the $14.48 quote and denied checkout
+while the window was closed. The invited fixture driver went online.
+The deployed listing, invited accounts and actual owner's driver status
+still require authenticated owner checks. No live staging records changed.
