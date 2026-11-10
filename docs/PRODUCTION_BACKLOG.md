@@ -578,3 +578,18 @@ service reported database, auth, pricing, TEST provider, webhook configuration
 and workers ready with live charges disabled. No authenticated checkout or signed
 provider event was exercised. Deploy the verified PR revision and follow
 PRIVATE_TEST_DELIVERY.md for private acceptance after explicit authorization.
+
+### Recovered dispatch custody test
+
+Ported the useful regression from the older Codex checkout to the current API.
+The relational test rejects unpaid assignment, races reassignment against the
+original driver's pickup, and verifies that only the driver who completes the
+handoff earns the driver settlement. All 114 local app/API tests passed. This
+uses fixture payments. The actual Stripe TEST order and commercial settlement
+remain separate acceptance items.
+
+The read-only staging mobile endpoint also reported private staging enabled and
+both ordering and live charges disabled. For the next owner-assisted test, use
+a manually deployed, CI-verified PR revision in Render, leave ordering closed
+while checking the owner and tester roles, and follow PRIVATE_TEST_DELIVERY.md.
+No signed Play release AAB or signed iOS release was produced in this session.

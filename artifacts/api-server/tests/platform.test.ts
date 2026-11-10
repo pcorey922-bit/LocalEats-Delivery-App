@@ -1129,6 +1129,47 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     const code=await api(`/orders/${order.id}/delivery-code`,ids.customer,"POST");
     assert.equal((await api(`/driver/orders/${order.id}/deliver`,ids.driver2,"POST",{code:code.data.code})).status,200);
   });
+  await t.test("pickup and reassignment cannot both change custody, and the final driver earns the delivery", async () => {
+    for (const driver of [ids.driver, ids.driver2]) {
+      assert.equal((await api("/driver/availability", driver, "PUT", { available: true })).status, 200);
+    }
+    const order = await create();
+    const assignmentPath = `/admin/orders/${order.id}/assignment`;
+    const pickupPath = `/driver/orders/${order.id}/pickup`;
+    const firstAssignment = {
+      driverProfileId: ids.driver,
+      expectedDriverProfileId: null,
+      expectedAssignedAt: null,
+      reason: "Assign driver for custody verification",
+    };
+    assert.equal((await api(assignmentPath, ids.admin, "POST", firstAssignment)).status, 409);
+    await ready(order.id);
+    const assigned = await api(assignmentPath, ids.admin, "POST", firstAssignment);
+    assert.equal(assigned.status, 200);
+
+    const [reassigned, pickedUp] = await Promise.all([
+      api(assignmentPath, ids.admin, "POST", {
+        driverProfileId: ids.driver2,
+        expectedDriverProfileId: ids.driver,
+        expectedAssignedAt: assigned.data.assignedAt,
+        reason: "Reassign concurrently with pickup",
+      }),
+      api(pickupPath, ids.driver, "POST"),
+    ]);
+    assert.deepEqual([reassigned.status, pickedUp.status].sort(), [200, 409]);
+
+    const finalDriver = reassigned.status === 200 ? ids.driver2 : ids.driver;
+    if (finalDriver === ids.driver2) {
+      assert.equal((await api(pickupPath, finalDriver, "POST")).status, 200);
+    }
+    const code = await api(`/orders/${order.id}/delivery-code`, ids.customer, "POST");
+    assert.equal(code.status, 200);
+    const completed = await api(`/driver/orders/${order.id}/deliver`, finalDriver, "POST", { code: code.data.code });
+    assert.equal(completed.status, 200);
+
+    const earnings = await db.select().from(payoutsTable).where(eq(payoutsTable.orderId, order.id));
+    assert.deepEqual(earnings.filter((entry) => entry.kind === "driver").map((entry) => entry.recipientProfileId), [finalDriver]);
+  });
   await t.test("admin assignments race safely with driver claims and reject busy or expired drivers", async () => {
     for (const driver of [ids.driver,ids.driver2]) await api('/driver/availability',driver,'PUT',{available:true});
     const first=await create(), second=await create(); await ready(first.id);await ready(second.id);
