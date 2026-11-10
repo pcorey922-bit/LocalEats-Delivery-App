@@ -21,6 +21,7 @@ import { randomUUID } from "node:crypto";
 import { webHosting } from "./lib/web-hosting";
 import { privateStaging } from "./middlewares/private-staging";
 const app: Express = express();
+app.disable("x-powered-by");
 
 app.use(
   pinoHttp({
@@ -85,28 +86,31 @@ app.use(
   })),
 );
 
-app.use("/api", privateStaging);
 app.use("/api", (req, res, next) => {
   if (
-    !["GET", "HEAD", "OPTIONS"].includes(req.method) &&
-    req.headers.cookie &&
-    !req.headers.authorization
+    process.env.ROCOEATS_PRIVATE_STAGING === "true" ||
+    req.headers.cookie || req.headers.authorization || req.get("X-RoCoEats-Guest-Token")
   ) {
+    res.setHeader("Cache-Control", "no-store");
+  }
+  if (!["GET", "HEAD", "OPTIONS"].includes(req.method) && req.headers.cookie) {
     const origin = req.get("origin");
-    const trusted = new Set(
-      [
-        ...allowedOrigins,
-        process.env.PUBLIC_APP_URL,
-        `${req.protocol}://${req.get("host")}`,
-      ].filter(Boolean),
-    );
-    if (!origin || !trusted.has(origin)) {
+    const trusted = [
+      ...allowedOrigins,
+      ...stagingNativeOrigins(),
+      process.env.PUBLIC_APP_URL?.replace(/\/$/, ""),
+    ];
+    if (process.env.NODE_ENV !== "production" && req.get("host")) {
+      trusted.push(`${req.protocol}://${req.get("host")}`);
+    }
+    if (!origin || !trusted.includes(origin)) {
       res.status(403).json({ error: "Untrusted request origin" });
       return;
     }
   }
   next();
 });
+app.use("/api", privateStaging);
 app.use("/api", limitMutations);
 app.use("/api", router);
 

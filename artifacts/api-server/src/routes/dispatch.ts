@@ -215,6 +215,13 @@ router.post(
         "Location timestamp is stale or in the future",
       );
     const result = await db.transaction(async (tx) => {
+      // Keep the same profile-before-order lock order used by driver claim.
+      const [current] = await tx.select().from(profilesTable)
+        .where(eq(profilesTable.id, profile.id)).for("update");
+      const [application] = await tx.select().from(driverApplicationsTable)
+        .where(eq(driverApplicationsTable.profileId, profile.id));
+      if (!hasDriverAccess(current, application))
+        throw new CommerceError(403, "Driver access is required");
       const [order] = await tx
         .select()
         .from(ordersTable)

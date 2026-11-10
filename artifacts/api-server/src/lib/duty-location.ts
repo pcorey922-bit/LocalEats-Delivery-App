@@ -1,14 +1,10 @@
 import { lt } from "drizzle-orm";
-import { db, driverDutyLocationsTable } from "@workspace/db";
-// Latest position only, never a route history. Offline/revoked drivers are cleared
-// immediately; this bounds retention for crashes and disconnected devices.
-export async function pruneDutyLocations(now = new Date()) {
-  await db
-    .delete(driverDutyLocationsTable)
-    .where(
-      lt(
-        driverDutyLocationsTable.receivedAt,
-        new Date(now.getTime() - 15 * 60 * 1000),
-      ),
-    );
+import { db, deliveryLocationsTable, driverDutyLocationsTable } from "@workspace/db";
+
+// Latest position only. Bound retention for disconnected devices and deliveries
+// that ended without the normal handoff or reassignment cleanup.
+export async function pruneDriverLocations(now = new Date()) {
+  const cutoff = new Date(now.getTime() - 15 * 60 * 1000);
+  await db.delete(driverDutyLocationsTable).where(lt(driverDutyLocationsTable.receivedAt, cutoff));
+  await db.delete(deliveryLocationsTable).where(lt(deliveryLocationsTable.receivedAt, cutoff));
 }

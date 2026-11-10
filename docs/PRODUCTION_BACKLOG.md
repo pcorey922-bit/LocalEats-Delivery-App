@@ -796,3 +796,34 @@ with the same total. Order completion does not erase a cart changed while
 the request was pending. The mobile-width browser fixture tested delayed
 quote response, requote, and identical submission retries using simulated
 API responses. This exercise created no staging order or Stripe payment.
+
+### Security hardening pass
+
+Verified draft PR #1 at 779d28f with passing Validate 42777465245 and native
+42777464916. Android/iOS compile jobs passed; signing and emulator jobs were
+skipped. Render still served 5d9374c and passed all 16 read-only checks, with
+private staging active and both ordering windows and live charges off.
+
+Reviewed cookie/session handling and API response caching using OWASP ASVS,
+object permissions using the OWASP API Security Top 10, and native data handling
+using OWASP MASVS. This is a scoped review, not a full standards assessment.
+
+- Cookie-bearing API writes now require a trusted origin even when an
+  Authorization header is present. Production trusts configured origins rather
+  than deriving a trusted origin from the incoming Host. The existing approved
+  native origins remain eligible in private Stripe TEST staging. Authenticated,
+  guest-capability and private staging responses default to no-store.
+- Per-order GPS writes recheck current driver eligibility under a profile lock
+  before acquiring order custody. The maintenance worker deletes stale order
+  positions as well as duty positions after 15 minutes. The latest position
+  remains available to authorized participants within existing freshness rules.
+- All 121 local tests and the production build/typechecks passed. Production
+  dependency audit found no known vulnerabilities at the requested threshold.
+  The first origin-test fixture used production mode with a simulator-backed
+  quote and returned 503 by design. The corrected fixture exercises profile
+  mutations and the real origin guard with simulated authentication.
+
+Next security priorities are cross-account finance and support authorization
+review, production-grade abuse monitoring, physical-device storage and
+background GPS verification, and authenticated provider staging acceptance.
+No staging or financial settings were changed.

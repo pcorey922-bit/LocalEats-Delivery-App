@@ -3,7 +3,7 @@ import { processStripeEvent } from "../src/routes/payment-webhook";
 import { processOrderTiming } from "../src/lib/order-timing";
 import { processReservationExpiry } from "../src/lib/reservation-expiry";
 import { recordPayment } from "../src/lib/commerce";
-import { pruneDutyLocations } from "../src/lib/duty-location";
+import { pruneDriverLocations } from "../src/lib/duty-location";
 import assert from "node:assert/strict";
 import { before, after, test } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
@@ -630,7 +630,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       assert.equal((await api('/driver/location',ids.driver,'POST',position)).status,409);
       assert.equal((await api('/driver/heartbeat',ids.driver,'POST')).status,409);
       await api('/driver/availability',ids.driver,'PUT',{available:true});await api('/driver/location',ids.driver,'POST',position);
-      await db.update(driverDutyLocationsTable).set({receivedAt:new Date(Date.now()-16*60*1000)}).where(eq(driverDutyLocationsTable.profileId,ids.driver));await pruneDutyLocations();
+      await db.update(driverDutyLocationsTable).set({receivedAt:new Date(Date.now()-16*60*1000)}).where(eq(driverDutyLocationsTable.profileId,ids.driver));await pruneDriverLocations();
       assert.equal((await db.select().from(driverDutyLocationsTable).where(eq(driverDutyLocationsTable.profileId,ids.driver))).length,0);
       await api('/driver/location',ids.driver,'POST',position);await api(`/admin/drivers/${ids.driver}/approval`,ids.admin,'PATCH',{approved:false});
       assert.equal((await db.select().from(driverDutyLocationsTable).where(eq(driverDutyLocationsTable.profileId,ids.driver))).length,0);
@@ -799,18 +799,48 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     assert.equal((await api("/driver/offers", ids.unapproved)).status, 403);
     assert.equal((await api("/admin/payouts", ids.customer)).status, 403);
   });
-  await t.test("cross-site cookie mutations are rejected", async () => {
-    const response = await fetch(`${origin}/api/orders/quote`, {
-      method: "POST",
-      headers: {
-        "x-test-user": ids.customer,
-        "content-type": "application/json",
-        cookie: "__session=test",
-        origin: "https://untrusted.example",
-      },
-      body: JSON.stringify(input()),
+  await t.test("cookie mutations require an approved origin and private responses cannot be stored", async () => {
+    const { displayName } = (await api("/profiles/me", ids.customer)).data;
+    const mutation = (headers: Record<string, string>) => fetch(`${origin}/api/profiles/me`, {
+      method: "PATCH",
+      headers: { "x-test-user": ids.customer, "content-type": "application/json", ...headers },
+      body: JSON.stringify({ displayName, expectedDisplayName: displayName }),
     });
-    assert.equal(response.status, 403);
+    const browserHeaders = { cookie: "__session=fixture", origin: "https://untrusted.example" };
+    for (const headers of [
+      browserHeaders,
+      { ...browserHeaders, authorization: "Bearer fixture" },
+      { cookie: browserHeaders.cookie },
+    ]) {
+      const denied = await mutation(headers);
+      assert.equal(denied.status, 403);
+      assert.equal(denied.headers.get("cache-control"), "no-store");
+    }
+
+    const priorNode = process.env.NODE_ENV;
+    const priorPublic = process.env.PUBLIC_APP_URL;
+    try {
+      process.env.NODE_ENV = "production";
+      process.env.PUBLIC_APP_URL = "https://staging.example.test/";
+      assert.equal((await mutation({ cookie: browserHeaders.cookie, origin })).status, 403);
+      const approved = await mutation({ cookie: browserHeaders.cookie, origin: "https://staging.example.test" });
+      assert.equal(approved.status, 200);
+      assert.equal(approved.headers.get("cache-control"), "no-store");
+      assert.equal(approved.headers.get("x-powered-by"), null);
+      const bearer = await mutation({ authorization: "Bearer fixture" });
+      assert.equal(bearer.status, 200);
+      assert.equal(bearer.headers.get("cache-control"), "no-store");
+      const profile = await fetch(`${origin}/api/profiles/me`, {
+        headers: { "x-test-user": ids.customer, cookie: browserHeaders.cookie },
+      });
+      assert.equal(profile.status, 200);
+      assert.equal(profile.headers.get("cache-control"), "no-store");
+    } finally {
+      if (priorNode === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = priorNode;
+      if (priorPublic === undefined) delete process.env.PUBLIC_APP_URL;
+      else process.env.PUBLIC_APP_URL = priorPublic;
+    }
   });
   await t.test(
     "quotes enforce address ownership, delivery area, and server totals",
@@ -3308,6 +3338,14 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     const [trackedDelivery]=await db.select().from(deliveriesTable).where(eq(deliveriesTable.orderId,order.id));
     await db.update(deliveryLocationsTable).set({observedAt:new Date(Date.now()-130000)}).where(eq(deliveryLocationsTable.deliveryId,trackedDelivery.id));
     const stale=await api(`/orders/${order.id}/tracking`,ids.restaurant);assert.equal(stale.data.locationStatus,'stale');assert.equal(stale.data.location,null);
+    await pruneDriverLocations();
+    assert.equal((await api(`/orders/${order.id}/tracking`, ids.restaurant)).data.locationStatus, "stale");
+    await db.update(deliveryLocationsTable).set({ receivedAt: new Date(Date.now() - 16 * 60 * 1000) })
+      .where(eq(deliveryLocationsTable.deliveryId, trackedDelivery.id));
+    await pruneDriverLocations();
+    assert.equal((await api(`/orders/${order.id}/tracking`, ids.restaurant)).data.locationStatus, "not_shared");
+    assert.equal((await db.select().from(deliveryLocationsTable)
+      .where(eq(deliveryLocationsTable.deliveryId, trackedDelivery.id))).length, 0);
     assert.equal((await api(`/driver/orders/${order.id}/release`,drivers[0],'POST',{reason:'Transfer this staging delivery to another eligible courier'})).status,200);
     assert.equal((await api(`/driver/orders/${order.id}/claim`,drivers[1],'POST')).status,201);
     const reassigned=await api(`/orders/${order.id}/tracking`,ids.restaurant);
