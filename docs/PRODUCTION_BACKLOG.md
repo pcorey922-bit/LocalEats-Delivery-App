@@ -533,3 +533,28 @@ Added isolated boot diagnostics, explicit KVM acceleration, headless Vulkan-off
 settings and an absolute eight-minute boot deadline. No Samsung settings are changed.
 The pending runtime suite also checks location/notification permissions are not
 pre-granted and reports incomplete runs explicitly rather than marking them passed.
+
+## Resume checkpoint — November 9 (Eastern time)
+
+- Fetched PR #1 at `2f1e0b917174556bde77dc800cbdc91aadafb89a`. Validate
+  run 42586776915 passed. Native run 42586776890 passed Android and iOS build
+  jobs. Its signed staging and emulator jobs were skipped.
+- Recovered the older local Codex checkout without modifying its working
+  tree. All 16 local-only commits have patch-equivalent remote commits.
+  Its uncommitted dispatch work overlaps the published `17601d9` implementation,
+  which already includes authorization, assignment version checks, GPS cleanup,
+  notifications and custody protections. Keep the remote implementation.
+- Owner physical Samsung Galaxy S22 Ultra evidence for signed staging artifact
+  13658705753: APK installed and launched, Android presented its native location
+  prompt, Driver Mode went online, and administrator dispatch showed the driver
+  available with fresh, accurate coordinates. The Google Maps location link
+  opened at the correct position. This verifies basic foreground GPS reporting
+  and the external coordinate link. Embedded map rendering, pickup/drop-off
+  navigation and continuous background tracking still require separate tests.
+  The exact deployed backend revision during the phone test was not recorded.
+- Next acceptance is an authorized private Stripe TEST order through all four
+  roles, including a processed signed event, delivery and financial records.
+  Complete provider refund/dispute/Connect exercises separately. The signed
+  staging APK is suitable for device testing. Play submission still requires a
+  signed Android release AAB, and iOS distribution requires signing/provisioning.
+  Keep public ordering disabled pending explicit launch authorization.
