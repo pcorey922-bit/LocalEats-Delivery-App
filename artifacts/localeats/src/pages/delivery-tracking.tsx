@@ -1,3 +1,4 @@
+import { useAppForeground } from "../hooks/use-app-foreground";
 import { useDutyIntent } from "../hooks/use-duty-intent";
 import { dutyIntent } from "../lib/duty-intent";
 import { NavigationActions } from "./navigation-actions";
@@ -49,8 +50,8 @@ export function DriverAvailability() {
       <h2>Your availability</h2>
       <p>
         Going online shares your current location with authorized dispatch while
-        the RoCoEats app is active and you choose to stay online. Going offline stops routine sharing and
-        clears the dispatch position.
+        the RoCoEats app is active and you choose to stay online. Going offline
+        stops routine sharing and clears the dispatch position.
       </p>
 
       <p>
@@ -99,12 +100,15 @@ export function DriverAvailability() {
   );
 }
 export function DriverLocationControl({ orderId }: { orderId: string }) {
+  const foreground = useAppForeground();
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState("");
   const [lastSent, setLastSent] = useState<number | null>(null);
   const lastAttempt = useRef(0);
   useEffect(() => {
-    if (!sharing) return;
+    if (!sharing || !foreground) return;
+    const controller = new AbortController();
+    let inFlight = false;
     let disposed = false;
     let watchId: string | undefined;
     void Geolocation.watchPosition(
@@ -117,21 +121,30 @@ export function DriverLocationControl({ orderId }: { orderId: string }) {
           );
           return;
         }
-        if (Date.now() - lastAttempt.current < 15000) return;
+        if (inFlight || Date.now() - lastAttempt.current < 15000) return;
         lastAttempt.current = Date.now();
-        void customFetch(`/api/driver/orders/${orderId}/location`, {
-          method: "POST",
-          body: JSON.stringify({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracyMeters: position.coords.accuracy,
-            observedAt: new Date(position.timestamp).toISOString(),
-          }),
-        })
-          .then(() => {
+        inFlight = true;
+        void customFetch<{ accepted: boolean }>(
+          `/api/driver/orders/${orderId}/location`,
+          {
+            method: "POST",
+            signal: controller.signal,
+            body: JSON.stringify({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracyMeters: position.coords.accuracy,
+              observedAt: new Date(position.timestamp).toISOString(),
+            }),
+          },
+        )
+          .then(({ accepted }) => {
             if (!disposed) {
-              setError("");
-              setLastSent(Date.now());
+              if (accepted) {
+                setError("");
+                setLastSent(Date.now());
+              } else {
+                setError("Waiting for a newer GPS fix.");
+              }
             }
           })
           .catch(() => {
@@ -139,23 +152,28 @@ export function DriverLocationControl({ orderId }: { orderId: string }) {
               setError(
                 "Location update could not be sent. Sharing resumes when the connection returns.",
               );
+          })
+          .finally(() => {
+            inFlight = false;
           });
       },
     )
       .then((id) => {
         watchId = id;
-        if (disposed) void Geolocation.clearWatch({ id });
+        if (disposed) void Geolocation.clearWatch({ id }).catch(() => {});
       })
-      .catch(() =>
-        setError(
-          "Location permission is required to share your delivery position.",
-        ),
-      );
+      .catch(() => {
+        if (!disposed)
+          setError(
+            "Location permission is required to share your delivery position.",
+          );
+      });
     return () => {
       disposed = true;
-      if (watchId) void Geolocation.clearWatch({ id: watchId });
+      controller.abort();
+      if (watchId) void Geolocation.clearWatch({ id: watchId }).catch(() => {});
     };
-  }, [sharing, orderId]);
+  }, [sharing, orderId, foreground]);
   return (
     <section>
       <button
@@ -166,7 +184,9 @@ export function DriverLocationControl({ orderId }: { orderId: string }) {
         {sharing ? "Stop location sharing" : "Share delivery location"}
       </button>
       <p className="roco-meta">
-        Location sharing works while this screen is active.{" "}
+        {sharing && !foreground
+          ? "Location sharing is paused while the app is in the background."
+          : "Location sharing works while this screen is active."}{" "}
         {lastSent
           ? `Last sent ${new Date(lastSent).toLocaleTimeString()}.`
           : ""}

@@ -616,3 +616,30 @@ Hosted access and authenticated Clerk tester sessions were unavailable in this
 session. No deployment, customer order, Stripe webhook processing, refund or
 payout was exercised. Use PRIVATE_TEST_DELIVERY.md for the four-role run and
 capture test-only payment and accounting evidence there or in the operator record.
+
+### Foreground GPS lifecycle and private checkout safeguards
+
+The shared lifecycle check combines WebView visibility with native activity.
+Both driver location watches pause when backgrounded and cancel pending client
+requests when the watch ends. On-duty uploads cannot start an assigned-order
+upload after the originating watch ends. The manual delivery control serializes
+uploads and updates its last-sent time only when the server accepts the sample.
+No background permissions or services were introduced. The existing Samsung
+foreground evidence still applies to the installed APK. Repeat with a newly
+built signed staging APK: background, lock, resume, go offline and sign out.
+Compare dispatch timestamps across each transition. Continuous background GPS
+requires separate native implementation and on-device verification.
+
+Extended relational coverage to verify anonymous and uninvited checkout
+requests are denied with the private test order gate open, and admitted order
+creation is denied when closed. The private acceptance guide now includes
+reconciliation evidence and closing the test window. All 114 local app/API
+tests, production typechecks and build passed. The tests use fixture identities
+and simulated payments. The actual hosted four-role Stripe TEST order remains
+pending the verified staging deploy and authenticated test sessions.
+
+Launch tax settings remain open. Preserve the sandbox-only pricing until the
+responsible collector, destination jurisdiction, and tax treatment of food,
+fees, and tips are verified for the actual business model. Signed Play AAB,
+signed iOS archive, physical push, and embedded Maps provider verification
+remain pending.

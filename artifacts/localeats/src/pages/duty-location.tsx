@@ -18,6 +18,7 @@ export function DutyLocation({
     let disposed = false,
       watch: string | undefined,
       inFlight = false;
+    const controller = new AbortController();
     attempt.current = 0;
     void Geolocation.watchPosition(
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 },
@@ -41,20 +42,22 @@ export function DutyLocation({
         void customFetch<{ accepted: boolean }>("/api/driver/location", {
           method: "POST",
           body: payload,
+          signal: controller.signal,
         })
           .then(async (result) => {
+            if (disposed) return;
             if (!result.accepted) {
-              if (!disposed)
-                setMessage(
-                  "Waiting for a newer GPS fix; the last position was not replaced.",
-                );
+              setMessage(
+                "Waiting for a newer GPS fix; the last position was not replaced.",
+              );
               return;
             }
-            if (activeOrderId)
+            if (activeOrderId) {
               await customFetch(
                 `/api/driver/orders/${activeOrderId}/location`,
-                { method: "POST", body: payload },
+                { method: "POST", body: payload, signal: controller.signal },
               );
+            }
             if (!disposed) {
               setLastSent(Date.now());
               setMessage("");
@@ -83,6 +86,7 @@ export function DutyLocation({
       });
     return () => {
       disposed = true;
+      controller.abort();
       if (watch) void Geolocation.clearWatch({ id: watch }).catch(() => {});
     };
   }, [available, foreground, activeOrderId]);

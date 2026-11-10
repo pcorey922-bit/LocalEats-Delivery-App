@@ -72,6 +72,23 @@ or the component fixtures. Keep live keys, real bank details and paid services o
   hosted Connect onboarding and transfers are separate TEST exercises. A transfer
   into a connected balance is not proof of bank payout or live banking readiness.
 
+## Close the private acceptance window
+
+When the test or any failed attempt ends, restore `ROCOEATS_ORDERING_ENABLED=false`
+on the same private Render service and wait for the redeploy. Keep the Stripe TEST
+provider and existing credentials. Confirm `/livez` still reports the expected
+revision and `/api/mobile/readiness` reports private staging, closed ordering and
+disabled live charges. Leave existing test records available for reconciliation.
+
+Record the order ID and the Stripe TEST Checkout/payment/event references privately.
+For the order, compare the displayed and stored subtotal, delivery/service fees,
+tip, tax and charged total. Compare the restaurant commission and driver
+allocation against the order pricing snapshot, including the tip. Check the
+settlement recipients and the balanced administrator ledger. Confirm the signed
+webhook inbox entry is processed and compare the Stripe fee and net balance
+transaction to the reconciliation report. Record each stage separately and
+mark any missing provider evidence or mismatched cents as an open item.
+
 ## Failure acceptance and evidence
 
 Exercise decline/abandoned checkout, duplicate submission/webhooks, restaurant

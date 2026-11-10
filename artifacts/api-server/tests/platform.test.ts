@@ -277,6 +277,19 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       process.env.ROCOEATS_STAGING_TESTER_CLERK_USER_IDS = ` ${ids.customer} `;
       assert.equal((await api("/restaurants", ids.customer)).status, 200);
       assert.equal((await api("/admin/profiles", ids.customer)).status, 403);
+      const quote = await api("/orders/quote", ids.customer, "POST", input());
+      assert.equal(quote.status, 200);
+      const orderInput = { ...input(), expectedTotalCents: quote.data.totalCents };
+      for (const [actor, status] of [[null, 401], [ids.other, 403]] as const) {
+        assert.equal((await api("/orders", actor, "POST", orderInput, randomUUID())).status, status);
+        assert.equal((await api(`/orders/${randomUUID()}/checkout`, actor, "POST")).status, status);
+      }
+      process.env.ROCOEATS_ORDERING_ENABLED = "false";
+      try {
+        assert.equal((await api("/orders", ids.customer, "POST", orderInput, randomUUID())).status, 503);
+      } finally {
+        process.env.ROCOEATS_ORDERING_ENABLED = "true";
+      }
       const webhook = await fetch(`${origin}/api/webhooks/stripe`, {method: "POST", headers: {"content-type":"application/json"}, body:"{}"});
       assert.equal(webhook.status, 503); // Reached signature configuration check, not staging authentication.
       assert.equal((await fetch(`${origin}/livez`)).status, 200);
