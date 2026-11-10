@@ -37,3 +37,18 @@ test("private staging fails closed on missing owners, non-development keys and u
   ]) assert.throws(() => containerEnvironment({ ...valid(), ...change }));
   assert.doesNotThrow(() => containerEnvironment({ ...valid(), ROCOEATS_ORDERING_ENABLED: "true", STRIPE_WEBHOOK_SECRET: "whsec_fixture" }));
 });
+
+test("private test ordering requires a closed public gate and Stripe webhook", () => {
+  const env = {
+    ...valid(), ROCOEATS_ORDERING_ENABLED: "false",
+    ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED: "true", STRIPE_WEBHOOK_SECRET: "whsec_fixture",
+  };
+  assert.doesNotThrow(() => containerEnvironment(env));
+  for (const patch of [
+    { ROCOEATS_PRIVATE_STAGING: "false" },
+    { ROCOEATS_ORDERING_ENABLED: "true" },
+    { ROCOEATS_ORDERING_ENABLED: undefined },
+    { STRIPE_WEBHOOK_SECRET: undefined },
+    { ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED: "yes" },
+  ]) assert.throws(() => containerEnvironment({ ...env, ...patch }));
+});

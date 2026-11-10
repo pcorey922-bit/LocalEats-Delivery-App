@@ -123,8 +123,9 @@ money. After the URL exists, follow the test webhook steps in
 to enter `STRIPE_WEBHOOK_SECRET` through Render **Environment**, then configure
 test pricing, menus, hours, stock and approved restaurant/driver accounts. Keep
 ordering disabled during initial private-access checks. Only after those checks
-may you explicitly enable ordering **for admitted test users**; live keys remain
-rejected. Stay awake in an active browser session for end-to-end order testing.
+may you open the private test window using the separate setting in
+[PRIVATE_TEST_DELIVERY.md](PRIVATE_TEST_DELIVERY.md). Keep public ordering closed
+and use an active browser session for end-to-end order testing.
 
 No simulator is enabled. Push/Google dispatch maps still need their provider
 configuration; Google Maps billing is outside this $0 deployment. Existing Google

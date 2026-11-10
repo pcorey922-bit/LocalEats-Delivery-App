@@ -4,8 +4,9 @@ import { test } from "node:test";
 import {
   allocateEarnings,
   calculatePrice,
+  orderingEnabled,
   paymentMode,
-
+  privateTestOrderingEnabled,
 } from "./commerce-policy";
 test("fees, tax, and tip use integer cents and immutable allocation inputs", () => {
   const price = calculatePrice(1999, 300, {
@@ -45,4 +46,30 @@ test("live and restricted secret keys cannot activate charges", () => {
     paymentMode({ PAYMENT_PROVIDER: "sandbox", NODE_ENV: "test" }),
     "sandbox",
   );
+});
+
+test("private test ordering fails closed unless public ordering is explicitly off and Stripe TEST is configured", () => {
+  const env = {
+    ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED: "true",
+    ROCOEATS_PRIVATE_STAGING: "true",
+    ROCOEATS_ORDERING_ENABLED: "false",
+    PAYMENT_PROVIDER: "stripe_test",
+    STRIPE_SECRET_KEY: "sk_test_fixture",
+    STRIPE_WEBHOOK_SECRET: "whsec_fixture",
+  };
+  assert.equal(privateTestOrderingEnabled(env), true);
+  assert.equal(orderingEnabled(env), true);
+  for (const patch of [
+    { ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED: undefined },
+    { ROCOEATS_PRIVATE_STAGING: "false" },
+    { ROCOEATS_ORDERING_ENABLED: undefined },
+    { ROCOEATS_ORDERING_ENABLED: "true" },
+    { PAYMENT_PROVIDER: "sandbox" },
+    { STRIPE_SECRET_KEY: "sk_live_fixture" },
+    { STRIPE_WEBHOOK_SECRET: undefined },
+  ]) {
+    assert.equal(privateTestOrderingEnabled({ ...env, ...patch }), false);
+    assert.equal(orderingEnabled({ ...env, ...patch }), false);
+  }
+  assert.equal(orderingEnabled({ ROCOEATS_ORDERING_ENABLED: "true" }), true);
 });

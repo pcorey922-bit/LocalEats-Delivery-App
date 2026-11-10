@@ -6,6 +6,7 @@ import { expireReservation } from "../lib/reservation-expiry";
 import { driverDutyLocationsTable } from "@workspace/db";
 import {
   orderingEnabled,
+  privateTestOrderingEnabled,
   requireOrderingEnabled,
 } from "../lib/commerce-policy";
 import { driverApplicationsTable, driverPresenceTable } from "@workspace/db";
@@ -82,6 +83,8 @@ router.get("/commerce/config", async (_req, res) => {
     testMode: true,
     liveChargesEnabled: false,
     orderingEnabled: orderingEnabled(),
+    publicOrderingEnabled: process.env.ROCOEATS_ORDERING_ENABLED === "true",
+    privateTestOrderingEnabled: privateTestOrderingEnabled(),
     pricing,
     configurationRequired: pricing === null,
     taxNotice:

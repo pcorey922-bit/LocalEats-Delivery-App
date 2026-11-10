@@ -643,3 +643,28 @@ responsible collector, destination jurisdiction, and tax treatment of food,
 fees, and tips are verified for the actual business model. Signed Play AAB,
 signed iOS archive, physical push, and embedded Maps provider verification
 remain pending.
+
+## Render deployment verified — November 10 (Eastern time)
+
+Render serves `fdb0c9f90679822217f9fb7da6537acb01de8329`, matching the owner's
+deployment. All eleven closed-staging HTTP checks passed. Database, auth, pricing,
+test provider configuration, webhook configuration and workers reported ready.
+Private staging is active. Ordering and live charges are disabled. A separate
+unsigned webhook request returned HTTP 400 before event intake. These checks do
+not establish delivery of a real signed event or a real payment.
+
+PR revision `6835d3d` passed Validate (42759057919) and Android/iOS compile CI
+(42759057632). Signed staging and emulator jobs were skipped. Preserve the
+Samsung foreground GPS evidence for the installed build.
+
+Added a separate `ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED` window. It requires
+private staging, the public switch explicitly false, Stripe TEST credentials and
+a configured webhook signing secret. Existing admission remains in force. The
+new setting defaults off. Automated coverage verifies invited order creation,
+anonymous/uninvited denial, closure blocking checkout and cancellation after
+closure. The test uses fixture identities and makes no external checkout request.
+All 116 local app/API tests, ten configuration/release checks, production
+typechecks and the build passed. Deployment and authenticated Stripe acceptance
+for this new path remain pending. Follow PRIVATE_TEST_DELIVERY.md using the
+existing owner and invited tester sessions. No environment or credentials were
+changed in this session.

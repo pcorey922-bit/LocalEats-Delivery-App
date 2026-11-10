@@ -3410,5 +3410,36 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       const [suspended]=await db.select().from(profilesTable).where(eq(profilesTable.id,inactiveId));assert.equal(suspended.role,'customer');assert.equal(suspended.isActive,false);
     }finally{if(previous===undefined)delete process.env.LOCALEATS_ADMIN_CLERK_USER_IDS;else process.env.LOCALEATS_ADMIN_CLERK_USER_IDS=previous;}
   });
+  await t.test("a private Stripe TEST window admits a tester without opening public ordering", async () => {
+    process.env.ROCOEATS_ORDERING_ENABLED = "false";
+    process.env.ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED = "true";
+    process.env.ROCOEATS_PRIVATE_STAGING = "true";
+    process.env.ROCOEATS_STAGING_TESTER_CLERK_USER_IDS = ids.customer;
+    process.env.PAYMENT_PROVIDER = "stripe_test";
+    process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
+    process.env.STRIPE_WEBHOOK_SECRET = "whsec_fixture";
+    try {
+      const quote = await api("/orders/quote", ids.customer, "POST", input());
+      assert.equal(quote.status, 200);
+      const payload = { ...input(), expectedTotalCents: quote.data.totalCents };
+      const config = await api("/commerce/config", ids.customer);
+      assert.equal(config.data.publicOrderingEnabled, false);
+      assert.equal(config.data.privateTestOrderingEnabled, true);
+      assert.equal(config.data.mode, "stripe_test");
+      assert.equal(config.data.liveChargesEnabled, false);
+
+      for (const [actor, status] of [[null, 401], [ids.other, 403]] as const) {
+        assert.equal((await api("/orders", actor, "POST", payload, randomUUID())).status, status);
+      }
+      const created = await api("/orders", ids.customer, "POST", payload, randomUUID());
+      assert.equal(created.status, 201, JSON.stringify(created.data));
+
+      process.env.ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED = "false";
+      assert.equal((await api(`/orders/${created.data.id}/checkout`, ids.customer, "POST")).status, 503);
+      assert.equal((await api(`/orders/${created.data.id}/cancel`, ids.customer, "POST", { reason: "Close private staging fixture" })).status, 200);
+    } finally {
+      delete process.env.ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED;
+    }
+  });
 
 });

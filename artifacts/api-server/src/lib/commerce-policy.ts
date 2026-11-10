@@ -7,9 +7,22 @@ export class CommerceError extends Error {
     super(message);
   }
 }
-// This server-only gate authorizes new ordering requests; it does not enable live money.
-export function orderingEnabled() {
-  return process.env.ROCOEATS_ORDERING_ENABLED === "true";
+export function privateTestOrderingEnabled(env = process.env) {
+  return (
+    env.ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED === "true" &&
+    env.ROCOEATS_ORDERING_ENABLED === "false" &&
+    env.ROCOEATS_PRIVATE_STAGING === "true" &&
+    env.PAYMENT_PROVIDER === "stripe_test" &&
+    /^sk_test_[A-Za-z0-9]+$/.test(env.STRIPE_SECRET_KEY || "") &&
+    /^whsec_[A-Za-z0-9]+$/.test(env.STRIPE_WEBHOOK_SECRET || "")
+  );
+}
+
+// The private path still passes through the existing tester admission middleware.
+export function orderingEnabled(env = process.env) {
+  if (env.ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED === "true")
+    return privateTestOrderingEnabled(env);
+  return env.ROCOEATS_ORDERING_ENABLED === "true";
 }
 export function requireOrderingEnabled() {
   if (!orderingEnabled())

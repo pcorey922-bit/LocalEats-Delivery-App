@@ -1,4 +1,4 @@
-import { orderingEnabled } from "../lib/commerce-policy";
+import { orderingEnabled, privateTestOrderingEnabled } from "../lib/commerce-policy";
 import { Router } from "express";
 import { z } from "zod";
 import { createHash, randomBytes } from "node:crypto";
@@ -22,7 +22,7 @@ router.get("/mobile/readiness", (_req, res) => {
   const configured =
     process.env.ROCOEATS_PRIVATE_STAGING === "true" &&
     process.env.PAYMENT_PROVIDER === "stripe_test" &&
-    !orderingEnabled() &&
+    process.env.ROCOEATS_ORDERING_ENABLED !== "true" &&
     /^pk_test_/.test(process.env.CLERK_PUBLISHABLE_KEY || "");
   res
     .status(configured ? 200 : 503)
@@ -30,6 +30,8 @@ router.get("/mobile/readiness", (_req, res) => {
       nativeProtocolVersion: 1,
       privateTestStaging: configured,
       orderingEnabled: orderingEnabled(),
+      publicOrderingEnabled: process.env.ROCOEATS_ORDERING_ENABLED === "true",
+      privateTestOrderingEnabled: privateTestOrderingEnabled(),
       liveChargesEnabled: false,
       clerkPublishableKey: configured
         ? process.env.CLERK_PUBLISHABLE_KEY

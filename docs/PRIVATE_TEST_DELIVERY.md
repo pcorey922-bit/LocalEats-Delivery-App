@@ -7,7 +7,8 @@ or the component fixtures. Keep live keys, real bank details and paid services o
 ## Owner setup before an order
 
 1. Deploy the latest verified branch in Render. Leave
-   `ROCOEATS_ORDERING_ENABLED=false` during setup. Confirm owner access at
+   `ROCOEATS_ORDERING_ENABLED=false` throughout and leave
+   `ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED=false` during setup. Confirm owner access at
    `/account/access`; Google sign-in must match the configured owner identity.
 2. Open `/operations`. **Stripe TEST setup** shows the exact webhook URL, installed
    SDK's snapshot event API version, required subscriptions, and whether the
@@ -42,10 +43,14 @@ or the component fixtures. Keep live keys, real bank details and paid services o
    and may be quarantined because its order metadata does not belong to this DB.
    Historical accepted-event time does not verify a newly changed signing secret.
    Real payment evidence comes from the actual Checkout transaction below.
-7. **Stop until the owner has verified these private safeguards and authorized
-   private ordering.** Only then may the owner change the Render ordering gate for
-   this private sandbox. No engineering endpoint automatically changes it. This
-   never authorizes public orders or live payments. Leave the gate false otherwise.
+7. Once the owner has authorized the test and verified the safeguards, set
+   `ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED=true` in the existing Render service
+   and deploy the revision that supports this flag. Keep
+   `ROCOEATS_ORDERING_ENABLED=false`, `ROCOEATS_PRIVATE_STAGING=true` and
+   `PAYMENT_PROVIDER=stripe_test`. Leave all credentials as configured. Before
+   submitting, verify `/api/mobile/readiness` reports `privateTestStaging: true`,
+   `publicOrderingEnabled: false`, `privateTestOrderingEnabled: true` and
+   `liveChargesEnabled: false`. Verify an uninvited identity is denied.
 
 ## Complete the actual business workflow
 
@@ -74,11 +79,11 @@ or the component fixtures. Keep live keys, real bank details and paid services o
 
 ## Close the private acceptance window
 
-When the test or any failed attempt ends, restore `ROCOEATS_ORDERING_ENABLED=false`
+When the test or any failed attempt ends, restore `ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED=false`
 on the same private Render service and wait for the redeploy. Keep the Stripe TEST
 provider and existing credentials. Confirm `/livez` still reports the expected
 revision and `/api/mobile/readiness` reports private staging, closed ordering and
-disabled live charges. Leave existing test records available for reconciliation.
+disabled live charges. The public ordering switch stays false throughout. Leave existing test records available for reconciliation.
 
 Record the order ID and the Stripe TEST Checkout/payment/event references privately.
 For the order, compare the displayed and stored subtotal, delivery/service fees,

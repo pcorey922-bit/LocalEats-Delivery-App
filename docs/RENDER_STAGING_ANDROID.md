@@ -110,13 +110,9 @@ Neither bank credentials nor a live Stripe key is needed for staging.
    Open `/admin`, configure reviewed **test** pricing and service ZIP codes.
    Your driver access uses the same owner account and still requires explicit
    on-duty/location consent and normal safe delivery state transitions.
-6. Keep `ROCOEATS_ORDERING_ENABLED=false` until testers, approved restaurants,
-   menus, operating hours, stock and operational settings are ready. Then change
-   that setting to `true` in Render Environment and redeploy **only for private
-   test orders**. Startup refuses this change without a test webhook secret.
-   `/readyz` must become 200 after configuration and worker startup. Verify a real
-   test Checkout transaction and signed webhook delivery before claiming payments
-   work. Dashboard-generated sample events do not prove a complete order flow.
+6. Keep `ROCOEATS_ORDERING_ENABLED=false`. For an authorized private Stripe TEST
+   delivery, use the separate test window documented in
+   [PRIVATE_TEST_DELIVERY.md](PRIVATE_TEST_DELIVERY.md).
 
 See [Stripe webhook setup](https://docs.stripe.com/webhooks).
 

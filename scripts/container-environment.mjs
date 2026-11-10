@@ -12,6 +12,12 @@ export function containerEnvironment(env) {
     if (env.ROCOEATS_PRIVATE_STAGING !== "true")
       throw new Error("Render staging requires ROCOEATS_PRIVATE_STAGING=true");
   }
+  const privateOrders = result.ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED;
+  if (privateOrders !== undefined && !["true", "false"].includes(privateOrders))
+    throw new Error("Use true or false for ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED");
+  if (privateOrders === "true" &&
+      (result.ROCOEATS_PRIVATE_STAGING !== "true" || result.ROCOEATS_ORDERING_ENABLED !== "false"))
+    throw new Error("Private test ordering requires private staging and explicitly closed public ordering");
   if (result.ROCOEATS_PRIVATE_STAGING === "true") {
     const owners = (result.LOCALEATS_ADMIN_CLERK_USER_IDS || "").split(",").map(s => s.trim()).filter(Boolean);
     const drivers = (result.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS || "").split(",").map(s => s.trim()).filter(Boolean);
@@ -23,7 +29,7 @@ export function containerEnvironment(env) {
       throw new Error("Private staging requires Clerk Development keys");
     if (result.PAYMENT_PROVIDER !== "stripe_test" || !/^sk_test_[A-Za-z0-9]+$/.test(result.STRIPE_SECRET_KEY || ""))
       throw new Error("Private staging requires Stripe test credentials");
-    if (result.ROCOEATS_ORDERING_ENABLED === "true" && !/^whsec_[A-Za-z0-9]+$/.test(result.STRIPE_WEBHOOK_SECRET || ""))
+    if ((result.ROCOEATS_ORDERING_ENABLED === "true" || privateOrders === "true") && !/^whsec_[A-Za-z0-9]+$/.test(result.STRIPE_WEBHOOK_SECRET || ""))
       throw new Error("Configure STRIPE_WEBHOOK_SECRET before enabling test ordering");
   }
   return result;
