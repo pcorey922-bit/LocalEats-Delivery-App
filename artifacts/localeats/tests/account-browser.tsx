@@ -1,3 +1,4 @@
+import App from "../src/App";
 import { NativeSignIn } from "../src/pages/native-sign-in";
 import { ImportGuestLink } from "../src/pages/import-guest-link";
 import { NextGuestOrder } from "../src/pages/next-guest-order";
@@ -71,7 +72,15 @@ window.qaNextGuestWrites = [];
 window.qaTelephoneStatus = "pending";
 window.qaTelephoneVersion = 1;
 window.qaTelephoneWrites = [];
-window.qaSignedIn = !["guest=true", "native=true", "importGuest=true"].some(
+const signupFixture = location.pathname === "/signup-fixture" || sessionStorage.getItem("qa-signup-fixture") === "1";
+if (location.pathname === "/signup-fixture") {
+  const query = new URLSearchParams(location.search);
+  sessionStorage.setItem("qa-signup-fixture", "1");
+  if (query.has("deny")) sessionStorage.setItem("qa-signup-deny", "1");
+  if (query.has("expired")) sessionStorage.setItem("qa-signup-expired", "1");
+  history.replaceState(null, "", "/sign-up" + location.search);
+}
+window.qaSignedIn = signupFixture ? sessionStorage.getItem("qa-signup-session") === "signed-in" : !["guest=true", "native=true", "importGuest=true"].some(
   (v) => location.search.includes(v),
 );
 window.qaGuestContacts = [];
@@ -113,6 +122,33 @@ window.fetch = async (url, options = {}) => {
     new Response(JSON.stringify(value), {
       headers: { "content-type": "application/json" },
     });
+  if (signupFixture && String(url).startsWith("/api/")) {
+    const path = String(url);
+    const raw = sessionStorage.getItem("qa-signup-profile");
+    const saved = raw ? JSON.parse(raw) : null;
+    const denied = sessionStorage.getItem("qa-signup-deny") === "1";
+    if (path === "/api/profiles/me") {
+      if (sessionStorage.getItem("qa-signup-expired") === "1") return Response.json({ error: "Sign in again" }, { status: 401 });
+      if (denied) return Response.json({ error: "Private staging requires an invitation" }, { status: 403 });
+      if (options.method === "POST") {
+        if (saved) return Response.json({ error: "Profile already exists" }, { status: 409 });
+        const profile = { ...JSON.parse(String(options.body)), id: "fixture-profile", createdAt: new Date().toISOString() };
+        sessionStorage.setItem("qa-signup-profile", JSON.stringify(profile));
+        sessionStorage.setItem("qa-signup-writes", String(Number(sessionStorage.getItem("qa-signup-writes")) + 1));
+        return Response.json(profile, { status: 201 });
+      }
+      return saved ? json(saved) : Response.json({ error: "Profile setup is required" }, { status: 404 });
+    }
+    if (path === "/api/session/access") return json({
+      ...window.qaAccess, privateStaging: true, stagingAdmitted: !denied,
+      profileStatus: saved ? "active" : "setup_required", role: saved?.role ?? null,
+    });
+    if (path === "/api/dashboard") return json({ ...saved, sections: [] });
+    if (path === "/api/restaurants/me") return Response.json({ error: "No restaurant" }, { status: 404 });
+    if (path === "/api/driver/availability") return json({ available: false, approved: false, online: false });
+    if (path === "/api/driver/application") return json(null);
+    return json([]);
+  }
   if (String(url) === "/api/orders/fixture-telephone/guest-contact")
     return json({
       name: "QA telephone guest",
@@ -313,7 +349,7 @@ window.fetch = async (url, options = {}) => {
   throw Error("Unexpected QA request " + url);
 };
 createRoot(document.getElementById("root")!).render(
-  <QueryClientProvider
+  signupFixture ? <App /> : <QueryClientProvider
     client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
   >
     <p>SIMULATED authentication and API: component QA only</p>

@@ -765,3 +765,23 @@ the production build/typechecks passed. The Chromium runner was blocked before
 navigation by a denied process socket, so the browser fixture is unverified.
 Read-only Render checks passed all 16 on 5d9374c with both ordering gates closed.
 No production settings or Stripe transactions were changed.
+
+### Signup browser reproduction and loading loop fix
+
+On 5702b18, web Validate 42775984020 and native workflow 42775983964 passed.
+The deployed Render revision still reports 5d9374c. The installed Chromium
+process could not bind its singleton socket in this workspace. Google's
+official Chrome Headless Shell ran the mobile-width browser fixture locally.
+
+The fixture loaded the real signup, account setup, restaurant and dashboard
+routes with simulated Clerk and API responses. A 403 reproduced the loading
+loop in account setup: its error view mounted a header that retried the same
+failed query, hid the error view, and repeated. Profile observers now retain
+the error until an explicit retry or normal refocus. Direct restaurant and
+driver URLs preserve signup intent and distinguish missing profile from denied
+access. The fixture verified all three signup paths, reload persistence, stable
+restaurant/dashboard denial and Retry, expired-session recovery, guest-cart
+transfer, and native handoff. All 121 local API tests and the production build
+passed. Real Clerk registration and the reported Gmail alias on deployed
+private staging remain unverified. Signed native builds, physical-device
+coverage and real provider acceptance remain open. Ordering gates were not changed.

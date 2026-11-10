@@ -55,7 +55,7 @@ function Loading({ label = 'Loading records' }: { label?: string }) { return <di
 function LoadError({ retry, message = 'We could not load this information.' }: { retry: () => void; message?: string }) { return <div className="roco-alert" role="alert">{message}<button className="roco-button" style={{ marginLeft: 12 }} onClick={retry}><RefreshCw size={14}/> Retry</button></div>; }
 function useMyProfile() {
   const { isLoaded, isSignedIn, userId } = useAuth();
-  return useGetMyProfile({ query: { queryKey: [...getGetMyProfileQueryKey(), userId], enabled: !!isLoaded && !!isSignedIn, networkMode: 'always', retry: false } });
+  return useGetMyProfile({ query: { queryKey: [...getGetMyProfileQueryKey(), userId], enabled: !!isLoaded && !!isSignedIn, networkMode: 'always', retry: false, retryOnMount: false } });
 }
 function RoleGate({ allowed }: { allowed: string[] }) {
   const profile = useMyProfile();
@@ -221,7 +221,9 @@ export function DriverPage() {
     onSuccess: () => { void client.invalidateQueries({queryKey:['driver-declined-offers']}); void client.invalidateQueries({queryKey:['driver-availability']}); void client.invalidateQueries({ queryKey: ['driver-offers'] }); void client.invalidateQueries({ queryKey: ['driver-deliveries'] }); },
   });
   if (profile.isLoading) return <Shell><Loading label="Checking driver access"/></Shell>;
-  if (!enabled) return <Shell><main className="roco-main"><PageIntro eyebrow="Driver access" title="Your delivery workspace.">Sign in with an active, administrator-approved driver profile to view deliveries.</PageIntro><p><Link href="/account/access">Check owner-driver access</Link> · <Link href="/account/setup">Complete profile setup</Link></p></main></Shell>;
+  if (profile.isError && accountStatus(profile.error) === 404) return <Redirect to="/account/setup?join=driver" />;
+  if (profile.isError) return <Shell><main className="roco-main"><PageIntro eyebrow="Driver access" title="We couldn’t open your workspace."/><LoadError retry={() => void profile.refetch()} message={accountStatus(profile.error) === 403 ? "This account does not have driver workspace access. Private staging requires an invitation." : "Check your connection or sign in again."}/><p><Link href="/account/access">Check account access</Link> · <Link href="/sign-in?join=driver">Sign in again</Link></p></main></Shell>;
+  if (!enabled) return <Shell><main className="roco-main"><PageIntro eyebrow="Driver access" title="Your delivery workspace.">Sign in with an active, administrator-approved driver profile to view deliveries.</PageIntro><p><Link href="/account/access">Check driver access</Link></p></main></Shell>;
   const card = (d: DriverDelivery, offer: boolean) => <article className="roco-card" key={d.orderId}>
     {d.status==='picked_up'&&d.orderStatus==='out_for_delivery'&&<DriverHandoff orderId={d.orderId} onCompleted={()=>{void client.invalidateQueries({queryKey:['driver-availability']});void client.invalidateQueries({queryKey:['driver-deliveries']});void client.invalidateQueries({queryKey:['driver-offers']});}}/>}
     {!offer&&<SupportDesk orderId={d.orderId}/>}<h3>{d.restaurantName}</h3><p>Pickup: {d.pickupStreet}, {d.pickupCity}</p><p className="roco-meta">Order {d.orderId} · {statusText(d.status)}</p>

@@ -19,6 +19,9 @@ export function DriverDutySession() {
     query: {
       queryKey: [...getGetMyProfileQueryKey(), userId],
       enabled: !!isSignedIn,
+      networkMode: "always",
+      retry: false,
+      retryOnMount: false,
     },
   });
   const enabled =

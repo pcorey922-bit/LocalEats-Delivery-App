@@ -25,6 +25,12 @@ await build({
     "process.env.NODE_ENV": '"development"',
     "import.meta.env.VITE_API_ORIGIN": '"https://qa.onrender.com"',
     "import.meta.env.BASE_URL": '"/"',
+    "import.meta.env.VITE_CLERK_PUBLISHABLE_KEY": '"fixture"',
+    "import.meta.env.VITE_CLERK_PROXY_URL": "undefined",
+    "import.meta.env.DEV": "false",
+    "import.meta.env.VITE_DEMO_MODE": "undefined",
+    "import.meta.env.VITE_GOOGLE_MAPS_API_KEY": "undefined",
+    "import.meta.env.VITE_GOOGLE_MAPS_MAP_ID": "undefined",
   },
   plugins: [
     {
@@ -43,12 +49,37 @@ await build({
     {
       name: "qa-clerk",
       setup(b) {
+        b.onResolve({ filter: /^@clerk\/react\/internal$/ }, () => ({
+          path: "internal", namespace: "qa-internal",
+        }));
+        b.onLoad({ filter: /.*/, namespace: "qa-internal" }, () => ({
+          contents: 'export const publishableKeyFromHost = (_host, key) => key;',
+          loader: "js",
+        }));
         b.onResolve({ filter: /^@clerk\/react$/ }, () => ({
           path: "clerk",
           namespace: "qa",
         }));
         b.onLoad({ filter: /.*/, namespace: "qa" }, () => ({
-          contents: `export const useSignIn=()=>({signIn:{ticket:async({ticket})=>{window.qaNativeTickets.push(ticket);return{error:null}},finalize:async()=>{window.qaSignedIn=true;return{error:null}}}});export const useAuth=()=>({isLoaded:true,isSignedIn:window.qaSignedIn,userId:window.qaSignedIn?'user_QA':null});export const useClerk=()=>({openUserProfile:()=>{window.securityOpened=true}});`,
+          resolveDir: root + "/artifacts/localeats",
+          contents: `
+            import React from "react";
+            const account = () => ({isLoaded:true,isSignedIn:window.qaSignedIn,userId:window.qaSignedIn?'user_QA':null,getToken:async()=>null});
+            export const useAuth=account;
+            export const useUser=()=>({isLoaded:true,user:window.qaSignedIn?{id:'user_QA',fullName:'Signup Fixture'}:null});
+            export const ClerkProvider=({children})=>children;
+            const start=({forceRedirectUrl})=>React.createElement("button",{onClick:()=>{
+              sessionStorage.setItem("qa-signup-session","signed-in");
+              location.assign(forceRedirectUrl);
+            }},"Complete simulated Clerk sign-in");
+            export const SignUp=start, SignIn=start;
+            export const useSignIn=()=>({signIn:{ticket:async({ticket})=>{window.qaNativeTickets.push(ticket);return{error:null}},finalize:async()=>{window.qaSignedIn=true;return{error:null}}}});
+            export const useClerk=()=>({
+              openUserProfile:()=>{window.securityOpened=true},
+              addListener:()=>()=>{},
+              signOut:async({redirectUrl})=>{sessionStorage.removeItem("qa-signup-session");location.assign(redirectUrl)},
+            });
+          `,
           loader: "js",
         }));
       },
@@ -100,6 +131,79 @@ try {
     headless: true,
     args: ["--no-sandbox"],
   });
+  const origin = "http://127.0.0.1:" + server.address().port;
+  for (const [intent, role, destination, heading] of [
+    ["", "customer", "/dashboard", "Welcome, Signup Fixture."],
+    ["?join=restaurant", "restaurant", "/restaurant", "Bring your business to the table."],
+    ["?join=driver", "driver", "/driver", "Local deliveries."],
+  ]) {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    page.setDefaultTimeout(10000);
+    page.on("pageerror", error => console.error("Signup fixture error:", error.message));
+    await page.goto(origin + "/signup-fixture" + intent);
+    await page.getByRole("button", { name: "Complete simulated Clerk sign-in" }).click();
+    try {
+      await page.waitForURL(url => url.pathname === destination, { timeout: 10000 });
+    } catch (error) {
+      console.error("Signup destination", role, page.url(), await page.locator("body").innerText());
+      throw error;
+    }
+    await page.getByRole("heading", { name: heading, exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => JSON.parse(sessionStorage.getItem("qa-signup-profile")).role), role);
+    await page.reload();
+    await page.getByRole("heading", { name: heading, exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => Number(sessionStorage.getItem("qa-signup-writes"))), 1);
+    await page.close();
+  }
+
+  const deniedPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  deniedPage.setDefaultTimeout(10000);
+  deniedPage.on("pageerror", error => console.error("Denied fixture error:", error.message));
+  await deniedPage.goto(origin + "/signup-fixture?join=restaurant&deny=1");
+  await deniedPage.getByRole("button", { name: "Complete simulated Clerk sign-in" }).click();
+  try {
+    await deniedPage.getByRole("alert").filter({ hasText: "Private staging requires an invitation" }).waitFor();
+  } catch (error) {
+    console.error("Denied signup state:", deniedPage.url(), await deniedPage.locator("body").innerText());
+    throw error;
+  }
+  assert.equal(await deniedPage.evaluate(() => sessionStorage.getItem("qa-signup-writes")), null);
+  await deniedPage.goto(origin + "/restaurant");
+  await deniedPage.getByRole("alert").filter({ hasText: "Private staging requires an invitation" }).waitFor();
+  await deniedPage.getByRole("button", { name: "Retry", exact: true }).click();
+  await deniedPage.getByRole("alert").filter({ hasText: "Private staging requires an invitation" }).waitFor();
+  await deniedPage.getByRole("link", { name: "Check account access" }).click();
+  await deniedPage.getByText("You are signed in. This private staging account still needs an invitation.").waitFor();
+  await deniedPage.goto(origin + "/dashboard");
+  await deniedPage.getByRole("alert").filter({ hasText: "Check your connection or account access" }).waitFor();
+  await deniedPage.getByRole("button", { name: "Try again", exact: true }).click();
+  await deniedPage.getByRole("alert").filter({ hasText: "Check your connection or account access" }).waitFor();
+  await deniedPage.close();
+  console.log("Signup UI: three member paths, session reload, and stable restaurant/dashboard staging denials passed (simulated Clerk/API)");
+
+  const expiredPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await expiredPage.goto(origin + "/signup-fixture?join=restaurant&expired=1");
+  await expiredPage.getByRole("button", { name: "Complete simulated Clerk sign-in" }).click();
+  await expiredPage.getByRole("button", { name: "Sign in again to continue" }).click();
+  await expiredPage.waitForURL(url => url.pathname === "/sign-in" && url.searchParams.get("join") === "restaurant");
+  assert.equal(await expiredPage.evaluate(() => sessionStorage.getItem("qa-signup-session")), null);
+  await expiredPage.close();
+
+  const cartSignup = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await cartSignup.goto(origin + "/signup-fixture?checkout=1");
+  await cartSignup.evaluate(() => localStorage.setItem("rocoeats-guest-cart:v1", JSON.stringify([{
+    menuItemId: "11111111-1111-4111-8111-111111111111", name: "Guest cart fixture", priceCents: 899,
+    quantity: 1, restaurantId: "22222222-2222-4222-8222-222222222222", restaurantName: "Fixture kitchen",
+  }])));
+  await cartSignup.getByRole("button", { name: "Complete simulated Clerk sign-in" }).click();
+  await cartSignup.waitForURL(url => url.pathname === "/cart" && !url.search);
+  await cartSignup.getByText("Guest cart fixture", { exact: true }).waitFor();
+  assert.equal(await cartSignup.evaluate(() => JSON.parse(localStorage.getItem("rocoeats-guest-cart:v1")).length), 0);
+  await cartSignup.reload();
+  await cartSignup.getByText("Guest cart fixture", { exact: true }).waitFor();
+  await cartSignup.close();
+  console.log("Signup UI: expired-session recovery and guest cart restoration passed (simulated Clerk/API)");
+
   const nativePage = await browser.newPage({
     viewport: { width: 390, height: 844 },
   });

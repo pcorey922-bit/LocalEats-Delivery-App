@@ -327,7 +327,7 @@ function QueryError({ retry, message = 'We couldn’t load this part of your acc
 
 function useProfileQuery() {
   const { isLoaded, isSignedIn, userId } = useAuth();
-  return useGetMyProfile({ query: { queryKey: [...getGetMyProfileQueryKey(), userId], enabled: !!isLoaded && !!isSignedIn, networkMode: 'always', retry: false } });
+  return useGetMyProfile({ query: { queryKey: [...getGetMyProfileQueryKey(), userId], enabled: !!isLoaded && !!isSignedIn, networkMode: 'always', retry: false, retryOnMount: false } });
 }
 
 function isNotFound(error: unknown) {
@@ -363,10 +363,10 @@ function SessionLoading() {
   </main>;
 }
 
-function Protected({ children }: { children: ReactNode }) {
+function Protected({ children, signInPath = "/" }: { children: ReactNode; signInPath?: string }) {
   const { isLoaded, isSignedIn } = useAuth();
   if (!isLoaded) return <SessionLoading />;
-  if (!isSignedIn) return <Redirect to="/" />;
+  if (!isSignedIn) return <Redirect to={signInPath} />;
   return <>{children}</>;
 }
 
@@ -468,7 +468,7 @@ function AccountPage() {
 function DashboardPage() {
   const [, setLocation] = useLocation();
   const profile = useProfileQuery();
-  const dashboard = useGetMyDashboard({ query: { queryKey: [...getGetMyDashboardQueryKey(), profile.data?.id], enabled: !!profile.data, networkMode: 'always', retry: false } });
+  const dashboard = useGetMyDashboard({ query: { queryKey: [...getGetMyDashboardQueryKey(), profile.data?.id], enabled: !!profile.data, networkMode: 'always', retry: false, retryOnMount: false } });
   useEffect(() => {
     if (!profile.data && profile.isError && isNotFound(profile.error)) setLocation('/account/setup', { replace: true });
   }, [profile.data, profile.isError, profile.error, setLocation]);
@@ -505,13 +505,13 @@ function Router() {
     <Route path="/mobile/authorize" component={MobileAuthorize} />
     <Route path="/guest/order" component={GuestOrderPage} />
     <Route path="/orders" component={() => <Protected><OrdersPage /></Protected>} />
-    <Route path="/restaurant" component={() => <Protected><RestaurantPage /></Protected>} />
+    <Route path="/restaurant" component={() => <Protected signInPath="/sign-in?join=restaurant"><RestaurantPage /></Protected>} />
     <Route path="/account/delete" component={() => <Protected><DeletionRequest /></Protected>} />
     <Route path="/account/access" component={() => <Protected><AccountAccess /></Protected>} />
     <Route path="/notifications" component={() => <Protected><NotificationsPage /></Protected>} />
     <Route path="/earnings" component={() => <Protected><EarningsPage /></Protected>} />
     <Route path="/operations" component={() => <Protected><OperationsCommerce /></Protected>} />
-    <Route path="/driver" component={() => <Protected><DriverPage /></Protected>} />
+    <Route path="/driver" component={() => <Protected signInPath="/sign-in?join=driver"><DriverPage /></Protected>} />
     <Route path="/admin" component={() => <Protected><AdminPage /></Protected>} />
     <Route path="/sign-in/*?" component={SignInPage} />
     <Route path="/sign-up/*?" component={SignUpPage} />
