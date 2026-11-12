@@ -457,7 +457,7 @@ body { background:var(--roco-bg); color:var(--roco-ink); }
 .portal-skeleton { background:linear-gradient(90deg,#1b2a3e 25%,#263951 45%,#1b2a3e 65%);background-size:200% 100%; }
 .roco-page { min-height:100dvh;background:var(--roco-bg);color:var(--roco-ink); }
 .roco-wrap { width:min(1140px,calc(100% - 40px));margin:auto; }
-.roco-header { height:74px;border-bottom:1px solid var(--roco-line);display:flex;align-items:center;justify-content:space-between;gap:18px; }
+.roco-header { min-height:74px;padding-block:14px;border-bottom:1px solid var(--roco-line);display:flex;align-items:center;justify-content:space-between;gap:18px; }
 .roco-logo { color:var(--roco-ink);text-decoration:none;display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.04em;font-size:19px; }
 .roco-logo-mark { display:grid;place-items:center;width:34px;height:34px;border-radius:11px 11px 11px 3px;background:var(--roco-amber);color:#162236; }
 .roco-nav { display:flex;align-items:center;gap:7px;flex-wrap:wrap; }
@@ -516,7 +516,7 @@ body { background:var(--roco-bg); color:var(--roco-ink); }
 @media(max-width:760px) {
  .roco-wrap,.roco-main { width:calc(100% - 32px); }
  .roco-header { min-height:66px;height:auto;align-items:flex-start;padding:14px 0;flex-direction:column; }
- .roco-nav { width:100%;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px; }
+ .roco-nav { width:100%;flex-wrap:wrap;padding-bottom:2px; }
  .roco-nav a,.roco-nav button { white-space:nowrap;padding:9px 10px; }
  .roco-main { padding:37px 0 72px; }
  .roco-grid { grid-template-columns:1fr; }

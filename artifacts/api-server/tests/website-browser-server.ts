@@ -28,6 +28,8 @@ export async function start(root: string) {
   for (const role of ['customer', 'restaurant', 'driver', 'admin'] as const) {
     await db.insert(profilesTable).values({ id: ids[role], clerkUserId: ids[role], role, displayName: `Browser ${role}`, driverApproved: role === 'driver' });
   }
+  process.env.LOCALEATS_ADMIN_CLERK_USER_IDS = ids.admin;
+  process.env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS = ids.admin;
   await db.insert(restaurantsTable).values({ id: ids.business, ownerProfileId: ids.restaurant, name: 'Browser Test Kitchen', description: 'Disposable local workflow fixture', street1: '100 Test Pickup', city: 'Kingston', region: 'TN', postalCode: '37763', status: 'approved', acceptingOrders: true });
   for (let weekday = 0; weekday < 7; weekday++) {
     await db.insert(restaurantHoursTable).values({ restaurantId: ids.business, weekday, openTime: '00:00', closeTime: '24:00' });

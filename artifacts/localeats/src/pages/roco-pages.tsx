@@ -44,8 +44,10 @@ const statusText = (s: string) => s.replaceAll('_', ' ');
 function Logo() { return <Link className="roco-logo" href="/"><span className="roco-logo-mark"><Utensils size={18} /></span><span>RoCoEats</span></Link>; }
 function Shell({ children }: { children: React.ReactNode }) {
   const { isSignedIn, userId } = useAuth(); const { signOut } = useClerk();
+  const profile = useMyProfile();
+  const role = profile.data?.role;
   return <div className="roco-page"><header className="roco-header roco-wrap"><Logo/><nav className="roco-nav" aria-label="Main navigation">
-    <Link href="/restaurants">Find food</Link>{isSignedIn && <><Link href="/dashboard">Dashboard</Link><Link href="/orders">Orders</Link><Link href="/restaurant">Restaurant</Link><Link href="/driver">Driver</Link><Link href="/account">Account</Link><Link href="/admin">Operations</Link><button onClick={async () => { if(userId)dutyIntent.set(userId,false); await customFetch('/api/driver/availability',{method:'PUT',body:JSON.stringify({available:false})}).catch(()=>{}); await unregisterPush().catch(()=>{}); await signOut({ redirectUrl: '/' }); }}>Sign out</button></>}
+    <Link href="/restaurants">Find food</Link>{isSignedIn && <><Link href="/dashboard">Dashboard</Link><Link href="/orders">Orders</Link>{role === 'restaurant' && <Link href="/restaurant">Restaurant</Link>}{['admin','driver'].includes(role??'') && <Link href="/driver">Driver</Link>}<Link href="/account">Account</Link>{role === 'admin' && <><Link href="/admin">Administrator</Link><Link href="/operations">Dispatch &amp; orders</Link></>}<button onClick={async () => { if(userId)dutyIntent.set(userId,false); await customFetch('/api/driver/availability',{method:'PUT',body:JSON.stringify({available:false})}).catch(()=>{}); await unregisterPush().catch(()=>{}); await signOut({ redirectUrl: '/' }); }}>Sign out</button></>}
     {!isSignedIn && <><Link href="/cart">Continue as Guest</Link><Link href="/guest/order">Guest order</Link><Link href="/sign-in">Sign in</Link><Link href="/sign-up">Create account</Link><Link href="/sign-up?join=restaurant">Partner With RoCoEats</Link><Link href="/sign-up?join=driver">Drive With RoCoEats</Link></>}
   </nav></header><CommerceBanner/>{children}</div>;
 }

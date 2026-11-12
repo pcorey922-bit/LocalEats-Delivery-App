@@ -18,11 +18,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
   useGetMyProfile,
+  getGetMyProfileQueryKey,
   getListMyOrdersQueryKey,
 } from "@workspace/api-client-react";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 import type { Order } from "@workspace/api-client-react";
 import { Capacitor } from "@capacitor/core";
+import { useAuth } from '@clerk/react';
 import { Browser } from "@capacitor/browser";
 const money = (value: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
@@ -66,6 +68,8 @@ function ErrorText({ error }: { error: Error | null }) {
 }
 export function CommerceBanner() {
   const config = useCommerce();
+  const { isLoaded, isSignedIn, userId } = useAuth();
+  const profile = useGetMyProfile({ query: { queryKey: [...getGetMyProfileQueryKey(), userId], enabled: !!isLoaded && !!isSignedIn, networkMode: 'always', retry: false, retryOnMount: false } });
   return (
     <aside
       className="roco-notice"
@@ -82,10 +86,11 @@ export function CommerceBanner() {
           ? "Stripe test integration: use test payment details only."
           : "Payments are not configured."}{" "}
       Tax and pricing settings are illustrative.{" "}
-      <Link href="/notifications">Notifications</Link> ·{" "}
-      <Link href="/earnings">Earnings</Link> ·{" "}
-      <Link href="/operations">Order operations</Link> ·{" "}
-      <Link href="/account/delete">Delete account</Link>
+      {isSignedIn && <><Link href="/notifications">Notifications</Link>
+        {['admin','restaurant','driver'].includes(profile.data?.role??'') && <> · <Link href="/earnings">Earnings</Link></>}
+        {profile.data?.role === 'admin' && <> · <Link href="/operations">Order operations</Link></>}
+        {' · '}<Link href="/account/delete">Delete account</Link>
+      </>}
     </aside>
   );
 }

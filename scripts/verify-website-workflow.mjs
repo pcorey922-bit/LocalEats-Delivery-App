@@ -77,6 +77,8 @@ try {
   await customer.getByLabel('Search approved restaurants').fill('Browser Test');
   await customer.getByRole('link', { name: 'View menu' }).click();
   await customer.getByRole('heading', { name: 'Browser Test Kitchen', exact: true }).waitFor();
+  const customerNav = customer.getByRole('navigation', { name: 'Main navigation', exact: true });
+  for (const name of ['Administrator', 'Dispatch & orders', 'Driver', 'Restaurant']) assert.equal(await customerNav.getByRole('link', { name, exact: true }).count(), 0);
   await customer.getByLabel('Green beans (+$1.50)', { exact: true }).check();
   await customer.getByLabel('Preparation instructions (optional)').fill('No onions');
   await customer.getByRole('button', { name: 'Add to cart', exact: true }).click();
@@ -104,6 +106,9 @@ try {
   await customer.getByText('Payment succeeded · collected', { exact: true }).waitFor();
   const restaurant = await actor('restaurant');
   await restaurant.goto(origin + '/restaurant');
+  const restaurantNav = restaurant.getByRole('navigation', { name: 'Main navigation', exact: true });
+  await restaurantNav.getByRole('link', { name: 'Restaurant', exact: true }).waitFor();
+  assert.equal(await restaurantNav.getByRole('link', { name: 'Driver', exact: true }).count(), 0);
   await restaurant.getByRole('tab', { name: 'Incoming orders', exact: true }).click();
   for (const status of ['accepted', 'preparing', 'ready for pickup']) {
     await restaurant.getByRole('button', { name: `Mark ${status}`, exact: true }).click();
@@ -111,6 +116,7 @@ try {
   const driver = await actor('driver');
   await driver.goto(origin + '/driver');
   await driver.getByRole('button', { name: 'Go online', exact: true }).click();
+  assert.equal(await driver.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: 'Administrator', exact: true }).count(), 0);
   await driver.getByRole('button', { name: 'Claim delivery', exact: true }).click();
   await driver.getByRole('button', { name: 'I’m at the restaurant', exact: true }).click();
   await driver.getByRole('button', { name: 'Confirm pickup', exact: true }).click();
@@ -140,6 +146,16 @@ try {
   assert.equal(payouts.find(p => p.kind === 'restaurant').amountCents, 1035);
   for (const journal of ledger.journals) assert.equal(journal.lines.reduce((sum, line) => sum + line.amountCents, 0), 0);
   const admin = await actor('admin');
+  await admin.goto(origin + '/admin');
+  await admin.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: 'Driver', exact: true }).click();
+  await admin.getByText(/Administrator delivery workspace/).waitFor();
+  await admin.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: 'Administrator', exact: true }).click();
+  await admin.getByRole('heading', { name: 'The county operations desk.', exact: true }).waitFor();
+  assert.equal((await api('admin', '/profiles/me')).role, 'admin');
+  for (const role of ['customer', 'restaurant', 'driver']) {
+    const denied = await fetch(origin + '/api/admin/dispatch', { headers: { 'x-test-user': ids[role] } });
+    assert.equal(denied.status, 403);
+  }
   await admin.goto(origin + '/operations');
   await admin.getByLabel('Filter by order ID', { exact: true }).fill(order.id);
   await admin.getByRole('button', { name: 'Apply filter', exact: true }).click();
@@ -147,6 +163,10 @@ try {
   for (const [index, page] of pages.entries()) {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `No mobile overflow for actor ${index}`);
     await page.screenshot({ path: path.join(web, `workflow-${index}.png`), fullPage: true });
+    for (const link of await page.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link').all()) {
+      const box = await link.boundingBox();
+      assert.ok(box.x >= 0 && box.x + box.width <= 390, 'Workspace navigation stays visible on phones');
+    }
   }
   const guest = await actor('guest');
   await guest.goto(origin);
