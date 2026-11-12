@@ -1,11 +1,11 @@
 import { HomePage } from './pages/home';
-import { accountDestination, accountStatus, joinRole } from "./lib/account-entry";
+import { accountDestination, accountEntryLinks, accountStatus } from "./lib/account-entry";
 import { NativeSignIn } from "./pages/native-sign-in";
 import { MobileAuthorize } from "./pages/mobile-authorize";
 import { Capacitor } from "@capacitor/core";
 import { GuestCheckoutAccess, GuestOrderPage } from "./pages/guest-order";
 import { DriverDutySession } from "./pages/driver-duty-session";
-import { AccountAccess } from "./pages/account-access";
+import { AccountAccess, AccountSetupChoices } from "./pages/account-access";
 import { AccountSettings } from "./pages/account-settings";
 import { workspaceLinks } from "./lib/workspace-links";
 import { NotificationsPage, EarningsPage, OperationsCommerce, DeletionRequest } from './pages/commerce-pages';
@@ -96,14 +96,15 @@ function BrandLink() {
 }
 
 function PortalHeader({ active }: { active: 'dashboard' | 'account' }) {
+  const entry = useJoinLinks();
   const { signOut } = useClerk();
   const profile = useProfileQuery();
   return <header className="portal-topbar">
     <BrandLink />
     <nav className="portal-nav" aria-label="Account navigation" data-testid="nav-account">
-      <a className={active === 'dashboard' ? 'portal-nav-current' : ''} href={`${basePath}/dashboard`} data-testid="link-dashboard">Dashboard</a>
-      <a className={active === 'account' ? 'portal-nav-current' : ''} href={`${basePath}/account`} data-testid="link-account">Account</a>
-      <a href={`${basePath}/account/access`}>Access check</a>
+      <a className={active === 'dashboard' ? 'portal-nav-current' : ''} href={`${basePath}/dashboard${entry.query}`} data-testid="link-dashboard">Dashboard</a>
+      <a className={active === 'account' ? 'portal-nav-current' : ''} href={`${basePath}/account${entry.query}`} data-testid="link-account">Account</a>
+      <a href={`${basePath}${entry.access}`}>Access check</a>
       {profile.data?.role === 'admin' && <a href={`${basePath}/admin`}>Administrator</a>}
       {['admin','driver'].includes(profile.data?.role??'') && <a href={`${basePath}/driver`}>Driver</a>}
       <button type="button" onClick={async () => { await unregisterPush().catch(()=>{}); await signOut({ redirectUrl: basePath || '/' }); }} data-testid="button-logout"><LogOut size={14} /> Log out</button>
@@ -116,7 +117,8 @@ function LoadingView({ label = 'Loading your RoCoEats account' }: { label?: stri
 }
 
 function QueryError({ retry, message = 'We couldn’t load this part of your account. Check your connection or account access.' }: { retry: () => void; message?: string }) {
-  return <div className="portal-empty-error" role="alert" data-testid="status-load-error"><CircleAlert size={17} style={{ verticalAlign: 'middle', marginRight: 8 }} />{message}<div style={{ marginTop: 14 }}><button className="portal-primary" type="button" onClick={retry} data-testid="button-retry"><RefreshCw size={14} /> Try again</button> <a href={`${basePath}/account/access`}>Check account access</a></div></div>;
+  const entry = useJoinLinks();
+  return <div className="portal-empty-error" role="alert" data-testid="status-load-error"><CircleAlert size={17} style={{ verticalAlign: 'middle', marginRight: 8 }} />{message}<div style={{ marginTop: 14 }}><button className="portal-primary" type="button" onClick={retry} data-testid="button-retry"><RefreshCw size={14} /> Try again</button> <a href={`${basePath}${entry.access}`}>Check account access</a></div></div>;
 }
 
 function useProfileQuery() {
@@ -150,11 +152,7 @@ function Protected({ children, signInPath = "/sign-in" }: { children: ReactNode;
 }
 
 function useJoinLinks() {
-  const params = new URLSearchParams(useSearch());
-  const role = joinRole(params.get('join'));
-  const checkout = role === 'customer' && params.get('checkout') === '1';
-  const query = `?join=${role}${checkout ? '&checkout=1' : ''}`;
-  return { role, checkout, query, setup: `/account/setup${query}` };
+  return accountEntryLinks(useSearch());
 }
 
 function SignInPage() {
@@ -183,7 +181,7 @@ function SignUpPage() {
 
 
 function AccountSetup() {
-  const { role, checkout, query } = useJoinLinks();
+  const { role, checkout, query, access, hasIntent } = useJoinLinks();
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
   const { userId } = useAuth();
@@ -208,11 +206,11 @@ function AccountSetup() {
   const start = () => provision.mutate((user?.fullName?.trim() || (role === 'restaurant' ? 'Restaurant partner' : role === 'driver' ? 'RoCoEats driver' : 'RoCoEats customer')).slice(0, 120));
   useEffect(() => {
     if (profile.data) setLocation(accountDestination(profile.data.role, checkout), { replace: true });
-    else if (missing && isLoaded && userId && !attempted.current) {
+    else if (missing && hasIntent && isLoaded && userId && !attempted.current) {
       attempted.current = true;
       start();
     }
-  }, [profile.data, checkout, missing, isLoaded, userId, setLocation]);
+  }, [profile.data, checkout, missing, hasIntent, isLoaded, userId, setLocation]);
   if (!isLoaded) return <SessionLoading />;
   if (!userId) return <Redirect to={`/sign-in${query}`} />;
   if (provision.isError || profile.isError && !missing) {
@@ -220,22 +218,24 @@ function AccountSetup() {
     const status = accountStatus(error);
     return <main className="portal"><div className="portal-shell"><PortalHeader active="account"/><section className="portal-main">
       <h1>Let’s finish your setup</h1>
-      {status === 403 ? <><p role="alert">This account does not have access to the workspace. Private staging requires an invitation.</p><a href={`${basePath}/account/access`}>Check account access</a></> :
+      {status === 403 ? <><p role="alert">This account does not have access to the workspace. Private staging requires an invitation.</p><a href={`${basePath}${access}`}>Check account access</a></> :
         status === 401 ? <button className="roco-button" onClick={() => void signOut({ redirectUrl: `${basePath}/sign-in${query}` }).catch(() => window.location.reload())}>Sign in again to continue</button> :
         <QueryError retry={() => provision.isError ? start() : void profile.refetch()} message="We couldn’t finish connecting your account. Check your connection and try again." />}
     </section></div></main>;
   }
+  if (missing && !hasIntent) return <main className="roco-main"><h1>Choose your account type</h1><AccountSetupChoices/></main>;
   return <LoadingView label="Preparing your workspace" />;
 }
 
 function AccountPage() {
+  const entry = useJoinLinks();
   const { user } = useUser();
   const [, setLocation] = useLocation();
   const profile = useProfileQuery();
   useEffect(() => {
     if (profile.data) return;
-    if (profile.isError && isNotFound(profile.error)) setLocation('/account/setup', { replace: true });
-  }, [profile.data, profile.isError, profile.error, setLocation]);
+    if (profile.isError && isNotFound(profile.error)) setLocation(entry.setup, { replace: true });
+  }, [profile.data, profile.isError, profile.error, entry.setup, setLocation]);
   if (profile.isLoading || !profile.data && profile.isError && isNotFound(profile.error)) return <LoadingView label="Loading profile" />;
   return <Protected><main className="portal" data-testid="page-account"><div className="portal-shell"><PortalHeader active="account" /><section className="portal-main">
     <div className="portal-eyebrow">Your LocalEats profile</div><h1 className="portal-title">Account, <em>at a glance.</em></h1><p className="portal-lede">Your account details and how you’re connected to the LocalEats community.</p>
@@ -251,12 +251,13 @@ function AccountPage() {
 }
 
 function DashboardPage() {
+  const entry = useJoinLinks();
   const [, setLocation] = useLocation();
   const profile = useProfileQuery();
   const dashboard = useGetMyDashboard({ query: { queryKey: [...getGetMyDashboardQueryKey(), profile.data?.id], enabled: !!profile.data, networkMode: 'always', retry: false, retryOnMount: false } });
   useEffect(() => {
-    if (!profile.data && profile.isError && isNotFound(profile.error)) setLocation('/account/setup', { replace: true });
-  }, [profile.data, profile.isError, profile.error, setLocation]);
+    if (!profile.data && profile.isError && isNotFound(profile.error)) setLocation(entry.setup, { replace: true });
+  }, [profile.data, profile.isError, profile.error, entry.setup, setLocation]);
   if (profile.isLoading || !profile.data && profile.isError && isNotFound(profile.error)) return <LoadingView label="Loading your dashboard" />;
   return <Protected><main className="portal" data-testid="page-dashboard"><div className="portal-shell"><PortalHeader active="dashboard" /><section className="portal-main">
     {profile.isError && !isNotFound(profile.error) ? <><div className="portal-eyebrow">Your LocalEats home</div><h1 className="portal-title">A place in the <em>community.</em></h1><div style={{ marginTop: 28 }}><QueryError retry={() => profile.refetch()} /></div></> : dashboard.isLoading ? <LoadingView label="Loading dashboard sections" /> : dashboard.isError ? <><div className="portal-eyebrow">Your LocalEats home</div><h1 className="portal-title">A place in the <em>community.</em></h1><div style={{ marginTop: 28 }}><QueryError retry={() => dashboard.refetch()} /></div></> : dashboard.data && <>
@@ -282,6 +283,11 @@ function SignedInCheckout() {
   return <GuestCheckoutAccess><CartPage /></GuestCheckoutAccess>;
 }
 
+function AccountAccessPage() {
+  const entry = useJoinLinks();
+  return <Protected signInPath={entry.signIn}><AccountAccess /></Protected>;
+}
+
 function Router() {
   return <RoutedErrorBoundary><Switch>
     <Route path="/" component={HomePage} />
@@ -293,7 +299,7 @@ function Router() {
     <Route path="/orders" component={() => <Protected><OrdersPage /></Protected>} />
     <Route path="/restaurant" component={() => <Protected signInPath="/sign-in?join=restaurant"><RestaurantPage /></Protected>} />
     <Route path="/account/delete" component={() => <Protected><DeletionRequest /></Protected>} />
-    <Route path="/account/access" component={() => <Protected><AccountAccess /></Protected>} />
+    <Route path="/account/access" component={AccountAccessPage} />
     <Route path="/notifications" component={() => <Protected><NotificationsPage /></Protected>} />
     <Route path="/earnings" component={() => <Protected><EarningsPage /></Protected>} />
     <Route path="/operations" component={() => <Protected><OperationsCommerce /></Protected>} />

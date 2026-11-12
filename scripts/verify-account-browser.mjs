@@ -68,10 +68,10 @@ await build({
             export const useAuth=account;
             export const useUser=()=>({isLoaded:true,user:window.qaSignedIn?{id:'user_QA',fullName:'Signup Fixture'}:null});
             export const ClerkProvider=({children})=>children;
-            const start=({forceRedirectUrl})=>React.createElement("button",{onClick:()=>{
+            const start=({forceRedirectUrl,signInUrl,signUpUrl})=>React.createElement(React.Fragment,null,React.createElement("button",{onClick:()=>{
               sessionStorage.setItem("qa-signup-session","signed-in");
               location.assign(forceRedirectUrl);
-            }},"Complete simulated Clerk sign-in");
+            }},"Complete simulated Clerk sign-in"),React.createElement("a",{href:signInUrl||signUpUrl},signInUrl?"Use existing sign-in":"Create signup account"));
             export const SignUp=start, SignIn=start;
             export const useSignIn=()=>({signIn:{ticket:async({ticket})=>{window.qaNativeTickets.push(ticket);return{error:null}},finalize:async()=>{window.qaSignedIn=true;return{error:null}}}});
             export const useClerk=()=>({
@@ -133,6 +133,84 @@ try {
     args: ["--no-sandbox"],
   });
   const origin = "http://127.0.0.1:" + server.address().port;
+  for (const role of ['restaurant', 'driver']) {
+    const recovery = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    recovery.setDefaultTimeout(10000);
+    await recovery.goto(origin + `/signup-fixture?join=${role}&deny=1`);
+    await recovery.getByRole('link', { name: 'Use existing sign-in', exact: true }).click();
+    await recovery.waitForURL(url => url.pathname === '/sign-in' && url.searchParams.get('join') === role);
+    await recovery.getByRole('link', { name: 'Create signup account', exact: true }).click();
+    await recovery.waitForURL(url => url.pathname === '/sign-up' && url.searchParams.get('join') === role);
+    await recovery.getByRole('button', { name: 'Complete simulated Clerk sign-in' }).click();
+    await recovery.getByRole('alert').filter({ hasText: 'Private staging requires an invitation' }).waitFor();
+    const access = recovery.getByRole('link', { name: 'Check account access', exact: true });
+    assert.equal(await access.getAttribute('href'), `/account/access?join=${role}`);
+    await access.click();
+    await recovery.getByText('You are signed in. This private staging account still needs an invitation.').waitFor();
+    assert.equal(await recovery.getByRole('link', { name: 'Complete account setup', exact: true }).count(), 0);
+    assert.equal(await recovery.evaluate(() => sessionStorage.getItem('qa-signup-writes')), null);
+    await recovery.getByRole('link', { name: '← Dashboard', exact: true }).click();
+    await recovery.getByRole('alert').filter({ hasText: 'Check your connection or account access' }).waitFor();
+    assert.equal(await recovery.getByRole('link', { name: 'Check account access', exact: true }).getAttribute('href'), `/account/access?join=${role}`);
+    await recovery.getByRole('link', { name: 'Check account access', exact: true }).click();
+    // Losing the authenticated session on the access page must preserve intent too.
+    await recovery.evaluate(() => sessionStorage.removeItem('qa-signup-session'));
+    await recovery.reload();
+    await recovery.waitForURL(url => url.pathname === '/sign-in' && url.searchParams.get('join') === role);
+    await recovery.getByRole('button', { name: 'Complete simulated Clerk sign-in' }).click();
+    await recovery.getByRole('link', { name: 'Check account access', exact: true }).click();
+    // Simulated invitation approval changes only this browser fixture, never staging.
+    await recovery.evaluate(() => sessionStorage.removeItem('qa-signup-deny'));
+    await recovery.reload();
+    const setup = recovery.getByRole('link', { name: 'Complete account setup', exact: true });
+    await setup.waitFor();
+    assert.equal(await setup.getAttribute('href'), `/account/setup?join=${role}`);
+    await setup.click();
+    await recovery.waitForURL(url => url.pathname === `/${role}`);
+    assert.equal(await recovery.evaluate(() => JSON.parse(sessionStorage.getItem('qa-signup-profile')).role), role);
+    assert.equal(await recovery.evaluate(() => Number(sessionStorage.getItem('qa-signup-writes'))), 1);
+    await recovery.close();
+  }
+  for (const role of ['restaurant', 'driver']) {
+    const missing = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await missing.goto(origin + '/home-fixture');
+    await missing.evaluate(() => sessionStorage.setItem('qa-signup-session', 'signed-in'));
+    await missing.goto(origin + '/account/access');
+    await missing.getByRole('link', { name: `Set up as a ${role}`, exact: true }).waitFor();
+    assert.equal(await missing.getByRole('link', { name: 'Complete account setup', exact: true }).count(), 0);
+    for (const path of ['/account/setup', '/account/setup?join=admin']) {
+      await missing.goto(origin + path);
+      await missing.getByRole('heading', { name: 'Choose your account type', exact: true }).waitFor();
+      assert.equal(await missing.evaluate(() => sessionStorage.getItem('qa-signup-writes')), null);
+    }
+    // No implicit Customer account, even when intent and authentication are both lost.
+    await missing.evaluate(() => sessionStorage.removeItem('qa-signup-session'));
+    await missing.goto(origin + '/account/access');
+    await missing.waitForURL(url => url.pathname === '/sign-in');
+    await missing.getByRole('button', { name: 'Complete simulated Clerk sign-in' }).click();
+    await missing.getByRole('heading', { name: 'Choose your account type', exact: true }).waitFor();
+    await missing.reload();
+    assert.equal(await missing.evaluate(() => sessionStorage.getItem('qa-signup-writes')), null);
+    await missing.getByRole('link', { name: `Set up as a ${role}`, exact: true }).click();
+    await missing.waitForURL(url => url.pathname === `/${role}`);
+    assert.equal(await missing.evaluate(() => JSON.parse(sessionStorage.getItem('qa-signup-profile')).role), role);
+    assert.equal(await missing.evaluate(() => Number(sessionStorage.getItem('qa-signup-writes'))), 1);
+    await missing.close();
+  }
+  const existingOwner = await browser.newPage();
+  await existingOwner.goto(origin + '/home-fixture');
+  await existingOwner.evaluate(() => {
+    sessionStorage.setItem('qa-signup-session', 'signed-in');
+    sessionStorage.setItem('qa-signup-profile', JSON.stringify({ id: 'fixture-profile', role: 'admin', displayName: 'Owner', createdAt: new Date().toISOString() }));
+  });
+  for (const intent of ['restaurant', 'driver']) {
+    await existingOwner.goto(origin + `/account/setup?join=${intent}`);
+    await existingOwner.waitForURL(url => url.pathname === '/admin');
+    assert.equal(await existingOwner.evaluate(() => JSON.parse(sessionStorage.getItem('qa-signup-profile')).role), 'admin');
+    assert.equal(await existingOwner.evaluate(() => sessionStorage.getItem('qa-signup-writes')), null);
+  }
+  await existingOwner.close();
+  console.log('Signup recovery PASS: restaurant and driver intent survives auth links, invitation denial, access-page session loss, reload and admission, with exactly one profile of the intended role (simulated Clerk/API).');
   for (const width of [320, 390, 768, 1440]) {
     const home = await browser.newPage({ viewport: { width, height: 900 } });
     await home.goto(origin + "/home-fixture");
@@ -177,7 +255,7 @@ try {
   }
   console.log("Homepage PASS: five stacked actions, keyboard focus and no overflow at 320/390/768/1440px; server-profile routing for all four roles (simulated Clerk/API).");
   for (const [intent, role, destination, heading] of [
-    ["", "customer", "/dashboard", "Welcome, Signup Fixture."],
+    ["?join=customer", "customer", "/dashboard", "Welcome, Signup Fixture."],
     ["?join=restaurant", "restaurant", "/restaurant", "Bring your business to the table."],
     ["?join=driver", "driver", "/driver", "Local deliveries."],
   ]) {
@@ -225,13 +303,15 @@ try {
   await deniedPage.close();
   console.log("Signup UI: three member paths, session reload, and stable restaurant/dashboard staging denials passed (simulated Clerk/API)");
 
-  const expiredPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await expiredPage.goto(origin + "/signup-fixture?join=restaurant&expired=1");
-  await expiredPage.getByRole("button", { name: "Complete simulated Clerk sign-in" }).click();
-  await expiredPage.getByRole("button", { name: "Sign in again to continue" }).click();
-  await expiredPage.waitForURL(url => url.pathname === "/sign-in" && url.searchParams.get("join") === "restaurant");
-  assert.equal(await expiredPage.evaluate(() => sessionStorage.getItem("qa-signup-session")), null);
-  await expiredPage.close();
+  for (const role of ['restaurant', 'driver']) {
+    const expiredPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await expiredPage.goto(origin + `/signup-fixture?join=${role}&expired=1`);
+    await expiredPage.getByRole('button', { name: 'Complete simulated Clerk sign-in' }).click();
+    await expiredPage.getByRole('button', { name: 'Sign in again to continue' }).click();
+    await expiredPage.waitForURL(url => url.pathname === '/sign-in' && url.searchParams.get('join') === role);
+    assert.equal(await expiredPage.evaluate(() => sessionStorage.getItem('qa-signup-session')), null);
+    await expiredPage.close();
+  }
 
   const cartSignup = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await cartSignup.goto(origin + "/signup-fixture?checkout=1");

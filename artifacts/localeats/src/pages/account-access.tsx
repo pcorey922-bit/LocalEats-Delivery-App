@@ -1,7 +1,8 @@
 import { useAuth } from "@clerk/react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
+import { accountEntryLinks } from '../lib/account-entry';
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 type Access = {
   ownerConfigured: boolean; ownerMatched: boolean; ownerDriverConfigured: boolean;
@@ -9,13 +10,19 @@ type Access = {
   privateStaging?: boolean; stagingAdmitted?: boolean;
   administrator: boolean; superAdministrator: boolean; driver: boolean;
 };
+export function AccountSetupChoices() {
+  return <div><p>Choose the account type you intended to register.</p>
+    <p>{(['customer', 'restaurant', 'driver'] as const).map(role => <Link className="roco-button" key={role} href={`/account/setup?join=${role}`}>Set up as {role === 'restaurant' ? 'a restaurant' : role === 'driver' ? 'a driver' : 'a customer'}</Link>)}</p>
+  </div>;
+}
 export function AccountAccess() {
+  const entry = accountEntryLinks(useSearch());
   const { isSignedIn, userId } = useAuth();
   const [copyStatus,setCopyStatus] = useState("");
   const result = useQuery({ queryKey: ["session-access", userId], enabled: !!isSignedIn, networkMode: "always",
     queryFn: () => customFetch<Access>("/api/session/access"), retry: false, staleTime: 0 });
   const access = result.data;
-  return <main className="roco-main"><Link href="/dashboard">← Dashboard</Link><h1>Account access</h1>
+  return <main className="roco-main"><Link href={`/dashboard${entry.query}`}>← Dashboard</Link><h1>Account access</h1>
     <p>These permissions come from the server. Your Google sign-in must belong to the Clerk identity configured in Render.</p>
     <p>Your signed-in Clerk User ID: <code style={{overflowWrap:'anywhere'}}>{userId}</code></p>
     <button className="roco-button" onClick={async()=>{try{await navigator.clipboard.writeText(userId??'');setCopyStatus('Copied. Paste only into your protected Render settings.');}catch{setCopyStatus('Select your User ID above and copy it manually.');}}}>Copy my Clerk User ID</button>
@@ -35,7 +42,7 @@ export function AccountAccess() {
       {!access.ownerMatched && <p>If you are the owner, compare your signed-in Clerk User ID above with Render’s <code>LOCALEATS_ADMIN_CLERK_USER_IDS</code>. Google may have created a different Clerk identity. Enter the correct ID only in Render’s protected Environment settings and redeploy; never grant ownership by email or a client-side role.</p>}
       {access.ownerMatched && !access.ownerDriverMatched && <p>For owner-driver access, enter the same owner ID in Render’s <code>ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS</code> and redeploy.</p>}
       {access.privateStaging && access.stagingAdmitted === false && <p role="alert">You are signed in. This private staging account still needs an invitation.</p>}
-      {access.stagingAdmitted !== false && access.profileStatus === "setup_required" && <p><Link href="/account/setup">Complete account setup</Link></p>}
+      {access.stagingAdmitted !== false && access.profileStatus === "setup_required" && (entry.hasIntent ? <p><Link href={entry.setup}>Complete account setup</Link></p> : <AccountSetupChoices/>)}
       {access.profileStatus === "suspended" && <p role="alert">This account is suspended. Bootstrap does not reactivate suspended accounts.</p>}
     </section>}
   </main>;
