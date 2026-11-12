@@ -72,7 +72,12 @@ window.qaNextGuestWrites = [];
 window.qaTelephoneStatus = "pending";
 window.qaTelephoneVersion = 1;
 window.qaTelephoneWrites = [];
-const signupFixture = location.pathname === "/signup-fixture" || sessionStorage.getItem("qa-signup-fixture") === "1";
+const homeFixture = location.pathname === "/home-fixture";
+if (homeFixture) {
+  sessionStorage.setItem("qa-signup-fixture", "1");
+  history.replaceState(null, "", "/");
+}
+const signupFixture = homeFixture || location.pathname === "/signup-fixture" || sessionStorage.getItem("qa-signup-fixture") === "1";
 if (location.pathname === "/signup-fixture") {
   const query = new URLSearchParams(location.search);
   sessionStorage.setItem("qa-signup-fixture", "1");

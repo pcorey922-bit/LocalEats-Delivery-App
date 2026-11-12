@@ -105,7 +105,7 @@ export function GuestCheckoutAccess({
           Private staging requires an invited tester to create guest access.
           Public ordering remains disabled.
         </p>
-        <Link href="/">Keep browsing</Link> ·{" "}
+        <Link href="/restaurants">Keep browsing</Link> ·{" "}
         <Link href="/sign-in">Sign in instead</Link>
       </section>
     </main>
@@ -153,7 +153,7 @@ export function GuestOrderPage() {
   });
   return (
     <main className="roco-main">
-      <Link href="/">RoCoEats · Find food</Link>
+      <Link href="/restaurants">RoCoEats · Find food</Link>
       <h1>Your guest order</h1>
       <p>
         <a href="rocoeats://orders">Return to mobile app</a>

@@ -1,6 +1,6 @@
 export function workspaceLinks(role: string) {
   const common = [
-    { title: "Find food", href: "/", detail: "Browse available restaurants and menus" },
+    { title: "Find food", href: "/restaurants", detail: "Browse available restaurants and menus" },
     { title: "My orders", href: "/orders", detail: "Receipts, delivery tracking and support" },
     { title: "Notifications", href: "/notifications", detail: "Your saved operational updates" },
     { title: "Account access", href: "/account/access", detail: "Check your server-verified permissions" },

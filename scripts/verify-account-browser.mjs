@@ -132,6 +132,48 @@ try {
     args: ["--no-sandbox"],
   });
   const origin = "http://127.0.0.1:" + server.address().port;
+  for (const width of [320, 390, 768, 1440]) {
+    const home = await browser.newPage({ viewport: { width, height: 900 } });
+    await home.goto(origin + "/home-fixture");
+    await home.getByRole("heading", { name: "Good food. Closer to home." }).waitFor();
+    const actions = home.getByRole("navigation", { name: "Get started with RoCoEats" }).getByRole("link");
+    assert.deepEqual(await actions.allTextContents(), ["Sign In", "Order as Guest", "Browse Restaurants & Menus", "Partner With RoCoEats", "Drive With RoCoEats"]);
+    let previousBottom = 0;
+    for (const link of await actions.all()) {
+      const box = await link.boundingBox();
+      assert.ok(box.height >= 48 && box.y >= previousBottom);
+      previousBottom = box.y + box.height;
+      await link.focus();
+      assert.equal(await link.evaluate(el => el === document.activeElement), true);
+    }
+    assert.equal(await home.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await home.getByRole("link", { name: "Order as Guest", exact: true }).click();
+    await home.waitForURL(url => url.pathname === "/restaurants" && url.searchParams.get("guest") === "1");
+    await home.getByRole("heading", { name: "Local food, right around here." }).waitFor();
+    await home.goto(origin + "/");
+    await home.getByRole("link", { name: "Partner With RoCoEats", exact: true }).click();
+    await home.waitForURL(url => url.pathname === "/sign-up" && url.searchParams.get("join") === "restaurant");
+    await home.goto(origin + "/");
+    await home.getByRole("link", { name: "Drive With RoCoEats", exact: true }).click();
+    await home.waitForURL(url => url.pathname === "/sign-up" && url.searchParams.get("join") === "driver");
+    await home.goto(origin + "/");
+    await home.screenshot({ path: target + `/homepage-${width}.png`, fullPage: true });
+    await home.close();
+  }
+  for (const [role, destination] of [["customer", "/dashboard"], ["restaurant", "/restaurant"], ["driver", "/driver"], ["admin", "/admin"]]) {
+    const member = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await member.goto(origin + "/home-fixture");
+    await member.evaluate(role => {
+      sessionStorage.setItem("qa-signup-session", "signed-in");
+      sessionStorage.setItem("qa-signup-profile", JSON.stringify({ id: "fixture-profile", role, displayName: "QA member", createdAt: new Date().toISOString() }));
+    }, role);
+    await member.reload();
+    await member.getByRole("link", { name: "Sign In", exact: true }).click();
+    await member.waitForURL(url => url.pathname === destination);
+    assert.equal(await member.evaluate(() => sessionStorage.getItem("qa-signup-writes")), null);
+    await member.close();
+  }
+  console.log("Homepage PASS: five stacked actions, keyboard focus and no overflow at 320/390/768/1440px; server-profile routing for all four roles (simulated Clerk/API).");
   for (const [intent, role, destination, heading] of [
     ["", "customer", "/dashboard", "Welcome, Signup Fixture."],
     ["?join=restaurant", "restaurant", "/restaurant", "Bring your business to the table."],
