@@ -101,9 +101,10 @@ await writeFile(
   target + "/index.html",
   '<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/app.css"><div id="root"></div><script type="module" src="/app.js"></script></html>',
 );
+await writeFile(target + "/logo.svg", await readFile(root + "/artifacts/localeats/public/logo.svg"));
 const server = http.createServer(async (req, res) => {
   try {
-    const file =
+    const file = req.url === "/logo.svg" ? "logo.svg" :
       req.url === "/app.js"
         ? "app.js"
         : req.url === "/app.css"
@@ -113,7 +114,7 @@ const server = http.createServer(async (req, res) => {
       "content-type",
       file.endsWith(".js")
         ? "text/javascript"
-        : file.endsWith(".css")
+        : file.endsWith(".svg") ? "image/svg+xml" : file.endsWith(".css")
           ? "text/css"
           : "text/html",
     );
@@ -136,6 +137,7 @@ try {
     const home = await browser.newPage({ viewport: { width, height: 900 } });
     await home.goto(origin + "/home-fixture");
     await home.getByRole("heading", { name: "Good food. Closer to home." }).waitFor();
+    await home.waitForFunction(() => document.querySelector('.roco-home-brand img')?.naturalWidth > 0);
     const actions = home.getByRole("navigation", { name: "Get started with RoCoEats" }).getByRole("link");
     assert.deepEqual(await actions.allTextContents(), ["Sign In", "Order as Guest", "Browse Restaurants & Menus", "Partner With RoCoEats", "Drive With RoCoEats"]);
     let previousBottom = 0;

@@ -1,4 +1,5 @@
 import { accountStatus } from "../lib/account-entry";
+import { RestaurantStatus } from './restaurant-status';
 import { GuestDeliveryContact } from "./guest-delivery-contact";
 import { RestaurantConfirmation } from "./restaurant-confirmation";
 import { readGuestToken } from "../lib/guest-session";
@@ -90,6 +91,7 @@ export function RestaurantMenuPage() {
   if (menu.isError || !menu.data) return <Shell><main className="roco-main"><LoadError retry={() => void menu.refetch()} message="This approved restaurant menu could not be found."/></main></Shell>;
   return <Shell><main className="roco-main"><PageIntro eyebrow={`${menu.data.city}, ${menu.data.region} · approved restaurant`} title={menu.data.name}>{menu.data.description || 'Browse the current menu from this Roane County restaurant.'}</PageIntro>
     <div className="roco-toolbar">{cartWarning&&<p role="alert">{cartWarning}</p>}<div className="roco-meta">{menu.data.street1} · {menu.data.city}, {menu.data.region} {menu.data.postalCode}</div><Link className="roco-button primary" href="/cart"><ShoppingBag size={15}/> Cart ({cart.reduce((n, i) => n + i.quantity, 0)})</Link></div>
+    <RestaurantStatus restaurantId={restaurantId}/>
     {menu.data.categories.length ? <div className="roco-two-col"><section className="roco-list">{menu.data.categories.map(cat => <div className="roco-card" key={cat.id}><div className="roco-row"><h2>{cat.name}</h2><span className="roco-meta">Menu section</span></div>{cat.items.length ? cat.items.map(item => <div className="roco-menu-item" key={item.id}><div><strong>{item.name}</strong><p style={{ margin: '5px 0 0' }}>{item.description}</p>{!item.isAvailable && <span className="roco-meta">Currently unavailable</span>}</div><div style={{ display: 'grid', gap: 10, justifyItems: 'end' }}><span className="roco-price">{money(item.priceCents)}</span>{item.isAvailable && <CustomizedAdd key={`${item.id}:${userId}`} item={item} onAdd={(selected,extra,label,instructions)=>add(item,selected,extra,label,instructions)}/>}</div></div>) : <p>No menu items listed in this section.</p>}</div>)}</section><aside className="roco-card"><div className="roco-kicker">Ordering status</div><h2 style={{ marginTop: 13 }}>Development checkout</h2><p>Submitting an order saves an order record using server-verified totals. It does not charge money. Payments and delivery are not active services.</p><div className="roco-rule"/><Link className="roco-button primary" href="/cart">Review your cart <ArrowRight size={14}/></Link></aside></div> : <div className="roco-empty"><h2>Menu not published yet</h2><p>This approved restaurant has not added menu categories yet.</p></div>}
   </main></Shell>;
 }
