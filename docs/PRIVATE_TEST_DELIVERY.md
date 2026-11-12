@@ -4,6 +4,61 @@ Use https://localeats-delivery-app.onrender.com/ with real Clerk sessions and th
 persistent staging database. This procedure must not be replaced with the old demo
 or the component fixtures. Keep live keys, real bank details and paid services out.
 
+## Website release to the existing service (approval required)
+
+Do not create another service, deploy the paid root `render.yaml`, reset Neon,
+change existing credentials, or enable ordering as part of this release.
+
+1. Confirm every GitHub workflow for the chosen full commit SHA has finished with
+   conclusion **success**. A queued/running/missing result is not a pass; skipped
+   signing/device jobs do not verify those capabilities. Keep PR #1 draft/unmerged.
+2. After deployment approval, open the **existing** Render service for
+   `localeats-delivery-app.onrender.com`. Confirm branch
+   `feature/rocoeats-launch-readiness`, Dockerfile `./Dockerfile`, Docker Command
+   `node --enable-source-maps scripts/start-free-staging.mjs`, `/livez` health
+   check, auto-deploy off, and the existing Neon database. Use **Manual Deploy →
+   Deploy a specific commit** with the approved full SHA. Preserve all environment
+   values, including `ROCOEATS_PRIVATE_STAGING=true`, `PAYMENT_PROVIDER=stripe_test`,
+   `ROCOEATS_ORDERING_ENABLED=false`, and
+   `ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED=false`.
+3. Wait for migrations and Render **Live**, then run from this repository (replace
+   the placeholder with the approved 40-character GitHub SHA):
+
+   ```sh
+   node scripts/verify-staging-http.mjs https://localeats-delivery-app.onrender.com/ APPROVED_FULL_COMMIT_SHA
+   ```
+
+   Require `verificationPassed: true`, `revisionMatches: true`,
+   `dependenciesReady: true`, and empty `missingConfiguration`,
+   `unverifiedDependencies`, and `failures` arrays. The verifier uses only GET and
+   OPTIONS requests. A wrong release still reports the observed SHA and all
+   independent checks. Missing configuration is distinct from unavailable health
+   evidence. Reports contain no keys, cookies, guest capabilities or provider
+   payloads. HTTP 200 for a website route verifies its HTML shell, not a Clerk
+   login or completed business action. A 503 readiness response can be diagnosed
+   with ordering closed; it is not acceptance readiness.
+4. In separate private browser sessions, use homepage **Sign In** with the invited
+   customer, restaurant, driver and administrator accounts. Confirm server roles
+   at `/account/access` and the authorized workspace destinations. The owner must
+   be able to switch Administrator → Driver → Administrator without losing admin
+   access. A non-admin must be denied `/operations`. Test guest browsing using
+   **Private guest test access** from Operations in a separate signed-out session;
+   ordinary anonymous visitors cannot create staging guest access.
+5. Review `/operations` → **Stripe TEST setup** and **Verify Stripe TEST connection**
+   using the existing configuration. Both provider TEST mode and the exact enabled
+   webhook URL/version/events must be verified. Review saved test pricing, ZIPs,
+   restaurant hours/stock/approval, and driver approval/availability. Do not replace
+   existing settings simply because this procedure mentions setup below.
+6. Stop with both ordering switches off. Only a **separate explicit approval**
+   authorizes the private acceptance window described below. During that window,
+   run the same verifier with `--private-test-window` after the approved SHA; after
+   closing it, rerun the command without that option.
+
+The acceptance below is a supervised website exercise: no Android/iOS build,
+installation or device-signing step is required. A signed Stripe sample event
+checks intake only. Actual payment acceptance requires the Checkout transaction,
+matching processed signed event, delivery receipt and per-order reconciliation.
+
 ## Set up RoCoEats Test Kitchen with both ordering switches off
 
 1. Use separate browser sessions for the customer, restaurant operator and owner.
@@ -53,7 +108,9 @@ or the component fixtures. Keep live keys, real bank details and paid services o
    TEST-mode result and endpoint configuration result must be Yes. Authentication,
    permission and network failures are redacted; no key or provider payload returns
    to the browser. A restricted/mismatched account key may fail these read checks.
-3. In Stripe's **same sandbox** as the platform secret key, use **Workbench →
+3. Reuse the existing Stripe destination if step 2 passes. Only if the destination
+   is missing or mismatched, and after owner approval, in Stripe's **same sandbox**
+   as the platform secret key use **Workbench →
    Webhooks → Add destination → Your account → Webhook endpoint**. Use the URL/API
    version/events shown in the app. This is a snapshot endpoint, not a thin event
    destination or connected-account-only destination. Copy that endpoint's signing
@@ -61,9 +118,10 @@ or the component fixtures. Keep live keys, real bank details and paid services o
    Never paste keys into chat or app forms. Stripe publishable keys are not needed
    by the existing hosted Checkout integration. Full setup is also in
    FREE_STAGING_ANDROID.md and RENDER_STAGING_ANDROID.md's TEST webhook section.
-4. Save reviewed **test** delivery fee, service percentage, tax rate/base,
+4. Review the saved **test** delivery fee, service percentage, tax rate/base,
    restaurant commission, driver share and service ZIPs in `/operations` →
    **Pricing and service policy**. There is no automatic business tax default.
+   Preserve existing reviewed settings. Save changes only after owner approval.
    These settings are server-validated; existing orders retain their snapshots.
 5. Create separate safe customer, restaurant and driver Clerk test identities.
    Admit their IDs through Render's protected
@@ -93,8 +151,11 @@ or the component fixtures. Keep live keys, real bank details and paid services o
 
 - Customer chooses an approved available restaurant, selects real menu items and
   modifiers, saves a service-area delivery address and reviews the server quote.
-  Confirm stock/capacity and all fees/tip before submitting. Use hosted Stripe
-  Checkout in TEST mode with Stripe's documented sandbox payment methods. Do not
+  Click **Calculate test total**, review every amount, then **Create order** →
+  **Prepare secure test payment** → **Open Stripe test checkout**. For the initial
+  successful card test use Stripe's documented TEST Visa `4242 4242 4242 4242`,
+  a future expiry and any three-digit CVC, only on Stripe's TEST checkout page.
+  Confirm stock/capacity and all fees/tip before submitting. Do not
   submit real card information or claim a simulated return page proves payment.
 - Stripe's signed event must match the saved session, order, total and currency.
   Confirm collected payment and a processed inbox event. When the latest signed
@@ -113,7 +174,15 @@ or the component fixtures. Keep live keys, real bank details and paid services o
   order; the driver enters it to complete delivery. Do not post the handoff code
   in chat. Confirm the customer receipt, completion event, earnings/tip allocations,
   restaurant/driver dashboards and administrator financial records.
-- Run the provider reconciliation action and verify fee/net evidence. Recipient
+- Administrator: in `/operations`, find this order, enter a **Review reason**
+  of at least ten characters and select **Reconcile Stripe test charge**. Verify
+  the returned charge, fee and net evidence against that payment in Stripe.
+  In **Operational ledger**, enter the order ID in **Filter by order ID**, select
+  **Apply filter**, and require **Trial balance is balanced** with zero missing
+  payment baselines. Compare the saved quote/charged total and pricing snapshot
+  with the restaurant and driver earnings, including tip. Record discrepancies;
+  a balanced ledger alone does not prove correct allocations or provider evidence.
+  Recipient
   hosted Connect onboarding and transfers are separate TEST exercises. A transfer
   into a connected balance is not proof of bank payout or live banking readiness.
 
