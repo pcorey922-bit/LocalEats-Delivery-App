@@ -133,6 +133,16 @@ try {
     args: ["--no-sandbox"],
   });
   const origin = "http://127.0.0.1:" + server.address().port;
+  const cartSync = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await cartSync.goto(origin + '/?cartSync=true');
+  await cartSync.getByRole('button', { name: 'Add fries menu', exact: true }).click();
+  await cartSync.waitForFunction(() => JSON.parse(document.querySelector('[data-testid="checkout-cart"]').textContent).length === 1, undefined, { timeout: 3000 });
+  for (const name of ['menu', 'checkout']) {
+    const lines = JSON.parse(await cartSync.getByTestId(`${name}-cart`).textContent());
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0].quantity, 1);
+  }
+  await cartSync.close();
   for (const role of ['restaurant', 'driver']) {
     const recovery = await browser.newPage({ viewport: { width: 390, height: 844 } });
     recovery.setDefaultTimeout(10000);

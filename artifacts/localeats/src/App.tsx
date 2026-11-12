@@ -1,3 +1,4 @@
+import { useGuestToken } from './lib/guest-session';
 import { HomePage } from './pages/home';
 import { accountDestination, accountEntryLinks, accountStatus } from "./lib/account-entry";
 import { NativeSignIn } from "./pages/native-sign-in";
@@ -272,7 +273,8 @@ function DashboardPage() {
 }
 
 function SignedInCheckout() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, userId } = useAuth();
+  const guestToken = useGuestToken();
   const profile = useProfileQuery();
   if (!isLoaded) return <SessionLoading />;
   if (isSignedIn && profile.isLoading) return <LoadingView label="Preparing checkout" />;
@@ -280,7 +282,12 @@ function SignedInCheckout() {
     if (isNotFound(profile.error)) return <Redirect to="/account/setup?join=customer&checkout=1" />;
     return <main className="roco-main"><h1>Checkout</h1><QueryError retry={() => void profile.refetch()} /></main>;
   }
-  return <GuestCheckoutAccess><CartPage /></GuestCheckoutAccess>;
+  if (isSignedIn && profile.data && profile.data.role !== 'customer') return <main className="roco-main">
+    <h1>Customer account required</h1><p>You are signed in as {profile.data.role === 'admin' ? 'an administrator' : `a ${profile.data.role}`}.</p>
+    <p>Saved delivery addresses and customer checkout require a customer account. Keep this workspace signed in and use your invited customer account in a separate browser session.</p>
+    <a className="roco-button" href={`${basePath}/dashboard`}>Return to your workspace</a>{' '}<a className="roco-button" href={`${basePath}/account/access`}>Check account access</a>
+  </main>;
+  return <GuestCheckoutAccess><CartPage key={isSignedIn ? userId : guestToken ?? 'guest'} /></GuestCheckoutAccess>;
 }
 
 function AccountAccessPage() {

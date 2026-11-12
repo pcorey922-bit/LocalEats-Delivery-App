@@ -20,4 +20,5 @@ test("cart identity preserves preparation requests and canonicalizes modifier or
     cartLineKey("chicken", selected),
   );
   assert.deepEqual(selected.extras, ["bacon", "cheese"]);
+  assert.equal(cartLineKey('fries', { extras: [] }), cartLineKey('fries', {}));
 });

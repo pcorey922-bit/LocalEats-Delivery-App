@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   createCustomerCart,
+  createCustomerCartRegistry,
   type CartEntry,
 } from "../../localeats/src/lib/customer-cart";
 const line: CartEntry = {
@@ -88,4 +89,53 @@ test("storage refresh receives other-tab updates without sharing other account d
   first.setItems([]);
   otherTab.reload();
   assert.deepEqual(otherTab.getSnapshot().items, []);
+});
+
+test('same-tab consumers share a live cart and unresolved authentication never reads guest data', () => {
+  const s = storage();
+  s.setItem('rocoeats-guest-cart:v1', JSON.stringify([line]));
+  const carts = createCustomerCartRegistry(s);
+  const menu = carts.get('a'), checkout = carts.get('a');
+  assert.equal(menu, checkout);
+  menu.setItems([line]);
+  checkout.setItems(items => items.map(item => ({ ...item, quantity: item.quantity + 1 })));
+  assert.equal(menu.getSnapshot().items[0].quantity, 2);
+  const unresolved = carts.get(undefined);
+  assert.deepEqual(unresolved.getSnapshot().items, []);
+  unresolved.setItems([line]);
+  assert.equal(carts.get(null).getSnapshot().items[0].quantity, 1);
+  assert.deepEqual(carts.get('b').getSnapshot().items, []);
+});
+
+test('canonical hydration combines identical selections but retains distinct preparation and modifier choices', () => {
+  const s = storage();
+  s.setItem('rocoeats-cart:v2:a', JSON.stringify([
+    { ...line, modifiers: {}, specialInstructions: ' No onions ' },
+    { ...line, modifiers: { optional: [] } },
+    { ...line, specialInstructions: 'Extra onions' },
+    { ...line, modifiers: { sauce: ['hot'] } },
+  ]));
+  const cart = createCustomerCart('a', s);
+  assert.equal(cart.getSnapshot().items.length, 3);
+  assert.equal(cart.getSnapshot().items[0].quantity, 2);
+  assert.match(cart.getSnapshot().warning, /combined/);
+  for (let i = 0; i < 3; i++) cart.reload();
+  assert.equal(cart.getSnapshot().items[0].quantity, 2);
+  assert.equal(cart.getSnapshot().items.reduce((sum, item) => sum + item.priceCents * item.quantity, 0), 4000);
+});
+
+test('resume retains unsaved session edits and updates from another tab precede a new addition', () => {
+  let raw: string | null = null, fail = false;
+  const s = { getItem: () => raw, setItem: (_key: string, value: string) => { if (fail) throw Error('quota'); raw = value; } };
+  const carts = createCustomerCartRegistry(s), first = carts.get('a');
+  first.setItems([line]);
+  fail = true;
+  first.setItems(items => items.map(item => ({ ...item, quantity: 2 })));
+  carts.reload();
+  assert.equal(first.getSnapshot().items[0].quantity, 2);
+  assert.match(first.getSnapshot().warning, /could not be saved/);
+  fail = false;
+  raw = JSON.stringify([{ ...line, quantity: 3 }]);
+  first.setItems(items => items.map(item => ({ ...item, quantity: item.quantity + 1 })));
+  assert.equal(first.getSnapshot().items[0].quantity, 4);
 });

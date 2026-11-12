@@ -182,6 +182,8 @@ export function ModifierEditor({
 export function CustomizedAdd({
   item,
   onAdd,
+  disabled = false,
+  quantityInCart = 0,
 }: {
   item: {
     id: string;
@@ -195,6 +197,8 @@ export function CustomizedAdd({
     label: string,
     instructions: string,
   ) => void;
+  disabled?: boolean;
+  quantityInCart?: number;
 }) {
   const [instructions, setInstructions] = useState("");
   const [selected, setSelected] = useState<Record<string, string[]>>({});
@@ -243,8 +247,9 @@ export function CustomizedAdd({
       <p>${((item.priceCents + extra) / 100).toFixed(2)}</p>
       {error && <small>{error}</small>}
       <button
-        className="roco-button"
-        disabled={!!error}
+        type="button"
+        className="roco-button roco-add-to-cart"
+        disabled={disabled || !!error}
         onClick={() =>
           onAdd(
             selected,
@@ -258,6 +263,7 @@ export function CustomizedAdd({
       >
         Add to cart
       </button>
+      <span className="roco-meta" role="status">{quantityInCart ? `${quantityInCart} in cart` : ''}</span>
     </div>
   );
 }

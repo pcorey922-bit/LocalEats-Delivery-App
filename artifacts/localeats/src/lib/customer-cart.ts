@@ -25,50 +25,94 @@ const cartSchema = z
   .refine(
     (items) => new Set(items.map((i) => i.restaurantId)).size <= 1,
     "Your cart can contain items from one restaurant.",
-  )
-  .refine(
-    (items) =>
-      new Set(
-        items.map((i) =>
-          cartLineKey(i.menuItemId, i.modifiers, i.specialInstructions),
-        ),
-      ).size === items.length,
-    "Duplicate cart lines must be combined.",
   );
 export type CartStorage = Pick<Storage, "getItem" | "setItem">;
-export function createCustomerCart(owner: string | null, storage: CartStorage) {
-  const key = owner ? `rocoeats-cart:v2:${owner}` : "rocoeats-guest-cart:v1";
-  type Snapshot = { items: CartEntry[]; warning: string };
-  function read(): Snapshot {
-    if (!key) return { items: [], warning: "" };
+type Snapshot = { items: CartEntry[]; warning: string };
+function normalize(items: CartEntry[]): CartEntry[] {
+  const combined = new Map<string, CartEntry>();
+  for (const item of items) {
+    const modifiers = Object.fromEntries(
+      Object.entries(item.modifiers ?? {}).filter(
+        ([, options]) => options.length,
+      ),
+    );
+    const lineId = cartLineKey(
+      item.menuItemId,
+      modifiers,
+      item.specialInstructions,
+    );
+    const previous = combined.get(lineId);
+    const quantity = item.quantity + (previous?.quantity ?? 0);
+    if (quantity > 50) throw new Error("Cart quantity limit");
+    combined.set(lineId, {
+      ...item,
+      modifiers,
+      specialInstructions: item.specialInstructions?.trim(),
+      lineId,
+      quantity,
+    });
+  }
+  return [...combined.values()];
+}
+export function createCustomerCart(
+  owner: string | null | undefined,
+  storage: CartStorage,
+) {
+  // Undefined means Clerk has not resolved identity. Never read the guest cart then.
+  const key =
+    owner === undefined
+      ? null
+      : owner
+        ? `rocoeats-cart:v2:${owner}`
+        : "rocoeats-guest-cart:v1";
+  let lastRaw: string | null = null;
+  function decode(raw: string | null): Snapshot {
+    if (!raw) return { items: [], warning: "" };
     try {
-      const raw = storage.getItem(key);
-      if (!raw) return { items: [], warning: "" };
-      const parsed = cartSchema.safeParse(JSON.parse(raw));
-      if (!parsed.success)
-        return {
-          items: [],
-          warning:
-            "Your saved cart could not be restored. Please add your items again.",
-        };
+      const parsed = cartSchema.parse(JSON.parse(raw));
+      const items = normalize(parsed);
       return {
-        items: parsed.data.map((i) => ({
-          ...i,
-          lineId: cartLineKey(i.menuItemId, i.modifiers, i.specialInstructions),
-        })),
-        warning: "",
+        items,
+        warning:
+          items.length < parsed.length
+            ? "Identical saved cart lines were combined. Please review quantities."
+            : "",
       };
     } catch {
       return {
         items: [],
         warning:
-          "Saved cart storage is unavailable. You can still build a cart for this session.",
+          "Your saved cart could not be restored. Please add your items again.",
       };
     }
   }
-  let snapshot = read();
+  let snapshot: Snapshot;
+  try {
+    lastRaw = key ? storage.getItem(key) : null;
+    snapshot = decode(lastRaw);
+  } catch {
+    snapshot = {
+      items: [],
+      warning:
+        "Saved cart storage is unavailable. You can still build a cart for this session.",
+    };
+  }
   const listeners = new Set<() => void>();
   const emit = () => listeners.forEach((fn) => fn());
+  const reload = () => {
+    if (!key) return;
+    try {
+      const raw = storage.getItem(key);
+      // Retain session-only edits after a failed save. Unchanged storage is not
+      // evidence that an older saved cart should replace the live cart on resume.
+      if (raw === lastRaw) return;
+      snapshot = decode(raw);
+      lastRaw = raw;
+      emit();
+    } catch {
+      // A temporary storage failure must not erase the current cart.
+    }
+  };
   return {
     key,
     getSnapshot: () => snapshot,
@@ -78,18 +122,18 @@ export function createCustomerCart(owner: string | null, storage: CartStorage) {
         listeners.delete(fn);
       };
     },
-    reload: () => {
-      snapshot = read();
-      emit();
-    },
+    reload,
     setItems: (
       update: CartEntry[] | ((previous: CartEntry[]) => CartEntry[]),
     ) => {
       if (!key) return;
-      const candidate =
-        typeof update === "function" ? update(snapshot.items) : update;
-      const parsed = cartSchema.safeParse(candidate);
-      if (!parsed.success) {
+      reload();
+      let items: CartEntry[];
+      try {
+        const candidate =
+          typeof update === "function" ? update(snapshot.items) : update;
+        items = normalize(cartSchema.parse(candidate));
+      } catch {
         snapshot = {
           ...snapshot,
           warning:
@@ -98,19 +142,38 @@ export function createCustomerCart(owner: string | null, storage: CartStorage) {
         emit();
         return;
       }
-      const items = parsed.data.map((i) => ({
-        ...i,
-        lineId: cartLineKey(i.menuItemId, i.modifiers, i.specialInstructions),
-      }));
       let warning = "";
       try {
-        storage.setItem(key, JSON.stringify(items));
+        const raw = JSON.stringify(items);
+        storage.setItem(key, raw);
+        lastRaw = raw;
       } catch {
         warning =
           "Your cart is available for this session but could not be saved on this device.";
       }
       snapshot = { items, warning };
       emit();
+    },
+  };
+}
+
+export function createCustomerCartRegistry(storage: CartStorage) {
+  const stores = new Map<
+    string | null | undefined,
+    ReturnType<typeof createCustomerCart>
+  >();
+  return {
+    get(owner: string | null | undefined) {
+      let store = stores.get(owner);
+      if (!store) {
+        store = createCustomerCart(owner, storage);
+        stores.set(owner, store);
+      }
+      return store;
+    },
+    reload(key: string | null = null) {
+      for (const store of stores.values())
+        if (key === null || key === store.key) store.reload();
     },
   };
 }

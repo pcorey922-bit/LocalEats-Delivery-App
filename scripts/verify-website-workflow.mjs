@@ -1,3 +1,4 @@
+import { verifyCheckout } from './checkout-browser-checks.mjs';
 // Real website + API + migrated, disposable PGlite database. Only Clerk and
 // payment provider are simulated. This is NOT a Stripe TEST transaction.
 import assert from 'node:assert/strict';
@@ -33,9 +34,11 @@ try {
     plugins: [{ name: 'test-only-clerk', setup(b) {
       b.onResolve({ filter: /^@clerk\/react\/internal$/ }, () => ({ path: 'internal', namespace: 'clerk-fixture' }));
       b.onResolve({ filter: /^@clerk\/react$/ }, () => ({ path: 'react', namespace: 'clerk-fixture' }));
-      b.onLoad({ filter: /.*/, namespace: 'clerk-fixture' }, args => ({ loader: 'js', contents: args.path === 'internal'
+      b.onLoad({ filter: /.*/, namespace: 'clerk-fixture' }, args => ({ resolveDir: path.join(root, 'artifacts/localeats'), loader: 'js', contents: args.path === 'internal'
         ? 'export const publishableKeyFromHost=(_host,key)=>key;'
-        : `export const useAuth=()=>({isLoaded:true,isSignedIn:!!window.qaUserId,userId:window.qaUserId,getToken:async()=>null});
+        : `import { useSyncExternalStore } from 'react';
+           const subscribe=callback=>{window.addEventListener('qa-auth-change',callback);return()=>window.removeEventListener('qa-auth-change',callback)};
+           export const useAuth=()=>{useSyncExternalStore(subscribe,()=>String(window.qaAuthReady)+String(window.qaUserId));return{isLoaded:window.qaAuthReady!==false,isSignedIn:!!window.qaUserId,userId:window.qaUserId,getToken:async()=>null}};
            export const useUser=()=>({isLoaded:true,user:window.qaUserId?{id:window.qaUserId,fullName:'Browser tester'}:null});
            export const ClerkProvider=({children})=>children;
            export const SignIn=()=>null, SignUp=()=>null;
@@ -58,8 +61,13 @@ try {
   browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
   async function actor(role) {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
-    await context.addInitScript(id => { window.qaUserId = id; }, ids[role] || null);
-    if (ids[role]) await context.route('**/api/**', route => route.continue({ headers: { ...route.request().headers(), 'x-test-user': ids[role] } }));
+    await context.addInitScript(id => { window.qaUserId = sessionStorage.getItem('qa-user') || id; window.qaAuthReady = sessionStorage.getItem('qa-pending') !== '1'; }, ids[role] || null);
+    await context.route('**/api/**', async route => {
+      try {
+        const id = await route.request().frame().evaluate(() => window.qaUserId);
+        await route.continue({ headers: { ...route.request().headers(), ...(id ? { 'x-test-user': id } : {}) } });
+      } catch { await route.abort().catch(() => {}); }
+    });
     const page = await context.newPage();
     page.setDefaultTimeout(15000);
     page.on('pageerror', error => browserErrors.push(error.message));
@@ -71,6 +79,8 @@ try {
     assert.ok(response.ok, `${method} ${url}: ${response.status} ${await response.clone().text()}`);
     return response.json();
   }
+  await verifyCheckout({ actor, origin, ids });
+  if (process.env.ROCOEATS_CHECKOUT_ONLY !== 'true') {
   const customer = await actor('customer');
   await customer.goto(origin);
   await customer.getByRole('link', { name: 'Browse Restaurants & Menus', exact: true }).click();
@@ -80,8 +90,8 @@ try {
   const customerNav = customer.getByRole('navigation', { name: 'Main navigation', exact: true });
   for (const name of ['Administrator', 'Dispatch & orders', 'Driver', 'Restaurant']) assert.equal(await customerNav.getByRole('link', { name, exact: true }).count(), 0);
   await customer.getByLabel('Green beans (+$1.50)', { exact: true }).check();
-  await customer.getByLabel('Preparation instructions (optional)').fill('No onions');
-  await customer.getByRole('button', { name: 'Add to cart', exact: true }).click();
+  await customer.locator('.roco-menu-item').filter({ has: customer.locator('strong', { hasText: /^Local supper$/ }) }).getByLabel('Preparation instructions (optional)').fill('No onions');
+  await customer.locator('.roco-menu-item').filter({ has: customer.locator('strong', { hasText: /^Local supper$/ }) }).getByRole('button', { name: 'Add to cart', exact: true }).click();
   await customer.getByRole('link', { name: 'Cart (1)', exact: true }).click();
   await customer.getByRole('button', { name: 'Add address', exact: true }).click();
   await customer.getByLabel('Street address', { exact: true }).fill('200 Test Delivery');
@@ -161,6 +171,7 @@ try {
   await admin.getByRole('button', { name: 'Apply filter', exact: true }).click();
   await admin.getByText(/Trial balance is balanced/).waitFor();
   for (const [index, page] of pages.entries()) {
+    if (page.isClosed()) continue;
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `No mobile overflow for actor ${index}`);
     await page.screenshot({ path: path.join(web, `workflow-${index}.png`), fullPage: true });
     for (const link of await page.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link').all()) {
@@ -173,7 +184,7 @@ try {
   await guest.getByRole('link', { name: 'Order as Guest', exact: true }).click();
   await guest.getByRole('link', { name: 'View menu' }).click();
   await guest.getByLabel('Green beans (+$1.50)', { exact: true }).check();
-  await guest.getByRole('button', { name: 'Add to cart', exact: true }).click();
+  await guest.locator('.roco-menu-item').filter({ has: guest.locator('strong', { hasText: /^Local supper$/ }) }).getByRole('button', { name: 'Add to cart', exact: true }).click();
   await guest.getByRole('link', { name: 'Cart (1)', exact: true }).click();
   await guest.getByLabel('Your name', { exact: true }).fill('Browser guest');
   await guest.getByLabel('Receipt email', { exact: true }).fill('browser@example.test');
@@ -201,6 +212,8 @@ try {
   assert.deepEqual(browserErrors, []);
   console.log(`PASS: real website/API/PGlite workflow: search, modifiers, cart/address/quote, simulator payment, restaurant acceptance/preparation, driver availability/claim/navigation/pickup/handoff, delivery receipt, balanced ledger and two earnings records; guest browsing/session/cart. Simulated Clerk and payment only. Screenshots: ${web}`);
   console.log('PASS: live restaurant hours, paused/closed status, weekly hours and availability outage recovery. Only the outage response was intercepted.');
+  }
+  assert.deepEqual(browserErrors, []);
 } catch (error) {
   console.error('Website workflow failed. Local artifacts:', web);
   for (const [index, page] of pages.entries()) {

@@ -17,6 +17,18 @@ import { PricingSettings } from "../src/pages/commerce-pages";
 import { PaymentSetupChecks } from "../src/pages/payment-setup";
 import { OrderTracking } from "../src/pages/delivery-tracking";
 import { DeclinedOffers } from "../src/pages/declined-offers";
+import { useCustomerCart } from '../src/hooks/use-customer-cart';
+import { cartLineKey } from '../src/lib/cart-line';
+function CartProbe({ name }: { name: string }) {
+  const [items, setItems] = useCustomerCart();
+  return <section><output data-testid={`${name}-cart`}>{JSON.stringify(items)}</output><button onClick={() => {
+    const menuItemId = '11111111-1111-4111-8111-111111111110';
+    const lineId = cartLineKey(menuItemId);
+    setItems(old => old.some(i => i.lineId === lineId) ? old.map(i => i.lineId === lineId ? { ...i, quantity: i.quantity + 1 } : i) : [...old, {
+      lineId, menuItemId, restaurantId: '11111111-1111-4111-8111-111111111111', restaurantName: 'QA kitchen', name: 'French fries', priceCents: 349, quantity: 1,
+    }]);
+  }}>Add fries {name}</button></section>;
+}
 declare global {
   interface Window {
     qaNativeStart: Record<string, unknown> | null;
@@ -376,7 +388,7 @@ createRoot(document.getElementById("root")!).render(
     client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
   >
     <p>SIMULATED authentication and API: component QA only</p>
-    {location.search.includes("native=true") ? (
+    {location.search.includes('cartSync=true') ? <React.StrictMode><CartProbe name="menu"/><CartProbe name="checkout"/></React.StrictMode> : location.search.includes("native=true") ? (
       <NativeSignIn role={location.search.includes("join=restaurant") ? "restaurant" : undefined} />
     ) : location.search.includes("importGuest=true") ? (
       <ImportGuestLink />

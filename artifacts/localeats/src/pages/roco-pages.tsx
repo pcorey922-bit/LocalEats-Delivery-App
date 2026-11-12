@@ -1,3 +1,5 @@
+import { CheckoutAddresses } from './checkout-addresses';
+import { useGuestToken } from '../lib/guest-session';
 import { accountStatus } from "../lib/account-entry";
 import { RestaurantStatus } from './restaurant-status';
 import { GuestDeliveryContact } from "./guest-delivery-contact";
@@ -25,14 +27,14 @@ import { ArrowRight, ClipboardList, MapPin, Plus, RefreshCw, ShieldCheck, Shoppi
 import {
   getGetAdminFinanceQueryKey, getGetAdminOverviewQueryKey, getGetMyOrderQueryKey, getGetMyProfileQueryKey, getGetMyRestaurantQueryKey, getGetRestaurantQueryKey,
   getListAdminProfilesQueryKey, getListAdminRestaurantsQueryKey, getListMyAddressesQueryKey,
-  getListMyOrdersQueryKey, getListRestaurantsQueryKey, useCreateMyAddress, useCreateMyOrder,
+  getListMyOrdersQueryKey, getListRestaurantsQueryKey, useCreateMyOrder,
   useCreateMyRestaurant, useCreateMyRestaurantCategory, useCreateMyRestaurantMenuItem, useDeleteMyRestaurantCategory,
   useDeleteMyAddress, useDeleteMyRestaurantMenuItem, useGetAdminFinance, useGetAdminOverview, useGetMyOrder, useGetMyProfile, useGetMyRestaurant,
   useGetRestaurant, useHealthCheck, useListAdminProfiles, useListAdminRestaurants, useListMyAddresses, useListMyOrders,
   useUpdateMyAddress,
   useListRestaurants, useUpdateAdminProfile, useUpdateAdminRestaurantStatus, useUpdateMyRestaurant,
   useUpdateMyRestaurantCategory, useUpdateMyRestaurantMenuItem, useUpdateOrderStatus,
-  type Address, type RestaurantInput, type Order, type OrderStatus,
+  type RestaurantInput, type Order, type OrderStatus,
 } from '@workspace/api-client-react';
 
 import { customFetch } from '../../../../lib/api-client-react/src/custom-fetch';
@@ -81,10 +83,11 @@ export function DiscoveryPage() {
 }
 export function RestaurantMenuPage() {
   const { restaurantId = '' } = useParams<{ restaurantId: string }>();
-  const {userId}=useAuth();
+  const {isLoaded,userId}=useAuth();
   const menu = useGetRestaurant(restaurantId, { query: { queryKey: getGetRestaurantQueryKey(restaurantId), enabled: !!restaurantId } });
   const [cart, setCart, cartWarning] = useCustomerCart();
   const add = (item: { id: string; name: string; priceCents: number }, modifiers:Record<string,string[]>={},extra=0,customization="",specialInstructions="") => {
+    if (!isLoaded) return;
     if (cart.some(i => i.restaurantId !== restaurantId)) { window.alert('Your cart can include items from one restaurant at a time. Clear the cart before switching restaurants.'); return; }
     const lineId=cartLineKey(item.id,modifiers,specialInstructions);
     setCart(old=>old.some(i=>i.lineId===lineId)?old.map(i=>i.lineId===lineId?{...i,quantity:i.quantity+1}:i):[...old,{lineId,modifiers,customization,specialInstructions,menuItemId:item.id,name:item.name,priceCents:item.priceCents+extra,quantity:1,restaurantId,restaurantName:menu.data?.name||''}]);
@@ -94,17 +97,14 @@ export function RestaurantMenuPage() {
   return <Shell><main className="roco-main"><PageIntro eyebrow={`${menu.data.city}, ${menu.data.region} · approved restaurant`} title={menu.data.name}>{menu.data.description || 'Browse the current menu from this Roane County restaurant.'}</PageIntro>
     <div className="roco-toolbar">{cartWarning&&<p role="alert">{cartWarning}</p>}<div className="roco-meta">{menu.data.street1} · {menu.data.city}, {menu.data.region} {menu.data.postalCode}</div><Link className="roco-button primary" href="/cart"><ShoppingBag size={15}/> Cart ({cart.reduce((n, i) => n + i.quantity, 0)})</Link></div>
     <RestaurantStatus restaurantId={restaurantId}/>
-    {menu.data.categories.length ? <div className="roco-two-col"><section className="roco-list">{menu.data.categories.map(cat => <div className="roco-card" key={cat.id}><div className="roco-row"><h2>{cat.name}</h2><span className="roco-meta">Menu section</span></div>{cat.items.length ? cat.items.map(item => <div className="roco-menu-item" key={item.id}><div><strong>{item.name}</strong><p style={{ margin: '5px 0 0' }}>{item.description}</p>{!item.isAvailable && <span className="roco-meta">Currently unavailable</span>}</div><div style={{ display: 'grid', gap: 10, justifyItems: 'end' }}><span className="roco-price">{money(item.priceCents)}</span>{item.isAvailable && <CustomizedAdd key={`${item.id}:${userId}`} item={item} onAdd={(selected,extra,label,instructions)=>add(item,selected,extra,label,instructions)}/>}</div></div>) : <p>No menu items listed in this section.</p>}</div>)}</section><aside className="roco-card"><div className="roco-kicker">Ordering status</div><h2 style={{ marginTop: 13 }}>Development checkout</h2><p>Submitting an order saves an order record using server-verified totals. It does not charge money. Payments and delivery are not active services.</p><div className="roco-rule"/><Link className="roco-button primary" href="/cart">Review your cart <ArrowRight size={14}/></Link></aside></div> : <div className="roco-empty"><h2>Menu not published yet</h2><p>This approved restaurant has not added menu categories yet.</p></div>}
+    {menu.data.categories.length ? <div className="roco-two-col"><section className="roco-list">{menu.data.categories.map(cat => <div className="roco-card" key={cat.id}><div className="roco-row"><h2>{cat.name}</h2><span className="roco-meta">Menu section</span></div>{cat.items.length ? cat.items.map(item => <div className="roco-menu-item" key={item.id}><div><strong>{item.name}</strong><p style={{ margin: '5px 0 0' }}>{item.description}</p>{!item.isAvailable && <span className="roco-meta">Currently unavailable</span>}</div><div style={{ display: 'grid', gap: 10, justifyItems: 'end' }}><span className="roco-price">{money(item.priceCents)}</span>{item.isAvailable && <CustomizedAdd key={`${item.id}:${userId}`} item={item} disabled={!isLoaded} quantityInCart={cart.filter(line => line.menuItemId === item.id).reduce((count, line) => count + line.quantity, 0)} onAdd={(selected,extra,label,instructions)=>add(item,selected,extra,label,instructions)}/>}</div></div>) : <p>No menu items listed in this section.</p>}</div>)}</section><aside className="roco-card"><div className="roco-kicker">Ordering status</div><h2 style={{ marginTop: 13 }}>Development checkout</h2><p>Submitting an order saves an order record using server-verified totals. It does not charge money. Payments and delivery are not active services.</p><div className="roco-rule"/><Link className="roco-button primary" href="/cart">Review your cart <ArrowRight size={14}/></Link></aside></div> : <div className="roco-empty"><h2>Menu not published yet</h2><p>This approved restaurant has not added menu categories yet.</p></div>}
   </main></Shell>;
 }
 
-function AddressForm({ onCreated }: { onCreated: (a: Address) => void }) {
-  const create = useCreateMyAddress(); const client = useQueryClient();
-  const submit = (e: FormEvent<HTMLFormElement>) => { e.preventDefault(); const f = new FormData(e.currentTarget); create.mutate({ data: { label: String(f.get('label') || 'Home'), street1: String(f.get('street1')), city: String(f.get('city')), region: String(f.get('region') || 'TN'), postalCode: String(f.get('postalCode')), deliveryInstructions:String(f.get('deliveryInstructions')||''), isDefault: f.get('isDefault') === 'on' } }, { onSuccess: a => { invalidate(client, getListMyAddressesQueryKey()); onCreated(a); } }); };
-  return <form className="roco-card roco-form-grid" onSubmit={submit}><label className="roco-field">Label<input name="label" className="roco-input" defaultValue="Home"/></label><label className="roco-field">Street address<input required name="street1" className="roco-input"/></label><label className="roco-field">City<input required name="city" className="roco-input"/></label><label className="roco-field">State<input name="region" className="roco-input" defaultValue="TN"/></label><label className="roco-field">ZIP code<input required name="postalCode" className="roco-input"/></label><label className="roco-field">Delivery instructions<textarea name="deliveryInstructions" className="roco-input" maxLength={1000}/></label><label className="roco-field" style={{ display: 'flex', alignItems: 'center' }}><span>Set as default address</span><input type="checkbox" name="isDefault"/></label><button className="roco-button primary" disabled={create.isPending}>Save address</button>{create.isError && <p className="roco-alert">Address could not be saved. Check the fields and retry.</p>}</form>;
-}
 export function CartPage() {
-  const {isSignedIn,userId}=useAuth();
+  const {isLoaded,isSignedIn,userId}=useAuth();
+  const guestToken = useGuestToken();
+  const principal = isSignedIn ? userId : guestToken;
   const restore = new URLSearchParams(useSearch()).get('restore') === '1';
   const [guestCart, clearGuestCart] = useCartForOwner(null);
   const [, navigate] = useLocation();
@@ -123,12 +123,20 @@ export function CartPage() {
     }
     navigate('/cart', { replace: true });
   }, [isSignedIn, restore, guestCart, cart.length, setCart, clearGuestCart, navigate, userId]);
-  const [addressId, setAddressId] = useState(''); const [showAddress, setShowAddress] = useState(false);
+  const [addressId, setAddressId] = useState('');
   const [tipCents, setTipCents] = useState(0); const [placed, setPlaced] = useState<Order | null>(null);
   type Quote = {subtotalCents:number;deliveryFeeCents:number;serviceFeeCents:number;taxCents:number;tipCents:number;totalCents:number};
-  const addresses = useListMyAddresses({ query: { queryKey: getListMyAddressesQueryKey(), retry:false } });
+  const addressKey = [...getListMyAddressesQueryKey(), isSignedIn ? 'customer' : 'guest', principal];
+  const addresses = useListMyAddresses({ query: { queryKey: addressKey, enabled: !!isLoaded && !!principal, retry: false, networkMode: 'always' } });
+  const selectedAddressId = !addresses.isError && addresses.data?.some(address => address.id === addressId) ? addressId : '';
+  useEffect(() => {
+    if (!addresses.data || addresses.isError) return;
+    if (!addresses.data.some(address => address.id === addressId)) {
+      setAddressId(addresses.data.find(address => address.isDefault)?.id ?? (addresses.data.length === 1 ? addresses.data[0].id : ''));
+    }
+  }, [addresses.data, addresses.isError, addressId]);
   const inputFor = (items: typeof cart) => ({
-    restaurantId: items[0]?.restaurantId, addressId, tipCents,
+    restaurantId: items[0]?.restaurantId, addressId: selectedAddressId, tipCents,
     items: items.map(i => ({ menuItemId: i.menuItemId, quantity: i.quantity, modifiers: i.modifiers ?? {}, specialInstructions: i.specialInstructions })),
   });
   const input = inputFor(cart);
@@ -153,14 +161,17 @@ export function CartPage() {
       invalidate(client, getListMyOrdersQueryKey());
     },
   });
-  const save = (next: typeof cart) => setCart(next);
+  const changeQuantity = (lineId: string, change: number) => setCart(current => current.flatMap(line => {
+    if (line.lineId !== lineId) return [line];
+    const quantity = line.quantity + change;
+    return quantity > 0 ? [{ ...line, quantity }] : [];
+  }));
   const totals=(q:Quote)=><dl>{([['Food',q.subtotalCents],['Delivery',q.deliveryFeeCents],['Service',q.serviceFeeCents],['Illustrative test tax',q.taxCents],['Tip',q.tipCents],['Total',q.totalCents]] as const).map(([label,value])=><div className="roco-row" key={label}><dt>{label}</dt><dd>{money(value)}</dd></div>)}</dl>;
-  return <Shell><main className="roco-main"><PageIntro eyebrow="Customer · test checkout" title={placed?'Order saved. Complete test payment.':'Review your delivery.'}>All checkout and settlement activity is test mode. Live charges are disabled.</PageIntro>
-    {!commerce.data?.orderingEnabled&&<p className="roco-notice">Ordering is not open yet. You can browse menus and review a quote.</p>}{cartWarning&&<p role="alert">{cartWarning}</p>}{placed?<section className="roco-card">{totals(placed)}<RestaurantConfirmation orderId={placed.id}/><CheckoutPanel orderId={placed.id}/><Link href={!isSignedIn&&readGuestToken()?"/guest/order":"/orders"} className="roco-button">Track order</Link></section>:<div className="roco-two-col"><section className="roco-card"><h2>Your items</h2>{cart.length?cart.map(i=><div className="roco-menu-item" key={i.lineId??i.menuItemId}><div><strong>{i.name}</strong><p>{i.customization}</p><p>{i.specialInstructions}</p><p>{i.restaurantName} · {money(i.priceCents*i.quantity)}</p></div><div><button className="roco-button" aria-label={`Remove one ${i.name}`} onClick={()=>save(i.quantity>1?cart.map(x=>(x.lineId??x.menuItemId)===(i.lineId??i.menuItemId)?{...x,quantity:x.quantity-1}:x):cart.filter(x=>(x.lineId??x.menuItemId)!==(i.lineId??i.menuItemId)))}>−</button> {i.quantity} <button className="roco-button" aria-label={`Add one ${i.name}`} onClick={()=>save(cart.map(x=>(x.lineId??x.menuItemId)===(i.lineId??i.menuItemId)?{...x,quantity:x.quantity+1}:x))}>+</button></div></div>):<p>Your cart is empty. <Link href="/restaurants">Find food</Link></p>}</section>
-      <section className="roco-card"><h2>Delivery address</h2>{addresses.isError?<LoadError retry={()=>void addresses.refetch()}/>:<select aria-label="Delivery address" className="roco-select" value={addressId} onChange={e=>setAddressId(e.target.value)}><option value="">Choose a saved address</option>{addresses.data?.map(a=><option key={a.id} value={a.id}>{a.street1}, {a.city}</option>)}</select>}
-      <button className="roco-button" onClick={()=>setShowAddress(!showAddress)}>Add address</button>{showAddress&&<AddressForm onCreated={a=>{setAddressId(a.id);setShowAddress(false);}}/>}
+  return <Shell><main className="roco-main roco-checkout"><PageIntro eyebrow="Customer · test checkout" title={placed?'Order saved. Complete test payment.':'Review your delivery.'}>All checkout and settlement activity is test mode. Live charges are disabled.</PageIntro>
+    {!commerce.data?.orderingEnabled&&<p className="roco-notice">Ordering is not open yet. You can browse menus and review a quote.</p>}{cartWarning&&<p role="alert">{cartWarning}</p>}{placed?<section className="roco-card">{totals(placed)}<RestaurantConfirmation orderId={placed.id}/><CheckoutPanel orderId={placed.id}/><Link href={!isSignedIn&&readGuestToken()?"/guest/order":"/orders"} className="roco-button">Track order</Link></section>:<div className="roco-two-col"><section className="roco-card"><h2>Your items</h2>{cart.length?cart.map(i=><div className="roco-menu-item roco-cart-item" key={i.lineId}><div><strong>{i.name}</strong><p>{i.customization}</p><p>{i.specialInstructions}</p><p>{i.restaurantName} · {money(i.priceCents*i.quantity)}</p></div><div><button className="roco-button" aria-label={`Remove one ${i.name}`} onClick={()=>changeQuantity(i.lineId!, -1)}>−</button> {i.quantity} <button className="roco-button" aria-label={`Add one ${i.name}`} disabled={i.quantity >= 50} onClick={()=>changeQuantity(i.lineId!, 1)}>+</button></div></div>):<p>Your cart is empty. <Link href="/restaurants">Find food</Link></p>}</section>
+      <section className="roco-card"><h2>Delivery address</h2><CheckoutAddresses key={principal} addresses={addresses.data} pending={addresses.isPending} error={addresses.error} retry={()=>void addresses.refetch()} selectedId={selectedAddressId} onSelect={setAddressId} queryKey={addressKey} guest={!isSignedIn}/>
       <label className="roco-field">Driver tip (dollars)<input className="roco-input" type="number" min="0" max="1000" step="0.01" value={(tipCents/100).toString()} onChange={e=>setTipCents(Math.round(Number(e.target.value)*100))}/></label>
-      <button className="roco-button" disabled={!cart.length||!addressId||quote.isPending||order.isPending} onClick={()=>quote.mutate({ snapshot: input, previous: review })}>Calculate test total</button>
+      <button className="roco-button" disabled={!cart.length||!selectedAddressId||quote.isPending||order.isPending} onClick={()=>quote.mutate({ snapshot: input, previous: review })}>Calculate test total</button>
       {review&&<>{totals(review.quote)}<button className="roco-button primary" disabled={!commerce.data?.orderingEnabled||order.isPending||quote.isPending} onClick={()=>order.mutate(review)}>Create order · {money(review.quote.totalCents)}</button></>}
       {quote.isError&&<p role="alert" className="roco-alert">{quote.error.message}</p>}{order.isError&&<p role="alert" className="roco-alert">{order.error.message}</p>}</section></div>}
   </main></Shell>;

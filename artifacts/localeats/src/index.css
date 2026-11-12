@@ -476,6 +476,12 @@ body { background:var(--roco-bg); color:var(--roco-ink); }
 .roco-button.primary { background:var(--roco-amber);border-color:var(--roco-amber);color:#172235; }
 .roco-button.danger { color:#ffc3b2;border-color:#784b45; }
 .roco-button:disabled { opacity:.5;cursor:not-allowed;transform:none; }
+.roco-checkout .roco-button, .roco-add-to-cart { min-height:44px;min-width:44px; }
+.roco-address-form { margin-top:16px; }
+.roco-address-default { display:flex;align-items:center;gap:10px;min-height:44px; }
+.roco-cart-item > div { min-width:0;overflow-wrap:anywhere; }
+.roco-cart-item > div:last-child { display:flex;align-items:center;gap:12px;flex-shrink:0; }
+@media (max-width:520px) { .roco-cart-item { flex-wrap:wrap; } }
 .roco-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px; }
 .roco-card { min-width:0;border:1px solid var(--roco-line);border-radius:13px;background:var(--roco-panel);padding:20px; }
 .roco-restaurant-card { display:flex;min-height:198px;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden; }
