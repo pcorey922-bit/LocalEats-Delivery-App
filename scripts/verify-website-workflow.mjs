@@ -108,7 +108,13 @@ try {
   const order = await saved.json();
   assert.equal(order.items[0].specialInstructions, 'No onions');
   assert.equal(order.items[0].modifierSnapshot[0].option, 'Green beans');
+  const checkoutResponse = customer.waitForResponse(response => response.url().endsWith(`/api/orders/${order.id}/checkout`) && response.request().method() === 'POST');
   await customer.getByRole('button', { name: 'Prepare secure test payment', exact: true }).click();
+  // A completed browser click does not imply the server has committed checkout.
+  // Wait for that prerequisite before sending the simulator confirmation.
+  const checkoutResult = await checkoutResponse;
+  assert.equal(checkoutResult.status(), 200);
+  assert.equal((await checkoutResult.json()).mode, 'sandbox');
   // Explicit stand-in for provider confirmation: only the simulator endpoint.
   // No Stripe API, hosted checkout, card, webhook delivery or transfer occurs.
   await api('customer', `/orders/${order.id}/sandbox-payment`, 'POST', { outcome: 'succeeded' });
