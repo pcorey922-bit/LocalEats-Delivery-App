@@ -1,3 +1,4 @@
+import { requireLaunchDeliveryArea } from '../lib/delivery-area';
 import { telephoneConfirmationsTable, notificationsTable } from "@workspace/db";
 import { guestSessionsTable } from "@workspace/db";
 import type { GuestRequest } from "../lib/guest-access";
@@ -279,22 +280,7 @@ router.post(
     }
 
     const pricing = await readPricing();
-    if (
-      !["tn", "tennessee"].includes(address.region.trim().toLowerCase()) ||
-      !["tn", "tennessee"].includes(restaurant.region.trim().toLowerCase())
-    )
-      throw new CommerceError(
-        409,
-        "Test delivery is configured for Tennessee only",
-      );
-    if (
-      !pricing.allowedPostalCodes.includes(address.postalCode) ||
-      !pricing.allowedPostalCodes.includes(restaurant.postalCode)
-    )
-      throw new CommerceError(
-        409,
-        "Address or restaurant is outside the configured test delivery area",
-      );
+    requireLaunchDeliveryArea(restaurant, address, pricing.allowedPostalCodes);
     const price = calculatePrice(
       subtotalCents,
       parsed.data.tipCents ?? 0,
@@ -424,6 +410,7 @@ router.post(
           409,
           "Checkout details changed. Review your address, menu and a fresh quote before ordering",
         );
+      requireLaunchDeliveryArea(lockedRestaurant, lockedAddress, lockedPricing.allowedPostalCodes);
       await ensureAccepting(lockedRestaurant, tx);
       await ensureCapacity(lockedRestaurant, tx);
       ensureInventory(lockedItems, parsed.data.items);

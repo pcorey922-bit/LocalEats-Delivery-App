@@ -35,7 +35,7 @@ export async function start(root: string) {
   await db.insert(profilesTable).values({ id: ids.otherCustomer, clerkUserId: ids.otherCustomer, role: 'customer', displayName: 'Other browser customer' });
   process.env.LOCALEATS_ADMIN_CLERK_USER_IDS = ids.admin;
   process.env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS = ids.admin;
-  await db.insert(restaurantsTable).values({ id: ids.business, ownerProfileId: ids.restaurant, name: 'Browser Test Kitchen', description: 'Disposable local workflow fixture', street1: '100 Test Pickup', city: 'Kingston', region: 'TN', postalCode: '37763', status: 'approved', acceptingOrders: true });
+  await db.insert(restaurantsTable).values({ id: ids.business, ownerProfileId: ids.restaurant, name: 'Browser Test Kitchen', description: 'Disposable local workflow fixture', street1: '100 Test Pickup', city: 'Rockwood', region: 'TN', postalCode: '37854', status: 'approved', acceptingOrders: true });
   for (let weekday = 0; weekday < 7; weekday++) {
     await db.insert(restaurantHoursTable).values({ restaurantId: ids.business, weekday, openTime: '00:00', closeTime: '24:00' });
   }

@@ -14,7 +14,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AccountAccess } from "../src/pages/account-access";
 import { AccountSettings } from "../src/pages/account-settings";
 import { AdministratorAccessManager } from "../src/pages/administrator-access";
-import { PricingSettings } from "../src/pages/commerce-pages";
+import { CheckoutPanel, PricingSettings } from "../src/pages/commerce-pages";
 import { PaymentSetupChecks } from "../src/pages/payment-setup";
 import { OrderTracking } from "../src/pages/delivery-tracking";
 import { DeclinedOffers } from "../src/pages/declined-offers";
@@ -140,6 +140,15 @@ window.qaStaff = {
   accessVersion: "v1",
 };
 window.fetch = async (url, options = {}) => {
+  if (location.search.includes('checkoutCsp=true')) {
+    const path = String(url);
+    if (path === '/api/commerce/config') return Response.json({ mode: 'stripe_test', orderingEnabled: true, testMode: true, liveChargesEnabled: false });
+    if (path === '/api/orders/fixture-csp/confirmation') return Response.json({ mode: 'electronic', status: null, orderStatus: 'placed', preparationMinutes: null });
+    if (path === '/api/orders/fixture-csp/payment') return Response.json({ reservationExpiresAt: new Date(Date.now()+900000).toISOString() });
+    if (path === '/api/orders/fixture-csp/checkout') return Response.json({ mode: 'stripe_test', operationId: 'fixture-csp-operation', url: null }, { status: 202 });
+    if (path === '/api/orders/fixture-csp/financial-operations') return Response.json([{ id: 'fixture-csp-operation', state: 'succeeded', result: { url: 'https://checkout.stripe.com/c/pay/cs_test_csp_fixture' }, errorCode: null }]);
+  }
+
   if (String(url) === '/api/admin/orders/fixture-reconciliation/reconcile-payment') {
     window.qaEvidenceAttempts++;
     const state = window.qaEvidenceState;
@@ -177,7 +186,7 @@ window.fetch = async (url, options = {}) => {
       profileStatus: saved ? "active" : "setup_required", role: saved?.role ?? null,
     });
     if (path === "/api/commerce/config") return json({ orderingEnabled: true, testMode: true, liveChargesEnabled: false });
-    if (path === "/api/addresses/me") return json([{ id: "fixture-address", street1: "100 Test Way", city: "Kingston" }]);
+    if (path === "/api/addresses/me") return json([{ id: "fixture-address", street1: "100 Test Way", city: "Rockwood" }]);
     if (path === "/api/orders/quote") {
       const input = JSON.parse(String(options.body));
       if (sessionStorage.getItem("qa-hold-quote") === "1") {
@@ -404,7 +413,7 @@ createRoot(document.getElementById("root")!).render(
     client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
   >
     <p>SIMULATED authentication and API: component QA only</p>
-    {location.search.includes('reconciliation=true') ? <PaymentReconciliation orderId="fixture-reconciliation"/> : location.search.includes('cartSync=true') ? <React.StrictMode><CartProbe name="menu"/><CartProbe name="checkout"/></React.StrictMode> : location.search.includes("native=true") ? (
+    {location.search.includes('checkoutCsp=true') ? <CheckoutPanel orderId="fixture-csp"/> : location.search.includes('reconciliation=true') ? <PaymentReconciliation orderId="fixture-reconciliation"/> : location.search.includes('cartSync=true') ? <React.StrictMode><CartProbe name="menu"/><CartProbe name="checkout"/></React.StrictMode> : location.search.includes("native=true") ? (
       <NativeSignIn role={location.search.includes("join=restaurant") ? "restaurant" : undefined} />
     ) : location.search.includes("importGuest=true") ? (
       <ImportGuestLink />

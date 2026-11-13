@@ -8,6 +8,6 @@ export const testPricing: Pricing = {
   taxDeliveryAndService: false,
   restaurantCommissionBps: 1000,
   driverShareBps: 8000,
-  allowedPostalCodes: ["37854", "37748", "37763"],
+  allowedPostalCodes: ["37854"],
   testMode: true,
 };

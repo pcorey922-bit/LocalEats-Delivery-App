@@ -96,6 +96,14 @@ matching processed signed event, delivery receipt and per-order reconciliation.
 
 ## Owner setup before an order
 
+Rockwood launch restriction: new quotes and checkout require restaurant and delivery
+address locality Rockwood, state TN/Tennessee, ZIP 37854 (or a valid 37854 ZIP+4), and 37854 enabled in
+the saved service policy. Do not change historical test records to make them pass.
+An older Kingston/locality test address can still be read and reconciled but cannot
+start another checkout under this policy. Postal/locality checks are not physical
+city-limit verification; approve trusted geocoding and a municipal boundary check
+before public launch. Existing order/payment/receipt access remains unchanged.
+
 1. Deploy the latest verified branch in Render. Leave
    `ROCOEATS_ORDERING_ENABLED=false` throughout and leave
    `ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED=false` during setup. Confirm owner access at

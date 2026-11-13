@@ -46,6 +46,7 @@ export type CommerceConfig = {
   orderingEnabled: boolean;
   pricing: Pricing | null;
   taxNotice: string;
+  launchArea?: { city: string; region: string; postalCode: string };
 };
 export function useCommerce() {
   return useQuery({
@@ -83,6 +84,7 @@ export function CommerceBanner() {
           ? "Stripe test integration: use test payment details only."
           : "Payments are not configured."}{" "}
       Tax and pricing settings are illustrative.{" "}
+      {config.data?.launchArea && <span>Initial delivery: {config.data.launchArea.city}, {config.data.launchArea.region} {config.data.launchArea.postalCode}. </span>}
 
     </aside>
   );
@@ -892,7 +894,7 @@ export function PricingSettings({ current }: { current: Pricing | null }) {
     <section className="roco-card">
       <h2>Pricing and service policy</h2>
       <p>
-        No orders can be quoted until these settings are saved. Tax entries must
+        Initial launch: Rockwood, Tennessee, ZIP 37854 only. Other ZIP codes cannot be enabled through pricing. No orders can be quoted until these settings are saved. Tax entries must
         come from your approved tax configuration; test mode does not establish
         the correct tax rate.
       </p>

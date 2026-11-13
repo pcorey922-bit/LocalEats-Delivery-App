@@ -112,8 +112,8 @@ export async function verifyCheckout({ actor, origin, ids }) {
   await page.getByRole('button', { name: 'Add address', exact: true }).click();
   await page.getByLabel('Street address', { exact: true }).fill('200 Mobile Test Way');
   await page.getByLabel('Apartment / unit (optional)', { exact: true }).fill('Unit 2');
-  await page.getByLabel('City', { exact: true }).fill('Kingston');
-  await page.getByLabel('ZIP code', { exact: true }).fill('37763');
+  await page.getByLabel('City', { exact: true }).fill('Rockwood');
+  await page.getByLabel('ZIP code', { exact: true }).fill('37854');
   await page.getByLabel('Delivery instructions', { exact: true }).fill('Meet at door');
   await page.getByLabel('Set as default address', { exact: true }).check();
   const savedResponse = page.waitForResponse(response => response.url().endsWith('/api/addresses/me') && response.request().method() === 'POST');

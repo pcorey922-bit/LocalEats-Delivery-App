@@ -96,8 +96,8 @@ try {
   await customer.getByRole('link', { name: 'Cart (1)', exact: true }).click();
   await customer.getByRole('button', { name: 'Add address', exact: true }).click();
   await customer.getByLabel('Street address', { exact: true }).fill('200 Test Delivery');
-  await customer.getByLabel('City', { exact: true }).fill('Kingston');
-  await customer.getByLabel('ZIP code', { exact: true }).fill('37763');
+  await customer.getByLabel('City', { exact: true }).fill('Rockwood');
+  await customer.getByLabel('ZIP code', { exact: true }).fill('37854');
   await customer.getByLabel('Delivery instructions', { exact: true }).fill('Meet at door');
   await customer.getByRole('button', { name: 'Save address', exact: true }).click();
   await customer.getByLabel('Driver tip (dollars)').fill('3');

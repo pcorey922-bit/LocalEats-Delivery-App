@@ -1,3 +1,4 @@
+import { requireLaunchDeliveryArea, requireLaunchPostalCodes, launchArea } from '../lib/delivery-area';
 import { requireTelephoneAcceptance } from "../lib/telephone-confirmation";
 import { requireCustomerAuth } from "../lib/guest-access";
 import { isOwnerDriver } from "../lib/owner-access";
@@ -87,6 +88,7 @@ router.get("/commerce/config", async (_req, res) => {
     privateTestOrderingEnabled: privateTestOrderingEnabled(),
     pricing,
     configurationRequired: pricing === null,
+    launchArea: { ...launchArea, boundaryModel: "postal_locality", municipalBoundaryVerified: false },
     taxNotice:
       "Pricing and tax policy must be explicitly configured. Provider test mode does not certify production tax accuracy.",
   });
@@ -140,6 +142,7 @@ router.post("/orders/:orderId/checkout", requireCustomerAuth, async (req, res) =
       .limit(1);
     if (restaurant?.status !== "approved")
       throw new CommerceError(409, "Restaurant is no longer accepting orders");
+    requireLaunchDeliveryArea(restaurant, order.addressSnapshot, (await readPricing(tx)).allowedPostalCodes);
     await ensureAccepting(restaurant, tx);
     if (payment.checkoutSessionId)
       return {
@@ -716,6 +719,7 @@ router.put("/admin/pricing", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
   if (!profile || !requireRole(profile, ["admin"], res)) return;
   const value = pricingSchema.parse(req.body);
+  requireLaunchPostalCodes(value.allowedPostalCodes);
   await db.transaction(async (tx) => {
     await tx
       .insert(platformSettingsTable)

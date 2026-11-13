@@ -1,3 +1,4 @@
+import { securityHeaders } from './lib/security-headers';
 import { ProviderEvidenceError } from './lib/provider-balance-evidence';
 import { stagingNativeOrigins } from "./lib/native-origins";
 import express, { type Express, type ErrorRequestHandler } from "express";
@@ -23,6 +24,7 @@ import { webHosting } from "./lib/web-hosting";
 import { privateStaging } from "./middlewares/private-staging";
 const app: Express = express();
 app.disable("x-powered-by");
+app.use(securityHeaders());
 
 app.use(
   pinoHttp({

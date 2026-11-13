@@ -19,6 +19,8 @@ try {
     ["stripe-setup", "src/lib/stripe-setup.test.ts"],
     ["provider-balance-evidence", "src/lib/provider-balance-evidence.test.ts"],
     ["availability", "src/lib/restaurant-availability.test.ts"],
+    ["delivery-area", "src/lib/delivery-area.test.ts"],
+    ["security-headers", "src/lib/security-headers.test.ts"],
     ["platform", "tests/platform.test.ts"],
     ["recovery-safety", "tests/recovery-safety.test.ts"],
     ["worker-loop", "src/lib/worker-loop.test.ts"],

@@ -58,7 +58,7 @@ import { testPricing } from "../src/lib/testing/pricing";
 import { fanOutPushNotifications, processPushDelivery } from "../src/lib/push";
 import { processWebhookInbox } from "../src/lib/webhook-worker";
 import { processPayoutProvisioning } from "../src/lib/payout-onboarding";
-import { processFinancialOperation, reconcileFinancialOperation } from "../src/lib/financial-operations";
+import { executeStripeOperation, processFinancialOperation, reconcileFinancialOperation } from "../src/lib/financial-operations";
 import { postJournal, journalRefund } from "../src/lib/ledger";
 const ids = {
   customer: randomUUID(),
@@ -175,7 +175,7 @@ before(async () => {
     ownerProfileId: ids.restaurant,
     name: "TEST FIXTURE ONLY",
     street1: "Test pickup",
-    city: "Test city",
+    city: "Rockwood",
     postalCode: "37854",
     status: "approved",
     acceptingOrders: true,
@@ -203,7 +203,7 @@ before(async () => {
     id: ids.address,
     profileId: ids.customer,
     street1: "PRIVATE CUSTOMER STREET",
-    city: "Test city",
+    city: "Rockwood",
     region: "TN",
     postalCode: "37854",
   });
@@ -323,8 +323,11 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     assert.equal((await guest("/guest/session",token)).status,200);
     assert.equal((await fetch(`${origin}/api/restaurants`,{headers:{"X-RoCoEats-Guest-Token":token}})).status,200);
     delete process.env.ROCOEATS_PRIVATE_STAGING;
-    const address=await guest("/addresses/me",token,"POST",{street1:"Guest delivery street",city:"Kingston",region:"TN",postalCode:"37854",isDefault:true});
+    const address=await guest("/addresses/me",token,"POST",{street1:"Guest delivery street",city:"Rockwood",region:"TN",postalCode:"37854",isDefault:true});
     assert.equal(address.status,201,JSON.stringify(address.data));
+    const outside = await guest('/addresses/me', token, 'POST', { street1: 'Unsupported fixture street', city: 'Rockwood', region: 'TN', postalCode: '37763' });
+    assert.equal(outside.status, 201);
+    assert.equal((await guest('/orders/quote', token, 'POST', { ...input(), addressId: outside.data.id, coverageApproved: true })).status, 409);
     const value={...input(),addressId:address.data.id};
     const quote=await guest("/orders/quote",token,"POST",value);assert.equal(quote.status,200);
     process.env.ROCOEATS_ORDERING_ENABLED="false";
@@ -429,7 +432,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       const r=await fetch(`${origin}/api${path}`,{method,headers:{"X-RoCoEats-Guest-Token":token,...(data?{"Content-Type":"application/json"}:{}),...(key?{"Idempotency-Key":key}:{})},body:data?JSON.stringify(data):undefined});return {status:r.status,data:await r.json()};
     };
     await api(`/admin/restaurants/${ids.business}/receipt-mode`,ids.admin,"PUT",{mode:"telephone",expectedMode:"electronic"});
-    const address=await guest("/addresses/me","POST",{street1:"Private guest destination",city:"Kingston",region:"TN",postalCode:"37854",isDefault:true,deliveryInstructions:"Call on arrival"});assert.equal(address.status,201);
+    const address=await guest("/addresses/me","POST",{street1:"Private guest destination",city:"Rockwood",region:"TN",postalCode:"37854",isDefault:true,deliveryInstructions:"Call on arrival"});assert.equal(address.status,201);
     const value={...input(),addressId:address.data.id};const quote=await guest("/orders/quote","POST",value);assert.equal(quote.status,200);
     const saved=await guest("/orders","POST",{...value,expectedTotalCents:quote.data.totalCents},randomUUID());assert.equal(saved.status,201);const order=saved.data;
     assert.equal((await guest(`/orders/${order.id}/confirmation`)).data.status,"pending");
@@ -904,6 +907,49 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       );
     },
   );
+  await t.test('Rockwood launch ceiling rejects direct API bypasses, broadened pricing and stale checkout snapshots', async () => {
+    const originalPricing = (await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.settingKey, 'test_pricing')))[0].value;
+    const [originalAddress] = await db.select().from(addressesTable).where(eq(addressesTable.id, ids.address));
+    const [originalRestaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, ids.business));
+    const quote = await api('/orders/quote', ids.customer, 'POST', input());
+    assert.equal(quote.status, 200);
+    const oldOrder = await create();
+    const [oldStoredOrder] = await db.select().from(ordersTable).where(eq(ordersTable.id, oldOrder.id));
+    const before = await db.select().from(ordersTable);
+    try {
+      // Simulate a legacy saved policy that contains more than the launch ZIP.
+      await db.update(platformSettingsTable).set({ value: { ...testPricing, allowedPostalCodes: ['37854','37763','37748'] } }).where(eq(platformSettingsTable.settingKey, 'test_pricing'));
+      for (const patch of [{ postalCode: '37763' }, { city: 'Kingston' }, { region: 'KY' }, { postalCode: '378540' }]) {
+        await db.update(addressesTable).set({ city: 'Rockwood', region: 'TN', postalCode: '37854', ...patch }).where(eq(addressesTable.id, ids.address));
+        const spoofed = { ...input(), city: 'Rockwood', postalCode: '37854', coverageApproved: true, expectedTotalCents: quote.data.totalCents };
+        assert.equal((await api('/orders/quote', ids.customer, 'POST', spoofed)).status, 409);
+        assert.equal((await api('/orders', ids.customer, 'POST', spoofed, randomUUID())).status, 409);
+      }
+      await db.update(addressesTable).set({ city: originalAddress.city, region: originalAddress.region, postalCode: originalAddress.postalCode }).where(eq(addressesTable.id, ids.address));
+      await db.update(restaurantsTable).set({ postalCode: '37763' }).where(eq(restaurantsTable.id, ids.business));
+      assert.equal((await api('/orders/quote', ids.customer, 'POST', input())).status, 409);
+      assert.equal((await api(`/orders/${oldOrder.id}/checkout`, ids.customer, 'POST')).status, 409);
+      await db.update(restaurantsTable).set({ postalCode: originalRestaurant.postalCode }).where(eq(restaurantsTable.id, ids.business));
+      await db.update(ordersTable).set({ addressSnapshot: { ...oldStoredOrder.addressSnapshot, city: 'Kingston', region: 'TN', postalCode: '37763' } }).where(eq(ordersTable.id, oldOrder.id));
+      assert.equal((await api(`/orders/${oldOrder.id}/checkout`, ids.customer, 'POST')).status, 409);
+      process.env.PAYMENT_PROVIDER = 'stripe_test'; process.env.STRIPE_SECRET_KEY = 'sk_test_fixture'; process.env.STRIPE_WEBHOOK_SECRET = 'whsec_fixture';
+      await db.update(paymentsTable).set({ provider: 'stripe_test' }).where(eq(paymentsTable.orderId, oldOrder.id));
+      assert.equal((await api(`/orders/${oldOrder.id}/checkout`, ids.customer, 'POST')).status, 409);
+      assert.equal((await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.orderId, oldOrder.id))).length, 0);
+      await assert.rejects(() => executeStripeOperation({ id: 'checkout:area-fixture', kind: 'checkout', orderId: oldOrder.id, payload: { amount: quote.data.totalCents, origin: 'https://staging.example' } } as any), /Rockwood/);
+      assert.equal((await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.orderId, oldOrder.id))).length, 0);
+      const history = await api(`/orders/${oldOrder.id}`, ids.customer);
+      assert.equal(history.status, 200); // Reading historical orders remains allowed.
+      assert.equal((await db.select().from(ordersTable)).length, before.length);
+      const rejectedPolicy = await api('/admin/pricing', ids.admin, 'PUT', { ...testPricing, allowedPostalCodes: ['37854', '37763'] });
+      assert.equal(rejectedPolicy.status, 409);
+    } finally {
+      process.env.PAYMENT_PROVIDER = 'sandbox'; delete process.env.STRIPE_SECRET_KEY; delete process.env.STRIPE_WEBHOOK_SECRET;
+      await db.update(platformSettingsTable).set({ value: originalPricing }).where(eq(platformSettingsTable.settingKey, 'test_pricing'));
+      await db.update(addressesTable).set({ city: originalAddress.city, region: originalAddress.region, postalCode: originalAddress.postalCode }).where(eq(addressesTable.id, ids.address));
+      await db.update(restaurantsTable).set({ city: originalRestaurant.city, region: originalRestaurant.region, postalCode: originalRestaurant.postalCode }).where(eq(restaurantsTable.id, ids.business));
+    }
+  });
   await t.test("driver application privacy, approval checklist, resubmission and stale reviews",async()=>{
     const application={phone:"+1 865 555 0100",vehicleMake:"Toyota",vehicleModel:"Corolla",vehicleYear:2021,licenseState:"TN",licenseExpiresOn:"2030-12-31",eligibilityAttested:true,insuranceAttested:true};
     assert.equal((await api('/driver/application',ids.customer,'PUT',application)).status,403);
@@ -3250,6 +3296,9 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     const order=await create();await pay(order.id);const pi=`pi_reconcile_${order.id}`,ch=`ch_${order.id}`,id=`txn_charge_${order.id}`;
     await db.update(paymentsTable).set({provider:'stripe_test',providerPaymentId:pi}).where(eq(paymentsTable.orderId,order.id));
     const [actor]=await db.select().from(profilesTable).where(eq(profilesTable.id,ids.admin));
+    const [historical] = await db.select().from(ordersTable).where(eq(ordersTable.id, order.id));
+    await db.update(ordersTable).set({ addressSnapshot: { ...historical.addressSnapshot, city: 'Kingston', postalCode: '37763' } }).where(eq(ordersTable.id, order.id));
+    // New coverage rules must not prevent financial reconciliation of a prior payment.
     const proof={id:pi,amountReceived:order.totalCents,currency:'usd',livemode:false,status:'succeeded',chargeId:ch,chargePaymentId:pi,chargeAmount:order.totalCents,chargePaid:true,balance:{id,sourceId:ch,kind:'charge',amountCents:order.totalCents,feeCents:100,netCents:order.totalCents-100,currency:'usd' as const,status:'available' as const}};
     assert.equal((await api(`/admin/orders/${order.id}/reconcile-payment`,ids.customer,'POST',{reason:'Unauthorized provider reconciliation'})).status,403);
     for(const invalid of [{...proof,livemode:true},{...proof,amountReceived:1},{...proof,chargePaymentId:'pi_wrong'},{...proof,balance:{...proof.balance,sourceId:'ch_other'}},{...proof,balance:{...proof.balance,feeCents:-1,netCents:proof.amountReceived+1}},{...proof,balance:{...proof.balance,netCents:1}},{...proof,balance:{...proof.balance,status:'pending'}}])await assert.rejects(()=>reconcilePayment(order.id,actor,'Reject inconsistent provider data',async()=>invalid as any));
@@ -3595,7 +3644,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     try {
       const created = await api("/restaurants/me", operator, "POST", {
         name: "RoCoEats Test Kitchen", street1: "100 Test Kitchen Way",
-        city: "Kingston", region: "TN", postalCode: "37854",
+        city: "Rockwood", region: "TN", postalCode: "37854",
       });
       assert.equal(created.status, 201, JSON.stringify(created.data));
       assert.equal(created.data.status, "pending");
@@ -3677,7 +3726,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     }
     assert.equal((await api("/restaurants/me", subject, "POST", {
       name: "Signup fixture kitchen", street1: "100 Test Kitchen Way",
-      city: "Kingston", region: "TN", postalCode: "37854",
+      city: "Rockwood", region: "TN", postalCode: "37854",
     })).status, 201);
   });
 
