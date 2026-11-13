@@ -38,7 +38,7 @@ try {
         ? 'export const publishableKeyFromHost=(_host,key)=>key;'
         : `import { useSyncExternalStore } from 'react';
            const subscribe=callback=>{window.addEventListener('qa-auth-change',callback);return()=>window.removeEventListener('qa-auth-change',callback)};
-           export const useAuth=()=>{useSyncExternalStore(subscribe,()=>String(window.qaAuthReady)+String(window.qaUserId));return{isLoaded:window.qaAuthReady!==false,isSignedIn:!!window.qaUserId,userId:window.qaUserId,getToken:async()=>null}};
+           export const useAuth=()=>{useSyncExternalStore(subscribe,()=>String(window.qaAuthReady)+String(window.qaUserId));return{isLoaded:window.qaAuthReady!==false,isSignedIn:!!window.qaUserId,userId:window.qaUserId,getToken:async(options)=>{if(options?.skipCache){window.qaTokenRefreshes=(window.qaTokenRefreshes||0)+1;return 'qa-refreshed-token'}return null}}};
            export const useUser=()=>({isLoaded:true,user:window.qaUserId?{id:window.qaUserId,fullName:'Browser tester'}:null});
            export const ClerkProvider=({children})=>children;
            export const SignIn=()=>null, SignUp=()=>null;
@@ -60,7 +60,7 @@ try {
   const { origin } = server, { ids } = fixture;
   browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
   async function actor(role) {
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     await context.addInitScript(id => { window.qaUserId = sessionStorage.getItem('qa-user') || id; window.qaAuthReady = sessionStorage.getItem('qa-pending') !== '1'; }, ids[role] || null);
     await context.route('**/api/**', async route => {
       try {
@@ -87,6 +87,7 @@ try {
   await customer.getByLabel('Search approved restaurants').fill('Browser Test');
   await customer.getByRole('link', { name: 'View menu' }).click();
   await customer.getByRole('heading', { name: 'Browser Test Kitchen', exact: true }).waitFor();
+  await customer.getByRole('button', { name: 'Menu', exact: true }).click();
   const customerNav = customer.getByRole('navigation', { name: 'Main navigation', exact: true });
   for (const name of ['Administrator', 'Dispatch & orders', 'Driver', 'Restaurant']) assert.equal(await customerNav.getByRole('link', { name, exact: true }).count(), 0);
   await customer.getByLabel('Green beans (+$1.50)', { exact: true }).check();
@@ -122,6 +123,7 @@ try {
   await customer.getByText('Payment succeeded · collected', { exact: true }).waitFor();
   const restaurant = await actor('restaurant');
   await restaurant.goto(origin + '/restaurant');
+  await restaurant.getByRole('button', { name: 'Menu', exact: true }).click();
   const restaurantNav = restaurant.getByRole('navigation', { name: 'Main navigation', exact: true });
   await restaurantNav.getByRole('link', { name: 'Restaurant', exact: true }).waitFor();
   assert.equal(await restaurantNav.getByRole('link', { name: 'Driver', exact: true }).count(), 0);
@@ -163,8 +165,10 @@ try {
   for (const journal of ledger.journals) assert.equal(journal.lines.reduce((sum, line) => sum + line.amountCents, 0), 0);
   const admin = await actor('admin');
   await admin.goto(origin + '/admin');
+  await admin.getByRole('button', { name: 'Menu', exact: true }).click();
   await admin.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: 'Driver', exact: true }).click();
   await admin.getByText(/Administrator delivery workspace/).waitFor();
+  await admin.getByRole('button', { name: 'Menu', exact: true }).click();
   await admin.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: 'Administrator', exact: true }).click();
   await admin.getByRole('heading', { name: 'The county operations desk.', exact: true }).waitFor();
   assert.equal((await api('admin', '/profiles/me')).role, 'admin');
@@ -200,6 +204,11 @@ try {
   const availabilityUrl = origin + `/restaurants/${ids.business}`;
   const settings = { acceptingOrders: false, hours: Array.from({ length: 7 }, (_, weekday) => ({ weekday, isClosed: false, openTime: '00:00', closeTime: '24:00' })) };
   await api('restaurant', '/restaurants/me/availability/settings', 'PUT', settings);
+  const quoteAddress = (await api('customer', '/addresses/me'))[0].id;
+  const availabilityQuote = () => fetch(origin + '/api/orders/quote', { method: 'POST', headers: { 'x-test-user': ids.customer, 'content-type': 'application/json' }, body: JSON.stringify({ restaurantId: ids.business, addressId: quoteAddress, tipCents: 0, items: [{ menuItemId: ids.fries, quantity: 1, modifiers: {} }] }) });
+  const pausedQuote = await availabilityQuote();
+  assert.equal(pausedQuote.status, 409);
+  assert.match((await pausedQuote.json()).error, /paused order acceptance/);
   await guest.goto(availabilityUrl);
   await guest.getByText('This restaurant has paused new orders.', { exact: true }).waitFor();
   await guest.getByText('Weekly hours (America/New_York)', { exact: true }).click();
@@ -207,6 +216,9 @@ try {
   await api('restaurant', '/restaurants/me/availability/settings', 'PUT', { ...settings, acceptingOrders: true, hours: settings.hours.map(h => ({ ...h, isClosed: true })) });
   await guest.reload();
   await guest.getByText('This restaurant is outside its ordering hours.', { exact: true }).waitFor();
+  const closedQuote = await availabilityQuote();
+  assert.equal(closedQuote.status, 409);
+  assert.match((await closedQuote.json()).error, /closed.*Eastern/);
   await api('restaurant', '/restaurants/me/availability/settings', 'PUT', { ...settings, acceptingOrders: true });
   const availabilityApi = '**/api/restaurants/*/availability';
   await guest.route(availabilityApi, route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Intentional availability outage' }) }));

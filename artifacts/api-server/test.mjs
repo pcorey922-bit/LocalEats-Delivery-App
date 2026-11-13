@@ -10,6 +10,7 @@ try {
     ["order-lifecycle", "src/lib/order-lifecycle.test.ts"],
     ["guest-access-link", "tests/guest-access-link.test.ts"],
     ["customer-cart", "tests/customer-cart.test.ts"],
+    ["account-read", "tests/account-read.test.ts"],
     ["cart-line", "tests/cart-line.test.ts"],
     ["duty-intent", "tests/duty-intent.test.ts"],
     ["navigation", "tests/navigation.test.ts"],

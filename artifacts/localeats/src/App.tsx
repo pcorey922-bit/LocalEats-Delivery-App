@@ -1,3 +1,7 @@
+import { ConnectionNotice } from './components/connection-notice';
+import { ResponsiveNavigation } from './components/responsive-navigation';
+import { useAccountProfile } from './hooks/use-account-profile';
+import { accountReadOptions, sessionRead } from './lib/account-read';
 import { useGuestToken } from './lib/guest-session';
 import { HomePage } from './pages/home';
 import { accountDestination, accountEntryLinks, accountStatus } from "./lib/account-entry";
@@ -18,7 +22,7 @@ import { QueryClient, QueryClientProvider, useMutation, useQueryClient } from '@
 import { ClerkProvider, SignIn, SignUp, useClerk, useAuth, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
-import { setAuthTokenGetter, getGetMyProfileQueryKey, getGetMyDashboardQueryKey, useGetMyProfile, createMyProfile, getMyProfile, useGetMyDashboard } from '@workspace/api-client-react';
+import { setAuthTokenGetter, getGetMyProfileQueryKey, getGetMyDashboardQueryKey, createMyProfile, getMyProfile, useGetMyDashboard, getMyDashboard } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -102,14 +106,14 @@ function PortalHeader({ active }: { active: 'dashboard' | 'account' }) {
   const profile = useProfileQuery();
   return <header className="portal-topbar">
     <BrandLink />
-    <nav className="portal-nav" aria-label="Account navigation" data-testid="nav-account">
+    <ResponsiveNavigation className="portal-nav" label="Account navigation">
       <a className={active === 'dashboard' ? 'portal-nav-current' : ''} href={`${basePath}/dashboard${entry.query}`} data-testid="link-dashboard">Dashboard</a>
       <a className={active === 'account' ? 'portal-nav-current' : ''} href={`${basePath}/account${entry.query}`} data-testid="link-account">Account</a>
       <a href={`${basePath}${entry.access}`}>Access check</a>
       {profile.data?.role === 'admin' && <a href={`${basePath}/admin`}>Administrator</a>}
       {['admin','driver'].includes(profile.data?.role??'') && <a href={`${basePath}/driver`}>Driver</a>}
       <button type="button" onClick={async () => { await unregisterPush().catch(()=>{}); await signOut({ redirectUrl: basePath || '/' }); }} data-testid="button-logout"><LogOut size={14} /> Log out</button>
-    </nav>
+    </ResponsiveNavigation>
   </header>;
 }
 
@@ -122,10 +126,7 @@ function QueryError({ retry, message = 'We couldn’t load this part of your acc
   return <div className="portal-empty-error" role="alert" data-testid="status-load-error"><CircleAlert size={17} style={{ verticalAlign: 'middle', marginRight: 8 }} />{message}<div style={{ marginTop: 14 }}><button className="portal-primary" type="button" onClick={retry} data-testid="button-retry"><RefreshCw size={14} /> Try again</button> <a href={`${basePath}${entry.access}`}>Check account access</a></div></div>;
 }
 
-function useProfileQuery() {
-  const { isLoaded, isSignedIn, userId } = useAuth();
-  return useGetMyProfile({ query: { queryKey: [...getGetMyProfileQueryKey(), userId], enabled: !!isLoaded && !!isSignedIn, networkMode: 'always', retry: false, retryOnMount: false } });
-}
+const useProfileQuery = useAccountProfile;
 
 function isNotFound(error: unknown) {
   const candidate = error as { status?: number; response?: { status?: number } } | null;
@@ -242,7 +243,7 @@ function AccountPage() {
     <div className="portal-eyebrow">Your LocalEats profile</div><h1 className="portal-title">Account, <em>at a glance.</em></h1><p className="portal-lede">Your account details and how you’re connected to the LocalEats community.</p>
     {profile.isError ? <div style={{ marginTop: 30 }}><QueryError retry={() => profile.refetch()} /></div> : profile.data && <div className="portal-grid"><section className="portal-panel" data-testid="panel-profile-details"><h2>Profile details</h2><p className="portal-panel-intro">This is the information attached to your LocalEats profile.</p>
       <div className="portal-profile-row"><span className="portal-profile-label">Display name</span><span className="portal-profile-value" data-testid="text-profile-name">{profile.data.displayName}</span></div>
-      <AccountSettings displayName={profile.data.displayName}/>
+      <AccountSettings displayName={profile.data.displayName}/><a href={`${basePath}/account/delete`}>Request account deletion</a>
       <div className="portal-profile-row"><span className="portal-profile-label">Role</span><span className="portal-profile-value"><span className="portal-role-badge" data-testid="text-profile-role">{profile.data.role}</span></span></div>
       <div className="portal-profile-row"><span className="portal-profile-label">Account ID</span><span className="portal-profile-value" data-testid="text-profile-id">{profile.data.id}</span></div>
       <div className="portal-profile-row"><span className="portal-profile-label">Clerk user ID</span><span className="portal-profile-value" data-testid="text-clerk-user-id">{user?.id || 'Not available'}</span></div>
@@ -255,7 +256,8 @@ function DashboardPage() {
   const entry = useJoinLinks();
   const [, setLocation] = useLocation();
   const profile = useProfileQuery();
-  const dashboard = useGetMyDashboard({ query: { queryKey: [...getGetMyDashboardQueryKey(), profile.data?.id], enabled: !!profile.data, networkMode: 'always', retry: false, retryOnMount: false } });
+  const { getToken } = useAuth();
+  const dashboard = useGetMyDashboard({ query: { queryKey: [...getGetMyDashboardQueryKey(), profile.data?.id], enabled: !!profile.data, queryFn: ({ signal }) => sessionRead(headers => getMyDashboard({ signal, headers }), getToken), ...accountReadOptions } });
   useEffect(() => {
     if (!profile.data && profile.isError && isNotFound(profile.error)) setLocation(entry.setup, { replace: true });
   }, [profile.data, profile.isError, profile.error, entry.setup, setLocation]);
@@ -277,7 +279,7 @@ function SignedInCheckout() {
   const guestToken = useGuestToken();
   const profile = useProfileQuery();
   if (!isLoaded) return <SessionLoading />;
-  if (isSignedIn && profile.isLoading) return <LoadingView label="Preparing checkout" />;
+  if (isSignedIn && profile.isPending) return <><ConnectionNotice /><LoadingView label="Preparing checkout" /></>;
   if (isSignedIn && profile.isError) {
     if (isNotFound(profile.error)) return <Redirect to="/account/setup?join=customer&checkout=1" />;
     return <main className="roco-main"><h1>Checkout</h1><QueryError retry={() => void profile.refetch()} /></main>;

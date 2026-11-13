@@ -29,3 +29,15 @@ export function openAt(
     time < row.closeTime.slice(0, 5),
   );
 }
+
+export function orderingAvailabilityIssue(
+  acceptingOrders: boolean,
+  hours: Parameters<typeof openAt>[0],
+  now = new Date(),
+) {
+  if (!acceptingOrders) return 'Restaurant has paused order acceptance. Please try again after the restaurant resumes accepting orders.';
+  if (!hours.length)
+    return 'Restaurant has not configured its opening hours.';
+  if (!openAt(hours, now)) return 'Restaurant is closed. Opening hours use Eastern time (America/New_York). Please try again during its operating hours.';
+  return null;
+}

@@ -1,12 +1,9 @@
+import { useAccountProfile } from '../hooks/use-account-profile';
 import { dutyIntent } from "../lib/duty-intent";
 import { useDutyIntent } from "../hooks/use-duty-intent";
 import { useAppForeground } from "../hooks/use-app-foreground";
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/react";
-import {
-  useGetMyProfile,
-  getGetMyProfileQueryKey,
-} from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { DutyLocation } from "./duty-location";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
@@ -15,15 +12,7 @@ export function DriverDutySession() {
   useEffect(() => {
     if (!isSignedIn) dutyIntent.clear();
   }, [isSignedIn]);
-  const profile = useGetMyProfile({
-    query: {
-      queryKey: [...getGetMyProfileQueryKey(), userId],
-      enabled: !!isSignedIn,
-      networkMode: "always",
-      retry: false,
-      retryOnMount: false,
-    },
-  });
+  const profile = useAccountProfile();
   const enabled =
     !!isSignedIn && ["driver", "admin"].includes(profile.data?.role ?? "");
   const state = useQuery({

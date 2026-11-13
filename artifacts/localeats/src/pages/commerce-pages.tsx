@@ -1,3 +1,4 @@
+import { useAccountProfile } from '../hooks/use-account-profile';
 import { TelephoneDispatch } from "./telephone-dispatch";
 import { RestaurantConfirmation, useRestaurantConfirmation } from "./restaurant-confirmation";
 import { GuestTestInvitation } from "./guest-test-invitation";
@@ -17,8 +18,6 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
-  useGetMyProfile,
-  getGetMyProfileQueryKey,
   getListMyOrdersQueryKey,
 } from "@workspace/api-client-react";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
@@ -68,8 +67,6 @@ function ErrorText({ error }: { error: Error | null }) {
 }
 export function CommerceBanner() {
   const config = useCommerce();
-  const { isLoaded, isSignedIn, userId } = useAuth();
-  const profile = useGetMyProfile({ query: { queryKey: [...getGetMyProfileQueryKey(), userId], enabled: !!isLoaded && !!isSignedIn, networkMode: 'always', retry: false, retryOnMount: false } });
   return (
     <aside
       className="roco-notice"
@@ -86,11 +83,7 @@ export function CommerceBanner() {
           ? "Stripe test integration: use test payment details only."
           : "Payments are not configured."}{" "}
       Tax and pricing settings are illustrative.{" "}
-      {isSignedIn && <><Link href="/notifications">Notifications</Link>
-        {['admin','restaurant','driver'].includes(profile.data?.role??'') && <> · <Link href="/earnings">Earnings</Link></>}
-        {profile.data?.role === 'admin' && <> · <Link href="/operations">Order operations</Link></>}
-        {' · '}<Link href="/account/delete">Delete account</Link>
-      </>}
+
     </aside>
   );
 }
@@ -188,7 +181,7 @@ export function CheckoutPanel({
 }
 export function OrderActions({ order }: { order: Order }) {
   const client = useQueryClient();
-  const profile = useGetMyProfile();
+  const profile = useAccountProfile();
   const [expanded, setExpanded] = useState(false);
   const details = useQuery({
     queryKey: ["payment", order.id],
@@ -423,7 +416,7 @@ type Payout = {
   providerReversalId: string | null;
 };
 export function OperationsCommerce() {
-  const profile = useGetMyProfile();
+  const profile = useAccountProfile();
   const client = useQueryClient();
   const enabled = profile.data?.role === "admin";
   const config = useCommerce();

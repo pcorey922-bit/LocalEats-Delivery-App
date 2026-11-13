@@ -1,3 +1,7 @@
+import { ConnectionNotice } from '../components/connection-notice';
+import { ResponsiveNavigation } from '../components/responsive-navigation';
+import { useAccountProfile } from '../hooks/use-account-profile';
+import { accountReadOptions, sessionRead } from '../lib/account-read';
 import { CheckoutAddresses } from './checkout-addresses';
 import { useGuestToken } from '../lib/guest-session';
 import { accountStatus } from "../lib/account-entry";
@@ -25,11 +29,11 @@ import { useAuth, useClerk } from '@clerk/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, ClipboardList, MapPin, Plus, RefreshCw, ShieldCheck, ShoppingBag, Utensils } from 'lucide-react';
 import {
-  getGetAdminFinanceQueryKey, getGetAdminOverviewQueryKey, getGetMyOrderQueryKey, getGetMyProfileQueryKey, getGetMyRestaurantQueryKey, getGetRestaurantQueryKey,
+  getGetAdminFinanceQueryKey, getGetAdminOverviewQueryKey, getGetMyOrderQueryKey, getGetMyRestaurantQueryKey, getGetRestaurantQueryKey,
   getListAdminProfilesQueryKey, getListAdminRestaurantsQueryKey, getListMyAddressesQueryKey,
-  getListMyOrdersQueryKey, getListRestaurantsQueryKey, useCreateMyOrder,
+  listMyAddresses, getListMyOrdersQueryKey, getListRestaurantsQueryKey, useCreateMyOrder,
   useCreateMyRestaurant, useCreateMyRestaurantCategory, useCreateMyRestaurantMenuItem, useDeleteMyRestaurantCategory,
-  useDeleteMyAddress, useDeleteMyRestaurantMenuItem, useGetAdminFinance, useGetAdminOverview, useGetMyOrder, useGetMyProfile, useGetMyRestaurant,
+  useDeleteMyAddress, useDeleteMyRestaurantMenuItem, useGetAdminFinance, useGetAdminOverview, useGetMyOrder, useGetMyRestaurant,
   useGetRestaurant, useHealthCheck, useListAdminProfiles, useListAdminRestaurants, useListMyAddresses, useListMyOrders,
   useUpdateMyAddress,
   useListRestaurants, useUpdateAdminProfile, useUpdateAdminRestaurantStatus, useUpdateMyRestaurant,
@@ -48,20 +52,18 @@ function Shell({ children }: { children: React.ReactNode }) {
   const { isSignedIn, userId } = useAuth(); const { signOut } = useClerk();
   const profile = useMyProfile();
   const role = profile.data?.role;
-  return <div className="roco-page"><header className="roco-header roco-wrap"><Logo/><nav className="roco-nav" aria-label="Main navigation">
-    <Link href="/restaurants">Find food</Link>{isSignedIn && <><Link href="/dashboard">Dashboard</Link><Link href="/orders">Orders</Link>{role === 'restaurant' && <Link href="/restaurant">Restaurant</Link>}{['admin','driver'].includes(role??'') && <Link href="/driver">Driver</Link>}<Link href="/account">Account</Link>{role === 'admin' && <><Link href="/admin">Administrator</Link><Link href="/operations">Dispatch &amp; orders</Link></>}<button onClick={async () => { if(userId)dutyIntent.set(userId,false); await customFetch('/api/driver/availability',{method:'PUT',body:JSON.stringify({available:false})}).catch(()=>{}); await unregisterPush().catch(()=>{}); await signOut({ redirectUrl: '/' }); }}>Sign out</button></>}
+  return <div className="roco-page"><header className="roco-header roco-wrap"><Logo/><ResponsiveNavigation className="roco-nav" label="Main navigation">
+    <Link href="/restaurants">Find food</Link>{isSignedIn && <><Link href="/dashboard">Dashboard</Link><Link href="/orders">Orders</Link>{role === 'restaurant' && <Link href="/restaurant">Restaurant</Link>}{['admin','driver'].includes(role??'') && <Link href="/driver">Driver</Link>}<Link href="/notifications">Notifications</Link><Link href="/account">Account</Link>{role === 'admin' && <><Link href="/admin">Administrator</Link><Link href="/operations">Dispatch &amp; orders</Link></>}<button onClick={async () => { if(userId)dutyIntent.set(userId,false); await customFetch('/api/driver/availability',{method:'PUT',body:JSON.stringify({available:false})}).catch(()=>{}); await unregisterPush().catch(()=>{}); await signOut({ redirectUrl: '/' }); }}>Sign out</button></>}
     {!isSignedIn && <><Link href="/cart">Continue as Guest</Link><Link href="/guest/order">Guest order</Link><Link href="/sign-in">Sign in</Link><Link href="/sign-up">Create account</Link><Link href="/sign-up?join=restaurant">Partner With RoCoEats</Link><Link href="/sign-up?join=driver">Drive With RoCoEats</Link></>}
-  </nav></header><CommerceBanner/>{children}</div>;
+  </ResponsiveNavigation></header><CommerceBanner/>{children}</div>;
 }
 function PageIntro({ eyebrow, title, children }: { eyebrow: string; title: string; children?: React.ReactNode }) {
   return <><div className="roco-kicker">{eyebrow}</div><h1 className="roco-title">{title}</h1>{children && <p className="roco-subtitle">{children}</p>}</>;
 }
 function Loading({ label = 'Loading records' }: { label?: string }) { return <div className="roco-main" role="status" aria-label={label}><div className="portal-skeleton portal-loading-block" style={{ width: 170 }}/><div className="portal-skeleton portal-loading-block" style={{ width: 'min(520px,90%)', height: 52 }}/><div className="roco-grid">{[1,2,3].map(i => <div className="roco-card" key={i}><div className="portal-skeleton portal-loading-block"/><div className="portal-skeleton portal-loading-block" style={{ height: 90 }}/></div>)}</div></div>; }
 function LoadError({ retry, message = 'We could not load this information.' }: { retry: () => void; message?: string }) { return <div className="roco-alert" role="alert">{message}<button className="roco-button" style={{ marginLeft: 12 }} onClick={retry}><RefreshCw size={14}/> Retry</button></div>; }
-function useMyProfile() {
-  const { isLoaded, isSignedIn, userId } = useAuth();
-  return useGetMyProfile({ query: { queryKey: [...getGetMyProfileQueryKey(), userId], enabled: !!isLoaded && !!isSignedIn, networkMode: 'always', retry: false, retryOnMount: false } });
-}
+const useMyProfile = useAccountProfile;
+
 function RoleGate({ allowed }: { allowed: string[] }) {
   const profile = useMyProfile();
   if (profile.isLoading) return <Loading label="Checking account permissions"/>;
@@ -102,7 +104,7 @@ export function RestaurantMenuPage() {
 }
 
 export function CartPage() {
-  const {isLoaded,isSignedIn,userId}=useAuth();
+  const {isLoaded,isSignedIn,userId,getToken}=useAuth();
   const guestToken = useGuestToken();
   const principal = isSignedIn ? userId : guestToken;
   const restore = new URLSearchParams(useSearch()).get('restore') === '1';
@@ -127,7 +129,7 @@ export function CartPage() {
   const [tipCents, setTipCents] = useState(0); const [placed, setPlaced] = useState<Order | null>(null);
   type Quote = {subtotalCents:number;deliveryFeeCents:number;serviceFeeCents:number;taxCents:number;tipCents:number;totalCents:number};
   const addressKey = [...getListMyAddressesQueryKey(), isSignedIn ? 'customer' : 'guest', principal];
-  const addresses = useListMyAddresses({ query: { queryKey: addressKey, enabled: !!isLoaded && !!principal, retry: false, networkMode: 'always' } });
+  const addresses = useListMyAddresses({ query: { queryKey: addressKey, enabled: !!isLoaded && !!principal, queryFn: ({ signal }) => isSignedIn ? sessionRead(headers => listMyAddresses({ signal, headers }), getToken) : listMyAddresses({ signal }), ...accountReadOptions } });
   const selectedAddressId = !addresses.isError && addresses.data?.some(address => address.id === addressId) ? addressId : '';
   useEffect(() => {
     if (!addresses.data || addresses.isError) return;
@@ -168,7 +170,7 @@ export function CartPage() {
   }));
   const totals=(q:Quote)=><dl>{([['Food',q.subtotalCents],['Delivery',q.deliveryFeeCents],['Service',q.serviceFeeCents],['Illustrative test tax',q.taxCents],['Tip',q.tipCents],['Total',q.totalCents]] as const).map(([label,value])=><div className="roco-row" key={label}><dt>{label}</dt><dd>{money(value)}</dd></div>)}</dl>;
   return <Shell><main className="roco-main roco-checkout"><PageIntro eyebrow="Customer · test checkout" title={placed?'Order saved. Complete test payment.':'Review your delivery.'}>All checkout and settlement activity is test mode. Live charges are disabled.</PageIntro>
-    {!commerce.data?.orderingEnabled&&<p className="roco-notice">Ordering is not open yet. You can browse menus and review a quote.</p>}{cartWarning&&<p role="alert">{cartWarning}</p>}{placed?<section className="roco-card">{totals(placed)}<RestaurantConfirmation orderId={placed.id}/><CheckoutPanel orderId={placed.id}/><Link href={!isSignedIn&&readGuestToken()?"/guest/order":"/orders"} className="roco-button">Track order</Link></section>:<div className="roco-two-col"><section className="roco-card"><h2>Your items</h2>{cart.length?cart.map(i=><div className="roco-menu-item roco-cart-item" key={i.lineId}><div><strong>{i.name}</strong><p>{i.customization}</p><p>{i.specialInstructions}</p><p>{i.restaurantName} · {money(i.priceCents*i.quantity)}</p></div><div><button className="roco-button" aria-label={`Remove one ${i.name}`} onClick={()=>changeQuantity(i.lineId!, -1)}>−</button> {i.quantity} <button className="roco-button" aria-label={`Add one ${i.name}`} disabled={i.quantity >= 50} onClick={()=>changeQuantity(i.lineId!, 1)}>+</button></div></div>):<p>Your cart is empty. <Link href="/restaurants">Find food</Link></p>}</section>
+    {!commerce.data?.orderingEnabled&&<p className="roco-notice">Ordering is not open yet. You can browse menus and review a quote.</p>}{cartWarning&&<p role="alert">{cartWarning}</p>}{placed?<section className="roco-card">{totals(placed)}<RestaurantConfirmation orderId={placed.id}/><CheckoutPanel orderId={placed.id}/><Link href={!isSignedIn&&readGuestToken()?"/guest/order":"/orders"} className="roco-button">Track order</Link></section>:<div className="roco-two-col"><section className="roco-card"><h2>Your items</h2><ConnectionNotice /><p role="status" aria-label="Cart food subtotal">Estimated food subtotal: {money(cart.reduce((sum, item) => sum + item.priceCents * item.quantity, 0))} · before fees and tax</p>{cart.length?cart.map(i=><div className="roco-menu-item roco-cart-item" data-cart-line-id={i.lineId} key={i.lineId}><div><strong>{i.name}</strong><p>{i.customization}</p><p>{i.specialInstructions}</p><p>{i.restaurantName} · {money(i.priceCents*i.quantity)}</p></div><div><button className="roco-button" aria-label={`Remove one ${i.name}`} onClick={()=>changeQuantity(i.lineId!, -1)}>−</button> <span aria-label={`${i.name} quantity`}>{i.quantity}</span> <button className="roco-button" aria-label={`Add one ${i.name}`} disabled={i.quantity >= 50} onClick={()=>changeQuantity(i.lineId!, 1)}>+</button></div></div>):<p>Your cart is empty. <Link href="/restaurants">Find food</Link></p>}</section>
       <section className="roco-card"><h2>Delivery address</h2><CheckoutAddresses key={principal} addresses={addresses.data} pending={addresses.isPending} error={addresses.error} retry={()=>void addresses.refetch()} selectedId={selectedAddressId} onSelect={setAddressId} queryKey={addressKey} guest={!isSignedIn}/>
       <label className="roco-field">Driver tip (dollars)<input className="roco-input" type="number" min="0" max="1000" step="0.01" value={(tipCents/100).toString()} onChange={e=>setTipCents(Math.round(Number(e.target.value)*100))}/></label>
       <button className="roco-button" disabled={!cart.length||!selectedAddressId||quote.isPending||order.isPending} onClick={()=>quote.mutate({ snapshot: input, previous: review })}>Calculate test total</button>

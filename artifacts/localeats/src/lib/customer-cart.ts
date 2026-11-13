@@ -118,6 +118,9 @@ export function createCustomerCart(
     getSnapshot: () => snapshot,
     subscribe: (fn: () => void) => {
       listeners.add(fn);
+      // A backgrounded or unmounted page can miss storage/focus events.
+      // Reconcile before React commits a reused identity store on navigation.
+      reload();
       return () => {
         listeners.delete(fn);
       };

@@ -784,6 +784,9 @@ try {
   console.log(
     "390x844 real component QA PASS: owner/driver links, mismatch recovery, strict profile payload, owner grant/revoke controls, security delegation, no horizontal overflow. Authentication/API simulated.",
   );
+} catch (error) {
+  for (const context of browser?.contexts() ?? []) for (const page of context.pages()) console.error("Failed account fixture", page.url(), await page.locator("body").innerText());
+  throw error;
 } finally {
   await browser?.close();
   await new Promise((r) => server.close(r));

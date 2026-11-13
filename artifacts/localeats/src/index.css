@@ -534,3 +534,17 @@ body { background:var(--roco-bg); color:var(--roco-ink); }
 }
 /* Keep controls inside device cutouts in the bundled mobile app. */
 .roco-page { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+
+/* Keep workspace navigation compact without changing the homepage. */
+.roco-navigation { display:flex;justify-content:flex-end;flex:1;min-width:0; }
+.roco-menu-toggle { display:none; }
+@media (max-width:640px) {
+  .roco-header,.portal-topbar { flex-wrap:wrap; }
+  .portal-topbar { height:auto;min-height:76px; }
+  .roco-navigation { flex-wrap:wrap; }
+  .roco-navigation:has(.is-open) { flex-basis:100%; }
+  .roco-menu-toggle { display:inline-flex;min-height:44px; }
+  .roco-responsive-nav:not(.is-open) { display:none; }
+  .roco-responsive-nav.is-open { display:flex;width:100%;flex-direction:column;align-items:stretch;gap:4px;padding-top:10px; }
+  .roco-responsive-nav a,.roco-responsive-nav button { min-height:44px;display:flex;align-items:center;justify-content:flex-start; }
+}

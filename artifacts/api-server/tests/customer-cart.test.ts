@@ -139,3 +139,19 @@ test('resume retains unsaved session edits and updates from another tab precede 
   first.setItems(items => items.map(item => ({ ...item, quantity: item.quantity + 1 })));
   assert.equal(first.getSnapshot().items[0].quantity, 4);
 });
+
+test('returning to a reused cart reconciles storage even when the page missed every resume event', () => {
+  const s = storage(), carts = createCustomerCartRegistry(s), cart = carts.get('a');
+  cart.setItems([line, { ...line, specialInstructions: 'Extra onions' }]);
+  const unsubscribe = cart.subscribe(() => {});
+  unsubscribe();
+  // Another document changes storage while this consumer is unmounted. No
+  // storage/focus/pageshow callback is delivered to the suspended document.
+  s.setItem(cart.key!, JSON.stringify([line]));
+  let changed = 0;
+  const stop = carts.get('a').subscribe(() => changed++);
+  assert.equal(cart.getSnapshot().items.length, 1);
+  assert.equal(cart.getSnapshot().items[0].quantity, 1);
+  assert.equal(changed, 1);
+  stop();
+});

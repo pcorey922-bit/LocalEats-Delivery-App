@@ -7,7 +7,7 @@ import {
   ordersTable,
 } from "@workspace/db";
 import { CommerceError } from "./commerce-policy";
-import { openAt } from "./opening-hours";
+import { orderingAvailabilityIssue } from "./opening-hours";
 export { openAt } from "./opening-hours";
 export async function ensureAccepting(
   restaurant: { id: string; acceptingOrders: boolean },
@@ -30,11 +30,8 @@ export async function ensureAccepting(
     .select()
     .from(restaurantHoursTable)
     .where(eq(restaurantHoursTable.restaurantId, restaurant.id));
-  if (!restaurant.acceptingOrders || !openAt(hours))
-    throw new CommerceError(
-      409,
-      "Restaurant is paused, closed, or has not configured its opening hours",
-    );
+  const issue = orderingAvailabilityIssue(restaurant.acceptingOrders, hours);
+  if (issue) throw new CommerceError(409, issue);
 }
 
 // Includes pending payment, kitchen work and ready orders until pickup. Cancelling
