@@ -1,3 +1,4 @@
+import { boundarySha256 } from '../src/data/rockwood/boundary';
 import { ProviderEvidenceError } from '../src/lib/provider-balance-evidence';
 import { reconcileDispute, reconcilePayment } from "../src/lib/financial-holds";
 import { processStripeEvent } from "../src/routes/payment-webhook";
@@ -907,6 +908,74 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       );
     },
   );
+  await t.test('municipal approval and provider failures block frontend bypasses before orders or provider operations', async () => {
+    const previousMode = process.env.ROCOEATS_DELIVERY_AREA_MODE;
+    const previousApproval = process.env.ROCOEATS_APPROVED_BOUNDARY_SHA256;
+    const oldOrder = await create();
+    const beforeOrders = await db.select().from(ordersTable);
+    const beforeOperations = await db.select().from(financialOperationsTable);
+    try {
+      process.env.ROCOEATS_DELIVERY_AREA_MODE = 'municipal';
+      process.env.ROCOEATS_APPROVED_BOUNDARY_SHA256 = 'unapproved';
+      const spoofed = {...input(), latitude:35.865, longitude:-84.684, coverageApproved:true, geocodingVerified:true};
+      assert.equal((await api('/orders/quote', ids.customer, 'POST', spoofed)).status,503);
+      assert.equal((await api('/orders', ids.customer, 'POST', spoofed, randomUUID())).status,503);
+      assert.equal((await api(`/orders/${oldOrder.id}/checkout`, ids.customer, 'POST')).status,503);
+      assert.equal((await db.select().from(ordersTable)).length,beforeOrders.length);
+      assert.equal((await db.select().from(financialOperationsTable)).length,beforeOperations.length);
+      const savedProvider=process.env.PAYMENT_PROVIDER, savedKey=process.env.STRIPE_SECRET_KEY;
+      try {
+        process.env.PAYMENT_PROVIDER='stripe_test';process.env.STRIPE_SECRET_KEY='sk_test_fixture';process.env.STRIPE_WEBHOOK_SECRET='whsec_fixture';
+        await assert.rejects(executeStripeOperation({id:'checkout:municipal-fixture',kind:'checkout',orderId:oldOrder.id,payload:{}} as any),/Geographic delivery verification is unavailable/);
+      } finally {process.env.PAYMENT_PROVIDER=savedProvider; if(savedKey===undefined)delete process.env.STRIPE_SECRET_KEY;else process.env.STRIPE_SECRET_KEY=savedKey;delete process.env.STRIPE_WEBHOOK_SECRET;}
+      // Reads of historic orders remain possible without a geocoder or boundary approval.
+      assert.equal((await api('/orders/me',ids.customer)).status,200);
+    } finally {
+      if(previousMode===undefined)delete process.env.ROCOEATS_DELIVERY_AREA_MODE;else process.env.ROCOEATS_DELIVERY_AREA_MODE=previousMode;
+      if(previousApproval===undefined)delete process.env.ROCOEATS_APPROVED_BOUNDARY_SHA256;else process.env.ROCOEATS_APPROVED_BOUNDARY_SHA256=previousApproval;
+    }
+  });
+  await t.test('municipal geocoder results enforce real API checkout with no outside or outage fallback', async () => {
+    const priorEnv={...process.env}, originalFetch=globalThis.fetch;
+    const [savedAddress]=await db.select().from(addressesTable).where(eq(addressesTable.id,ids.address));
+    const [savedRestaurant]=await db.select().from(restaurantsTable).where(eq(restaurantsTable.id,ids.business));
+    await db.update(addressesTable).set({street1:'101 Main Street'}).where(eq(addressesTable.id,ids.address));
+    await db.update(restaurantsTable).set({street1:'101 Main Street'}).where(eq(restaurantsTable.id,ids.business));
+    const existing=await create();
+    const beforeOrders=(await db.select().from(ordersTable)).length;
+    const beforeFinance=(await db.select().from(financialOperationsTable)).length;
+    let providerCalls=0;
+    try {
+      Object.assign(process.env,{ROCOEATS_DELIVERY_AREA_MODE:'municipal',ROCOEATS_APPROVED_BOUNDARY_SHA256:boundarySha256,ROCOEATS_GEOCODING_PROVIDER:'geocodio'});
+      for(const mode of ['outside','coarse','ambiguous','unavailable','wrong-street','wrong-zip','unknown-precision']){
+        process.env.GEOCODIO_API_KEY='local_test_key_'+mode.replace(/-/g,'_');
+        globalThis.fetch=async(input,init)=>{
+          if(new URL(String(input)).hostname!=='api.geocod.io')return originalFetch(input,init);
+          providerCalls++;
+          if(mode==='unavailable')throw new Error('Simulated provider unavailable');
+          const result={accuracy:1,accuracy_type:'rooftop',match_type:'building_centroid',address_components:{number:'101',formatted_street:'Main St',city:'Rockwood',state:'TN',zip:'37854',country:'US'},location:{lng:-84.684,lat:35.865}};
+          if(mode==='outside')result.location={lng:-84.56,lat:35.88};
+          if(mode==='coarse')result.accuracy_type='range_interpolation';
+          if(mode==='wrong-street')result.address_components.number='999';
+          if(mode==='wrong-zip')result.address_components.zip='37763';
+          if(mode==='unknown-precision')result.match_type='parcel_centroid';
+          return new Response(JSON.stringify({results:mode==='ambiguous'?[result,result]:[result]}),{headers:{'content-type':'application/json'}});
+        };
+        const expected=mode==='unavailable'?503:409;
+        const spoofed={...input(),latitude:35.865,longitude:-84.684,coverageApproved:true};
+        assert.equal((await api('/orders/quote',ids.customer,'POST',spoofed)).status,expected,mode);
+        assert.equal((await api('/orders',ids.customer,'POST',spoofed,randomUUID())).status,expected,mode);
+        assert.equal((await api(`/orders/${existing.id}/checkout`,ids.customer,'POST')).status,expected,mode);
+      }
+      assert.ok(providerCalls>=21);
+      assert.equal((await db.select().from(ordersTable)).length,beforeOrders);
+      assert.equal((await db.select().from(financialOperationsTable)).length,beforeFinance);
+    } finally {
+      globalThis.fetch=originalFetch;process.env=priorEnv;
+      await db.update(addressesTable).set({street1:savedAddress.street1}).where(eq(addressesTable.id,ids.address));
+      await db.update(restaurantsTable).set({street1:savedRestaurant.street1}).where(eq(restaurantsTable.id,ids.business));
+    }
+  });
   await t.test('Rockwood launch ceiling rejects direct API bypasses, broadened pricing and stale checkout snapshots', async () => {
     const originalPricing = (await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.settingKey, 'test_pricing')))[0].value;
     const [originalAddress] = await db.select().from(addressesTable).where(eq(addressesTable.id, ids.address));

@@ -1,4 +1,4 @@
-import { requireLaunchDeliveryArea } from '../lib/delivery-area';
+import { requireLaunchServiceArea } from '../lib/municipal-delivery';
 import { telephoneConfirmationsTable, notificationsTable } from "@workspace/db";
 import { guestSessionsTable } from "@workspace/db";
 import type { GuestRequest } from "../lib/guest-access";
@@ -280,7 +280,7 @@ router.post(
     }
 
     const pricing = await readPricing();
-    requireLaunchDeliveryArea(restaurant, address, pricing.allowedPostalCodes);
+    await requireLaunchServiceArea(restaurant, address, pricing.allowedPostalCodes);
     const price = calculatePrice(
       subtotalCents,
       parsed.data.tipCents ?? 0,
@@ -410,7 +410,7 @@ router.post(
           409,
           "Checkout details changed. Review your address, menu and a fresh quote before ordering",
         );
-      requireLaunchDeliveryArea(lockedRestaurant, lockedAddress, lockedPricing.allowedPostalCodes);
+      await requireLaunchServiceArea(lockedRestaurant, lockedAddress, lockedPricing.allowedPostalCodes);
       await ensureAccepting(lockedRestaurant, tx);
       await ensureCapacity(lockedRestaurant, tx);
       ensureInventory(lockedItems, parsed.data.items);

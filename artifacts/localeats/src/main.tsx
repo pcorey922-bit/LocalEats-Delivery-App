@@ -1,3 +1,4 @@
+import "./lib/zod-csp";
 import { createRoot } from "react-dom/client";
 
 import { lazy, Suspense } from "react";

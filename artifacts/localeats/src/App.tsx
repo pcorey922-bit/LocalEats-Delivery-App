@@ -1,3 +1,4 @@
+import "./lib/zod-csp";
 import { ConnectionNotice } from './components/connection-notice';
 import { ResponsiveNavigation } from './components/responsive-navigation';
 import { useAccountProfile } from './hooks/use-account-profile';

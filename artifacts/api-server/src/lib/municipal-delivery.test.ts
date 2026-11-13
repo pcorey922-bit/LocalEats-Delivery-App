@@ -1,0 +1,290 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import {
+  createMunicipalValidator,
+  validateGeocodioResult,
+  safelyInsideBoundary,
+  municipalConfiguration,
+  requireLaunchServiceArea,
+  type Geometry,
+} from "./municipal-delivery";
+import { boundaryGeometry, boundarySha256 } from "../data/rockwood/boundary";
+const square: Geometry = {
+  type: "Polygon",
+  coordinates: [
+    [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+      [0, 0],
+    ],
+    [
+      [0.4, 0.4],
+      [0.6, 0.4],
+      [0.6, 0.6],
+      [0.4, 0.6],
+      [0.4, 0.4],
+    ],
+  ],
+};
+const address = {
+  street1: "101 Main Street",
+  city: "Rockwood",
+  region: "TN",
+  postalCode: "37854",
+};
+// Coordinates are geometry test points, not geocoded customer addresses.
+const result = {
+  accuracy: 1,
+  accuracy_type: "rooftop",
+  match_type: "building_centroid",
+  address_components: {
+    number: "101",
+    formatted_street: "Main St",
+    city: "Rockwood",
+    state: "TN",
+    zip: "37854",
+    country: "US",
+  },
+  location: { lng: -84.684, lat: 35.865 },
+};
+const evidence = () => ({ results: [structuredClone(result)] });
+const env = {
+  ROCOEATS_DELIVERY_AREA_MODE: "municipal",
+  ROCOEATS_APPROVED_BOUNDARY_SHA256: boundarySha256,
+  ROCOEATS_GEOCODING_PROVIDER: "geocodio",
+  GEOCODIO_API_KEY: "test_key_not_a_real_credential",
+};
+const response = (data: unknown) =>
+  new Response(JSON.stringify(data), {
+    headers: { "content-type": "application/json" },
+  });
+test("polygon holes, exterior, exact edges and uncertain edge buffer fail closed", () => {
+  assert.ok(safelyInsideBoundary([0.2, 0.2], square));
+  for (const p of [
+    [2, 2],
+    [0.5, 0.5],
+    [0, 0.2],
+    [0.0001, 0.2],
+    [NaN, 0.2],
+    [Infinity, 2],
+    [0.2],
+  ])
+    assert.equal(safelyInsideBoundary(p, square), false);
+  assert.equal(safelyInsideBoundary([0.4001, 0.3], square), true);
+  assert.equal(safelyInsideBoundary([0.3999, 0.5], square), false);
+  const multi: Geometry = {
+    type: "MultiPolygon",
+    coordinates: [
+      square.coordinates,
+      [
+        [
+          [2, 2],
+          [3, 2],
+          [3, 3],
+          [2, 3],
+          [2, 2],
+        ],
+      ],
+    ],
+  };
+  assert.ok(safelyInsideBoundary([2.5, 2.5], multi));
+  assert.equal(safelyInsideBoundary([1.5, 1.5], multi), false);
+});
+test("pinned state geometry hash and actual Rockwood exclusion ring are preserved", () => {
+  assert.equal(
+    createHash("sha256").update(JSON.stringify(boundaryGeometry)).digest("hex"),
+    boundarySha256,
+  );
+  assert.ok(
+    safelyInsideBoundary(
+      [result.location.lng, result.location.lat],
+      boundaryGeometry,
+    ),
+  );
+  assert.equal(safelyInsideBoundary([-84.56, 35.88], boundaryGeometry), false);
+  assert.ok(
+    boundaryGeometry.coordinates.length > 1,
+    "official geometry contains excluded territory",
+  );
+  const hole = boundaryGeometry.coordinates[1];
+  // Find a point inside the irregular official hole without assuming its centroid lies inside.
+  const xs = hole.map((p) => p[0]),
+    ys = hole.map((p) => p[1]);
+  let exclusion: number[] | undefined;
+  const holeGeometry: Geometry = { type: "Polygon", coordinates: [hole] };
+  for (let x = 0; x < 20 && !exclusion; x++)
+    for (let y = 0; y < 20 && !exclusion; y++) {
+      const p = [
+        Math.min(...xs) +
+          ((Math.max(...xs) - Math.min(...xs)) * (x + 0.5)) / 20,
+        Math.min(...ys) +
+          ((Math.max(...ys) - Math.min(...ys)) * (y + 0.5)) / 20,
+      ];
+      if (safelyInsideBoundary(p, holeGeometry, 0)) exclusion = p;
+    }
+  assert.ok(exclusion);
+  assert.equal(safelyInsideBoundary(exclusion, boundaryGeometry), false);
+});
+test("only approved exact street rooftop evidence inside city and ZIP is accepted", () => {
+  assert.ok(validateGeocodioResult(evidence(), address));
+  assert.ok(
+    validateGeocodioResult(evidence(), { ...address, street1: "101 Main St." }),
+  );
+  for (const patch of [
+    { accuracy: 0.99 },
+    { accuracy: NaN },
+    { accuracy_type: "range_interpolation" },
+    { accuracy_type: "nearest_rooftop_match" },
+    { match_type: null },
+    { match_type: "parcel_centroid" },
+    { location: { lng: -84.56, lat: 35.88 } },
+    { location: { lng: "-84.684", lat: 35.865 } },
+  ]) {
+    const data = evidence();
+    Object.assign(data.results[0], patch);
+    assert.throws(
+      () => validateGeocodioResult(data, address),
+      /cannot be verified/,
+    );
+  }
+  for (const patch of [
+    { number: "103" },
+    { formatted_street: "Other St" },
+    { state: "KY" },
+    { city: "Kingston" },
+    { zip: "37763" },
+    { zip: 37854 },
+    { zip: "37854junk" },
+    { country: "CA" },
+  ]) {
+    const data = evidence();
+    Object.assign(data.results[0].address_components, patch);
+    assert.throws(() => validateGeocodioResult(data, address));
+  }
+  for (const data of [null, {}, { results: [] }, { results: [result, result] }])
+    assert.throws(() => validateGeocodioResult(data, address));
+  assert.throws(() =>
+    validateGeocodioResult(evidence(), {
+      ...address,
+      street1: "999 False Road",
+      longitude: -84.684,
+      latitude: 35.865,
+    } as typeof address),
+  );
+  assert.throws(() =>
+    validateGeocodioResult(evidence(), { ...address, street2: "Unit 4" }),
+  );
+});
+test("unapproved, unknown, missing provider/key configurations never call a provider", async () => {
+  assert.deepEqual(municipalConfiguration({}), {
+    mode: "provisional_postal",
+    approved: false,
+  });
+  let calls = 0;
+  const validate = createMunicipalValidator(async () => {
+    calls++;
+    return response(evidence());
+  });
+  for (const patch of [
+    { ROCOEATS_APPROVED_BOUNDARY_SHA256: "unapproved" },
+    { ROCOEATS_GEOCODING_PROVIDER: "other" },
+    { GEOCODIO_API_KEY: "" },
+    { ROCOEATS_DELIVERY_AREA_MODE: "false" },
+    { ROCOEATS_DELIVERY_AREA_MODE: "provisional_postal" },
+  ])
+    await assert.rejects(
+      validate(address, { ...env, ...patch }),
+      /unavailable/,
+    );
+  assert.equal(calls, 0);
+});
+test("provider request uses only saved address, ignores coordinates and binds cache to full address", async () => {
+  let calls = 0;
+  let now = 1000;
+  const validate = createMunicipalValidator(
+    async (url, options) => {
+      calls++;
+      const parsed = new URL(String(url));
+      assert.equal(parsed.origin, "https://api.geocod.io");
+      assert.equal(parsed.pathname, "/v1.11/geocode");
+      assert.equal(options?.redirect, "error");
+      assert.ok(options?.signal);
+      assert.match(
+        parsed.searchParams.get("q")!,
+        /^101 Main Street, Rockwood, TN, 37854, US$/,
+      );
+      assert.equal(parsed.searchParams.has("lat"), false);
+      return response(evidence());
+    },
+    () => now,
+  );
+  await validate(
+    { ...address, latitude: 0, longitude: 0 } as typeof address,
+    env,
+  );
+  await validate(address, env);
+  assert.equal(calls, 1);
+  now += 300001;
+  await validate(address, env);
+  assert.equal(calls, 2);
+  await assert.rejects(
+    validate({ ...address, street1: "https://attacker.invalid" }, env),
+  );
+  assert.equal(calls, 2);
+  await assert.rejects(
+    validate({ ...address, street1: "101 Main Street\nOther" }, env),
+  );
+  assert.equal(calls, 2);
+  // Address edits cannot reuse a previous successful verification.
+  await assert.rejects(
+    validate({ ...address, street1: "999 Other Street" }, env),
+  );
+  assert.equal(calls, 3);
+});
+test("network timeout, rate/quota errors, redirects, bad JSON, oversized or ambiguous results fail closed without evidence caching", async () => {
+  for (const send of [
+    async () => {
+      throw new Error("secret provider URL");
+    },
+    async () => new Response("", { status: 429 }),
+    async () => new Response("", { status: 500 }),
+    async () =>
+      new Response("not json", {
+        headers: { "content-type": "application/json" },
+      }),
+    async () =>
+      new Response("x".repeat(262145), {
+        headers: { "content-type": "application/json" },
+      }),
+    async () => response({ results: [result, result] }),
+    async () =>
+      new Response("html", { headers: { "content-type": "text/html" } }),
+  ]) {
+    const validate = createMunicipalValidator(send);
+    await assert.rejects(validate(address, env));
+    await assert.rejects(validate(address, env));
+  }
+});
+test("postal checks run before geocoding and public production cannot use provisional approval", async () => {
+  const prior = { ...process.env };
+  try {
+    process.env.NODE_ENV = "production";
+    process.env.ROCOEATS_ORDERING_ENABLED = "true";
+    delete process.env.ROCOEATS_DELIVERY_AREA_MODE;
+    await assert.rejects(
+      requireLaunchServiceArea(address, address, ["37854"]),
+      /unavailable/,
+    );
+    await assert.rejects(
+      requireLaunchServiceArea(address, { ...address, postalCode: "37763" }, [
+        "37854",
+      ]),
+      /limited to Rockwood/,
+    );
+  } finally {
+    process.env = prior;
+  }
+});

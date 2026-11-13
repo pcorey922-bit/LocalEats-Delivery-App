@@ -1,4 +1,4 @@
-import { requireLaunchDeliveryArea } from './delivery-area';
+import { requireLaunchServiceArea } from './municipal-delivery';
 import { requireTelephoneAcceptance } from "./telephone-confirmation";
 import { databaseNow } from "./database-clock";
 import { requireNoFinancialHold } from "./financial-holds";
@@ -110,7 +110,7 @@ export async function requestProviderCheckout(orderId: string, actor: Profile) {
       .limit(1);
     if (restaurant?.status !== "approved")
       throw new CommerceError(409, "Restaurant is not accepting orders");
-    requireLaunchDeliveryArea(restaurant, order.addressSnapshot, (await readPricing(tx)).allowedPostalCodes);
+    await requireLaunchServiceArea(restaurant, order.addressSnapshot, (await readPricing(tx)).allowedPostalCodes);
     await ensureAccepting(restaurant, tx);
     // Reuse the saved attempt, including an ambiguous provider outcome. A fresh
     // attempt is only allowed after a confirmed failure/expiry of that session.
@@ -606,7 +606,7 @@ export async function executeStripeOperation(
       const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, job.orderId)).limit(1);
       const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, order?.restaurantId ?? '')).limit(1);
       if (!order || !restaurant) throw new CommerceError(409, 'Checkout restaurant or order is unavailable');
-      requireLaunchDeliveryArea(restaurant, order.addressSnapshot, (await readPricing()).allowedPostalCodes);
+      await requireLaunchServiceArea(restaurant, order.addressSnapshot, (await readPricing()).allowedPostalCodes);
     }
     const session = payment.checkoutSessionId
       ? await stripe.checkout.sessions.retrieve(payment.checkoutSessionId)

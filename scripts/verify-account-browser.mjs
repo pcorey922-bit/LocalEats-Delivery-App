@@ -137,8 +137,10 @@ try {
   });
   const origin = "http://127.0.0.1:" + server.address().port;
   const cspPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await cspPage.addInitScript(() => { window.cspStartupViolations = []; document.addEventListener('securitypolicyviolation', event => window.cspStartupViolations.push(event.effectiveDirective)); });
   await cspPage.goto(origin + '/?checkoutCsp=true');
   await cspPage.getByRole('button', { name: 'Prepare secure test payment', exact: true }).waitFor();
+  assert.deepEqual(await cspPage.evaluate(() => window.cspStartupViolations), [], 'Zod must not probe eval under strict CSP');
   await cspPage.evaluate(() => {
     window.cspViolations = [];
     document.addEventListener('securitypolicyviolation', event => window.cspViolations.push(event.effectiveDirective));

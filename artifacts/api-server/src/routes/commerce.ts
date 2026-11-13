@@ -1,4 +1,5 @@
-import { requireLaunchDeliveryArea, requireLaunchPostalCodes, launchArea } from '../lib/delivery-area';
+import { requireLaunchServiceArea } from '../lib/municipal-delivery';
+import { requireLaunchPostalCodes, launchArea } from '../lib/delivery-area';
 import { requireTelephoneAcceptance } from "../lib/telephone-confirmation";
 import { requireCustomerAuth } from "../lib/guest-access";
 import { isOwnerDriver } from "../lib/owner-access";
@@ -142,7 +143,7 @@ router.post("/orders/:orderId/checkout", requireCustomerAuth, async (req, res) =
       .limit(1);
     if (restaurant?.status !== "approved")
       throw new CommerceError(409, "Restaurant is no longer accepting orders");
-    requireLaunchDeliveryArea(restaurant, order.addressSnapshot, (await readPricing(tx)).allowedPostalCodes);
+    await requireLaunchServiceArea(restaurant, order.addressSnapshot, (await readPricing(tx)).allowedPostalCodes);
     await ensureAccepting(restaurant, tx);
     if (payment.checkoutSessionId)
       return {

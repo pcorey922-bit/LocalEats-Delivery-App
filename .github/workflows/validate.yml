@@ -43,6 +43,10 @@ jobs:
           PUBLIC_APP_URL: http://localhost:3001
           CORS_ORIGINS: http://localhost:3001
         run: docker compose --env-file /dev/null -f compose.staging.yml config --quiet
+      - name: Verify pinned owner-review delivery map
+        run: |
+          node scripts/build-delivery-area-review.mjs
+          git diff --exit-code -- docs/delivery-area/index.html docs/delivery-area/rockwood-proposal.svg
       - run: pnpm test
       - name: Rehearse PostgreSQL backup and restore with ledger guards
         env:

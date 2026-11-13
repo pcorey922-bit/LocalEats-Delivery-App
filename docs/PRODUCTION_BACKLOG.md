@@ -4,36 +4,28 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
-## Rockwood postal restriction and security headers — deployment pending
+## Rockwood geographic validation — implemented, approval and deployment pending
 
-Initial launch ceiling is Rockwood, Tennessee, ZIP 37854 for both pickup and
-delivery (including properly formatted 37854 ZIP+4 addresses). Server-side saved records, not frontend approval flags, are checked at
-quote, transactional order creation, checkout request and queued Stripe checkout
-execution. A broader legacy pricing list cannot enlarge this ceiling; future
-pricing saves reject ZIPs other than 37854. No hosted settings, saved addresses,
-restaurant profiles or historic order snapshots are rewritten. Old completed
-orders remain readable and financially reconcilable even if their historic
-locality is outside the new policy. New checkout for such an address is blocked.
+Deployed `e451605` passed 23 read-only staging checks; both ordering windows and
+live charges were closed. Enforced CSP/HSTS and anonymous Clerk screens worked.
+The caught Zod eval capability probe is corrected by `jitless` initialization,
+with browser coverage from startup; do not add unsafe-eval to the CSP.
 
-Important launch blocker: this is postal/locality eligibility, not proof of a
-street's physical location inside municipal limits. Customers supply address text;
-typing Rockwood/37854 cannot establish geographic eligibility. ZIP 37854 includes
-territory beyond incorporated Rockwood. Recommend an owner-approved city-limit
-polygon (Census Rockwood place GEOID 4764440 is a public reference), trusted
-server-side geocoding of the exact street address, and point-in-polygon checks.
-Ambiguous, outside, stale or unavailable geocoding must fail closed, with owner
-review for boundary streets. Boundary source/date and provider/data-sharing policy
-need approval before implementation/public ordering. No new geocoding provider,
-paid mapping service or invented boundary was activated. Keep ordering closed.
+Review [the boundary proposal](delivery-area/index.html) before choosing a boundary.
+See [source, provider and activation details](delivery-area/README.md). The pinned
+Tennessee Comptroller base polygon includes an excluded hole. Its informational
+status and Census ZCTA reference limitations are explicit. No boundary/provider
+approval, geocoding account, customer address transmission or hosted change has
+occurred. Public launch remains blocked pending owner approval and provider
+accuracy acceptance. Default provisional postal checks remain for private testing;
+production public checkout cannot use that provisional configuration.
 
-Enforced CSP permits configured Clerk, fonts and hosted Stripe navigation, blocks
-inline/foreign scripts, disables objects/base tags/framing and retains runtime
-inline styles needed by React/Clerk. Maps compatibility allowances apply only when
-real existing map configuration is present; maps remain unconfigured in staging.
-HSTS uses max-age=31536000 only for an HTTPS production deployment configured by
-PUBLIC_APP_URL, without includeSubDomains/preload or trusting request Host/proxy
-headers. Actual authenticated Clerk/Google sign-in and header behavior behind
-Render still require owner-assisted post-deployment checks, without payments.
+Municipal mode requires the exact reviewed geometry hash and provider approval,
+then exact street-level server evidence in Rockwood/TN/37854 inside the municipal
+polygon, at least 30 m from exterior/hole edges. It rejects ambiguity, coarse
+locations, changed addresses and outages. Quotes, order creation, checkout and
+queued provider execution recheck; historic reads/webhooks/reconciliation are
+unchanged. No completed order or financial record is rewritten.
 
 ## First owner-reported end-to-end Stripe TEST delivery — November 13 UTC
 
