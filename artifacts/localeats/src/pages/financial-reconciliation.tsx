@@ -10,11 +10,14 @@ export function PaymentReconciliation({ orderId }: { orderId: string }) {
         { method: "POST", body: JSON.stringify({ reason }) },
       ),
   });
+  const evidence = (check.error as { data?: { code?: string; error?: string; availableOn?: string } } | null)?.data;
+  const waiting = evidence?.code === 'STRIPE_BALANCE_PENDING' || evidence?.code === 'STRIPE_BALANCE_MISSING';
+  const availableOn = evidence?.availableOn && Number.isFinite(Date.parse(evidence.availableOn)) ? new Date(evidence.availableOn).toLocaleString() : null;
   return (
     <section>
       <h4>Verify original charge and fees</h4>
       <p>
-        Reads Stripe test evidence and records available balance entries. This
+        Reads Stripe test evidence and records available balance entries. Pending funds stay unreconciled. This
         does not verify bank payouts or every refund fee.
       </p>
       <label className="roco-field">
@@ -34,7 +37,12 @@ export function PaymentReconciliation({ orderId }: { orderId: string }) {
       >
         Reconcile Stripe test charge
       </button>
-      {check.error && <p role="alert">{check.error.message}</p>}
+      {check.error && (waiting ? <div role="status">
+        <strong>Reconciliation pending</strong>
+        <p>{evidence?.error}</p>
+        {availableOn && <p>Stripe’s reported availability: {availableOn}. This is not confirmation that funds are available.</p>}
+        <p>No fee or net evidence was recorded by this attempt. Keep this existing order; do not repeat its payment. Check Stripe and manually retry when the balance is available.</p>
+      </div> : <p role="alert">{check.error.message}</p>)}
       {check.data && (
         <p role="status">
           Verified charge fee ${(check.data.feeCents / 100).toFixed(2)}; net to

@@ -1,3 +1,4 @@
+import { PaymentReconciliation } from '../src/pages/financial-reconciliation';
 import App from "../src/App";
 import { NativeSignIn } from "../src/pages/native-sign-in";
 import { ImportGuestLink } from "../src/pages/import-guest-link";
@@ -31,6 +32,8 @@ function CartProbe({ name }: { name: string }) {
 }
 declare global {
   interface Window {
+    qaEvidenceState: string;
+    qaEvidenceAttempts: number;
     qaNativeStart: Record<string, unknown> | null;
     qaNativeTickets: string[];
     qaNativeOpened: string[];
@@ -76,6 +79,8 @@ window.qaAccess = {
   superAdministrator: true,
   driver: true,
 };
+window.qaEvidenceState = 'pending';
+window.qaEvidenceAttempts = 0;
 window.qaNativeStart = null;
 window.qaNativeTickets = [];
 window.qaNativeOpened = [];
@@ -135,6 +140,17 @@ window.qaStaff = {
   accessVersion: "v1",
 };
 window.fetch = async (url, options = {}) => {
+  if (String(url) === '/api/admin/orders/fixture-reconciliation/reconcile-payment') {
+    window.qaEvidenceAttempts++;
+    const state = window.qaEvidenceState;
+    if (state === 'available') return Response.json({ feeCents: 86, netCents: 1833 });
+    return Response.json({
+      error: state === 'pending' ? 'Stripe balance funds are pending.' : state === 'missing' ? 'Stripe has not supplied the charge balance transaction yet.' : 'Stripe balance evidence is invalid or inconsistent.',
+      code: state === 'pending' ? 'STRIPE_BALANCE_PENDING' : state === 'missing' ? 'STRIPE_BALANCE_MISSING' : 'STRIPE_BALANCE_INVALID',
+      ...(state === 'pending' && { availableOn: '2026-11-16T00:00:00.000Z' }),
+    }, { status: 409 });
+  }
+
   const json = (value: unknown) =>
     new Response(JSON.stringify(value), {
       headers: { "content-type": "application/json" },
@@ -388,7 +404,7 @@ createRoot(document.getElementById("root")!).render(
     client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
   >
     <p>SIMULATED authentication and API: component QA only</p>
-    {location.search.includes('cartSync=true') ? <React.StrictMode><CartProbe name="menu"/><CartProbe name="checkout"/></React.StrictMode> : location.search.includes("native=true") ? (
+    {location.search.includes('reconciliation=true') ? <PaymentReconciliation orderId="fixture-reconciliation"/> : location.search.includes('cartSync=true') ? <React.StrictMode><CartProbe name="menu"/><CartProbe name="checkout"/></React.StrictMode> : location.search.includes("native=true") ? (
       <NativeSignIn role={location.search.includes("join=restaurant") ? "restaurant" : undefined} />
     ) : location.search.includes("importGuest=true") ? (
       <ImportGuestLink />

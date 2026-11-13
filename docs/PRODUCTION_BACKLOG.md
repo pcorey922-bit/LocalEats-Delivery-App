@@ -4,6 +4,54 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
+## First owner-reported end-to-end Stripe TEST delivery — November 13 UTC
+
+On deployed `374477b`, the owner confirmed a $19.19 Stripe TEST payment, processed
+signed webhook, restaurant acceptance/preparation, driver claim/pickup and delivery
+with customer handoff code. Operational ledger was balanced with zero missing
+payment baselines. These are owner-assisted real-provider/device results, not
+engineering's independent access to the private payment or order. The owner closed
+the private ordering window afterward; engineering's read-only verifier confirmed
+both ordering gates and live charges disabled at this same SHA.
+
+Provider fee/net reconciliation remains unverified. The existing generic 409
+conflates invalid evidence with legitimate pending balances. Stripe documents
+pending/available funds and delayed balance transactions after asynchronous capture;
+the exact provider state for this payment still requires owner-supplied read-only
+evidence. The correction distinguishes pending, missing and invalid evidence, resolves
+unexpanded referenced objects using GET only, and retains the requirement for real
+available USD evidence and exact immutable financial matching. No pending balance
+is recorded as reconciled, and no fees are estimated. Deployment and retry of the
+existing order's reconciliation require owner approval. No new payment, refund,
+transfer, inventory change or service-area change is part of this fix. Preserve the
+Rockwood-only initial launch scope; commercial acceptance remains separate.
+
+## Latest owner acceptance — November 13, 2026 UTC
+
+Deployed revision: `374477bdb7d87a45a419c689c32a4491c04626d3`.
+Owner verified on Samsung Galaxy S22 Ultra: customer login/dashboard, three
+quantity-one items retained after refresh (899 + 349 + 200 = 1448 cents), saved
+address loading, mobile menu opening/closing, and the expected HTTP 409 while
+RoCoEats Test Kitchen has paused acceptance. The apparent duplicate fries occurs
+only in Samsung extended scrolling screenshots; live view, ordinary screenshots
+and recordings show one entry. Treat this as a probable screenshot-stitching
+artifact, not a confirmed remaining application duplication defect.
+
+Engineering read-only staging reassessment passed all 23 standard HTTP checks at
+this revision with database/auth/pricing/Stripe TEST/webhook configuration/workers
+ready. Public ordering, private test ordering and live charges remain disabled.
+This is configuration evidence, not a successful provider transaction or delivery.
+Authenticated restaurant stock/hours, dispatch eligibility, provider endpoint
+verification, actual signed-event processing and per-order financial evidence
+remain owner-assisted checks. Reuse PRIVATE_TEST_DELIVERY.md; do not recreate the
+already established accounts, restaurant or menu.
+
+Deferred owner-reported UX: duplicate Notifications dashboard card (root cause
+not independently established) and remaining mobile navigation/checkout cleanup.
+Do not expand this into new development before the supervised private TEST order.
+No ordering activation, restaurant unpause, provider probe/audit, payment or
+financial reconciliation write has been authorized by this reassessment.
+
 ## Current priority: real private TEST payment and delivery acceptance
 
 Staging: https://localeats-delivery-app.onrender.com/ (read-only verified deployed

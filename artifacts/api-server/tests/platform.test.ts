@@ -1,3 +1,4 @@
+import { ProviderEvidenceError } from '../src/lib/provider-balance-evidence';
 import { reconcileDispute, reconcilePayment } from "../src/lib/financial-holds";
 import { processStripeEvent } from "../src/routes/payment-webhook";
 import { processOrderTiming } from "../src/lib/order-timing";
@@ -3251,7 +3252,23 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     const [actor]=await db.select().from(profilesTable).where(eq(profilesTable.id,ids.admin));
     const proof={id:pi,amountReceived:order.totalCents,currency:'usd',livemode:false,status:'succeeded',chargeId:ch,chargePaymentId:pi,chargeAmount:order.totalCents,chargePaid:true,balance:{id,sourceId:ch,kind:'charge',amountCents:order.totalCents,feeCents:100,netCents:order.totalCents-100,currency:'usd' as const,status:'available' as const}};
     assert.equal((await api(`/admin/orders/${order.id}/reconcile-payment`,ids.customer,'POST',{reason:'Unauthorized provider reconciliation'})).status,403);
-    for(const invalid of [{...proof,livemode:true},{...proof,amountReceived:1},{...proof,chargePaymentId:'pi_wrong'},{...proof,balance:{...proof.balance,netCents:1}},{...proof,balance:{...proof.balance,status:'pending'}}])await assert.rejects(()=>reconcilePayment(order.id,actor,'Reject inconsistent provider data',async()=>invalid as any));
+    for(const invalid of [{...proof,livemode:true},{...proof,amountReceived:1},{...proof,chargePaymentId:'pi_wrong'},{...proof,balance:{...proof.balance,sourceId:'ch_other'}},{...proof,balance:{...proof.balance,feeCents:-1,netCents:proof.amountReceived+1}},{...proof,balance:{...proof.balance,netCents:1}},{...proof,balance:{...proof.balance,status:'pending'}}])await assert.rejects(()=>reconcilePayment(order.id,actor,'Reject inconsistent provider data',async()=>invalid as any));
+    const snapshots = async () => ({
+      audits: await db.select().from(auditLogsTable).where(eq(auditLogsTable.resourceId,order.id)),
+      payments: await db.select().from(paymentsTable).where(eq(paymentsTable.orderId,order.id)),
+      orders: await db.select().from(ordersTable).where(eq(ordersTable.id,order.id)),
+      balances: await db.select().from(providerBalanceEntriesTable).where(eq(providerBalanceEntriesTable.orderId,order.id)),
+      journals: await db.select().from(ledgerTransactionsTable).where(eq(ledgerTransactionsTable.orderId,order.id)),
+    });
+    const beforeWait = await snapshots();
+    for (const status of ['pending', 'unknown']) {
+      await assert.rejects(() => reconcilePayment(order.id, actor, 'Preserve paid delivery while evidence waits', async () => ({ ...proof, balance: { ...proof.balance, status } } as any)), error => error instanceof ProviderEvidenceError && error.code === (status === 'pending' ? 'STRIPE_BALANCE_PENDING' : 'STRIPE_BALANCE_INVALID'));
+      assert.deepEqual(await snapshots(), beforeWait);
+    }
+    for (const code of ['STRIPE_BALANCE_MISSING', 'STRIPE_BALANCE_PENDING'] as const) {
+      await assert.rejects(() => reconcilePayment(order.id, actor, 'Missing provider evidence leaves records unchanged', async () => { throw new ProviderEvidenceError(code, 'Fixture provider evidence is not ready'); }));
+      assert.deepEqual(await snapshots(), beforeWait);
+    }
     const first=await reconcilePayment(order.id,actor,'Verify original settled charge and fees',async()=>proof);assert.equal(first.feeCents,100);assert.equal(first.netCents,order.totalCents-100);
     await reconcilePayment(order.id,actor,'Replay original settled charge evidence',async()=>proof);
     const entries=await db.select().from(providerBalanceEntriesTable).where(eq(providerBalanceEntriesTable.orderId,order.id));assert.equal(entries.length,1);

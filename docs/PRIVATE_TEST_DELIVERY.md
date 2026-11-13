@@ -108,6 +108,9 @@ matching processed signed event, delivery receipt and per-order reconciliation.
    TEST-mode result and endpoint configuration result must be Yes. Authentication,
    permission and network failures are redacted; no key or provider payload returns
    to the browser. A restricted/mismatched account key may fail these read checks.
+   The app also saves a `payment.setup_checked` audit entry when this button is
+   used. Although Stripe calls are read-only, the button is not a strictly
+   read-only hosted-data operation; obtain approval for that audit write first.
 3. Reuse the existing Stripe destination if step 2 passes. Only if the destination
    is missing or mismatched, and after owner approval, in Stripe's **same sandbox**
    as the platform secret key use **Workbench →
@@ -182,6 +185,13 @@ matching processed signed event, delivery receipt and per-order reconciliation.
   payment baselines. Compare the saved quote/charged total and pricing snapshot
   with the restaurant and driver earnings, including tip. Record discrepancies;
   a balanced ledger alone does not prove correct allocations or provider evidence.
+  If balance evidence is missing or pending, leave this order and its payment
+  intact. Stripe can supply the balance transaction after asynchronous capture,
+  and its funds can remain pending afterward. Review the existing transaction's
+  status/availability in Stripe; retry reconciliation manually only when available.
+  A reported availability date is informational, not proof of settlement. Invalid
+  or mismatched evidence requires investigation; never estimate fees, override
+  the guard, repeat payment or create a replacement order to clear reconciliation.
   Recipient
   hosted Connect onboarding and transfers are separate TEST exercises. A transfer
   into a connected balance is not proof of bank payout or live banking readiness.

@@ -133,6 +133,30 @@ try {
     args: ["--no-sandbox"],
   });
   const origin = "http://127.0.0.1:" + server.address().port;
+  const reconciliation = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await reconciliation.goto(origin + '/?reconciliation=true');
+  await reconciliation.getByLabel('Review reason', { exact: true }).fill('Review existing completed test order');
+  const reconcile = reconciliation.getByRole('button', { name: 'Reconcile Stripe test charge', exact: true });
+  for (const state of ['pending', 'missing', 'invalid', 'available']) {
+    const before = await reconciliation.evaluate(() => window.qaEvidenceAttempts);
+    await reconciliation.evaluate(value => { window.qaEvidenceState = value; }, state);
+    await reconcile.tap();
+    if (state === 'pending' || state === 'missing') {
+      await reconciliation.getByRole('status').filter({ hasText: 'Reconciliation pending' }).waitFor();
+      await reconciliation.getByText(state === 'pending' ? 'Stripe balance funds are pending.' : 'Stripe has not supplied the charge balance transaction yet.', { exact: true }).waitFor();
+      await reconciliation.getByText('No fee or net evidence was recorded by this attempt.', { exact: false }).waitFor();
+      assert.equal(await reconciliation.getByRole('alert').count(), 0);
+      assert.equal(await reconciliation.getByText('Verified charge fee', { exact: false }).count(), 0);
+      if (state === 'pending') await reconciliation.getByText('Stripe’s reported availability:', { exact: false }).waitFor();
+    } else if (state === 'invalid') {
+      await reconciliation.getByRole('alert').filter({ hasText: 'invalid or inconsistent' }).waitFor();
+      assert.equal(await reconciliation.getByText('Verified charge fee', { exact: false }).count(), 0);
+    } else await reconciliation.getByRole('status').filter({ hasText: 'Verified charge fee $0.86; net to provider balance $18.33.' }).waitFor();
+    assert.equal(await reconciliation.evaluate(() => window.qaEvidenceAttempts), before + 1, 'Only an explicit tap submits a reconciliation attempt');
+  }
+  assert.equal(await reconciliation.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await reconciliation.close();
+  console.log('Reconciliation UI PASS: pending/missing evidence remains unreconciled, invalid evidence stays blocked, manual retry reaches verified fees without automatic resubmission (simulated provider/API).');
   const cartSync = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await cartSync.goto(origin + '/?cartSync=true');
   await cartSync.getByRole('button', { name: 'Add fries menu', exact: true }).click();

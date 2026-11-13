@@ -1,3 +1,4 @@
+import { ProviderEvidenceError } from './lib/provider-balance-evidence';
 import { stagingNativeOrigins } from "./lib/native-origins";
 import express, { type Express, type ErrorRequestHandler } from "express";
 import cors from "cors";
@@ -115,6 +116,10 @@ app.use("/api", limitMutations);
 app.use("/api", router);
 
 const errors: ErrorRequestHandler = (error, _req, res, _next) => {
+  if (error instanceof ProviderEvidenceError) {
+    res.status(error.status).json({ error: error.message, code: error.code, ...(error.availableOn && { availableOn: error.availableOn }) });
+    return;
+  }
   if (error instanceof CommerceError) {
     res.status(error.status).json({ error: error.message });
     return;

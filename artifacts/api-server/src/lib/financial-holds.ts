@@ -1,5 +1,6 @@
+import { verifiedBalance, balanceProof, readPaymentEvidence, type BalanceProof, type PaymentProof } from './provider-balance-evidence';
+export { balanceProofSchema, type PaymentProof } from './provider-balance-evidence';
 import { and, eq } from "drizzle-orm";
-import { z } from "zod";
 import type Stripe from "stripe";
 import {
   db,
@@ -143,33 +144,6 @@ export async function recordDisputeEvent(tx: Transaction, event: Stripe.Event) {
     eventCreated: event.created,
   });
 }
-const cents = z.number().int().min(-2147483647).max(2147483647);
-export const balanceProofSchema = z
-  .object({
-    id: z.string().min(1),
-    sourceId: z.string().min(1),
-    kind: z.string().min(1),
-    amountCents: cents,
-    feeCents: cents,
-    netCents: cents,
-    currency: z.literal("usd"),
-    status: z.literal("available"),
-  })
-  .strict()
-  .refine(
-    (b) => b.netCents === b.amountCents - b.feeCents,
-    "Provider balance arithmetic mismatch",
-  );
-type BalanceProof = z.infer<typeof balanceProofSchema>;
-function verifiedBalance(value: unknown): BalanceProof {
-  const result = balanceProofSchema.safeParse(value);
-  if (!result.success)
-    throw new CommerceError(
-      409,
-      "Provider balance evidence is invalid or not yet available. Retry after settlement or review in Stripe.",
-    );
-  return result.data;
-}
 export async function recordProviderBalance(
   tx: Transaction,
   orderId: string,
@@ -221,18 +195,6 @@ export async function recordProviderBalance(
         { account: "platform_revenue", amountCents: -proof.amountCents },
       ],
     });
-}
-function balanceProof(b: Stripe.BalanceTransaction): BalanceProof {
-  return verifiedBalance({
-    id: b.id,
-    sourceId: typeof b.source === "string" ? b.source : b.source?.id,
-    kind: b.type,
-    amountCents: b.amount,
-    feeCents: b.fee,
-    netCents: b.net,
-    currency: b.currency,
-    status: b.status,
-  });
 }
 export type DisputeProof = {
   id: string;
@@ -344,48 +306,8 @@ export async function reconcileDispute(
     return updated;
   });
 }
-export type PaymentProof = {
-  id: string;
-  amountReceived: number;
-  currency: string;
-  livemode: boolean;
-  status: string;
-  chargeId: string;
-  chargePaymentId: string;
-  chargeAmount: number;
-  chargePaid: boolean;
-  balance: BalanceProof;
-};
 async function readPayment(id: string): Promise<PaymentProof> {
-  const p = await stripeTest().paymentIntents.retrieve(id, {
-    expand: ["latest_charge.balance_transaction"],
-  });
-  const charge = p.latest_charge as Stripe.Charge;
-  if (
-    !charge ||
-    typeof charge === "string" ||
-    !charge.balance_transaction ||
-    typeof charge.balance_transaction === "string"
-  )
-    throw new CommerceError(
-      409,
-      "Expanded charge balance evidence is unavailable",
-    );
-  return {
-    id: p.id,
-    amountReceived: p.amount_received,
-    currency: p.currency,
-    livemode: p.livemode,
-    status: p.status,
-    chargeId: charge.id,
-    chargePaymentId:
-      typeof charge.payment_intent === "string"
-        ? charge.payment_intent
-        : (charge.payment_intent?.id ?? ""),
-    chargeAmount: charge.amount,
-    chargePaid: charge.paid,
-    balance: balanceProof(charge.balance_transaction),
-  };
+  return readPaymentEvidence(id, stripeTest());
 }
 export async function reconcilePayment(
   orderId: string,
