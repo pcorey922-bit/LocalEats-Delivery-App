@@ -6,6 +6,7 @@ import {
   validateGeocodioResult,
   safelyInsideBoundary,
   municipalConfiguration,
+  geographicReadiness,
   requireLaunchServiceArea,
   type Geometry,
 } from "./municipal-delivery";
@@ -287,4 +288,129 @@ test("postal checks run before geocoding and public production cannot use provis
   } finally {
     process.env = prior;
   }
+});
+
+test("adapter validates locality itself before any provider request or cache use", async () => {
+  let calls = 0;
+  const validate = createMunicipalValidator(async () => {
+    calls++;
+    return response(evidence());
+  });
+  for (const patch of [
+    { city: "Kingston" },
+    { region: "KY" },
+    { postalCode: "37763" },
+    { city: null },
+    { postalCode: 37854 },
+  ]) {
+    await assert.rejects(
+      validate({ ...address, ...patch }, env),
+      /cannot be verified/,
+    );
+    assert.throws(
+      () => validateGeocodioResult(evidence(), { ...address, ...patch }),
+      /cannot be verified/,
+    );
+  }
+  assert.equal(calls, 0);
+  await validate(address, env);
+  await assert.rejects(validate({ ...address, city: "Kingston" }, env));
+  assert.equal(calls, 1);
+});
+test("concurrent identical lookups share immutable evidence and snapshot mutable input", async () => {
+  let calls = 0,
+    release!: () => void;
+  const wait = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const validate = createMunicipalValidator(async () => {
+    calls++;
+    await wait;
+    return response(evidence());
+  });
+  const mutable = { ...address };
+  const first = validate(mutable, env);
+  const second = validate(address, env);
+  mutable.street1 = "999 Changed Street";
+  assert.equal(calls, 1);
+  release();
+  const [a, b] = await Promise.all([first, second]);
+  assert.deepEqual(a, b);
+  assert.ok(Object.isFrozen(a));
+  assert.equal(Reflect.set(a, "latitude", 0), false);
+  assert.equal((await validate(address, env)).latitude, result.location.lat);
+  assert.equal(calls, 1);
+});
+test("concurrent provider work is bounded, rejected lookups release slots, and failures are not cached", async () => {
+  let calls = 0,
+    release!: () => void;
+  const wait = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const validate = createMunicipalValidator(async () => {
+    calls++;
+    await wait;
+    throw new Error("provider secret error");
+  });
+  const jobs = Array.from({ length: 8 }, (_, i) =>
+    validate(address, { ...env, GEOCODIO_API_KEY: env.GEOCODIO_API_KEY + i }),
+  );
+  const settled = Promise.allSettled(jobs);
+  await assert.rejects(
+    validate(address, {
+      ...env,
+      GEOCODIO_API_KEY: env.GEOCODIO_API_KEY + "overflow",
+    }),
+    /unavailable/,
+  );
+  assert.equal(calls, 8);
+  release();
+  assert.ok((await settled).every((r) => r.status === "rejected"));
+  await assert.rejects(validate(address, env), /unavailable/);
+  assert.equal(calls, 9);
+});
+test("geographic readiness names missing settings without echoing values or implying provider acceptance", () => {
+  assert.deepEqual(geographicReadiness({}), {
+    mode: "provisional_postal",
+    configurationReady: true,
+    municipalConfigurationReady: false,
+    municipalEnforcementEnabled: false,
+    missingConfiguration: [],
+  });
+  const missing = geographicReadiness({
+    ROCOEATS_DELIVERY_AREA_MODE: "municipal",
+    GEOCODIO_API_KEY: "sensitive invalid key",
+  });
+  assert.equal(missing.configurationReady, false);
+  assert.equal(missing.municipalConfigurationReady, false);
+  assert.deepEqual(missing.missingConfiguration, [
+    "ROCOEATS_APPROVED_BOUNDARY_SHA256",
+    "ROCOEATS_GEOCODING_PROVIDER",
+    "GEOCODIO_API_KEY",
+  ]);
+  assert.equal(
+    JSON.stringify(missing).includes("sensitive invalid key"),
+    false,
+  );
+  assert.equal(
+    geographicReadiness({ ...env }).municipalEnforcementEnabled,
+    true,
+  );
+  const invalid = geographicReadiness({
+    ROCOEATS_DELIVERY_AREA_MODE: "sensitive misconfigured value",
+  });
+  assert.equal(invalid.mode, "invalid");
+  assert.equal(invalid.configurationReady, false);
+  assert.equal(
+    JSON.stringify(invalid).includes("sensitive misconfigured value"),
+    false,
+  );
+  const publicLaunch = geographicReadiness({
+    NODE_ENV: "production",
+    ROCOEATS_ORDERING_ENABLED: "true",
+  });
+  assert.equal(publicLaunch.configurationReady, false);
+  assert.ok(
+    publicLaunch.missingConfiguration.includes("ROCOEATS_DELIVERY_AREA_MODE"),
+  );
 });

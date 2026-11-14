@@ -185,3 +185,41 @@ test("CLI rejects unsafe hosts, credential-bearing URLs, short revisions and unk
   ])
     assert.throws(() => stagingArguments(args));
 });
+
+test("geographic misconfiguration fails readiness and reports only known setting names", async () => {
+  const f = fixture({
+    ready: false,
+    config: {
+      deliveryAreaReady: false,
+      geographicDelivery: {
+        mode: "municipal",
+        configurationReady: false,
+        municipalConfigurationReady: false,
+        municipalEnforcementEnabled: false,
+        missingConfiguration: ["GEOCODIO_API_KEY", "DO_NOT_ECHO_SECRET"],
+        apiKey: "DO_NOT_ECHO_SECRET",
+        address: "DO_NOT_ECHO_SECRET",
+      },
+    },
+  });
+  const report = await verifyStaging(
+    { origin, expectedRevision: expected },
+    f.fetcher,
+  );
+  assert.equal(report.verificationPassed, false);
+  assert.equal(report.dependenciesReady, false);
+  assert.ok(report.failures.includes("dependency_health"));
+  assert.ok(
+    report.missingConfiguration.includes("geographic_delivery_configuration"),
+  );
+  assert.deepEqual(report.geographicDelivery.missingConfiguration, [
+    "GEOCODIO_API_KEY",
+  ]);
+  assert.equal(JSON.stringify(report).includes("DO_NOT_ECHO"), false);
+  const old = await verifyStaging(
+    { origin, expectedRevision: expected },
+    fixture().fetcher,
+  );
+  assert.equal(old.verificationPassed, true);
+  assert.equal(old.geographicDelivery, null);
+});

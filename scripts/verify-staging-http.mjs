@@ -70,6 +70,8 @@ export async function verifyStaging(
     readiness = await (await request("/readyz", [200, 503])).json();
     assert.equal(readiness.liveChargesEnabled, false);
     assert.equal(readiness.database, true);
+    if (Object.hasOwn(readiness, "deliveryAreaReady"))
+      assert.equal(readiness.deliveryAreaReady, true);
     if (privateTestWindow) assert.equal(readiness.ready, true);
   });
   await check("private_staging_and_ordering_gates", async () => {
@@ -181,6 +183,9 @@ export async function verifyStaging(
     providerConfigured: "stripe_test_provider_configuration",
     webhookReady: "stripe_webhook_signing_configuration",
     workerReady: "background_worker_health",
+    ...(Object.hasOwn(readiness ?? {}, "deliveryAreaReady")
+      ? { deliveryAreaReady: "geographic_delivery_configuration" }
+      : {}),
   };
   const missingConfiguration = Object.entries(requirements)
     .filter(([key]) => readiness?.[key] === false)
@@ -213,6 +218,39 @@ export async function verifyStaging(
         "liveChargesEnabled",
       ].map((key) => [key, bool(readiness?.[key])]),
     ),
+    geographicDelivery:
+      readiness?.geographicDelivery &&
+      typeof readiness.geographicDelivery === "object"
+        ? {
+            mode: ["provisional_postal", "municipal", "invalid"].includes(
+              readiness.geographicDelivery.mode,
+            )
+              ? readiness.geographicDelivery.mode
+              : "invalid",
+            configurationReady: bool(
+              readiness.geographicDelivery.configurationReady,
+            ),
+            municipalConfigurationReady: bool(
+              readiness.geographicDelivery.municipalConfigurationReady,
+            ),
+            municipalEnforcementEnabled: bool(
+              readiness.geographicDelivery.municipalEnforcementEnabled,
+            ),
+            missingConfiguration: Array.isArray(
+              readiness.geographicDelivery.missingConfiguration,
+            )
+              ? readiness.geographicDelivery.missingConfiguration.filter(
+                  (value) =>
+                    [
+                      "ROCOEATS_DELIVERY_AREA_MODE",
+                      "ROCOEATS_APPROVED_BOUNDARY_SHA256",
+                      "ROCOEATS_GEOCODING_PROVIDER",
+                      "GEOCODIO_API_KEY",
+                    ].includes(value),
+                )
+              : [],
+          }
+        : null,
     missingConfiguration,
     unverifiedDependencies,
     privateTestStaging: bool(mobile?.privateTestStaging),

@@ -1,5 +1,195 @@
 # RoCoEats resumable engineering checkpoint
 
+## READ FIRST — recovered website/backend continuation, November 14, 2026 UTC
+
+This section supersedes the historical checkpoints below. Resume the existing
+repository/branch; preserve all completed work. Do not restart completed checkout,
+authentication, homepage, delivery or Stripe investigations. Do not follow the
+archived Android/iOS/signing tasks below: native development is deferred.
+
+### Repository and deployed/saved revisions
+
+- Repository: `pcorey922-bit/LocalEats-Delivery-App`.
+- Branch: `feature/rocoeats-launch-readiness`; draft PR #1. Never merge without
+  owner authorization. Worktree was clean at the preceding checkpoint.
+- Verified deployed revision: `e45160501d59db8e7265a58344ea4c4fcc69e197`.
+  Existing Render Free service `LocalEats-Delivery-App`, URL
+  `https://localeats-delivery-app.onrender.com/`. No deployment is authorized now.
+- Previous pushed implementation: `3a63f8b72bca3fe23408651b06c2a9c91942ae34`;
+  all three workflows completed successfully: Validate push `43381992730`,
+  Validate PR `43381999478`, existing native workflow `43381999472` (optional
+  signing/device jobs skipped). No native source/build development was performed.
+- This checkpoint commit recovers all nine previously uncommitted files and
+  contains the geographic adapter/readiness hardening described below. No code
+  was discarded or rebuilt during recovery. Resolve its exact SHA with
+  `git log -1 --format=%H -- docs/ENGINEERING_CHECKPOINT.md`; the final session
+  report supplies that SHA and its completed CI result. Do not substitute an older
+  successful CI run for the current commit's checks.
+
+### Safety and verified business state
+
+Public ordering OFF, private test ordering OFF, live charges OFF; Stripe TEST
+only. Last independent read-only `/livez` and `/api/mobile/readiness` inspection
+confirmed deployed `e451605` and all three closed safeguards. No hosted settings,
+credentials, permissions, customer/restaurant/menu/inventory records or financial
+records were changed. Do not deploy, enable ordering, create orders, initiate
+payments/refunds/transfers, retry reconciliation, or change secrets without the
+owner's explicit authorization. Do not create a Geocodio account, incur expenses
+or transmit customer addresses. Provider fixtures are not provider acceptance.
+
+Preserve completed order `c219f42d-7fb9-4cec-9547-06025d8528f5`: owner verified
+$19.19 Stripe TEST payment, signed webhook, restaurant acceptance/preparation,
+driver claim/pickup/customer-code delivery, balanced operational ledger and zero
+missing payment baselines. This was a real owner-supervised provider test, not an
+engineering simulation. Anonymous engineering checks cannot read its private
+contents. Provider fee/net reconciliation remains pending: owner saw fee $0.86,
+net $18.33, funds availability November 19, 2026 at 7 PM Eastern. Do not retry
+until Stripe explicitly confirms available evidence AND owner separately approves.
+Financial correction `cfbd315` is already deployed in `e451605`.
+
+### Completed geographic/security implementation — preserve
+
+- Official Tennessee Comptroller dashboard resolves to maintained service item
+  `432a7396947245d8acb98d9d2cba292b`, layer 2, Rockwood object 269.
+  Item published May 6, 2025; last updated November 3, 2026. Full raw base and
+  change references, source disclaimer, timestamps and hashes are committed under
+  `artifacts/api-server/src/data/rockwood/`.
+- Candidate version `TN-COT-432a7396947245d8acb98d9d2cba292b-layer2-269-20261103`.
+  Geometry SHA-256:
+  `e1ebc348ed9cc92ffe8ba8ba0d00873486c9fec851233d4190daad3538289d1f`.
+  Includes an excluded hole; do not fill it or union annexations into the current
+  base again. The state describes its municipality-reported data as informational,
+  not legal surveyed boundaries or proof of unreported annexations.
+- Owner review: `docs/delivery-area/index.html` and `rockwood-proposal.svg`.
+  Road labels use public Census 2026 context. Gold shows intersection with the
+  Census 37854 ZCTA reference only; a ZCTA is NOT an authoritative USPS ZIP polygon.
+  Actual future eligibility requires the approved city polygon AND provider-verified
+  ZIP 37854. Never equate all addresses in that ZIP with approved territory.
+- Proposed 30 m interior review margin applies to exterior and hole edges. Map
+  display is simplified below one pixel; runtime uses exact pinned full geometry.
+  No automatic boundary refresh or territory expansion exists.
+- `municipal-delivery.ts` verifies saved restaurant/delivery locations before new
+  quotes, transactional order creation, checkout preparation and queued Stripe
+  checkout execution. Existing identity/ownership checks remain. Historic reads,
+  webhooks, deliveries and financial reconciliation do not require a new geocode.
+- Provisional postal mode remains the existing default for closed/private staging.
+  Production public checkout cannot use provisional mode. Municipal mode requires
+  the exact approved hash, selected provider and server key. Unknown/missing
+  configuration fails closed. No hosted activation has occurred.
+- Geocodio adapter is implemented against fixed HTTPS `/v1.11/geocode`, refuses
+  redirects, bounds request time/response size, and rejects coarse/unknown or
+  ambiguous evidence, street/unit/country/state/city/ZIP mismatches and outside or
+  near-edge coordinates. No client coordinate is trusted. Requires one accuracy-1
+  rooftop result with supported precise match type. Strict rules can reject valid
+  apartments/aliases; evaluate with authorized examples before activation.
+- Latest hardening: adapter independently validates locality; snapshots input;
+  identical concurrent requests share one provider call; eight distinct in-flight
+  lookups maximum; five-minute/256-entry cache has no stale fallback; evidence is
+  immutable; failures release slots and are never cached. Rejected HTTP responses
+  release their bodies. No permanent geocoding database/migration was introduced.
+- `/readyz` now reports sanitized `deliveryAreaReady` and `geographicDelivery`.
+  Municipal misconfiguration makes readiness fail and lists setting NAMES only.
+  It never calls Geocodio; configuration readiness is not accuracy/account/quota
+  acceptance. The read-only staging verifier handles this optional newer summary
+  while retaining compatibility with deployed `e451605`.
+- Zod startup `jitless` fix is committed at `3a63f8b`; strict CSP is unchanged.
+  CSP/HSTS and anonymous Clerk screens passed on deployed `e451605` (the caught
+  Zod probe warning at that deployment is addressed in the undeployed successor).
+  Approved navy/gold homepage and five primary actions are preserved.
+
+### Verification at this checkpoint
+
+- **154 app/API tests passed**, including real HTTP checkout bypass rejection,
+  polygon/hole/edge cases, provider failures, locality defense, single-flight
+  concurrency/capacity, mutable-input isolation and secret-free readiness.
+- **12 staging verifier/configuration tests passed**, including new geographic
+  readiness failures, secret suppression and compatibility with older deployments.
+- Full typechecks and production API/website builds passed. Existing Vite chunk
+  size advisory remains informational; no build error.
+- Recovered browser logs confirm both suites finished successfully before the
+  interruption: mobile account/component QA (including the final 390x844 summary),
+  plus complete website/API/PGlite order-to-delivery/ledger and availability checks.
+  Both use simulated Clerk/payments. They do NOT prove a
+  new Stripe transaction, authenticated staging login or real Geocodio acceptance.
+- Source map regenerated deterministically and verified at Samsung-sized width
+  without horizontal overflow in the previous verified checkpoint. Current
+  hardening does not change boundary geometry, map, homepage or native source.
+- Logs in this workspace: `/tmp/rocoeats-boundary-hardening-final-tests.log`,
+  `-build.log`, `-staging-tests.log`, `-account.log`, `-workflow.log` using the same
+  prefix. CI is the portable evidence if temporary workspace files are unavailable.
+  Inspect current SHA workflows using the commands below; never call pending,
+  absent, cancelled or skipped required checks successful.
+
+### Exact resume instructions
+
+1. Read this current section, `docs/delivery-area/README.md` and
+   `docs/PRODUCTION_BACKLOG.md`. Historical sections below are reference only.
+2. Preserve local work and verify the remote before editing:
+   ```sh
+   cd /workspace/LocalEats-Delivery-App
+   git status --short
+   git fetch origin feature/rocoeats-launch-readiness
+   git log -6 --oneline --decorate
+   git rev-parse HEAD
+   git rev-parse origin/feature/rocoeats-launch-readiness
+   gh run list --repo pcorey922-bit/LocalEats-Delivery-App --commit "$(git rev-parse HEAD)" --json databaseId,name,status,conclusion,event,url
+   gh pr checks 1 --repo pcorey922-bit/LocalEats-Delivery-App
+   ```
+   If checks are pending, wait using `gh pr checks 1 --repo
+   pcorey922-bit/LocalEats-Delivery-App --watch --interval 15`, then inspect all runs
+   for that exact head. Repair actual failures; never reset/discard/pull over dirty
+   work, force-push, merge, deploy or activate settings to make a check green.
+3. No need to repeat already completed development or tests absent new changes.
+   For new changes, run relevant tests and then a meaningful checkpoint:
+   ```sh
+   env -u DATABASE_URL -u TEST_DATABASE_URL -u GEOCODIO_API_KEY -u ROCOEATS_DELIVERY_AREA_MODE -u ROCOEATS_APPROVED_BOUNDARY_SHA256 -u ROCOEATS_GEOCODING_PROVIDER pnpm test
+   pnpm build
+   node --test scripts/verify-staging-http.test.mjs scripts/check-staging-environment.test.mjs scripts/container-environment.test.mjs scripts/free-staging.test.mjs
+   PLAYWRIGHT_CORE_PATH=/tmp/rocoeats-browser/node_modules/playwright-core CHROMIUM_PATH=/usr/bin/chromium node scripts/verify-account-browser.mjs
+   PLAYWRIGHT_CORE_PATH=/tmp/rocoeats-browser/node_modules/playwright-core CHROMIUM_PATH=/usr/bin/chromium node scripts/verify-website-workflow.mjs
+   node scripts/build-delivery-area-review.mjs
+   git diff --check
+   ```
+   Use disposable databases and simulated providers; never point tests at hosted
+   data. If browser tools/dependencies are missing, follow the managed runtime
+   skill and current CI-pinned tooling rather than altering app infrastructure.
+4. Optional owner-requested read-only deployed verification (expected SHA stays
+   `e451605` until a separately approved deployment is confirmed):
+   ```sh
+   NODE_USE_ENV_PROXY=1 node scripts/verify-staging-http.mjs https://localeats-delivery-app.onrender.com/ e45160501d59db8e7265a58344ea4c4fcc69e197
+   ```
+   Use inherited proxy/CA; if sandbox cannot reach it, request tool-level escalation
+   for the same authorized read-only command. No Render/Stripe/Clerk authenticated
+   connector/session or hosted credentials are available here. Render login is
+   owner-controlled; never attempt credential workarounds or create infrastructure.
+5. Commit and push verified source promptly; wait for all required workflows. Keep
+   the checkpoint current. Resume safe engineering only within owner scope.
+
+### Remaining tasks and next owner-controlled decision
+
+- Implementation is authorized. Approval to ACTIVATE a particular boundary/provider
+  or change hosted settings is not recorded. Present the saved map/version, proposed
+  30 m review margin and Geocodio recommendation for explicit approval before activation.
+- Geocodio free tier was documented as 2,500 daily lookups without a credit card.
+  No account or real lookup was made. Owner must separately authorize/create a
+  free account and permitted accuracy-evaluation addresses; never request keys in
+  chat. Keep payment methods/paid credits absent; recheck current provider terms.
+- Evaluate known inside/outside, excluded-hole, boundary, apartment and street-alias
+  addresses using public or explicitly authorized examples. Strict precision,
+  one-result and unit rules may reject valid homes; adjust only on evidence without
+  broadening geographic eligibility or accepting untrusted coordinates.
+- A later owner-approved Render deployment/configuration may select municipal
+  mode plus exact hash/provider/server key; see delivery-area README. This does
+  not authorize opening public/private ordering or initiating another payment.
+- Provider fee/net reconciliation remains pending and independently gated as above.
+  Background GPS and interactive maps remain unverified/unconfigured; do not
+  activate paid mapping or native work. Duplicate Notifications/card/mobile UX
+  cleanup remains deferred unless separately prioritized; preserve checkout fixes.
+
+## Historical checkpoints — superseded, reference only
+
+Do not interpret the archived next actions below as current authorization.
+
 Continue GitHub PR #1 on `feature/rocoeats-launch-readiness`. Do not merge,
 enable live transactions, discard changes or claim launch readiness.
 

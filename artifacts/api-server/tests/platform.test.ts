@@ -908,6 +908,26 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       );
     },
   );
+  await t.test('readiness reports geographic setup safely without querying a provider or changing data', async () => {
+    const prior={...process.env},originalFetch=globalThis.fetch;
+    let providerCalls=0;
+    globalThis.fetch=async(input,init)=>{if(new URL(String(input)).hostname==='api.geocod.io'){providerCalls++;throw new Error('Readiness must not call provider');}return originalFetch(input,init);};
+    try {
+      delete process.env.ROCOEATS_DELIVERY_AREA_MODE;
+      const provisional=await(await fetch(origin+'/readyz')).json();
+      assert.equal(provisional.deliveryAreaReady,true);assert.equal(provisional.geographicDelivery.municipalEnforcementEnabled,false);
+      process.env.ROCOEATS_DELIVERY_AREA_MODE='municipal';
+      delete process.env.ROCOEATS_APPROVED_BOUNDARY_SHA256;delete process.env.ROCOEATS_GEOCODING_PROVIDER;delete process.env.GEOCODIO_API_KEY;
+      const missing=await fetch(origin+'/readyz');assert.equal(missing.status,503);const denied=await missing.json();
+      assert.equal(denied.deliveryAreaReady,false);assert.ok(denied.geographicDelivery.missingConfiguration.includes('GEOCODIO_API_KEY'));
+      Object.assign(process.env,{ROCOEATS_APPROVED_BOUNDARY_SHA256:boundarySha256,ROCOEATS_GEOCODING_PROVIDER:'geocodio',GEOCODIO_API_KEY:'sensitive_test_key_never_echo'});
+      const configured=await(await fetch(origin+'/readyz')).json();assert.equal(configured.deliveryAreaReady,true);assert.equal(configured.geographicDelivery.municipalConfigurationReady,true);
+      assert.equal(JSON.stringify(configured).includes('sensitive_test_key_never_echo'),false);
+      process.env.ROCOEATS_DELIVERY_AREA_MODE='sensitive_invalid_mode_value';
+      const invalid=await(await fetch(origin+'/readyz')).json();assert.equal(invalid.deliveryAreaReady,false);assert.equal(invalid.geographicDelivery.mode,'invalid');assert.equal(JSON.stringify(invalid).includes('sensitive_invalid_mode_value'),false);
+      assert.equal(providerCalls,0);
+    } finally {process.env=prior;globalThis.fetch=originalFetch;}
+  });
   await t.test('municipal approval and provider failures block frontend bypasses before orders or provider operations', async () => {
     const previousMode = process.env.ROCOEATS_DELIVERY_AREA_MODE;
     const previousApproval = process.env.ROCOEATS_APPROVED_BOUNDARY_SHA256;

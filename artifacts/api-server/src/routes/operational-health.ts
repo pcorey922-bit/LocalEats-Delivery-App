@@ -1,3 +1,4 @@
+import { geographicReadiness } from "../lib/municipal-delivery";
 import { and, count, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import { Router, type IRouter, type RequestHandler } from "express";
 import { z } from "zod";
@@ -41,7 +42,9 @@ export const readiness: RequestHandler = async (_req, res) => {
       process.env.CLERK_SECRET_KEY && process.env.CLERK_PUBLISHABLE_KEY,
     );
     const webhookReady = /^whsec_[A-Za-z0-9]+$/.test(process.env.STRIPE_WEBHOOK_SECRET || "");
+    const geographicDelivery = geographicReadiness();
     const ready =
+      geographicDelivery.configurationReady &&
       pricingReady &&
       provider === "stripe_test" &&
       workerReady &&
@@ -51,6 +54,8 @@ export const readiness: RequestHandler = async (_req, res) => {
     res.status(ready ? 200 : 503).json({
       ready,
       database: true,
+      deliveryAreaReady: geographicDelivery.configurationReady,
+      geographicDelivery,
       pricingReady,
       providerConfigured: provider === "stripe_test",
       authReady,

@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 import { CommerceError } from "./commerce-policy";
 import { boundaryGeometry, boundarySha256 } from "../data/rockwood/boundary";
-import { requireLaunchDeliveryArea } from "./delivery-area";
+import {
+  requireLaunchDeliveryArea,
+  rockwoodPostalAddress,
+} from "./delivery-area";
 
 export type DeliveryAddress = {
   street1?: unknown;
@@ -109,6 +112,7 @@ const street = (value: unknown) =>
       })[word]!,
   );
 function inputAddress(address: DeliveryAddress) {
+  if (!rockwoodPostalAddress(address)) throw ineligible();
   if (
     typeof address.street1 !== "string" ||
     !/^\d+[a-z]?\s+[a-z0-9]/i.test(address.street1.trim()) ||
@@ -137,6 +141,7 @@ export function validateGeocodioResult(
   address: DeliveryAddress,
   geometry: Geometry = boundaryGeometry,
 ) {
+  inputAddress(address);
   const results = (data as { results?: unknown[] })?.results;
   // Do not silently select the first candidate from ambiguous provider results.
   if (!Array.isArray(results) || results.length !== 1) throw ineligible();
@@ -175,17 +180,38 @@ export function validateGeocodioResult(
     throw ineligible();
   return { longitude: lng, latitude: lat, boundarySha256 };
 }
-export function municipalConfiguration(env = process.env) {
+export function geographicReadiness(env = process.env) {
   const mode = env.ROCOEATS_DELIVERY_AREA_MODE ?? "provisional_postal";
-  if (mode === "provisional_postal") return { mode, approved: false };
-  if (
-    mode !== "municipal" ||
-    env.ROCOEATS_APPROVED_BOUNDARY_SHA256 !== boundarySha256 ||
-    env.ROCOEATS_GEOCODING_PROVIDER !== "geocodio" ||
-    !/^[a-zA-Z0-9_-]{16,200}$/.test(env.GEOCODIO_API_KEY ?? "")
-  )
-    throw unavailable();
-  return { mode, approved: true };
+  const missingConfiguration: string[] = [];
+  const publicApprovalRequired =
+    env.NODE_ENV === "production" && env.ROCOEATS_ORDERING_ENABLED === "true";
+  if (mode !== "municipal" && mode !== "provisional_postal")
+    missingConfiguration.push("ROCOEATS_DELIVERY_AREA_MODE");
+  if (mode === "municipal" || publicApprovalRequired) {
+    if (mode !== "municipal" && !missingConfiguration.length)
+      missingConfiguration.push("ROCOEATS_DELIVERY_AREA_MODE");
+    if (env.ROCOEATS_APPROVED_BOUNDARY_SHA256 !== boundarySha256)
+      missingConfiguration.push("ROCOEATS_APPROVED_BOUNDARY_SHA256");
+    if (env.ROCOEATS_GEOCODING_PROVIDER !== "geocodio")
+      missingConfiguration.push("ROCOEATS_GEOCODING_PROVIDER");
+    if (!/^[a-zA-Z0-9_-]{16,200}$/.test(env.GEOCODIO_API_KEY ?? ""))
+      missingConfiguration.push("GEOCODIO_API_KEY");
+  }
+  const municipalConfigurationReady =
+    mode === "municipal" && missingConfiguration.length === 0;
+  return {
+    mode:
+      mode === "municipal" || mode === "provisional_postal" ? mode : "invalid",
+    configurationReady: missingConfiguration.length === 0,
+    municipalConfigurationReady,
+    municipalEnforcementEnabled: municipalConfigurationReady,
+    missingConfiguration,
+  };
+}
+export function municipalConfiguration(env = process.env) {
+  const state = geographicReadiness(env);
+  if (!state.configurationReady) throw unavailable();
+  return { mode: state.mode, approved: state.municipalConfigurationReady };
 }
 export function createMunicipalValidator(
   fetcher: typeof fetch = (...args) => fetch(...args),
@@ -195,8 +221,19 @@ export function createMunicipalValidator(
     string,
     { expires: number; value: ReturnType<typeof validateGeocodioResult> }
   >();
+  const pending = new Map<
+    string,
+    Promise<ReturnType<typeof validateGeocodioResult>>
+  >();
   return async (address: DeliveryAddress, env = process.env) => {
     const input = inputAddress(address);
+    const verifiedAddress: DeliveryAddress = {
+      street1: input.street1,
+      street2: input.street2,
+      city: input.city,
+      region: input.state,
+      postalCode: input.postal_code,
+    };
     const config = municipalConfiguration(env);
     if (!config.approved) throw unavailable();
     const key = createHash("sha256")
@@ -204,57 +241,73 @@ export function createMunicipalValidator(
       .digest("hex");
     const saved = cache.get(key);
     if (saved && saved.expires > now()) return saved.value;
-    const url = new URL("https://api.geocod.io/v1.11/geocode");
-    url.searchParams.set("api_key", env.GEOCODIO_API_KEY!);
-    url.searchParams.set(
-      "q",
-      [
-        input.street1,
-        input.street2,
-        input.city,
-        input.state,
-        input.postal_code,
-        input.country,
-      ]
-        .filter(Boolean)
-        .join(", "),
-    );
-    try {
-      const response = await fetcher(url, {
-        redirect: "error",
-        signal: AbortSignal.timeout(5000),
-        headers: { accept: "application/json" },
-      });
-      if (
-        !response.ok ||
-        !response.headers.get("content-type")?.includes("application/json")
-      )
-        throw unavailable();
-      // Bound the response stream; never log provider URLs, keys, addresses or response bodies.
-      const reader = response.body?.getReader();
-      if (!reader) throw unavailable();
-      const chunks: Uint8Array[] = [];
-      let size = 0;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        size += value.length;
-        if (size > 262144) {
-          await reader.cancel();
+    const existing = pending.get(key);
+    if (existing) return existing;
+    if (pending.size >= 8) throw unavailable();
+    const lookup = async () => {
+      const url = new URL("https://api.geocod.io/v1.11/geocode");
+      url.searchParams.set("api_key", env.GEOCODIO_API_KEY!);
+      url.searchParams.set(
+        "q",
+        [
+          input.street1,
+          input.street2,
+          input.city,
+          input.state,
+          input.postal_code,
+          input.country,
+        ]
+          .filter(Boolean)
+          .join(", "),
+      );
+      try {
+        const response = await fetcher(url, {
+          redirect: "error",
+          signal: AbortSignal.timeout(5000),
+          headers: { accept: "application/json" },
+        });
+        if (
+          !response.ok ||
+          !response.headers.get("content-type")?.includes("application/json")
+        ) {
+          await response.body?.cancel();
           throw unavailable();
         }
-        chunks.push(value);
+        // Bound the response stream; never log provider URLs, keys, addresses or response bodies.
+        const reader = response.body?.getReader();
+        if (!reader) throw unavailable();
+        const chunks: Uint8Array[] = [];
+        let size = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.length;
+          if (size > 262144) {
+            await reader.cancel();
+            throw unavailable();
+          }
+          chunks.push(value);
+        }
+        const value = Object.freeze(
+          validateGeocodioResult(
+            JSON.parse(Buffer.concat(chunks).toString("utf8")),
+            verifiedAddress,
+          ),
+        );
+        if (cache.size >= 256) cache.delete(cache.keys().next().value!);
+        cache.set(key, { expires: now() + 300000, value });
+        return value;
+      } catch (error) {
+        if (error instanceof CommerceError) throw error;
+        throw unavailable();
       }
-      const value = validateGeocodioResult(
-        JSON.parse(Buffer.concat(chunks).toString("utf8")),
-        address,
-      );
-      if (cache.size >= 256) cache.delete(cache.keys().next().value!);
-      cache.set(key, { expires: now() + 300000, value });
-      return value;
-    } catch (error) {
-      if (error instanceof CommerceError) throw error;
-      throw unavailable();
+    };
+    const promise = lookup();
+    pending.set(key, promise);
+    try {
+      return await promise;
+    } finally {
+      pending.delete(key);
     }
   };
 }

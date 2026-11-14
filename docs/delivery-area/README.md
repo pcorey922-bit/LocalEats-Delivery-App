@@ -100,9 +100,22 @@ has been approved.
 The proposed 30 m interior margin excludes uncertain boundary streets and hole
 edges; it is a conservative review policy, not a claimed provider error radius.
 Five-second provider timeout, bounded responses and five-minute/256-entry process
-cache fail closed without stale fallback. Cache keys bind the full saved address,
+cache fail closed without stale fallback. At most eight distinct lookups run
+concurrently; identical in-flight requests share one provider call. Saturation
+returns a retryable unavailable response, never a geographic approval. The adapter
+validates locality independently and snapshots input so mutation during a lookup
+cannot rebind cached evidence. Returned cached evidence is immutable. Cache keys bind the full saved address,
 provider key and boundary version; edits/expiry require new evidence. Restart
-clears it. No permanent customer geocoding database was introduced. Provider quota
+clears it. No permanent customer geocoding database was introduced.
+
+`/readyz` reports `deliveryAreaReady` and a sanitized `geographicDelivery`
+configuration summary. Municipal misconfiguration makes readiness fail; missing
+settings are listed by name only. Invalid mode values and provider keys are never
+echoed. The read-only staging verifier includes this summary when available and
+remains compatible with older deployments. This is configuration evidence only:
+readiness never calls the geocoder and cannot establish provider accuracy or
+account/quota health. Provisional private staging can remain healthy while
+municipal enforcement is explicitly reported inactive. Provider quota
 and outage fail closed; free account quota remains the ultimate cost limit.
 
 Before launch: owner approves the exact map/version, 30 m review policy, and
