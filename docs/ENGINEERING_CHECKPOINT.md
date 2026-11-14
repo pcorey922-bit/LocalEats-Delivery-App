@@ -7,6 +7,42 @@ repository/branch; preserve all completed work. Do not restart completed checkou
 authentication, homepage, delivery or Stripe investigations. Do not follow the
 archived Android/iOS/signing tasks below: native development is deferred.
 
+### Latest owner decision and exact deployment target — November 14, 2026
+
+Owner explicitly approved the existing Rockwood map/version, additional ZIP 37854
+restriction and conservative 30 m edge review margin. Do not request that approval
+again. Record: `docs/delivery-area/owner-approval.json`. This is not permission to
+activate geography, create a provider account, incur expense or send private
+addresses. Real Geocodio accuracy acceptance and separate activation approval
+remain required. Public institutional accuracy cases are prepared in the existing
+delivery-area README; no Geocodio requests were made.
+
+Deployment preparation target is exactly
+`9c095d39c821e90a23fb239d1ebd2a2e6105f97c`, regardless of a later documentation-only
+branch head. All three workflows were independently reverified completed/success:
+Validate push `43550235229`, Validate PR `43550240430`, existing native workflow
+`43550240407` (optional signing/device jobs skipped). Target code passed 155 app/API
+tests, 12 staging-tool tests, browser regressions, production builds and typechecks.
+CI also passed container packaging, unchanged migration reruns preserving rows,
+PostgreSQL backup/restore with ledger guards and dependency audit.
+
+No migration/schema, dependency/lockfile, Dockerfile or startup-script changes
+exist between deployed `e451605` and target `9c095d3`. Existing startup still runs
+its serialized, idempotent migration check; do not reset/seed or manually migrate
+hosted data. No environment changes are needed for this release: retain closed
+ordering, Stripe TEST, existing Neon/database/credentials, private/free staging and
+start command. Do not add/select municipal mode, approved hash, provider or key.
+The default provisional policy means geographic enforcement is inactive and new
+readiness fields explicitly report municipal enforcement false. Existing completed
+orders and financial reconciliation paths do not acquire geocoding prerequisites.
+
+Documentation-only commits record approval/test preparation; they do not change the
+requested deployment target. No automatic deployment is authorized. Use existing
+Render service → Manual Deploy → Deploy a specific commit → full target SHA → wait
+Live. After owner deployment confirmation, run the existing read-only verifier
+against that exact SHA and inspect geographicDelivery in /readyz. Do not use a
+latest-commit deploy or alter environment settings to activate new geography.
+
 ### Repository and deployed/saved revisions
 
 - Repository: `pcorey922-bit/LocalEats-Delivery-App`.
@@ -176,9 +212,9 @@ Financial correction `cfbd315` is already deployed in `e451605`.
 
 ### Remaining tasks and next owner-controlled decision
 
-- Implementation is authorized. Approval to ACTIVATE a particular boundary/provider
-  or change hosted settings is not recorded. Present the saved map/version, proposed
-  30 m review margin and Geocodio recommendation for explicit approval before activation.
+- Map/version, ZIP 37854 and 30 m margin are approved; do not ask again. Approval
+  to ACTIVATE geography/provider or change hosted settings is not recorded. Require
+  real Geocodio accuracy acceptance and separate activation authorization.
 - Geocodio free tier was documented as 2,500 daily lookups without a credit card.
   No account or real lookup was made. Owner must separately authorize/create a
   free account and permitted accuracy-evaluation addresses; never request keys in

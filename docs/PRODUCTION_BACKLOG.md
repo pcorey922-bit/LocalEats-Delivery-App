@@ -4,20 +4,23 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
-## Rockwood geographic validation — implemented, approval and deployment pending
+## Rockwood boundary approved — provider acceptance and deployment pending
 
 Deployed `e451605` passed 23 read-only staging checks; both ordering windows and
 live charges were closed. Enforced CSP/HSTS and anonymous Clerk screens worked.
 The caught Zod eval capability probe is corrected by `jitless` initialization,
 with browser coverage from startup; do not add unsafe-eval to the CSP.
 
-Review [the boundary proposal](delivery-area/index.html) before choosing a boundary.
+Owner approved the pinned boundary map, additional ZIP 37854 restriction and
+30 m edge review margin on November 14, 2026; see delivery-area/owner-approval.json.
+Real provider accuracy acceptance and separate activation authorization remain
+required. Deployment preparation target remains exactly `9c095d3`.
 See [source, provider and activation details](delivery-area/README.md). The pinned
 Tennessee Comptroller base polygon includes an excluded hole. Its informational
-status and Census ZCTA reference limitations are explicit. No boundary/provider
-approval, geocoding account, customer address transmission or hosted change has
-occurred. Public launch remains blocked pending owner approval and provider
-accuracy acceptance. Default provisional postal checks remain for private testing;
+status and Census ZCTA reference limitations are explicit. No provider account,
+customer address transmission, geographic activation or hosted change has occurred.
+Public launch remains blocked pending provider accuracy acceptance and separate
+activation/commercial authorization. Default provisional postal checks remain for private testing;
 production public checkout cannot use that provisional configuration.
 
 Current continuation: see the first section of ENGINEERING_CHECKPOINT.md. The

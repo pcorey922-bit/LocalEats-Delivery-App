@@ -1,6 +1,7 @@
 # Rockwood delivery boundary proposal
 
-Status: **candidate only, not approved, deployed or activated**. Public ordering,
+Status: **boundary map, ZIP restriction and 30 m margin approved by the owner on
+November 14, 2026; geographic enforcement not activated**. Public ordering,
 private ordering and live charges remain closed. No hosted settings or records
 have changed. The completed $19.19 test order and reconciliation safeguards are
 outside this change.
@@ -41,8 +42,13 @@ receive delivery at an address; existing account/ownership authorization remains
   automatically enforced as a USPS ZIP polygon or used to broaden the municipality.
 
 The state says the data is municipality-reported, informational, can have errors,
-and does not establish legal municipal lines. Owner review against known streets
-and city records is required. No boundary refresh or annexation is auto-approved.
+and does not establish legal municipal lines. The owner approved this pinned
+map/version, ZIP 37854 as an additional
+restriction and the 30 m edge review margin on November 14, 2026; see
+[approval record](owner-approval.json). The archived source provenance and original
+review map retain their capture-time candidate labels. They are not runtime
+configuration. Real provider accuracy acceptance and separate activation approval
+are still required. No boundary refresh or annexation is auto-approved.
 Rebuild the map from pinned files with `node scripts/build-delivery-area-review.mjs`.
 
 ## Provider recommendation — evaluation still required
@@ -94,8 +100,8 @@ New settings are **supported in code only; do not add them to Render yet**:
 Setting a mode or hash never enables ordering. Existing ordering/Stripe gates
 remain independent. Missing/incorrect approval or provider configuration blocks
 municipal checkout before transmitting addresses. Data updates require a new
-hash, new review and approval. This code does not assert the current candidate
-has been approved.
+hash, new review and approval. The owner approval record does not set any runtime
+variables or activate the provider.
 
 The proposed 30 m interior margin excludes uncertain boundary streets and hole
 edges; it is a conservative review policy, not a claimed provider error radius.
@@ -118,7 +124,39 @@ account/quota health. Provisional private staging can remain healthy while
 municipal enforcement is explicitly reported inactive. Provider quota
 and outage fail closed; free account quota remains the ultimate cost limit.
 
-Before launch: owner approves the exact map/version, 30 m review policy, and
-provider/address sharing; then authorizes free account setup and permitted accuracy
-evaluation. A later, separately approved deployment/configuration can activate
+The map/version, additional ZIP restriction and 30 m review policy are now
+approved. Before activation, obtain provider/account authorization, pass real
+accuracy evaluation, and obtain separate activation authorization. A later, separately approved deployment/configuration can activate
 municipal validation. No authorization to enable ordering or payments is implied.
+
+
+## Prepared public-address accuracy cases — not executed
+
+These are public institutional addresses, not customer or restaurant records.
+No address has been submitted to Geocodio and no account/key or paid resource has
+been created. Do not use these addresses to create delivery orders. Expected
+positive classifications remain candidates until an exact building/entrance point
+has been independently reviewed against the pinned polygon and margin. Published
+mailing addresses alone are not coordinate/precision evidence.
+
+| Case | Public address and source | Required evaluation |
+| --- | --- | --- |
+| City Hall | 110 North Chamberlain Avenue, Rockwood, TN 37854 — [city offices](https://cityofrockwoodtn.gov/administrative-offices/) | Candidate inside-area positive. Verify exact street, precise building point, ZIP and distance from all boundary/hole edges. |
+| Public office with unit | 1070 N Gateway Avenue, Suite 1, Rockwood, TN 37854 — [Tennessee Driver Service locations](https://safetysupport.tn.gov/hc/en-us/articles/51013024806291-Driver-Service-Locations) | Candidate unit/alias positive. Verify Suite 1 and precise evidence. Multiple candidates or an absent unit must remain blocked for review; do not weaken the validator to force a pass. |
+| Same-ZIP outside municipality | 258 Rockwood Airport Drive, Rockwood, TN 37854 — [city airport page](https://cityofrockwoodtn.gov/rockwood-municipal-airport/) | Must not be accepted merely because city/ZIP match. The city places its airport north of Rockwood; TDOT's published airport reference latitude 35°55.34′ N (~35.922333) is north of the pinned polygon's maximum latitude ~35.896132. That reference point is not a geocoded street entrance or rooftop: independently verify the address point before real-provider acceptance. |
+| Unsupported ZIP/locality | 276 Patton Lane, Harriman, TN 37748 — [Roane State](https://www.roanestate.edu/) | Application must reject before a provider call. Public geographic reference only; no need to consume a lookup to establish a disallowed ZIP. |
+
+Airport coordinate reference: [TDOT airport directory](https://www.tn.gov/content/dam/tn/tdot/documents/Aeronautics/Airport-directory.pdf).
+The approved polygon's actual hole/30 m edge checks, malformed fields, modified
+addresses, outages and rate/quota behavior remain covered by synthetic automated
+tests. Do not invent real street addresses for holes or border examples; choose
+additional public locations only when their footprint is independently established.
+
+Once account/provider evaluation is separately authorized, run each permitted
+lookup once, without orders or payments. Record field types, candidate count,
+accuracy score/type, match type, matched street/unit/ZIP, public point and
+inside/edge result. Compare with independent public map/parcel evidence. Keep keys
+out of logs. Missing, coarse, ambiguous, wrong-unit, outside or near-edge evidence
+is a rejection/review outcome. A precise known-inside street and unit must also
+work before activation; if valid cases fail, investigate and regression-test the
+smallest evidence-based correction rather than bypassing geography safeguards.

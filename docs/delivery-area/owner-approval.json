@@ -1,0 +1,16 @@
+{
+  "approvedOn": "2026-11-14",
+  "authority": "Owner confirmation in RoCoEats Next Staging Deployment Preparation instruction",
+  "scope": "municipal_boundary_map_zip_and_edge_review_policy",
+  "boundaryVersion": "TN-COT-432a7396947245d8acb98d9d2cba292b-layer2-269-20261103",
+  "geometrySha256": "e1ebc348ed9cc92ffe8ba8ba0d00873486c9fec851233d4190daad3538289d1f",
+  "additionalPostalCode": "37854",
+  "edgeReviewMarginMeters": 30,
+  "deploymentTargetCommit": "9c095d39c821e90a23fb239d1ebd2a2e6105f97c",
+  "geographicActivationAuthorized": false,
+  "providerAccuracyAcceptancePassed": false,
+  "providerAccountCreationAuthorized": false,
+  "privateAddressTransmissionAuthorized": false,
+  "paidUsageAuthorized": false,
+  "note": "Documentation record only. Runtime does not read this file. Approval does not enable ordering, geocoding, payments or deployment automation."
+}
