@@ -7,6 +7,55 @@ repository/branch; preserve all completed work. Do not restart completed checkou
 authentication, homepage, delivery or Stripe investigations. Do not follow the
 archived Android/iOS/signing tasks below: native development is deferred.
 
+### Direct API hardening / owner-local test path — November 14, 2026
+
+Continuation of verified 9c90d00ba4c347da529e73ea19b6f947b2b39d9d. Owner accepts
+the real CSV as preliminary evidence; this does not approve activation. Preserve
+approved boundary/hash, normalized exclusion geometry, ZIP 37854 and 30 m margin.
+
+Transport now accepts only HTTP 200 with an exact (case-insensitive) JSON media
+type, strictly decodes UTF-8 and rejects duplicate decoded JSON member names at
+any nesting depth. This prevents last-key-wins hiding extra candidates/precision.
+Existing fixed US endpoint, Bearer header, 256 KiB body cap, 5 s timeout, redirect
+rejection, no raw error logs, ambiguity/street/unit/locality/precision matching,
+frozen evidence, full-address/key/boundary cache, bounded concurrency, rolling
+30/minute and 500/UTC-day process budgets remain. Credential omission, no-store
+and no-referrer transport options are explicit. New real local HTTP stalled-body
+test verifies the timeout covers body consumption, not merely response headers.
+
+Geocodio public unauthenticated OPTIONS on Nov 14 allows origin * but NOT the
+Authorization request header. No key or address was sent; no geocoding lookup.
+Do not build a browser workaround using API keys in URLs. Secure developer secret
+entry remains unavailable. Prepared scripts/verify-geocodio-owner.py for a trusted
+owner-local interactive terminal: masked getpass with no unmasked fallback, free
+tier confirmation, no key arguments/files, temporary child environment, existing
+five-public-case production verifier. Four mocked wrapper tests make no provider
+calls. Python 3 plus installed Node/pnpm repo dependencies are required. Exact
+steps/limitations in docs/delivery-area/README.md. Never run a real key through the
+shared Codex terminal. Phone-only owner still needs a trusted local terminal or
+secure developer secret-entry facility. Do not ask for a key in chat/GitHub/Render.
+
+Validation: 169 app/API tests, 14 CLI/staging tests, four owner-wrapper tests,
+typechecks, production builds, default offline verifier and deterministic pinned
+map all pass. Mobile browser/account regressions pass (simulated Clerk/API).
+Full local browser/PGlite delivery workflow also passes (simulated payments only).
+GitHub CI is pending the push at this checkpoint; inspect the exact pushed SHA's
+three completed results, never infer success from pending.
+Logs: /tmp/rocoeats-geocodio-hardening-{tests,build,cli,account,workflow}.log.
+Sandbox blocks loopback: rerun local server/browser checks with authorized
+loopback access; this was an environment failure, not an application defect.
+
+Resume: first inspect branch/tree and the exact commit's three workflows. Do not
+repeat the completed CSV job or existing simulated flows absent changes/failures.
+Next required evidence: owner-local direct Bearer/API report, independent public
+building/entrance confirmation, owner acceptance then separate activation approval.
+In-memory quotas reset on restart and are not account-wide free-tier guarantees;
+confirm provider free-only hard limits and multi-process/restart usage protection
+before activation. No hosted configuration, database, migration, boundary change,
+real provider lookup, deployment, payment or financial operation performed. Deployed
+revision remains 9c095d3; public/private ordering and live charges stay OFF, Stripe
+TEST. Preserve the completed $19.19 order and all financial records.
+
 ### Actual Geocodio public CSV evaluated — November 14, 2026
 
 Owner attached the COMPLETED five-public-address Geocodio result CSV. Source

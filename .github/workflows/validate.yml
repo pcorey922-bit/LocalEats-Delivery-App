@@ -50,6 +50,8 @@ jobs:
       - run: pnpm test
       - name: Verify public geocoding runner defaults offline
         run: node scripts/verify-geocodio-public.mjs
+      - name: Verify masked owner-local geocoding runner without provider calls
+        run: python3 scripts/verify-geocodio-owner.test.py
       - name: Rehearse PostgreSQL backup and restore with ledger guards
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}

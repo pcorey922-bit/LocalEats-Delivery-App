@@ -297,9 +297,47 @@ A best-match spreadsheet row cannot establish that the direct API returned one
 candidate or used the tested JSON field types. Diagnostic predicate tests convert
 CSV numeric strings and wrap a selected row only to exercise checks; they do NOT
 turn the CSV into actual unique API evidence. Duplicated candidates still reject.
-No provider key is available to engineering; direct Bearer/API verification is
-still blocked by the missing secure key-entry path. Independent rooftop/entrance
+No provider key is available to engineering; direct Bearer/API verification has
+not been performed. An owner-local masked terminal path is prepared below. Independent rooftop/entrance
 checks, the full direct API precision/uniqueness evidence and owner review remain
 before accuracy acceptance/activation. `providerAccuracyAcceptancePassed` and
 `geographicActivationAuthorized` stay false. No additional lookups, hosted record
 changes, payments or financial operations were performed for this evaluation.
+
+### Secure owner-local direct API verification
+
+On November 14, 2026, an unauthenticated OPTIONS request (no key/address/lookup)
+to the fixed v1.11 endpoint returned `Access-Control-Allow-Origin: *` but allowed
+only `Content-Type, User-Agent` request headers. It did **not** allow Authorization.
+A local browser page therefore cannot use our Bearer transport. Do not work around
+this by putting a key in a URL or changing deployed CSP.
+
+The owner can instead use a **private local computer terminal**, never this shared
+Codex terminal or a cloud IDE. Requires Python 3, supported Node/pnpm and this
+repository with dependencies installed. From the repository root:
+
+1. Confirm the free account has no payment method, paid credits, subscription or
+   auto-refill, and at least five free lookups remaining. Do not repeat the CSV job.
+2. Run `python3 scripts/verify-geocodio-owner.py` with no arguments. Type `YES` to
+   confirm those limits. Paste the API key only into its hidden local prompt.
+   If entry cannot be masked, it stops. Do not use shell history, command arguments,
+   chat, GitHub secrets, Render settings or uploaded files to supply the key.
+3. The wrapper starts the existing production-transport verifier, passing the key
+   only in the local child process environment. At most five sequential fixed
+   public US lookups, no retry; stop on provider failure. No private records, DB,
+   payments, hosted settings or activation are involved. Close the terminal after
+   use. This assumes a trusted personal machine: local privileged processes can
+   read environment/memory; memory zeroization is not guaranteed.
+4. Review/share only the sanitized JSON report. It excludes the key, raw provider
+   response and requested URL. Exit 2 means acceptance gaps or expectation mismatch,
+   **not** permission to repeat the run. Stop and review the evidence first.
+
+Phone-only owners without a trusted local terminal still need a secure developer
+secret-entry facility before direct testing; do not paste credentials in chat.
+No live API test was run while implementing this runner. Mocked tests do not prove
+provider authentication or actual JSON compatibility. Independent building checks,
+owner acceptance of direct results and separate activation approval remain required.
+Process-local cache/quota controls reset on restart and are not account-wide billing
+limits. Before activation, confirm the provider's free-only limit behavior and plan
+account-wide usage protection for multiple processes/restarts; do not assume these
+in-memory guards alone guarantee no overage.

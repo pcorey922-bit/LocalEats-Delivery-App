@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { strictProviderJson } from "./strict-provider-json";
 import { CommerceError } from "./commerce-policy";
 import { boundaryGeometry, boundarySha256 } from "../data/rockwood/boundary";
 import {
@@ -305,6 +306,9 @@ export async function requestGeocodioEvidence(
   try {
     const response = await fetcher(url, {
       redirect: "error",
+      credentials: "omit",
+      cache: "no-store",
+      referrerPolicy: "no-referrer",
       signal: AbortSignal.timeout(5000),
       headers: {
         accept: "application/json",
@@ -312,8 +316,12 @@ export async function requestGeocodioEvidence(
       },
     });
     if (
-      !response.ok ||
-      !response.headers.get("content-type")?.includes("application/json")
+      response.status !== 200 ||
+      response.headers
+        .get("content-type")
+        ?.split(";", 1)[0]
+        .trim()
+        .toLowerCase() !== "application/json"
     ) {
       await response.body?.cancel();
       throw unavailable();
@@ -332,7 +340,7 @@ export async function requestGeocodioEvidence(
       }
       chunks.push(value);
     }
-    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    return strictProviderJson(Buffer.concat(chunks));
   } catch {
     throw unavailable();
   }

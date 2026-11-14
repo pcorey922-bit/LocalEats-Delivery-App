@@ -6,6 +6,99 @@ import {
   publicAccuracyRequestLimit,
 } from "./geocodio-accuracy";
 import { requestGeocodioEvidence } from "./municipal-delivery";
+import { strictProviderJson } from "./strict-provider-json";
+import { createServer } from "node:http";
+
+test("real fetch aborts a stalled response body within the provider timeout", async () => {
+  const server = createServer((_request, response) => {
+    response.writeHead(200, { "content-type": "application/json" });
+    response.write('{"results":[');
+    // Deliberately never finish: headers alone cannot satisfy the timeout.
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const address = server.address();
+    assert.ok(address && typeof address !== "string");
+    const started = Date.now();
+    await assert.rejects(
+      requestGeocodioEvidence(
+        "Public street, Rockwood, TN",
+        secret,
+        (_url, options) =>
+          fetch(`http://127.0.0.1:${address.port}`, {
+            ...options,
+            headers: { accept: "application/json" },
+          }),
+      ),
+      /Geographic delivery verification is unavailable/,
+    );
+    assert.ok(Date.now() - started < 10000);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  }
+});
+
+test("provider JSON rejects duplicate and escaped evidence keys without rejecting independent objects", () => {
+  const bytes = (s: string) => new TextEncoder().encode(s);
+  for (const body of [
+    '{"results":[{},{}],"results":[{}]}',
+    '{"results":[],"\\u0072esults":[{}]}',
+    '{"results":[{"accuracy":0.5,"accuracy":1}]}',
+    '{"a":{"x":1,"x":2}}',
+  ])
+    assert.throws(() => strictProviderJson(bytes(body)));
+  const valid = {
+    results: [{ accuracy: 1 }, { accuracy: 1 }],
+    text: 'escaped " \\ , { }',
+    nested: [[], { a: { a: 1 } }],
+  };
+  assert.deepEqual(strictProviderJson(bytes(JSON.stringify(valid))), valid);
+});
+
+test("transport rejects incomplete responses, deceptive media types and malformed UTF-8", async () => {
+  for (const response of [
+    new Response('{"results":[]}', {
+      status: 206,
+      headers: { "content-type": "application/json" },
+    }),
+    new Response('{"results":[]}', {
+      status: 202,
+      headers: { "content-type": "application/json" },
+    }),
+    new Response('{"results":[]}', {
+      headers: { "content-type": "text/plain; note=application/json" },
+    }),
+    new Response(new Uint8Array([123, 34, 120, 34, 58, 34, 0xff, 34, 125]), {
+      headers: { "content-type": "application/json" },
+    }),
+    new Response('{"results":[{},{}],"results":[{}]}', {
+      headers: { "content-type": "application/json" },
+    }),
+  ]) {
+    await assert.rejects(
+      requestGeocodioEvidence(
+        "Public street, Rockwood, TN",
+        secret,
+        async () => response,
+      ),
+      /Geographic delivery verification is unavailable/,
+    );
+  }
+  assert.deepEqual(
+    await requestGeocodioEvidence(
+      "Public street, Rockwood, TN",
+      secret,
+      async () =>
+        new Response('{"results":[]}', {
+          headers: { "content-type": "Application/JSON; charset=utf-8" },
+        }),
+    ),
+    { results: [] },
+  );
+});
 const secret = "sensitive_test_key_never_echo";
 const env = { GEOCODIO_API_KEY: secret };
 const payload = (query: string) => {
