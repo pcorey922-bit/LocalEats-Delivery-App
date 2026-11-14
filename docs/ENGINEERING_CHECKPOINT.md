@@ -16,8 +16,9 @@ Render changes/deployment, enforcement activation and financial operations remai
 unauthorized. Boundary/ZIP/30 m policy already approved. Activation still requires
 actual accuracy acceptance and separate owner approval.
 
-Owner replied that they are creating the free account. No authenticated browser,
-Geocodio account/session or API key is available to engineering yet. An asynchronous
+Owner subsequently confirmed the free account is ready and this Codex session
+has no secure environment Secrets field. No authenticated Geocodio session or API
+key is available to engineering. Do not ask the owner to create another account. An asynchronous
 question requested account readiness and whether development environment settings
 offer a secure Secrets field for GEOCODIO_API_KEY. Never ask for a key in chat.
 The runtime offers no request_changes/secret-entry tool here; owner must use a
@@ -62,10 +63,23 @@ reconciliation was performed. Deployed version remains verified 9c095d3, both
 ordering windows OFF, live charges OFF and Stripe TEST configured. No database
 migrations, environment changes or native source changes were added.
 
-Do not repeat completed engineering while awaiting the owner. Next required input:
-free Geocodio account ready, free quota at least five remaining, and secure
-GEOCODIO_API_KEY binding in DEVELOPMENT environment settings (not chat or Render).
-Then perform at most the fixed authorized public suite, inspect actual precision,
+Do not repeat completed engineering while awaiting the owner. Implementation
+commit 0a86e032a7367716cd2ee0bd7c9b17943aa70599 passed all three workflows:
+Validate push 43557984968, Validate PR 43557989731, existing native 43557989733
+(optional signing/device jobs skipped). The account is ready, but there is no
+secure development key field. Owner was guided to upload the provided five-public-
+address CSV in Geocodio, US only/no extra data appends, confirm five rows/free $0
+usage, and attach the geocoding RESULTS CSV (not usage/billing export). File:
+docs/delivery-area/public-geocodio-cases.csv; original download copy remains at
+/workspace/shared/rocoeats-public-geocodio-cases.csv. No provider results received yet.
+Do not request the API key in chat or use GitHub/Render to work around this restriction.
+
+Next input is that public-only results CSV. Analyze offline against the pinned
+boundary/margin. Best-match CSV output does not prove API candidate counts, exact
+JSON field types or Bearer authentication; mark missing evidence unverified and
+never manufacture it. Direct API tests remain blocked until a secure development
+key path is genuinely available. Then perform at most the fixed authorized public
+suite with at least five remaining free lookups, inspect actual precision,
 unit/ambiguity and independent near-boundary ground truth, add regression coverage
 for real discrepancies, and keep municipal activation OFF until separately approved.
 

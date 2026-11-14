@@ -15,5 +15,9 @@
   "note": "Documentation record only. Runtime does not read this file. Boundary and provider testing are approved; accuracy acceptance remains pending and hosted geographic activation/ordering/payments remain unauthorized.",
   "publicProviderAccuracyTestingAuthorized": true,
   "providerAuthorizationDate": "2026-11-14",
-  "providerScope": "Free Geocodio account and public, nonprivate Rockwood-area testing only; no paid billing, private addresses, deployment or enforcement activation."
+  "providerScope": "Free Geocodio account and public, nonprivate Rockwood-area testing only; no paid billing, private addresses, deployment or enforcement activation.",
+  "providerAccountReadyReported": true,
+  "secureDevelopmentKeyFieldAvailableReported": false,
+  "directProviderApiVerified": false,
+  "nextEvaluationPath": "owner_assisted_public_results_csv"
 }

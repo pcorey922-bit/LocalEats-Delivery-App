@@ -216,3 +216,26 @@ Exit 2: live observations collected with unresolved coverage/review or expectati
 The runner deliberately never marks `accuracyAcceptancePassed` or `activationReady`
 true by itself: owner review and remaining real-boundary/precision acceptance
 must be completed. No automated report enables enforcement or ordering.
+
+
+### Owner-assisted path when no secure key field is available
+
+Owner confirmed the free account is ready but this Codex environment exposes no
+secure Secrets entry. Keep the API key private in Geocodio. No direct provider API
+requests have been made by engineering. Do not place the key in GitHub, Render,
+chat, a screenshot, command arguments or an attachment to work around this.
+
+Download [the five-public-address CSV](public-geocodio-cases.csv), upload it to the
+Geocodio spreadsheet tool, select US only, leave optional appends/extras off and
+confirm five rows/free $0 usage before processing. Download the **geocoding results**
+CSV, not a Usage/Billing export (which may contain API-key information). Check it
+contains only these public rows and no key column before sharing it for analysis.
+No application records/orders are involved. Do not run a second job unnecessarily.
+
+These are owner-assisted real-provider observations, not engineering-authenticated
+API execution. Use the actual returned coordinates/precision against the approved
+polygon and 30 m margin; mark unmatched or omitted fields unverified. A spreadsheet
+may return only the best match: do not infer that the API returned one candidate,
+that the JSON field types are proven, or that Bearer authentication was verified.
+Independent public building footprints and a real near-edge case still require
+review. No CSV result automatically approves accuracy or activates enforcement.
