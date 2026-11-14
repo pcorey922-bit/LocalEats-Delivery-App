@@ -24,7 +24,9 @@ Current continuation: see the first section of ENGINEERING_CHECKPOINT.md. The
 adapter now independently validates locality, snapshots immutable lookup evidence,
 shares identical in-flight lookups and limits distinct concurrent requests. Readiness
 and the staging verifier report configuration failures without provider calls or
-secret values. These changes do not activate the provider or municipal policy.
+secret values. The recovered follow-up also rejects malformed provider fields
+instead of allowing string coercion to establish street/unit evidence. These
+changes do not activate the provider or municipal policy.
 
 Municipal mode requires the exact reviewed geometry hash and provider approval,
 then exact street-level server evidence in Rockwood/TN/37854 inside the municipal

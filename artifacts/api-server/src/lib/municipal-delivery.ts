@@ -136,19 +136,36 @@ function inputAddress(address: DeliveryAddress) {
     country: "US",
   };
 }
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 export function validateGeocodioResult(
   data: unknown,
   address: DeliveryAddress,
   geometry: Geometry = boundaryGeometry,
 ) {
   inputAddress(address);
-  const results = (data as { results?: unknown[] })?.results;
+  const results = isRecord(data) ? data.results : undefined;
   // Do not silently select the first candidate from ambiguous provider results.
   if (!Array.isArray(results) || results.length !== 1) throw ineligible();
-  const result = results[0] as Record<string, any>;
-  const components = result?.address_components;
+  const result: unknown = results[0];
   if (
-    !components ||
+    !isRecord(result) ||
+    !isRecord(result.address_components) ||
+    !isRecord(result.location)
+  )
+    throw ineligible();
+  const components = result.address_components;
+  if (
+    typeof components.number !== "string" ||
+    !components.number.trim() ||
+    typeof components.formatted_street !== "string" ||
+    !components.formatted_street.trim() ||
+    (components.unit_type != null &&
+      typeof components.unit_type !== "string") ||
+    (components.unit_number != null &&
+      typeof components.unit_number !== "string") ||
+    typeof result.match_type !== "string" ||
     result.accuracy !== 1 ||
     result.accuracy_type !== "rooftop" ||
     !["rooftop", "building_centroid", "unit"].includes(result.match_type) ||
@@ -171,7 +188,7 @@ export function validateGeocodioResult(
       unit.replace(/^apt |^ste |^suite |^unit |^#\s*/, "")
   )
     throw ineligible();
-  const { lng, lat } = result.location ?? {};
+  const { lng, lat } = result.location;
   if (
     typeof lng !== "number" ||
     typeof lat !== "number" ||

@@ -19,9 +19,12 @@ archived Android/iOS/signing tasks below: native development is deferred.
   all three workflows completed successfully: Validate push `43381992730`,
   Validate PR `43381999478`, existing native workflow `43381999472` (optional
   signing/device jobs skipped). No native source/build development was performed.
-- This checkpoint commit recovers all nine previously uncommitted files and
-  contains the geographic adapter/readiness hardening described below. No code
-  was discarded or rebuilt during recovery. Resolve its exact SHA with
+- Recovery saved all nine previously uncommitted files at
+  `df137a11916ec44b758d826db93de27a685595cb`, preserving the completed tests and
+  geographic adapter/readiness work. No work was discarded. This checkpoint
+  additionally rejects malformed provider fields that could previously match
+  street/unit text through string coercion; the regression failed before the fix.
+  Resolve its exact SHA with
   `git log -1 --format=%H -- docs/ENGINEERING_CHECKPOINT.md`; the final session
   report supplies that SHA and its completed CI result. Do not substitute an older
   successful CI run for the current commit's checks.
@@ -99,9 +102,11 @@ Financial correction `cfbd315` is already deployed in `e451605`.
 
 ### Verification at this checkpoint
 
-- **154 app/API tests passed**, including real HTTP checkout bypass rejection,
+- **155 app/API tests passed**, including real HTTP checkout bypass rejection,
   polygon/hole/edge cases, provider failures, locality defense, single-flight
-  concurrency/capacity, mutable-input isolation and secret-free readiness.
+  concurrency/capacity, mutable-input isolation and secret-free readiness. Malformed
+  provider field tests reject array/numeric coercion while preserving valid units;
+  the real HTTP checkout regression rejects malformed provider evidence too.
 - **12 staging verifier/configuration tests passed**, including new geographic
   readiness failures, secret suppression and compatibility with older deployments.
 - Full typechecks and production API/website builds passed. Existing Vite chunk
@@ -114,9 +119,13 @@ Financial correction `cfbd315` is already deployed in `e451605`.
 - Source map regenerated deterministically and verified at Samsung-sized width
   without horizontal overflow in the previous verified checkpoint. Current
   hardening does not change boundary geometry, map, homepage or native source.
-- Logs in this workspace: `/tmp/rocoeats-boundary-hardening-final-tests.log`,
-  `-build.log`, `-staging-tests.log`, `-account.log`, `-workflow.log` using the same
-  prefix. CI is the portable evidence if temporary workspace files are unavailable.
+- Recovery follow-up logs: `/tmp/rocoeats-recovered-final-tests.log`,
+  `/tmp/rocoeats-recovered-build.log`, `/tmp/rocoeats-recovered-staging-tests.log`,
+  `/tmp/rocoeats-recovered-workflow.log`. Original completed mobile/account browser
+  log: `/tmp/rocoeats-boundary-hardening-account.log`. Before/after coercion
+  evidence: `/tmp/rocoeats-recovered-geography-reproduction.log` and
+  `/tmp/rocoeats-recovered-geography-fixed.log`. No real provider was called.
+  CI is the portable evidence if temporary workspace files are unavailable.
   Inspect current SHA workflows using the commands below; never call pending,
   absent, cancelled or skipped required checks successful.
 

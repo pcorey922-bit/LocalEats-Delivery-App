@@ -414,3 +414,40 @@ test("geographic readiness names missing settings without echoing values or impl
     publicLaunch.missingConfiguration.includes("ROCOEATS_DELIVERY_AREA_MODE"),
   );
 });
+
+test("malformed provider address fields cannot gain approval through string coercion", () => {
+  const check = (patch: Record<string, unknown>) => {
+    const data = evidence();
+    Object.assign(data.results[0].address_components, patch);
+    assert.throws(
+      () => validateGeocodioResult(data, address),
+      /cannot be verified/,
+    );
+  };
+  for (const patch of [
+    { number: ["101"] },
+    { number: 101 },
+    { formatted_street: ["Main St"] },
+    { unit_type: 0 },
+    { unit_number: ["4"] },
+  ])
+    check(patch);
+  const validUnit = evidence();
+  Object.assign(validUnit.results[0].address_components, {
+    unit_type: "Unit",
+    unit_number: "4",
+  });
+  assert.ok(
+    validateGeocodioResult(validUnit, { ...address, street2: "Unit 4" }),
+  );
+  const malformedUnit = structuredClone(validUnit);
+  Object.assign(malformedUnit.results[0].address_components, {
+    unit_type: ["Unit"],
+    unit_number: ["4"],
+  });
+  assert.throws(
+    () =>
+      validateGeocodioResult(malformedUnit, { ...address, street2: "Unit 4" }),
+    /cannot be verified/,
+  );
+});

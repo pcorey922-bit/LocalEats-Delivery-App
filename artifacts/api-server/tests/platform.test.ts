@@ -967,7 +967,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     let providerCalls=0;
     try {
       Object.assign(process.env,{ROCOEATS_DELIVERY_AREA_MODE:'municipal',ROCOEATS_APPROVED_BOUNDARY_SHA256:boundarySha256,ROCOEATS_GEOCODING_PROVIDER:'geocodio'});
-      for(const mode of ['outside','coarse','ambiguous','unavailable','wrong-street','wrong-zip','unknown-precision']){
+      for(const mode of ['outside','coarse','ambiguous','unavailable','wrong-street','wrong-zip','unknown-precision','malformed-address']){
         process.env.GEOCODIO_API_KEY='local_test_key_'+mode.replace(/-/g,'_');
         globalThis.fetch=async(input,init)=>{
           if(new URL(String(input)).hostname!=='api.geocod.io')return originalFetch(input,init);
@@ -977,6 +977,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
           if(mode==='outside')result.location={lng:-84.56,lat:35.88};
           if(mode==='coarse')result.accuracy_type='range_interpolation';
           if(mode==='wrong-street')result.address_components.number='999';
+          if(mode==='malformed-address')Object.assign(result.address_components,{number:['101']});
           if(mode==='wrong-zip')result.address_components.zip='37763';
           if(mode==='unknown-precision')result.match_type='parcel_centroid';
           return new Response(JSON.stringify({results:mode==='ambiguous'?[result,result]:[result]}),{headers:{'content-type':'application/json'}});
