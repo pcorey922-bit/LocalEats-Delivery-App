@@ -57,13 +57,15 @@ Recommend evaluating **Geocodio** with public or separately authorized test
 addresses. [Free tier](https://www.geocod.io/free-geocoding): 2,500 daily lookups,
 no credit card. [Terms](https://www.geocod.io/terms-of-use) permit point-in-polygon
 use and storage for US results. Verify the current terms at account creation;
-leave payment methods/paid credits absent. No account or provider calls have been
-made by this change. No customer addresses have been transmitted.
+leave payment methods/paid credits absent. The owner authorized free account creation and public-address accuracy testing
+on November 14, 2026. Account creation/email verification and secure key entry
+currently require owner assistance; real-provider acceptance is not yet established.
+No customer addresses have been transmitted.
 
 The adapter uses the documented fixed HTTPS `/v1.11/geocode` endpoint. It sends
 only address components, including unit, never account names, instructions,
-phone numbers, coordinates, card data or order details. API key stays server-side;
-redirects are refused. Exceptions never expose request URLs, keys or bodies.
+phone numbers, coordinates, card data or order details. API key stays server-side and is sent in the provider-supported Authorization
+Bearer header, never the URL query string; redirects are refused. Exceptions never expose request URLs, keys or bodies.
 Results are checked against saved street, city, state, country and ZIP. Only one
 accuracy-1 rooftop result with a known building/rooftop/unit match is accepted.
 Parcel centroids, neighboring rooftops, interpolations, city/ZIP centroids,
@@ -106,7 +108,12 @@ variables or activate the provider.
 The proposed 30 m interior margin excludes uncertain boundary streets and hole
 edges; it is a conservative review policy, not a claimed provider error radius.
 Five-second provider timeout, bounded responses and five-minute/256-entry process
-cache fail closed without stale fallback. At most eight distinct lookups run
+cache fail closed without stale fallback. New outbound attempts are limited to
+30 per rolling minute and 500 per UTC day per process, counting failed attempts;
+cache/in-flight hits consume no extra requests. Invalid/backward clocks fail closed.
+These local budgets reset on restart and are not an account-wide spending control.
+Use a free-only account with no payment method, paid credits, subscription or
+auto-refill; confirm free quota before each real evaluation run. At most eight distinct lookups run
 concurrently; identical in-flight requests share one provider call. Saturation
 returns a retryable unavailable response, never a geographic approval. The adapter
 validates locality independently and snapshots input so mutation during a lookup
@@ -125,8 +132,9 @@ municipal enforcement is explicitly reported inactive. Provider quota
 and outage fail closed; free account quota remains the ultimate cost limit.
 
 The map/version, additional ZIP restriction and 30 m review policy are now
-approved. Before activation, obtain provider/account authorization, pass real
-accuracy evaluation, and obtain separate activation authorization. A later, separately approved deployment/configuration can activate
+approved. Provider/account and public testing are now authorized. Pass real accuracy
+evaluation and obtain separate activation authorization before changing hosted
+settings or municipal mode. A later, separately approved deployment/configuration can activate
 municipal validation. No authorization to enable ordering or payments is implied.
 
 
@@ -152,7 +160,8 @@ addresses, outages and rate/quota behavior remain covered by synthetic automated
 tests. Do not invent real street addresses for holes or border examples; choose
 additional public locations only when their footprint is independently established.
 
-Once account/provider evaluation is separately authorized, run each permitted
+Account/public evaluation is authorized. Once the account and secure key are ready,
+run each permitted
 lookup once, without orders or payments. Record field types, candidate count,
 accuracy score/type, match type, matched street/unit/ZIP, public point and
 inside/edge result. Compare with independent public map/parcel evidence. Keep keys
@@ -160,3 +169,50 @@ out of logs. Missing, coarse, ambiguous, wrong-unit, outside or near-edge eviden
 is a rejection/review outcome. A precise known-inside street and unit must also
 work before activation; if valid cases fail, investigate and regression-test the
 smallest evidence-based correction rather than bypassing geography safeguards.
+
+
+## Executable public accuracy runner
+
+Default command is offline and needs no credentials:
+
+```sh
+node scripts/verify-geocodio-public.mjs
+```
+
+After owner account setup and secure development-secret entry, engineering may
+run the authorized public suite only when free quota has at least five lookups
+remaining and no paid billing/credits/auto-refill are enabled:
+
+```sh
+NODE_USE_ENV_PROXY=1 node scripts/verify-geocodio-public.mjs --live --confirm-free-tier
+```
+
+`GEOCODIO_API_KEY` must be supplied through development environment Secrets. Never
+paste it in chat, put it in command arguments, commit it, or add it to Render for
+this evaluation. If this session has no secure secret-entry UI, leave the key in
+the owner's Geocodio dashboard and resolve that blocker before direct API testing.
+No account creation credential or private session is accessible to engineering.
+
+The executable accepts no custom addresses/files/URLs; it uses six fixed public
+cases and makes at most five provider calls, sequentially, with no retries. The
+unsupported-ZIP case is rejected without a lookup. Transport/quota failures stop
+further calls. Added cases: the published Lone Mountain State Forest office at
+4314 Roane State Hwy (boundary-review candidate, not yet proven near an edge) and
+Chamberlain Avenue without a house number (public street-only ambiguity/coarse
+result probe; production input validation always blocks it). It uses exactly the
+same fixed-origin transport and strict evidence validator as production, without
+changing any process/Render activation or ordering settings or reading a database.
+
+Reports contain only case IDs, normalized precision enums, scores, result counts,
+boundary distances, and accept/reject decisions. They omit API keys, URLs containing
+keys, raw responses, matched addresses and provider exception text. Exact provider
+points/returned street/unit evidence must be inspected securely by the owner and
+compared to independent public building/parcel evidence. A near-edge candidate is
+not independent ground truth. Ambiguity and near-edge coverage gaps are reported
+honestly if the actual provider does not return those cases.
+
+Exit 0: offline dry-run completed. Exit 1: invocation/configuration failed.
+Exit 2: live observations collected with unresolved coverage/review or expectations.
+The runner deliberately never marks `accuracyAcceptancePassed` or `activationReady`
+true by itself: owner review and remaining real-boundary/precision acceptance
+must be completed. No automated report enables enforcement or ordering.

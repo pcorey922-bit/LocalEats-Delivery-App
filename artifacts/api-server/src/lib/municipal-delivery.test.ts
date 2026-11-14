@@ -451,3 +451,87 @@ test("malformed provider address fields cannot gain approval through string coer
     /cannot be verified/,
   );
 });
+
+test("rolling minute and UTC daily budgets count failed calls and fail closed without provider I/O", async () => {
+  let calls = 0,
+    time = 0;
+  const settings = { perMinute: 2, perUtcDay: 3 };
+  const validate = createMunicipalValidator(
+    async () => {
+      calls++;
+      return new Response("", { status: 429 });
+    },
+    () => time,
+    settings,
+  );
+  settings.perMinute = 30;
+  settings.perUtcDay = 500; // Caller mutation cannot lift limits.
+  await assert.rejects(validate(address, env));
+  await assert.rejects(validate(address, env));
+  await assert.rejects(validate(address, env));
+  assert.equal(calls, 2);
+  time = 60000;
+  await assert.rejects(validate(address, env));
+  assert.equal(calls, 3);
+  time = 120000;
+  await assert.rejects(validate(address, env));
+  assert.equal(calls, 3);
+  time = 86400000;
+  await assert.rejects(validate(address, env));
+  assert.equal(calls, 4);
+  time = 86399999;
+  await assert.rejects(validate(address, env));
+  assert.equal(calls, 4);
+});
+test("cache and shared in-flight evidence remain usable when provider budget is exhausted", async () => {
+  let calls = 0,
+    release!: () => void;
+  const wait = new Promise<void>((r) => {
+    release = r;
+  });
+  const validate = createMunicipalValidator(
+    async () => {
+      calls++;
+      await wait;
+      return response(evidence());
+    },
+    () => 1000,
+    { perMinute: 1, perUtcDay: 1 },
+  );
+  const first = validate(address, env),
+    second = validate(address, env);
+  assert.equal(calls, 1);
+  release();
+  await Promise.all([first, second]);
+  await validate(address, env);
+  assert.equal(calls, 1);
+  await assert.rejects(
+    validate({ ...address, street1: "999 Other Street" }, env),
+  );
+  assert.equal(calls, 1);
+  for (const budget of [
+    { perMinute: 0, perUtcDay: 1 },
+    { perMinute: 31, perUtcDay: 1 },
+    { perMinute: 1, perUtcDay: 501 },
+    { perMinute: NaN, perUtcDay: 1 },
+  ])
+    assert.throws(
+      () => createMunicipalValidator(fetch, Date.now, budget),
+      /Invalid geocoding request budget/,
+    );
+});
+
+test("invalid provider budget clocks never perform network requests", async () => {
+  let calls = 0;
+  for (const time of [NaN, Infinity, -1, 0.5]) {
+    const validate = createMunicipalValidator(
+      async () => {
+        calls++;
+        return response(evidence());
+      },
+      () => time,
+    );
+    await assert.rejects(validate(address, env), /unavailable/);
+  }
+  assert.equal(calls, 0);
+});

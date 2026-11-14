@@ -7,6 +7,68 @@ repository/branch; preserve all completed work. Do not restart completed checkou
 authentication, homepage, delivery or Stripe investigations. Do not follow the
 archived Android/iOS/signing tasks below: native development is deferred.
 
+### Geocodio implementation authorization — November 14, 2026
+
+Owner now authorizes free Geocodio account creation/use, integration and real
+accuracy testing of public/nonprivate Rockwood-area addresses. Do not request
+that permission again. Paid billing/credits/expenses, private address transmission,
+Render changes/deployment, enforcement activation and financial operations remain
+unauthorized. Boundary/ZIP/30 m policy already approved. Activation still requires
+actual accuracy acceptance and separate owner approval.
+
+Owner replied that they are creating the free account. No authenticated browser,
+Geocodio account/session or API key is available to engineering yet. An asynchronous
+question requested account readiness and whether development environment settings
+offer a secure Secrets field for GEOCODIO_API_KEY. Never ask for a key in chat.
+The runtime offers no request_changes/secret-entry tool here; owner must use a
+secure environment Secrets field when offered. If no secure entry is available,
+keep the key in Geocodio and report that direct provider testing remains blocked.
+Do not put it in GitHub, CLI arguments, Render, logs or a chat attachment.
+
+New implementation: shared fixed-origin bounded Geocodio transport, rolling
+30/minute and 500/UTC-day process budgets (failed attempts included), immutable
+cache and shared in-flight results retained. Limits are local and restartable,
+not an account-wide billing guarantee; use a free-only/no-card account and confirm
+at least five free lookups before evaluation. Runtime/ordering settings unchanged.
+
+`node scripts/verify-geocodio-public.mjs` is an offline, no-key dry-run. Once the
+owner supplies a secure development key and confirms free-only remaining quota,
+run with `--live --confirm-free-tier` (NODE_USE_ENV_PROXY=1 behind the inherited
+proxy). Six fixed public cases, at most five calls, no custom address/file/URL
+arguments, no retry after transport/quota failure, no database or hosted changes.
+It reuses the actual production transport and validator. Reports omit raw payload,
+key, returned addresses and exception text. Live reports remain not activation-ready
+until independent public footprint/near-edge evidence and owner review are complete.
+See delivery-area README for sources, report semantics and exact steps. No real
+provider acceptance has been claimed from the offline/simulated tests.
+
+### Current Geocodio candidate verification and next action
+
+164 app/API tests, 14 CLI/staging tests, full typechecks and production builds
+passed locally. Existing mobile account/CSP/cart browser regression and full
+website/API/PGlite delivery/ledger regression passed with simulated Clerk/payments.
+Provider fixtures are synthetic; offline public runner made zero requests and
+correctly remained not activation-ready. Transport now uses documented Bearer
+authentication, with no key in URLs; explicit country=US and no data appends avoid
+non-US/extra-feature lookups. The fixed public CSV for an owner dashboard fallback
+is `/workspace/shared/rocoeats-public-geocodio-cases.csv` (five rows, no key/private
+address); do not confuse a geocoding result CSV with a usage export containing keys.
+
+Latest logs: `/tmp/rocoeats-geocodio-release-tests.log`, `-release-build.log`,
+`-cli-tests.log`, `-account.log`, `-workflow.log` with the same prefix. Verify the
+exact new commit and all three CI workflows after push, not the older 9c095d3 jobs.
+No deployment, hosted mutation, real provider lookup, payment/refund/transfer or
+reconciliation was performed. Deployed version remains verified 9c095d3, both
+ordering windows OFF, live charges OFF and Stripe TEST configured. No database
+migrations, environment changes or native source changes were added.
+
+Do not repeat completed engineering while awaiting the owner. Next required input:
+free Geocodio account ready, free quota at least five remaining, and secure
+GEOCODIO_API_KEY binding in DEVELOPMENT environment settings (not chat or Render).
+Then perform at most the fixed authorized public suite, inspect actual precision,
+unit/ambiguity and independent near-boundary ground truth, add regression coverage
+for real discrepancies, and keep municipal activation OFF until separately approved.
+
 ### Verified post-deployment state — November 14, 2026 UTC
 
 Owner deployed `9c095d39c821e90a23fb239d1ebd2a2e6105f97c` at 11:04 PM EST.
@@ -39,8 +101,9 @@ observed. Next geographic milestone: authorized public-address Geocodio accuracy
 acceptance, then separate activation approval. Do not request boundary/ZIP/30 m
 approval again; it is already recorded. Existing public test cases include the
 same-ZIP/outside-boundary airport and a public unit address. No provider account,
-key, live lookup, expense or private address transmission has been authorized or
-performed. Keep all ordering and financial safeguards closed.
+key, live lookup or expense has been performed. Public provider testing is now
+authorized as described above; private address transmission and paid usage remain
+unauthorized. Keep all ordering and financial safeguards closed.
 
 ### Owner approval and prior deployment preparation — November 14, 2026
 
@@ -251,8 +314,8 @@ Financial correction `cfbd315` is already deployed in `e451605`.
   to ACTIVATE geography/provider or change hosted settings is not recorded. Require
   real Geocodio accuracy acceptance and separate activation authorization.
 - Geocodio free tier was documented as 2,500 daily lookups without a credit card.
-  No account or real lookup was made. Owner must separately authorize/create a
-  free account and permitted accuracy-evaluation addresses; never request keys in
+  No account or real lookup was made. Owner authorized and is creating a
+  free account; secure development key entry is still needed; never request keys in
   chat. Keep payment methods/paid credits absent; recheck current provider terms.
 - Evaluate known inside/outside, excluded-hole, boundary, apartment and street-alias
   addresses using public or explicitly authorized examples. Strict precision,

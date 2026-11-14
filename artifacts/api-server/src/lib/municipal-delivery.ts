@@ -45,6 +45,26 @@ function segmentDistance(point: Point, a: Point, b: Point) {
     : 0;
   return Math.hypot(ax + t * dx, ay + t * dy);
 }
+export function boundaryDistanceMeters(point: Point, geometry: Geometry) {
+  if (
+    point.length !== 2 ||
+    !point.every(Number.isFinite) ||
+    Math.abs(point[0]) > 180 ||
+    Math.abs(point[1]) > 90
+  )
+    return null;
+  const polygons =
+    geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
+  let distance = Infinity;
+  for (const polygon of polygons)
+    for (const ring of polygon)
+      for (let i = 0; i < ring.length; i++)
+        distance = Math.min(
+          distance,
+          segmentDistance(point, ring[i], ring[(i + 1) % ring.length]),
+        );
+  return Number.isFinite(distance) ? distance : null;
+}
 function insideRing(point: Point, ring: readonly Point[]) {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -230,10 +250,83 @@ export function municipalConfiguration(env = process.env) {
   if (!state.configurationReady) throw unavailable();
   return { mode: state.mode, approved: state.municipalConfigurationReady };
 }
+// Fixed-origin transport shared with the public-only acceptance runner. Never log
+// the request URL, API key, response body or provider exception.
+export async function requestGeocodioEvidence(
+  query: string,
+  apiKey: string,
+  fetcher: typeof fetch = fetch,
+): Promise<unknown> {
+  if (
+    !/^[a-zA-Z0-9_-]{16,200}$/.test(apiKey) ||
+    !query.trim() ||
+    query.length > 600 ||
+    /[\r\n\x00]/.test(query)
+  )
+    throw unavailable();
+  const url = new URL("https://api.geocod.io/v1.11/geocode");
+  url.searchParams.set("q", query);
+  url.searchParams.set("country", "US"); // Rockwood-only; never request paid/non-US coverage.
+  try {
+    const response = await fetcher(url, {
+      redirect: "error",
+      signal: AbortSignal.timeout(5000),
+      headers: {
+        accept: "application/json",
+        authorization: `Bearer ${apiKey}`,
+      },
+    });
+    if (
+      !response.ok ||
+      !response.headers.get("content-type")?.includes("application/json")
+    ) {
+      await response.body?.cancel();
+      throw unavailable();
+    }
+    const reader = response.body?.getReader();
+    if (!reader) throw unavailable();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > 262144) {
+        await reader.cancel();
+        throw unavailable();
+      }
+      chunks.push(value);
+    }
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    throw unavailable();
+  }
+}
+
+export const geocodingRequestBudget = Object.freeze({
+  perMinute: 30,
+  perUtcDay: 500,
+} as const);
+
 export function createMunicipalValidator(
   fetcher: typeof fetch = (...args) => fetch(...args),
   now = () => Date.now(),
+  budget: { perMinute: number; perUtcDay: number } = geocodingRequestBudget,
 ) {
+  if (
+    !Number.isInteger(budget.perMinute) ||
+    budget.perMinute < 1 ||
+    budget.perMinute > geocodingRequestBudget.perMinute ||
+    !Number.isInteger(budget.perUtcDay) ||
+    budget.perUtcDay < 1 ||
+    budget.perUtcDay > geocodingRequestBudget.perUtcDay
+  )
+    throw new Error("Invalid geocoding request budget");
+  const { perMinute, perUtcDay } = budget;
+  let minuteRequests: number[] = [];
+  let day = -1,
+    dayRequests = 0,
+    lastTime = -Infinity;
   const cache = new Map<
     string,
     { expires: number; value: ReturnType<typeof validateGeocodioResult> }
@@ -256,63 +349,46 @@ export function createMunicipalValidator(
     const key = createHash("sha256")
       .update(JSON.stringify([input, boundarySha256, env.GEOCODIO_API_KEY]))
       .digest("hex");
+    const time = now();
+    if (!Number.isSafeInteger(time) || time < 0 || time < lastTime)
+      throw unavailable();
+    lastTime = time;
     const saved = cache.get(key);
-    if (saved && saved.expires > now()) return saved.value;
+    if (saved && saved.expires > time) return saved.value;
     const existing = pending.get(key);
     if (existing) return existing;
     if (pending.size >= 8) throw unavailable();
+    const utcDay = Math.floor(time / 86400000);
+    if (utcDay !== day) {
+      day = utcDay;
+      dayRequests = 0;
+    }
+    minuteRequests = minuteRequests.filter((start) => start > time - 60000);
+    if (dayRequests >= perUtcDay || minuteRequests.length >= perMinute)
+      throw unavailable();
+    minuteRequests.push(time);
+    dayRequests++; // Count failed/ambiguous attempts too; retries must not bypass quotas.
     const lookup = async () => {
-      const url = new URL("https://api.geocod.io/v1.11/geocode");
-      url.searchParams.set("api_key", env.GEOCODIO_API_KEY!);
-      url.searchParams.set(
-        "q",
-        [
-          input.street1,
-          input.street2,
-          input.city,
-          input.state,
-          input.postal_code,
-          input.country,
-        ]
-          .filter(Boolean)
-          .join(", "),
-      );
       try {
-        const response = await fetcher(url, {
-          redirect: "error",
-          signal: AbortSignal.timeout(5000),
-          headers: { accept: "application/json" },
-        });
-        if (
-          !response.ok ||
-          !response.headers.get("content-type")?.includes("application/json")
-        ) {
-          await response.body?.cancel();
-          throw unavailable();
-        }
-        // Bound the response stream; never log provider URLs, keys, addresses or response bodies.
-        const reader = response.body?.getReader();
-        if (!reader) throw unavailable();
-        const chunks: Uint8Array[] = [];
-        let size = 0;
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          size += value.length;
-          if (size > 262144) {
-            await reader.cancel();
-            throw unavailable();
-          }
-          chunks.push(value);
-        }
+        const evidence = await requestGeocodioEvidence(
+          [
+            input.street1,
+            input.street2,
+            input.city,
+            input.state,
+            input.postal_code,
+            input.country,
+          ]
+            .filter(Boolean)
+            .join(", "),
+          env.GEOCODIO_API_KEY!,
+          fetcher,
+        );
         const value = Object.freeze(
-          validateGeocodioResult(
-            JSON.parse(Buffer.concat(chunks).toString("utf8")),
-            verifiedAddress,
-          ),
+          validateGeocodioResult(evidence, verifiedAddress),
         );
         if (cache.size >= 256) cache.delete(cache.keys().next().value!);
-        cache.set(key, { expires: now() + 300000, value });
+        cache.set(key, { expires: time + 300000, value });
         return value;
       } catch (error) {
         if (error instanceof CommerceError) throw error;

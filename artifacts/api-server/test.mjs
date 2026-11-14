@@ -19,6 +19,7 @@ try {
     ["stripe-setup", "src/lib/stripe-setup.test.ts"],
     ["provider-balance-evidence", "src/lib/provider-balance-evidence.test.ts"],
     ["availability", "src/lib/restaurant-availability.test.ts"],
+    ["geocodio-accuracy", "src/lib/geocodio-accuracy.test.ts"],
     ["municipal-delivery", "src/lib/municipal-delivery.test.ts"],
     ["delivery-area", "src/lib/delivery-area.test.ts"],
     ["security-headers", "src/lib/security-headers.test.ts"],

@@ -9,8 +9,11 @@
   "deploymentTargetCommit": "9c095d39c821e90a23fb239d1ebd2a2e6105f97c",
   "geographicActivationAuthorized": false,
   "providerAccuracyAcceptancePassed": false,
-  "providerAccountCreationAuthorized": false,
+  "providerAccountCreationAuthorized": true,
   "privateAddressTransmissionAuthorized": false,
   "paidUsageAuthorized": false,
-  "note": "Documentation record only. Runtime does not read this file. Approval does not enable ordering, geocoding, payments or deployment automation."
+  "note": "Documentation record only. Runtime does not read this file. Boundary and provider testing are approved; accuracy acceptance remains pending and hosted geographic activation/ordering/payments remain unauthorized.",
+  "publicProviderAccuracyTestingAuthorized": true,
+  "providerAuthorizationDate": "2026-11-14",
+  "providerScope": "Free Geocodio account and public, nonprivate Rockwood-area testing only; no paid billing, private addresses, deployment or enforcement activation."
 }
