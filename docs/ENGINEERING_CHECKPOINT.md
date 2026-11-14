@@ -7,7 +7,42 @@ repository/branch; preserve all completed work. Do not restart completed checkou
 authentication, homepage, delivery or Stripe investigations. Do not follow the
 archived Android/iOS/signing tasks below: native development is deferred.
 
-### Latest owner decision and exact deployment target — November 14, 2026
+### Verified post-deployment state — November 14, 2026 UTC
+
+Owner deployed `9c095d39c821e90a23fb239d1ebd2a2e6105f97c` at 11:04 PM EST.
+Engineering independently observed the exact SHA from /livez at 04:08 UTC and
+passed all 23 read-only staging checks. /readyz: ready/database/auth/pricing/
+Stripe TEST configuration/webhook configuration/workers all true; no missing or
+unverified dependencies. Public ordering OFF, private test ordering OFF, effective
+ordering OFF, live charges OFF; private staging remains true. No payment, refund,
+transfer, reconciliation attempt, hosted configuration change or extra deployment
+was performed. Private completed-order contents were not read without a session.
+
+Geographic configuration: `mode=provisional_postal`, `configurationReady=true`,
+`municipalConfigurationReady=false`, `municipalEnforcementEnabled=false`, empty
+missingConfiguration. This is the intended inactive municipal state, not missing
+provider setup or evidence of real Geocodio acceptance.
+
+Deployed CSP is enforced on website and API responses; HSTS max-age=31536000.
+Inline scripts and unsafe-eval remain disallowed. At a 412x915 mobile viewport,
+homepage, real anonymous Clerk sign-in, restaurant and driver signup screens all
+rendered with zero CSP violations, failed requests or uncaught errors. The caught
+Zod capability probe seen at e451605 is gone. No forms were submitted. Authenticated
+Clerk/Google sign-in, account-specific routing and private order/ledger contents
+still require the owner's session. Widget rendering/configuration is not a full
+identity-provider login or financial/provider acceptance test.
+
+Read-only evidence in the current workspace:
+`/tmp/rocoeats-9c095d3-postdeployment.json` and
+`/tmp/rocoeats-9c095d3-browser-report.json`. No additional software defect was
+observed. Next geographic milestone: authorized public-address Geocodio accuracy
+acceptance, then separate activation approval. Do not request boundary/ZIP/30 m
+approval again; it is already recorded. Existing public test cases include the
+same-ZIP/outside-boundary airport and a public unit address. No provider account,
+key, live lookup, expense or private address transmission has been authorized or
+performed. Keep all ordering and financial safeguards closed.
+
+### Owner approval and prior deployment preparation — November 14, 2026
 
 Owner explicitly approved the existing Rockwood map/version, additional ZIP 37854
 restriction and conservative 30 m edge review margin. Do not request that approval
@@ -17,7 +52,7 @@ addresses. Real Geocodio accuracy acceptance and separate activation approval
 remain required. Public institutional accuracy cases are prepared in the existing
 delivery-area README; no Geocodio requests were made.
 
-Deployment preparation target is exactly
+The verified deployment target was
 `9c095d39c821e90a23fb239d1ebd2a2e6105f97c`, regardless of a later documentation-only
 branch head. All three workflows were independently reverified completed/success:
 Validate push `43550235229`, Validate PR `43550240430`, existing native workflow
@@ -48,7 +83,7 @@ latest-commit deploy or alter environment settings to activate new geography.
 - Repository: `pcorey922-bit/LocalEats-Delivery-App`.
 - Branch: `feature/rocoeats-launch-readiness`; draft PR #1. Never merge without
   owner authorization. Worktree was clean at the preceding checkpoint.
-- Verified deployed revision: `e45160501d59db8e7265a58344ea4c4fcc69e197`.
+- Verified deployed revision: `9c095d39c821e90a23fb239d1ebd2a2e6105f97c`.
   Existing Render Free service `LocalEats-Delivery-App`, URL
   `https://localeats-delivery-app.onrender.com/`. No deployment is authorized now.
 - Previous pushed implementation: `3a63f8b72bca3fe23408651b06c2a9c91942ae34`;
@@ -69,7 +104,7 @@ latest-commit deploy or alter environment settings to activate new geography.
 
 Public ordering OFF, private test ordering OFF, live charges OFF; Stripe TEST
 only. Last independent read-only `/livez` and `/api/mobile/readiness` inspection
-confirmed deployed `e451605` and all three closed safeguards. No hosted settings,
+confirmed deployed `9c095d3` and all three closed safeguards. No hosted settings,
 credentials, permissions, customer/restaurant/menu/inventory records or financial
 records were changed. Do not deploy, enable ordering, create orders, initiate
 payments/refunds/transfers, retry reconciliation, or change secrets without the
@@ -132,8 +167,8 @@ Financial correction `cfbd315` is already deployed in `e451605`.
   acceptance. The read-only staging verifier handles this optional newer summary
   while retaining compatibility with deployed `e451605`.
 - Zod startup `jitless` fix is committed at `3a63f8b`; strict CSP is unchanged.
-  CSP/HSTS and anonymous Clerk screens passed on deployed `e451605` (the caught
-  Zod probe warning at that deployment is addressed in the undeployed successor).
+  CSP/HSTS and anonymous Clerk screens passed on deployed `9c095d3` with zero
+  violations, including confirmation that the earlier caught Zod probe is gone.
   Approved navy/gold homepage and five primary actions are preserved.
 
 ### Verification at this checkpoint
@@ -198,10 +233,10 @@ Financial correction `cfbd315` is already deployed in `e451605`.
    Use disposable databases and simulated providers; never point tests at hosted
    data. If browser tools/dependencies are missing, follow the managed runtime
    skill and current CI-pinned tooling rather than altering app infrastructure.
-4. Optional owner-requested read-only deployed verification (expected SHA stays
-   `e451605` until a separately approved deployment is confirmed):
+4. Optional owner-requested read-only deployed verification (expected SHA is
+   `9c095d3`, independently confirmed after deployment; no later deployment is authorized):
    ```sh
-   NODE_USE_ENV_PROXY=1 node scripts/verify-staging-http.mjs https://localeats-delivery-app.onrender.com/ e45160501d59db8e7265a58344ea4c4fcc69e197
+   NODE_USE_ENV_PROXY=1 node scripts/verify-staging-http.mjs https://localeats-delivery-app.onrender.com/ 9c095d39c821e90a23fb239d1ebd2a2e6105f97c
    ```
    Use inherited proxy/CA; if sandbox cannot reach it, request tool-level escalation
    for the same authorized read-only command. No Render/Stripe/Clerk authenticated

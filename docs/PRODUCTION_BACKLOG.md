@@ -4,17 +4,21 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
-## Rockwood boundary approved — provider acceptance and deployment pending
+## Rockwood boundary approved and deployed — provider acceptance and activation pending
 
-Deployed `e451605` passed 23 read-only staging checks; both ordering windows and
-live charges were closed. Enforced CSP/HSTS and anonymous Clerk screens worked.
-The caught Zod eval capability probe is corrected by `jitless` initialization,
-with browser coverage from startup; do not add unsafe-eval to the CSP.
+Deployed `9c095d3` independently passed all 23 read-only staging checks on
+November 14, 2026. Database/auth/pricing/Stripe TEST/webhook configuration/workers
+are ready; no missing configuration. Public/private ordering and live charges are
+OFF. Geographic readiness is provisional_postal and municipal enforcement false.
+CSP/HSTS are enforced. Real anonymous Clerk screens rendered at mobile width with
+zero CSP violations, failed requests or uncaught errors; Zod's old probe warning is
+gone. Authenticated account/provider acceptance still needs the owner's session.
+No hosted/financial changes were made. See ENGINEERING_CHECKPOINT.md for evidence.
 
 Owner approved the pinned boundary map, additional ZIP 37854 restriction and
 30 m edge review margin on November 14, 2026; see delivery-area/owner-approval.json.
 Real provider accuracy acceptance and separate activation authorization remain
-required. Deployment preparation target remains exactly `9c095d3`.
+required. The verified deployed website/backend revision is `9c095d3`.
 See [source, provider and activation details](delivery-area/README.md). The pinned
 Tennessee Comptroller base polygon includes an excluded hole. Its informational
 status and Census ZCTA reference limitations are explicit. No provider account,
