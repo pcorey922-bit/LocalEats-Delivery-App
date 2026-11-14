@@ -1,0 +1,162 @@
+{
+  "evidenceType": "owner_supplied_real_geocodio_csv",
+  "recordedDate": "2026-11-14",
+  "sourceCsvSha256": "f9dbbcbda4620ba49453596aa3f7787219cae616b70be81f502c1e21677a3728",
+  "boundarySourceSha256": "e1ebc348ed9cc92ffe8ba8ba0d00873486c9fec851233d4190daad3538289d1f",
+  "rowCount": 5,
+  "apiCandidateCountVerified": false,
+  "apiJsonFieldTypesVerified": false,
+  "directApiAuthenticationVerified": false,
+  "independentRooftopGroundTruthVerified": false,
+  "referenceMethod": {
+    "geometryLibrary": "Shapely 2.1.2 / GEOS",
+    "projectionLibrary": "pyproj 3.7.2",
+    "crs": "EPSG:32616",
+    "sourceGeometryValidity": "Ring Self-intersection[-84.610097233458 35.8760486302104]",
+    "normalizedGeometryValid": true,
+    "boundaryPointSetHausdorffDistance": 0,
+    "description": "Only split repeated-vertex exclusion into two touching holes; no source edge moved."
+  },
+  "rows": [
+    {
+      "caseId": "city-hall",
+      "input": "110 North Chamberlain Avenue, Rockwood, TN 37854, US",
+      "csvFields": {
+        "Geocodio Latitude": "35.868948",
+        "Geocodio Longitude": "-84.686389",
+        "Geocodio Accuracy Score": "1",
+        "Geocodio Accuracy Type": "rooftop",
+        "Geocodio Address Line 1": "110 N Chamberlain Ave",
+        "Geocodio House Number": "110",
+        "Geocodio Street": "N Chamberlain Ave",
+        "Geocodio Unit Type": "",
+        "Geocodio Unit Number": "",
+        "Geocodio City": "Rockwood",
+        "Geocodio State / Province": "TN",
+        "Geocodio Postal Code": "37854",
+        "Geocodio Country": "US",
+        "Geocodio Source": "Statewide TN",
+        "Geocodio Match Type": "building_centroid"
+      },
+      "reference": {
+        "insideMunicipalBoundary": true,
+        "inExcludedHole": false,
+        "nearestBoundaryMetersUtm16N": 938.750906,
+        "clears30mMargin": true,
+        "selectedRowPredicateEligible": true
+      }
+    },
+    {
+      "caseId": "public-office-unit",
+      "input": "1070 N Gateway Avenue Suite 1, Rockwood, TN 37854, US",
+      "csvFields": {
+        "Geocodio Latitude": "35.879306",
+        "Geocodio Longitude": "-84.663667",
+        "Geocodio Accuracy Score": "1",
+        "Geocodio Accuracy Type": "rooftop",
+        "Geocodio Address Line 1": "1070 N Gateway Ave",
+        "Geocodio House Number": "1070",
+        "Geocodio Street": "N Gateway Ave",
+        "Geocodio Unit Type": "Ste",
+        "Geocodio Unit Number": "1",
+        "Geocodio City": "Rockwood",
+        "Geocodio State / Province": "TN",
+        "Geocodio Postal Code": "37854",
+        "Geocodio Country": "US",
+        "Geocodio Source": "Statewide TN",
+        "Geocodio Match Type": "building_centroid"
+      },
+      "reference": {
+        "insideMunicipalBoundary": true,
+        "inExcludedHole": false,
+        "nearestBoundaryMetersUtm16N": 815.067396,
+        "clears30mMargin": true,
+        "selectedRowPredicateEligible": true
+      }
+    },
+    {
+      "caseId": "same-zip-outside-airport",
+      "input": "258 Rockwood Airport Drive, Rockwood, TN 37854, US",
+      "csvFields": {
+        "Geocodio Latitude": "35.918025",
+        "Geocodio Longitude": "-84.698468",
+        "Geocodio Accuracy Score": "1",
+        "Geocodio Accuracy Type": "rooftop",
+        "Geocodio Address Line 1": "258 Rockwood Airport Dr",
+        "Geocodio House Number": "258",
+        "Geocodio Street": "Rockwood Airport Dr",
+        "Geocodio Unit Type": "",
+        "Geocodio Unit Number": "",
+        "Geocodio City": "Rockwood",
+        "Geocodio State / Province": "TN",
+        "Geocodio Postal Code": "37854",
+        "Geocodio Country": "US",
+        "Geocodio Source": "Statewide TN",
+        "Geocodio Match Type": "building_centroid"
+      },
+      "reference": {
+        "insideMunicipalBoundary": false,
+        "inExcludedHole": false,
+        "nearestBoundaryMetersUtm16N": 3829.953016,
+        "clears30mMargin": false,
+        "selectedRowPredicateEligible": false
+      }
+    },
+    {
+      "caseId": "boundary-review-candidate",
+      "input": "4314 Roane State Hwy, Rockwood, TN 37854, US",
+      "csvFields": {
+        "Geocodio Latitude": "35.876921",
+        "Geocodio Longitude": "-84.619035",
+        "Geocodio Accuracy Score": "1",
+        "Geocodio Accuracy Type": "rooftop",
+        "Geocodio Address Line 1": "4314 Roane State Hwy",
+        "Geocodio House Number": "4314",
+        "Geocodio Street": "Roane State Hwy",
+        "Geocodio Unit Type": "",
+        "Geocodio Unit Number": "",
+        "Geocodio City": "Rockwood",
+        "Geocodio State / Province": "TN",
+        "Geocodio Postal Code": "37854",
+        "Geocodio Country": "US",
+        "Geocodio Source": "Statewide TN",
+        "Geocodio Match Type": "building_centroid"
+      },
+      "reference": {
+        "insideMunicipalBoundary": false,
+        "inExcludedHole": true,
+        "nearestBoundaryMetersUtm16N": 13.47265,
+        "clears30mMargin": false,
+        "selectedRowPredicateEligible": false
+      }
+    },
+    {
+      "caseId": "ambiguous-public-street",
+      "input": "Chamberlain Avenue, Rockwood, TN 37854, US",
+      "csvFields": {
+        "Geocodio Latitude": "35.862862",
+        "Geocodio Longitude": "-84.694528",
+        "Geocodio Accuracy Score": "1",
+        "Geocodio Accuracy Type": "street_center",
+        "Geocodio Address Line 1": "S Chamberlain Ave",
+        "Geocodio House Number": "",
+        "Geocodio Street": "S Chamberlain Ave",
+        "Geocodio Unit Type": "",
+        "Geocodio Unit Number": "",
+        "Geocodio City": "Rockwood",
+        "Geocodio State / Province": "TN",
+        "Geocodio Postal Code": "37854",
+        "Geocodio Country": "US",
+        "Geocodio Source": "TIGER/Line\u00ae from the US Census Bureau",
+        "Geocodio Match Type": ""
+      },
+      "reference": {
+        "insideMunicipalBoundary": true,
+        "inExcludedHole": false,
+        "nearestBoundaryMetersUtm16N": 1082.889758,
+        "clears30mMargin": true,
+        "selectedRowPredicateEligible": false
+      }
+    }
+  ]
+}

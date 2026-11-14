@@ -20,7 +20,7 @@ const transitions: Record<OrderStatus, readonly OrderStatus[]> = {
   pending: ["accepted", "cancelled"],
   accepted: ["preparing", "cancelled"],
   preparing: ["ready_for_pickup", "cancelled"],
-  ready_for_pickup: ["out_for_delivery", "delivered"],
+  ready_for_pickup: ["out_for_delivery"],
   out_for_delivery: ["delivered"],
   delivered: [],
   cancelled: [],

@@ -59,7 +59,7 @@ export function clerkProxyMiddleware(): RequestHandler {
   }
 
   const secretKey = process.env.CLERK_SECRET_KEY;
-  if (!secretKey) {
+  if (!secretKey || secretKey.startsWith('sk_test_')) {
     return (_req, _res, next) => next();
   }
 

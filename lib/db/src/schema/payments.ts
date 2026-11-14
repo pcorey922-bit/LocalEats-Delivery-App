@@ -1,5 +1,5 @@
 import { createInsertSchema } from "drizzle-zod";
-import { integer, pgTable, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { integer, pgTable, timestamp, uuid, varchar, text } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 import { paymentStatusEnum } from "./enums";
 import { ordersTable } from "./orders";
@@ -12,6 +12,8 @@ export const paymentsTable = pgTable("payments", {
   status: paymentStatusEnum("status").notNull().default("pending"),
   provider: varchar("provider", { length: 60 }),
   providerPaymentId: varchar("provider_payment_id", { length: 180 }).unique(),
+  checkoutSessionId: text("checkout_session_id").unique(),
+  checkoutAttempt: integer("checkout_attempt").notNull().default(0),
   processedAt: timestamp("processed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

@@ -17,6 +17,8 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _guestTokenGetter: AuthTokenGetter | null = null;
+export function setGuestTokenGetter(getter: AuthTokenGetter | null): void { _guestTokenGetter=getter; }
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -326,6 +328,37 @@ export async function customFetch<T = unknown>(
   input: RequestInfo | URL,
   options: CustomFetchOptions = {},
 ): Promise<T> {
+  const source = options.signal ?? (isRequest(input) ? input.signal : undefined);
+  const controller = new AbortController();
+  const abort = () => controller.abort(source?.reason);
+  if (source?.aborted) abort();
+  else source?.addEventListener("abort", abort, { once: true });
+  const timer = setTimeout(() => {
+    controller.abort(new DOMException("The request timed out. Please try again.", "TimeoutError"));
+  }, 35000);
+  const signal = controller.signal;
+  let rejectOnAbort: (() => void) | undefined;
+  try {
+    signal.throwIfAborted();
+    const canceled = new Promise<never>((_, reject) => {
+      rejectOnAbort = () => reject(signal.reason);
+      signal.addEventListener("abort", rejectOnAbort, { once: true });
+    });
+    return await Promise.race([fetchApi<T>(input, { ...options, signal }), canceled]);
+  } finally {
+    clearTimeout(timer);
+    source?.removeEventListener("abort", abort);
+    if (rejectOnAbort) signal.removeEventListener("abort", rejectOnAbort);
+  }
+}
+
+async function fetchApi<T>(input: RequestInfo | URL, options: CustomFetchOptions): Promise<T> {
+  const relativeCustomerPath = /^\/api\/(?:guest(?:\/|$)|orders(?:\/|$)|addresses(?:\/|$)|support(?:\/|$)|restaurants(?:\/|$)|commerce\/config$|healthz$)/.test(resolveUrl(input));
+  const originalUrl=resolveUrl(input);
+  const trustedApiRequest=originalUrl.startsWith("/api/") || (()=>{
+    if(!_baseUrl)return false;
+    try{const target=new URL(originalUrl),base=new URL(_baseUrl);return target.origin===base.origin&&target.pathname.startsWith("/api/");}catch{return false;}
+  })();
   input = applyBaseUrl(input);
   const { responseType = "auto", headers: headersInit, ...init } = options;
 
@@ -351,15 +384,20 @@ export async function customFetch<T = unknown>(
 
   // Attach bearer token when an auth getter is configured and no
   // Authorization header has been explicitly provided.
-  if (_authTokenGetter && !headers.has("authorization")) {
+  if (trustedApiRequest && _authTokenGetter && !headers.has("authorization")) {
     const token = await _authTokenGetter();
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
     }
   }
 
+  // A guest capability is never sent to absolute/untrusted URLs or privileged APIs.
+  if(relativeCustomerPath && !headers.has("authorization") && !headers.has("X-RoCoEats-Guest-Token") && _guestTokenGetter){
+    const token=await _guestTokenGetter(); if(token) headers.set("X-RoCoEats-Guest-Token",token);
+  }
   const requestInfo = { method, url: resolveUrl(input) };
 
+  init.signal?.throwIfAborted();
   const response = await fetch(input, { ...init, method, headers });
 
   if (!response.ok) {

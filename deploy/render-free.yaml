@@ -1,0 +1,38 @@
+# Optional reference Blueprint. Phone setup uses New > Web Service > Free.
+# No managed Render database, disk, paid pre-deploy job or paid worker.
+services:
+  - type: web
+    name: rocoeats-owner-test
+    runtime: docker
+    branch: feature/rocoeats-launch-readiness
+    region: ohio
+    plan: free
+    autoDeployTrigger: "off"
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: node --enable-source-maps scripts/start-free-staging.mjs
+    healthCheckPath: /livez
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: LOCALEATS_ADMIN_CLERK_USER_IDS
+        sync: false
+      - key: ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: PAYMENT_PROVIDER
+        value: stripe_test
+      - key: ROCOEATS_PRIVATE_STAGING
+        value: "true"
+      - key: ROCOEATS_FREE_STAGING
+        value: "true"
+      - key: ROCOEATS_ORDERING_ENABLED
+        value: "false"
+      - key: PG_POOL_MAX
+        value: "2"

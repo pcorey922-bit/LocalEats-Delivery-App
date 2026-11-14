@@ -1,0 +1,55 @@
+name: rocoeats-staging
+x-app-build: &app-build
+  context: .
+  args:
+    VITE_CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY:?Set the staging Clerk publishable key}
+    VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
+    VITE_GOOGLE_MAPS_MAP_ID: ${VITE_GOOGLE_MAPS_MAP_ID:-}
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rocoeats
+      POSTGRES_DB: rocoeats_staging
+      POSTGRES_PASSWORD: ${ROCOEATS_DB_PASSWORD:?Generate the staging database password}
+    volumes:
+      - staging-db:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U rocoeats -d rocoeats_staging]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+  migrate:
+    image: rocoeats-staging:local
+    build: *app-build
+    profiles: [tools]
+    command: [pnpm, --filter, '@workspace/db', migrate]
+    environment:
+      DATABASE_URL: postgresql://rocoeats:${ROCOEATS_DB_PASSWORD:?Set the staging database password}@db:5432/rocoeats_staging
+    depends_on:
+      db:
+        condition: service_healthy
+  api:
+    image: rocoeats-staging:local
+    build: *app-build
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:3001:3001
+    environment:
+      DATABASE_URL: postgresql://rocoeats:${ROCOEATS_DB_PASSWORD:?Set the staging database password}@db:5432/rocoeats_staging
+      CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY:?Set the staging Clerk publishable key}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:?Set the staging Clerk server key}
+      LOCALEATS_ADMIN_CLERK_USER_IDS: ${LOCALEATS_ADMIN_CLERK_USER_IDS:?Set the owner's Clerk user ID}
+      ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS: ${ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:?Set explicit staging origins}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:?Set the staging app origin}
+      PAYMENT_PROVIDER: stripe_test
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:?Set the Stripe TEST key}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:?Set the Stripe TEST webhook secret}
+      ROCOEATS_ORDERING_ENABLED: ${ROCOEATS_ORDERING_ENABLED:-false}
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  staging-db:
