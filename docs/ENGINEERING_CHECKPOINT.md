@@ -1599,3 +1599,8 @@ Frontend types and iOS plist syntax pass. Initial emulator 42585658397 did not b
 and ran no app checks. Retry adds bounded boot diagnostics/KVM/headless settings and
 explicit ungranted location/push checks. Preserve original signed APK source 5c687ac
 and owner key; no need to reinstall it for authentication verification.
+
+
+## November 14 — owner live Geocodio diagnostic preserved
+
+Owner supplied complete sanitized real-provider report (5/5 requests, boundary SHA-256 e1ebc348ed9cc92ffe8ba8ba0d00873486c9fec851233d4190daad3538289d1f). City Hall accepted; airport, ambiguous street and unsupported ZIP safely rejected. Public-office-unit unexpectedly rejected despite one rooftop/building-centroid result, inside/clear at 807.2 m; reason unresolved, not yet a proven software defect or justified suite-level unit rejection. Forestry office is outside the approved footprint within its excluded hole, 13.4 m from edge; rejection is safe but expected review status needs offline classification inspection. Accuracy acceptance and activation remain false. Full transcribed evidence and investigation criteria: docs/delivery-area/geocodio-live-api-review-2026-11-14.md. No provider calls repeated. Disable the temporary diagnostic in Render via ROCOEATS_GEOCODIO_PUBLIC_TEST_ENABLED=false and redeploy configuration; preserve persisted report, ordering/enforcement off and Stripe TEST-only. No owner activation authorization.
