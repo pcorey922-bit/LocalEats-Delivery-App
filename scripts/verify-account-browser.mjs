@@ -540,6 +540,24 @@ try {
   await guestPage.close();
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await page.goto("http://127.0.0.1:" + server.address().port);
+  const geocodio = page.getByRole("region", { name: "Public Geocodio verification" });
+  const verifyGeocodio = geocodio.getByRole("button", { name: "Run public address verification once" });
+  await geocodio.getByText("Disabled until the separately approved server configuration is ready.").waitFor();
+  assert.equal(await verifyGeocodio.isDisabled(), true);
+  assert.equal(await geocodio.locator('input[type="password"], input[type="text"], textarea').count(), 0);
+  await page.evaluate(() => { window.qaGeoReady = true; });
+  await geocodio.getByRole("button", { name: "Refresh verification status" }).click();
+  const freeAllowance = geocodio.getByRole("checkbox");
+  await freeAllowance.waitFor();
+  assert.equal(await verifyGeocodio.isDisabled(), true);
+  await freeAllowance.check();
+  await verifyGeocodio.click();
+  await geocodio.getByText("Allowance used · completed. No further provider calls will be made.").waitFor();
+  assert.equal(await verifyGeocodio.count(), 0);
+  await geocodio.getByRole("button", { name: "Refresh verification status" }).click();
+  await geocodio.getByRole("button", { name: "Refresh verification status" }).click();
+  assert.equal(await page.evaluate(() => window.qaGeoCalls), 1);
+  console.log("Phone-only geocoding panel PASS: disabled by default, free-allowance confirmation, no credential form, lost-response status recovery and no automatic repeat (simulated owner/API; no provider calls).");
   await page
     .getByText(
       "Your order has been received. We're contacting the restaurant to confirm it.",

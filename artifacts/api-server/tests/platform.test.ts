@@ -229,6 +229,86 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     delete process.env.STRIPE_WEBHOOK_SECRET;
     process.env.API_MUTATION_LIMIT_PER_MINUTE = "10000";
   });
+  await t.test("public geocoding is owner-only, explicit, closed-gate and durable single-use across concurrent calls", async () => {
+    const names = ["LOCALEATS_ADMIN_CLERK_USER_IDS", "ROCOEATS_PRIVATE_STAGING", "ROCOEATS_STAGING_TESTER_CLERK_USER_IDS", "ROCOEATS_ORDERING_ENABLED", "ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED", "PAYMENT_PROVIDER", "STRIPE_SECRET_KEY", "ROCOEATS_DELIVERY_AREA_MODE", "GEOCODIO_API_KEY", "ROCOEATS_GEOCODIO_PUBLIC_TEST_ENABLED"];
+    const prior = Object.fromEntries(names.map(name => [name, process.env[name]]));
+    const originalFetch = globalThis.fetch;
+    const secret = "fixture_geocodio_secret_not_real";
+    let calls = 0;
+    const path = "/admin/geocodio-public-test";
+    try {
+      process.env.LOCALEATS_ADMIN_CLERK_USER_IDS = ids.admin;
+      process.env.ROCOEATS_PRIVATE_STAGING = "true";
+      process.env.ROCOEATS_STAGING_TESTER_CLERK_USER_IDS = [ids.customer, ids.restaurant, ids.driver].join(",");
+      process.env.ROCOEATS_ORDERING_ENABLED = "false";
+      process.env.ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED = "false";
+      process.env.PAYMENT_PROVIDER = "stripe_test";
+      process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
+      process.env.ROCOEATS_DELIVERY_AREA_MODE = "provisional_postal";
+      delete process.env.ROCOEATS_GEOCODIO_PUBLIC_TEST_ENABLED;
+      delete process.env.GEOCODIO_API_KEY;
+      globalThis.fetch = async (input, init) => {
+        const url = new URL(String(input));
+        if (url.hostname !== "api.geocod.io") return originalFetch(input, init);
+        calls++;
+        assert.equal(url.origin, "https://api.geocod.io");
+        assert.equal(url.searchParams.has("api_key"), false);
+        assert.equal(new Headers(init?.headers).get("authorization"), `Bearer ${secret}`);
+        await new Promise(resolve => setTimeout(resolve, 5));
+        return new Response('{"results":[]}', { headers: { "content-type": "application/json" } });
+      };
+      assert.equal((await api(path, null)).status, 401);
+      for (const user of [ids.customer, ids.restaurant, ids.driver]) {
+        assert.equal((await api(path, user)).status, 403);
+        assert.equal((await api(path, user, "POST", { freeTierConfirmed: true })).status, 403);
+      }
+      delete process.env.LOCALEATS_ADMIN_CLERK_USER_IDS;
+      assert.equal((await api(path, ids.admin)).status, 403);
+      assert.equal((await api(path, ids.admin, "POST", { freeTierConfirmed: true })).status, 403);
+      process.env.LOCALEATS_ADMIN_CLERK_USER_IDS = ids.admin;
+      const disabled = await api(path, ids.admin);
+      assert.equal(disabled.status, 200);
+      assert.equal(disabled.data.ready, false);
+      assert.equal(disabled.data.run, null);
+      assert.equal((await api(path, ids.admin, "POST", { freeTierConfirmed: true })).status, 409);
+      process.env.ROCOEATS_GEOCODIO_PUBLIC_TEST_ENABLED = "true";
+      assert.equal((await api(path, ids.admin, "POST", { freeTierConfirmed: true })).status, 409);
+      process.env.GEOCODIO_API_KEY = secret;
+      const untrusted = await originalFetch(`${origin}/api${path}`, { method: "POST", headers: { "x-test-user": ids.admin, cookie: "fixture=1", origin: "https://untrusted.example", "content-type": "application/json" }, body: JSON.stringify({ freeTierConfirmed: true }) });
+      assert.equal(untrusted.status, 403);
+      const privateStatus = await originalFetch(`${origin}/api${path}`, { headers: { "x-test-user": ids.admin } });
+      assert.equal(privateStatus.headers.get("cache-control"), "no-store");
+      await db.update(profilesTable).set({ isActive: false }).where(eq(profilesTable.id, ids.admin));
+      try { assert.equal((await api(path, ids.admin, "POST", { freeTierConfirmed: true })).status, 403); }
+      finally { await db.update(profilesTable).set({ isActive: true }).where(eq(profilesTable.id, ids.admin)); }
+      for (const body of [{}, { freeTierConfirmed: false }, { freeTierConfirmed: true, apiKey: secret }, { freeTierConfirmed: true, address: "private" }])
+        assert.equal((await api(path, ids.admin, "POST", body)).status, 400);
+      assert.equal((await api(path + "?address=private", ids.admin, "POST", { freeTierConfirmed: true })).status, 400);
+      for (const [name, bad] of [["ROCOEATS_ORDERING_ENABLED", "true"], ["ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED", "true"], ["ROCOEATS_PRIVATE_STAGING", "false"], ["STRIPE_SECRET_KEY", "sk_live_fixture"], ["PAYMENT_PROVIDER", "sandbox"], ["ROCOEATS_DELIVERY_AREA_MODE", "municipal"]]) {
+        const old = process.env[name]; process.env[name] = bad;
+        assert.equal((await api(path, ids.admin, "POST", { freeTierConfirmed: true })).status, 409);
+        process.env[name] = old;
+      }
+      assert.equal(calls, 0);
+      const responses = await Promise.all([api(path, ids.admin, "POST", { freeTierConfirmed: true }), api(path, ids.admin, "POST", { freeTierConfirmed: true })]);
+      assert.deepEqual(responses.map(r => r.status).sort(), [200, 409]);
+      assert.equal(calls, 5);
+      const saved = await api(path, ids.admin);
+      assert.equal(saved.data.run.state, "completed");
+      assert.equal(saved.data.run.report.requestsMade, 5);
+      assert.equal(saved.data.run.report.activationReady, false);
+      assert.equal(JSON.stringify(saved.data).includes(secret), false);
+      assert.equal((await api(path, ids.admin, "POST", { freeTierConfirmed: true })).status, 409);
+      assert.equal(calls, 5);
+      const [row] = await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.settingKey, "geocodio_public_api_v1"));
+      await db.update(platformSettingsTable).set({ value: { state: "started", report: null } }).where(eq(platformSettingsTable.id, row.id));
+      assert.equal((await api(path, ids.admin, "POST", { freeTierConfirmed: true })).status, 409, "Interrupted/unknown outcomes must also remain consumed");
+      assert.equal(calls, 5);
+    } finally {
+      globalThis.fetch = originalFetch;
+      for (const name of names) if (prior[name] === undefined) delete process.env[name]; else process.env[name] = prior[name];
+    }
+  });
   await t.test("native browser sign-in binds approval to state and PKCE, expires and consumes once without trusting client identities",async()=>{
     const oldOrigin=process.env.PUBLIC_APP_URL;
     process.env.PUBLIC_APP_URL="https://localeats-delivery-app.onrender.com";process.env.ROCOEATS_PRIVATE_STAGING="true";process.env.ROCOEATS_STAGING_TESTER_CLERK_USER_IDS=[ids.customer,ids.other].join(",");process.env.PAYMENT_PROVIDER="stripe_test";process.env.STRIPE_SECRET_KEY="sk_test_fixture";

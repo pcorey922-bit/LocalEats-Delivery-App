@@ -8,6 +8,7 @@ import { OrderTracking, DispatchOperations } from "./delivery-tracking";
 import { OrderIncidentConsole } from "./order-incidents";
 import { PartialRefundControls } from "./partial-refunds";
 import { PaymentSetupChecks } from "./payment-setup";
+import { GeocodioPublicTest } from "./geocodio-public-test";
 import {
   FinancialHoldConsole,
   PaymentReconciliation,
@@ -491,6 +492,7 @@ export function OperationsCommerce() {
       <Link href="/admin">← Operations overview</Link>
       <h1>Test order operations</h1>
       <PaymentSetupChecks />
+      <GeocodioPublicTest />
       <GuestTestInvitation />
       <TelephoneDispatch />
       <CommerceBanner />

@@ -10,6 +10,7 @@ import { CartPage } from "../src/pages/roco-pages";
 // Isolated component fixture: simulated auth/API only; never a production route.
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { GeocodioPublicTest } from "../src/pages/geocodio-public-test";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AccountAccess } from "../src/pages/account-access";
 import { AccountSettings } from "../src/pages/account-settings";
@@ -49,6 +50,9 @@ declare global {
     qaPricingWrites: unknown[];
     qaSignedEventAt: string | null;
     qaAccess: Record<string, string | boolean>;
+    qaGeoReady: boolean;
+    qaGeoCalls: number;
+    qaGeoRun: null | Record<string, unknown>;
     qaWrites: unknown[];
     qaAdminWrites: unknown[];
     qaStaff: {
@@ -80,6 +84,9 @@ window.qaAccess = {
   driver: true,
 };
 window.qaEvidenceState = 'pending';
+window.qaGeoReady = false;
+window.qaGeoCalls = 0;
+window.qaGeoRun = null;
 window.qaEvidenceAttempts = 0;
 window.qaNativeStart = null;
 window.qaNativeTickets = [];
@@ -140,6 +147,18 @@ window.qaStaff = {
   accessVersion: "v1",
 };
 window.fetch = async (url, options = {}) => {
+  if (String(url) === "/api/admin/geocodio-public-test") {
+    if (options.method === "POST") {
+      window.qaGeoCalls++;
+      if (!window.qaGeoReady || window.qaGeoRun) return Response.json({ error: "Blocked" }, { status: 409 });
+      if (String(options.body) !== JSON.stringify({ freeTierConfirmed: true })) throw Error("Unexpected public test payload");
+      window.qaGeoRun = { state: "completed", report: { requestsMade: 5, coverageGaps: ["independent_public_building_ground_truth"], cases: [{ id: "city-hall", status: "accepted_by_validator" }] } };
+      // Server succeeded, but the phone lost the response. GET must recover the
+      // saved report without automatically POSTing again.
+      throw new TypeError("Fixture connection interrupted");
+    }
+    return Response.json({ enabled: window.qaGeoReady, keyConfigured: window.qaGeoReady, ready: window.qaGeoReady, safeguards: { privateStaging: true, publicOrderingOff: true, privateOrderingOff: true, stripeTestOnly: true, municipalEnforcementOff: true }, run: window.qaGeoRun });
+  }
   if (location.search.includes('checkoutCsp=true')) {
     const path = String(url);
     if (path === '/api/commerce/config') return Response.json({ mode: 'stripe_test', orderingEnabled: true, testMode: true, liveChargesEnabled: false });
@@ -427,6 +446,7 @@ createRoot(document.getElementById("root")!).render(
         <AdministratorAccessManager />
         <AccountSettings displayName="QA profile" />
         <PaymentSetupChecks />
+        <GeocodioPublicTest />
         <PricingSettings current={null} />
         <OrderTracking orderId="fixture-tracking" />
         <DeclinedOffers />

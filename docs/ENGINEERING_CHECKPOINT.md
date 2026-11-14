@@ -7,6 +7,42 @@ repository/branch; preserve all completed work. Do not restart completed checkou
 authentication, homepage, delivery or Stripe investigations. Do not follow the
 archived Android/iOS/signing tasks below: native development is deferred.
 
+### Phone-only owner workflow — November 14, 2026
+
+Owner requires Samsung browser/cloud-dashboard management. Do NOT direct the owner
+to a laptop, local Python/Node install, terminal or GitHub secret entry. Retain the
+legacy local script for compatibility; it is no longer the recommended owner path.
+Continue from verified b3bd9017cff045f30e39e75adf0455ff5c267b9f. Current managed
+runtime status confirms no configured secret bindings; no secret-entry tool exists.
+Never request keys through chat, GitHub, attachments or public forms.
+
+Prepared owner-only Operations panel and GET/POST /api/admin/geocodio-public-test.
+Clerk-authenticated active admin AND configured-owner identity required. Diagnostic
+defaults OFF; future protected Render GEOCODIO_API_KEY plus
+ROCOEATS_GEOCODIO_PUBLIC_TEST_ENABLED=true require separate owner approval. No
+hosted settings/deployment happened. Requires closed public/private ordering,
+Stripe TEST and provisional municipal mode. Fixed five-public-case runner only,
+no custom inputs or key form, no automatic POST/retry. Existing unique
+platform_settings geocodio_public_api_v1 claim commits before provider I/O and
+persists across tabs/processes/restarts; interrupted/unknown runs stay consumed.
+Sanitized reports persist for GET recovery; existing nonfinancial audit entries
+on run start/completion. No schema migration, finance/pricing/order changes.
+
+Decision/review and exact Samsung steps in docs/delivery-area/README.md. Recommended
+path reuses existing Render service; no new cloud account/paid resource required.
+Local validation PASS: 170 app/API tests (including owner/non-owner, inactive owner,
+untrusted origin, explicit confirmation, missing config, unsafe gates, concurrent
+single-use claim and interrupted-run consumption), 14 CLI/staging tests, full
+typechecks/production builds, mobile account/CSP/cart regressions including new
+lost-response panel recovery, local browser/API/PGlite order-to-delivery workflow
+(simulated payments only), offline verifier and deterministic pinned map. Logs:
+/tmp/rocoeats-phone-geocodio-{tests,build,cli,account,workflow}.log. Exact pushed
+SHA's three GitHub workflows must finish successfully; pending is not success.
+Actual Geocodio API evidence remains unverified; tests use mocks only. Boundary,
+normalized exclusions, ZIP 37854, 30 m margin and all closed gates remain preserved.
+Next owner action: approve the verified code deployment and protected Render
+diagnostic configuration separately. Do not activate municipal enforcement.
+
 ### Direct API hardening / owner-local test path — November 14, 2026
 
 Continuation of verified 9c90d00ba4c347da529e73ea19b6f947b2b39d9d. Owner accepts

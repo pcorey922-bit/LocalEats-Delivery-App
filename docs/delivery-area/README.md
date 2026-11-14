@@ -304,7 +304,75 @@ before accuracy acceptance/activation. `providerAccuracyAcceptancePassed` and
 `geographicActivationAuthorized` stay false. No additional lookups, hosted record
 changes, payments or financial operations were performed for this evaluation.
 
-### Secure owner-local direct API verification
+### Recommended phone-only direct API verification — prepared, NOT deployed
+
+The owner requires Samsung browser/dashboard management, without a laptop,
+developer installations, command lines or keys shared through chat/GitHub. This
+supersedes the local-terminal recommendation below; that optional tool is retained
+only for compatibility and is not an owner prerequisite.
+
+Evaluated approaches:
+
+| Approach | Assessment |
+| --- | --- |
+| Managed cloud workspace with secret entry | Suitable if a trusted secret-entry feature becomes available. Current runtime reports no configured secret bindings and offers no secret-entry tool; do not invent a UI or use chat instead. |
+| Existing Render + owner-only Operations panel | Recommended: existing account/service, server-side Bearer requests, familiar mobile dashboards, no new paid resource or third-party key-sharing service. Requires separate deployment and protected Environment change approval. |
+| Downloaded browser tester / public API playground | Browser Bearer CORS is blocked by the provider's allowed-header policy. Do not use query-string keys or public forms. Cloud notebooks introduce another secret store/account and are unnecessary for this existing service. GitHub secret/workflow entry is excluded by the owner's preference. |
+
+Prepared endpoints `GET/POST /api/admin/geocodio-public-test` use existing Clerk
+authentication, an active Administrator profile AND server-configured owner match.
+Ordinary administrators, customers, restaurants, drivers and anonymous users cannot
+run/read it. Existing origin protection and mutation limits apply. Responses are
+no-store. Neither endpoint accepts an API key, custom address, URL, file or run ID.
+GET reads local configuration/results only and never contacts Geocodio or consumes
+the allowance. POST requires explicit free-tier confirmation and every closed gate.
+The Operations panel has no credential form and never auto-submits a provider run.
+
+Default is disabled. Activation of this **public-address diagnostic only** requires
+`ROCOEATS_GEOCODIO_PUBLIC_TEST_ENABLED=true` plus `GEOCODIO_API_KEY` in protected
+server Environment settings. It also requires private staging, explicitly false
+public/private ordering, Stripe TEST credentials/provider, and provisional_postal
+mode (municipal enforcement inactive). It does not change any of those gates.
+
+Existing `platform_settings` stores a nonsecret diagnostic claim/report under
+`geocodio_public_api_v1`; existing audit logs record start/completion. No migration,
+financial row or pricing value changes. A unique insert commits before provider I/O:
+at most five fixed public US requests across tabs/processes/restarts. Failed or
+interrupted runs consume the allowance too. There is no reset/retry endpoint;
+another provider suite requires engineering review and separate authorization.
+The sanitized report persists for safe GET refresh after a phone connection loss.
+If only `started` remains after a restart/write failure, inspect safely; never clear
+the marker to retry unknown outcomes. The one-shot limit is additional protection,
+not an account-wide guarantee for other Geocodio users/tools.
+
+**Owner steps — only AFTER separate deployment/configuration approval:**
+
+1. In Samsung Chrome, sign in to Render → existing LocalEats-Delivery-App service.
+   Deploy the exact CI-verified commit manually. No new service, plan, migration
+   command, database reset or ordering changes.
+2. In Geocodio confirm no payment method, paid subscription/credits or auto-refill,
+   and at least five free lookups remain. Copy the key using your phone only.
+3. In Render → Environment, add `GEOCODIO_API_KEY` using its protected value field.
+   Add `ROCOEATS_GEOCODIO_PUBLIC_TEST_ENABLED=true`. Save and deploy **only after
+   authorization**. Do not share the key/screenshot or put it in GitHub/chat. Leave
+   municipal mode inactive and public/private ordering false; Stripe remains TEST.
+4. Sign in to RoCoEats as the owner → Operations (`/operations`) → **Public
+   Geocodio verification**. Confirm the setup is ready, tick the free-allowance
+   confirmation and tap **Run public address verification once**. No payment or
+   private address is involved. If disconnected, tap **Refresh verification status**;
+   never change/reset the allowance. "Completed" means the report was saved,
+   not that every case passed or geographic activation is approved.
+5. Expand **Sanitized provider report** and share only that report for engineering
+   review. It excludes keys/raw provider text. After review, turn the diagnostic
+   flag false with separately approved Render configuration deployment. The report
+   remains readable. Leave the key protected or remove it only with approval.
+
+No deployment/configuration change or actual lookup has occurred during preparation.
+Real API response/authentication evidence still remains pending. Independent public
+building/entrance validation, free-tier-limit confirmation, owner acceptance and
+separate municipal activation approval are still required. No laptop is required.
+
+### Optional legacy owner-local direct API verification
 
 On November 14, 2026, an unauthenticated OPTIONS request (no key/address/lookup)
 to the fixed v1.11 endpoint returned `Access-Control-Allow-Origin: *` but allowed
@@ -332,8 +400,8 @@ repository with dependencies installed. From the repository root:
    response and requested URL. Exit 2 means acceptance gaps or expectation mismatch,
    **not** permission to repeat the run. Stop and review the evidence first.
 
-Phone-only owners without a trusted local terminal still need a secure developer
-secret-entry facility before direct testing; do not paste credentials in chat.
+Phone-only owners should use the prepared owner-only Operations workflow above
+after deployment/configuration approval; no local terminal is required.
 No live API test was run while implementing this runner. Mocked tests do not prove
 provider authentication or actual JSON compatibility. Independent building checks,
 owner acceptance of direct results and separate activation approval remain required.

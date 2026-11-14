@@ -19,7 +19,8 @@
   "providerAccountReadyReported": true,
   "secureDevelopmentKeyFieldAvailableReported": false,
   "directProviderApiVerified": false,
-  "nextEvaluationPath": "independent_rooftop_review_and_secure_direct_api_evidence",
+  "nextEvaluationPath": "owner_only_operations_public_api_panel_pending_deployment_and_configuration_approval",
+  "ownerPhoneOnlyManagementRequired": true,
   "publicProviderCsvResultsReceived": true,
   "publicSelectedPointEvaluationCompleted": true,
   "publicNearBoundaryCaseObserved": true
