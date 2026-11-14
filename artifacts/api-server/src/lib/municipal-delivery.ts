@@ -18,6 +18,41 @@ type Polygon = readonly (readonly Point[])[];
 export type Geometry =
   | { type: "Polygon"; coordinates: Polygon }
   | { type: "MultiPolygon"; coordinates: readonly Polygon[] };
+// The approved source has a pinched exclusion ring: two holes touch at one
+// repeated vertex. Split only at existing identical vertices, preserving every
+// directed edge and the full footprint. Never move, buffer or union a boundary.
+function splitTouchingHole(ring: readonly Point[]): Polygon {
+  const active: Point[] = [],
+    positions = new Map<string, number>();
+  const loops: Point[][] = [];
+  for (const point of ring) {
+    const key = `${point[0]},${point[1]}`,
+      index = positions.get(key);
+    if (index === undefined) {
+      positions.set(key, active.length);
+      active.push(point);
+      continue;
+    }
+    const loop = [...active.slice(index), point];
+    if (loop.length < 4)
+      throw new Error("Unsupported degenerate boundary exclusion");
+    loops.push(loop);
+    for (const removed of active.slice(index + 1))
+      positions.delete(`${removed[0]},${removed[1]}`);
+    active.length = index + 1;
+  }
+  if (active.length !== 1 || !loops.length)
+    throw new Error("Boundary exclusion must be closed");
+  return loops;
+}
+export const deliveryBoundaryGeometry = {
+  type: "Polygon",
+  coordinates: [
+    boundaryGeometry.coordinates[0],
+    ...boundaryGeometry.coordinates.slice(1).flatMap(splitTouchingHole),
+  ],
+} as const;
+
 const unavailable = () =>
   new CommerceError(
     503,
@@ -162,7 +197,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function validateGeocodioResult(
   data: unknown,
   address: DeliveryAddress,
-  geometry: Geometry = boundaryGeometry,
+  geometry: Geometry = deliveryBoundaryGeometry,
 ) {
   inputAddress(address);
   const results = isRecord(data) ? data.results : undefined;

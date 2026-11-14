@@ -1,8 +1,12 @@
+import { ownerGeocodioObservations } from "./testing/geocodio-owner-observations";
+import { publicAccuracyCases } from "./geocodio-accuracy";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
   createMunicipalValidator,
+  deliveryBoundaryGeometry,
+  boundaryDistanceMeters,
   validateGeocodioResult,
   safelyInsideBoundary,
   municipalConfiguration,
@@ -534,4 +538,99 @@ test("invalid provider budget clocks never perform network requests", async () =
     await assert.rejects(validate(address, env), /unavailable/);
   }
   assert.equal(calls, 0);
+});
+
+test("pinched source exclusion normalization preserves every approved directed edge", () => {
+  const edges = (coordinates: readonly (readonly (readonly number[])[])[]) =>
+    coordinates
+      .flatMap((ring) =>
+        ring.slice(0, -1).map((a, i) => JSON.stringify([a, ring[i + 1]])),
+      )
+      .sort();
+  assert.equal(boundaryGeometry.coordinates.length, 2);
+  assert.equal(deliveryBoundaryGeometry.coordinates.length, 3);
+  assert.deepEqual(
+    edges(deliveryBoundaryGeometry.coordinates),
+    edges(boundaryGeometry.coordinates),
+  );
+  const pinch = [-84.610097233458, 35.8760486302104];
+  assert.equal(safelyInsideBoundary(pinch, deliveryBoundaryGeometry, 0), false);
+  for (let x = 0; x < 21; x++)
+    for (let y = 0; y < 21; y++) {
+      const point = [-84.626 + x * 0.00085, 35.875 + y * 0.00075];
+      for (const margin of [0, 30])
+        assert.equal(
+          safelyInsideBoundary(point, deliveryBoundaryGeometry, margin),
+          safelyInsideBoundary(point, boundaryGeometry, margin),
+        );
+    }
+});
+test("actual owner-supplied Geocodio CSV points match independent GIS classifications and fail closed", () => {
+  assert.equal(ownerGeocodioObservations.boundarySourceSha256, boundarySha256);
+  assert.equal(ownerGeocodioObservations.apiCandidateCountVerified, false);
+  assert.equal(
+    ownerGeocodioObservations.directApiAuthenticationVerified,
+    false,
+  );
+  for (const row of ownerGeocodioObservations.rows) {
+    const c = row.csvFields,
+      point = [Number(c["Geocodio Longitude"]), Number(c["Geocodio Latitude"])];
+    assert.equal(
+      safelyInsideBoundary(point, deliveryBoundaryGeometry, 0),
+      row.reference.insideMunicipalBoundary,
+      row.caseId,
+    );
+    assert.equal(
+      safelyInsideBoundary(point, deliveryBoundaryGeometry),
+      row.reference.clears30mMargin,
+      row.caseId,
+    );
+    const distance = boundaryDistanceMeters(point, deliveryBoundaryGeometry)!;
+    assert.ok(
+      distance <= row.reference.nearestBoundaryMetersUtm16N &&
+        distance > row.reference.nearestBoundaryMetersUtm16N * 0.98,
+      row.caseId + " conservative distance",
+    );
+    const address = publicAccuracyCases.find(
+      (item) => item.id === row.caseId,
+    )!.address;
+    // A one-row diagnostic checks the predicate only; CSV does NOT prove API uniqueness.
+    const selectedRow = {
+      accuracy: Number(c["Geocodio Accuracy Score"]),
+      accuracy_type: c["Geocodio Accuracy Type"],
+      match_type: c["Geocodio Match Type"] || null,
+      location: { lng: point[0], lat: point[1] },
+      address_components: {
+        number: c["Geocodio House Number"],
+        formatted_street: c["Geocodio Street"],
+        unit_type: c["Geocodio Unit Type"] || undefined,
+        unit_number: c["Geocodio Unit Number"] || undefined,
+        city: c["Geocodio City"],
+        state: c["Geocodio State / Province"],
+        zip: c["Geocodio Postal Code"],
+        country: c["Geocodio Country"],
+      },
+    };
+    if (row.reference.selectedRowPredicateEligible)
+      assert.ok(validateGeocodioResult({ results: [selectedRow] }, address));
+    else
+      assert.throws(() =>
+        validateGeocodioResult({ results: [selectedRow] }, address),
+      );
+    // Best-match-only spreadsheets cannot waive the existing multi-candidate rejection.
+    assert.throws(() =>
+      validateGeocodioResult({ results: [selectedRow, selectedRow] }, address),
+    );
+  }
+  const edge = ownerGeocodioObservations.rows.find(
+    (r) => r.caseId === "boundary-review-candidate",
+  )!;
+  assert.equal(edge.reference.inExcludedHole, true);
+  assert.ok(edge.reference.nearestBoundaryMetersUtm16N < 30);
+  const streetOnly = ownerGeocodioObservations.rows.find(
+    (r) => r.caseId === "ambiguous-public-street",
+  )!;
+  assert.equal(streetOnly.csvFields["Geocodio Accuracy Score"], "1");
+  assert.equal(streetOnly.csvFields["Geocodio Accuracy Type"], "street_center");
+  assert.equal(streetOnly.reference.selectedRowPredicateEligible, false);
 });

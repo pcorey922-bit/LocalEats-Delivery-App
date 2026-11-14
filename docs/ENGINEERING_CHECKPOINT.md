@@ -7,6 +7,44 @@ repository/branch; preserve all completed work. Do not restart completed checkou
 authentication, homepage, delivery or Stripe investigations. Do not follow the
 archived Android/iOS/signing tasks below: native development is deferred.
 
+### Actual Geocodio public CSV evaluated — November 14, 2026
+
+Owner attached the COMPLETED five-public-address Geocodio result CSV. Source
+SHA-256 f9dbbcbda4620ba49453596aa3f7787219cae616b70be81f502c1e21677a3728.
+No API credential is present; Stable Address Key is not an authentication key and
+is excluded from committed observations. Real selected data, not synthetic
+provider acceptance: City Hall and public office are inside/clear (>800 m);
+airport outside (~3.83 km); forestry office inside excluded hole (~13.5 m from
+edge); no-house-number Chamberlain query street_center/score 1.0 must reject.
+All five scores are 1.0, demonstrating why score alone cannot authorize delivery.
+Detailed table and exact public coordinates: docs/delivery-area/README.md and
+geocodio-public-observations.json; map geocodio-results-map.svg. No private input
+was transmitted, no further lookup or financial operation was initiated.
+
+Independent Shapely 2.1.2/GEOS + pyproj 3.7.2 UTM16N reference agrees with production
+point/margin decisions. It found an invalid pinched source hole. Implemented a
+representation-only repeated-vertex split into two touching holes. Derived polygon
+is GIS-valid and equals GEOS make_valid(source); every original directed edge and
+boundary point set is identical. Approved raw data/hash/map/physical footprint are
+unchanged. See README proof/limitations. No dependency/migration/Render change.
+New actual-provider and topology regressions pass alongside existing functionality.
+The normalization is source-only, not deployed; deployed revision remains 9c095d3.
+
+Best-match CSV does NOT verify API candidate counts, JSON types, direct Bearer
+requests, exact physical rooftop positions or suite existence. Mark these unknown;
+never reconstruct a unique API claim from one selected row. The two suitable points
+remain conditional candidates, three are rejected. Actual near-edge public data
+is now observed, but overall accuracy acceptance and separate activation remain
+pending. Do not ask the owner to repeat this completed five-row spreadsheet job.
+No secure developer key field/key is available. Do not request key in chat or move
+it to GitHub/Render. Account creation and boundary/ZIP/30 m approval are already done.
+
+Local validation for this follow-up: 166 app/API tests, 14 CLI/staging tests,
+typechecks/production builds; browser regressions and exact new commit CI must be
+checked at completion. Logs /tmp/rocoeats-provider-csv-*. Offline GIS scripts and
+reference libraries live under /tmp/rocoeats-gis-reference only. Preserve the
+checkpoint and new public regression fixture; do not redo completed provider calls.
+
 ### Geocodio implementation authorization — November 14, 2026
 
 Owner now authorizes free Geocodio account creation/use, integration and real
@@ -71,7 +109,7 @@ secure development key field. Owner was guided to upload the provided five-publi
 address CSV in Geocodio, US only/no extra data appends, confirm five rows/free $0
 usage, and attach the geocoding RESULTS CSV (not usage/billing export). File:
 docs/delivery-area/public-geocodio-cases.csv; original download copy remains at
-/workspace/shared/rocoeats-public-geocodio-cases.csv. No provider results received yet.
+/workspace/shared/rocoeats-public-geocodio-cases.csv. Results have now been received and evaluated; see the newer section above.
 Do not request the API key in chat or use GitHub/Render to work around this restriction.
 
 Next input is that public-only results CSV. Analyze offline against the pinned

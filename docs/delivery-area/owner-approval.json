@@ -19,5 +19,8 @@
   "providerAccountReadyReported": true,
   "secureDevelopmentKeyFieldAvailableReported": false,
   "directProviderApiVerified": false,
-  "nextEvaluationPath": "owner_assisted_public_results_csv"
+  "nextEvaluationPath": "independent_rooftop_review_and_secure_direct_api_evidence",
+  "publicProviderCsvResultsReceived": true,
+  "publicSelectedPointEvaluationCompleted": true,
+  "publicNearBoundaryCaseObserved": true
 }

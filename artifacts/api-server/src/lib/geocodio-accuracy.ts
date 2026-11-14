@@ -1,7 +1,8 @@
-import { boundaryGeometry, boundarySha256 } from "../data/rockwood/boundary";
+import { boundarySha256 } from "../data/rockwood/boundary";
 import { rockwoodPostalAddress } from "./delivery-area";
 import {
   boundaryDistanceMeters,
+  deliveryBoundaryGeometry,
   requestGeocodioEvidence,
   safelyInsideBoundary,
   validateGeocodioResult,
@@ -96,7 +97,7 @@ function observations(evidence: unknown) {
           ? [loc.lng, loc.lat]
           : null;
       const distance = point
-        ? boundaryDistanceMeters(point, boundaryGeometry)
+        ? boundaryDistanceMeters(point, deliveryBoundaryGeometry)
         : null;
       return {
         accuracy:
@@ -129,10 +130,10 @@ function observations(evidence: unknown) {
             ? row.match_type
             : "unknown",
         insideBoundary: point
-          ? safelyInsideBoundary(point, boundaryGeometry, 0)
+          ? safelyInsideBoundary(point, deliveryBoundaryGeometry, 0)
           : false,
         safelyInterior: point
-          ? safelyInsideBoundary(point, boundaryGeometry)
+          ? safelyInsideBoundary(point, deliveryBoundaryGeometry)
           : false,
         boundaryDistanceMeters:
           distance === null ? null : Math.round(distance * 10) / 10,

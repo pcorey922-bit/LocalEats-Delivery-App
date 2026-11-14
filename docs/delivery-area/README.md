@@ -239,3 +239,67 @@ may return only the best match: do not infer that the API returned one candidate
 that the JSON field types are proven, or that Bearer authentication was verified.
 Independent public building footprints and a real near-edge case still require
 review. No CSV result automatically approves accuracy or activates enforcement.
+
+
+## Actual owner-supplied public results — November 14, 2026
+
+Owner reports Geocodio COMPLETED five rows. The attached results contain all five
+allowlisted public inputs and no authentication-key column. `Geocodio Stable
+Address Key` is a location identifier, not an API credential; it is omitted from
+our committed evidence. Raw original attachment is not committed. Sanitized public
+observations and source-content SHA-256 are in
+[the observation record](geocodio-public-observations.json).
+
+| Public case | Reported score/type | Independent boundary result | Delivery disposition |
+| --- | --- | --- | --- |
+| 110 N Chamberlain Ave, City Hall | 1.0, rooftop/building centroid | Inside, ~939 m from closest edge | Selected point passes spatial/precision checks; unique API match still unverified. |
+| 1070 N Gateway Ave, Suite 1 | 1.0, rooftop/building centroid | Inside, ~815 m from closest edge | Selected point passes spatial/precision checks; Ste 1 returned. This is a building-centroid point, not independently verified suite coordinates/existence. |
+| 258 Rockwood Airport Dr | 1.0, rooftop/building centroid | Outside outer footprint, ~3.83 km from closest edge | Reject despite matching Rockwood/37854 mailing locality. |
+| 4314 Roane State Hwy, forestry office | 1.0, rooftop/building centroid | Inside an excluded hole, ~13.5 m from its edge | Reject/review; not in the approved footprint and within the conservative edge-review zone. |
+| Chamberlain Avenue, no house number | 1.0, street_center, no precise match type | Point is inside, ~1.08 km from edge; provider selected S Chamberlain Ave | Reject: missing house number and coarse/direction-ambiguous result. A score of 1.0 is not proof of a deliverable address or positional accuracy. |
+
+See [the results map and exclusion detail](geocodio-results-map.svg). These are
+owner-assisted real-provider observations, not a new simulated provider response.
+No incorrect precise street/house-number match was established in this file;
+physical rooftop ground truth is still unverified. Two points are geographically
+suitable candidates, not final production ordering approvals. The three other
+results must remain rejected. The 30 m margin is additional restriction inside
+coverage; it never permits an outside point.
+
+Independent reference: Shapely 2.1.2/GEOS + pyproj 3.7.2, WGS84 to EPSG:32616.
+Distances above are approximate projected nearest-edge distances. Production uses
+a deliberately conservative local distance approximation (~1% shorter here);
+all five point/margin classifications agree. No source boundary vertices moved.
+The reference libraries were installed only under /tmp for this analysis; no new
+runtime dependency or database migration was introduced.
+
+### Source topology correction without territory change
+
+The approved source has one excluded ring that touches itself at
+(-84.610097233458, 35.8760486302104). GEOS reports that serialized ring invalid.
+The two touching excluded lobes can be represented as two hole rings instead.
+`deliveryBoundaryGeometry` performs only that deterministic repeated-vertex split:
+outer ring 5077 coordinates remains unchanged; exclusion 663 coordinates becomes
+20 + 644 coordinates (same 662 directed edges).
+
+Verified independently: derived polygon is valid, equals GEOS make_valid(source),
+boundary Hausdorff distance is zero, and every original directed boundary edge is
+preserved exactly. No area is added, no edge is buffered/moved, no hole filled, and
+no city/ZIP territory expands. Approved raw source, map, version and SHA-256 remain
+unchanged. The existing even-odd map represents the same footprint. Regression
+coverage compares raw/derived behavior over the exclusion, 30 m cases and actual
+CSV points. This is a representation correction, not an automatic boundary refresh.
+It has not been deployed and does not activate municipal enforcement.
+
+### Remaining acceptance evidence
+
+A best-match spreadsheet row cannot establish that the direct API returned one
+candidate or used the tested JSON field types. Diagnostic predicate tests convert
+CSV numeric strings and wrap a selected row only to exercise checks; they do NOT
+turn the CSV into actual unique API evidence. Duplicated candidates still reject.
+No provider key is available to engineering; direct Bearer/API verification is
+still blocked by the missing secure key-entry path. Independent rooftop/entrance
+checks, the full direct API precision/uniqueness evidence and owner review remain
+before accuracy acceptance/activation. `providerAccuracyAcceptancePassed` and
+`geographicActivationAuthorized` stay false. No additional lookups, hosted record
+changes, payments or financial operations were performed for this evaluation.
