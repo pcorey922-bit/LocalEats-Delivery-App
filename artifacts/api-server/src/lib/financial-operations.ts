@@ -1,7 +1,7 @@
 import { requireLaunchServiceArea } from './municipal-delivery';
 import { requireTelephoneAcceptance } from "./telephone-confirmation";
 import { databaseNow } from "./database-clock";
-import { requireLockedAdministrator } from "./transaction-access";
+import { requireLockedAdministrator, requireLockedActiveProfile } from "./transaction-access";
 import { requireNoFinancialHold } from "./financial-holds";
 import { alias } from "drizzle-orm/pg-core";
 import { restoreUnacceptedInventory } from "./inventory";
@@ -76,6 +76,7 @@ const leaseMs = 120000;
 export async function requestProviderCheckout(orderId: string, actor: Profile) {
   requireTestWebhook();
   return db.transaction(async (tx) => {
+    const currentActor = await requireLockedActiveProfile(tx, actor.id);
     const [order] = await tx
       .select()
       .from(ordersTable)
@@ -83,7 +84,7 @@ export async function requestProviderCheckout(orderId: string, actor: Profile) {
       .for("update")
       .limit(1);
     if (!order) throw new CommerceError(404, "Order not found");
-    if (order.customerProfileId !== actor.id && actor.role !== "admin")
+    if (order.customerProfileId !== actor.id && currentActor.role !== "admin")
       throw new CommerceError(403, "You cannot access this checkout");
     if (await expireReservation(tx, order))
       return {
@@ -174,6 +175,7 @@ export async function requestProviderTransfer(
   if (!initial?.orderId)
     throw new CommerceError(404, "Order settlement not found");
   return db.transaction(async (tx) => {
+    await requireLockedAdministrator(tx, actor.id);
     const [order] = await tx
       .select()
       .from(ordersTable)
@@ -279,6 +281,7 @@ export async function requestProviderCancellation(
   reason: string,
 ) {
   return db.transaction(async (tx) => {
+    const currentActor = await requireLockedActiveProfile(tx, actor.id);
     const [order] = await tx
       .select()
       .from(ordersTable)
@@ -292,10 +295,10 @@ export async function requestProviderCancellation(
       .where(eq(restaurantsTable.id, order.restaurantId))
       .limit(1);
     const customer =
-      actor.role === "customer" && order.customerProfileId === actor.id;
+      currentActor.role === "customer" && order.customerProfileId === actor.id;
     const owner =
-      actor.role === "restaurant" && restaurant?.ownerProfileId === actor.id;
-    if (actor.role !== "admin" && !customer && !owner)
+      currentActor.role === "restaurant" && restaurant?.ownerProfileId === actor.id;
+    if (currentActor.role !== "admin" && !customer && !owner)
       throw new CommerceError(403, "You cannot cancel this order");
     if (
       customer &&

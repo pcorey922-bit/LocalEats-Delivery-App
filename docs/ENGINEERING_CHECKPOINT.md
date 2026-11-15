@@ -7,6 +7,49 @@ repository/branch; preserve all completed work. Do not restart completed checkou
 authentication, homepage, delivery or Stripe investigations. Do not follow the
 archived Android/iOS/signing tasks below: native development is deferred.
 
+### November 15 current checkpoint — financial request authority
+
+Verified deployed c44d2228e5a8c7757659172acd896565fa638dd3 with 23/23 read-only
+checks at session start. Public/private ordering, live charges and municipal
+enforcement remain OFF; Stripe TEST configuration ready. No hosted settings,
+records, provider lookup, native source or migration changed this session.
+
+Commits already pushed: a6feb5ec4bf356efbed7b94183959c3f97a7172b (financial queue
+identity), 3b4f6e35b167c2529f022658978be57b1609524e (driver authority), and
+fc9b09c0e12df6bb3ae06ca0c75d2664a3dbaa28 (reconciliation authority). All three
+workflows passed for each, including real PostgreSQL FK-lock compatibility.
+
+Final follow-up revalidates current account authority before checkout/cancellation
+transactions and current administrator authority before transfer/partial-credit
+requests. Cancellation uses the locked current role with the same ownership and
+refund rules. A request that loses authority while waiting cannot mutate orders,
+payments, financial jobs, credits, payouts, ledger or audit state. Requests validly
+committed BEFORE a permission change are preserved, not retroactively cancelled.
+No new role grants, financial policy, provider call or client protocol introduced.
+
+Regression covers six deterministic HTTP interleavings (customer checkout/cancel,
+restaurant cancel, administrator cancel/transfer/credit). A temporary test bundle
+using the PREVIOUS committed source reproduced revoked checkout accepted with
+202; the working tree was never reverted/overwritten. New code returns 403 with
+exact financial snapshots unchanged. Logs:
+/tmp/rocoeats-financial-request-auth-{before,tests,build,workflow}.log.
+
+Local PASS: 183 app/API cases (182 pass, one PostgreSQL-only concurrency skip),
+14 CLI/staging tests, full typechecks/production builds and local browser/API/
+PGlite delivery regression. All provider/payment/account responses in development
+tests are simulated. Latest commit CI is pending push at checkpoint creation;
+inspect its exact three conclusions, never infer success from pending.
+
+Resume: fetch branch/tree; inspect latest CI and fix actual failures first.
+All currently reproduced defects from this focused authority/queue review are
+fixed. Next release gate is owner-approved staging deployment of the verified
+SHA, then GET/OPTIONS readiness and owner-session review with ordering closed.
+No extra environment variables or migrations required. Do not re-run provider
+tests, alter the one-shot allowance, or perform permission/payment mutations on
+hosted accounts without separate authorization. Geographic building ground truth,
+missing office response components and real Stripe settlement evidence remain
+external/owner-controlled acceptance blockers; do not invent them or weaken rules.
+
 ### November 15 reconciliation authority follow-up
 
 Financial identity fix a6feb5ec4bf356efbed7b94183959c3f97a7172b and driver race fix

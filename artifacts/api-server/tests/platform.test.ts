@@ -3590,6 +3590,70 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     }finally{await api(`/orders/${order.id}/cancel`,ids.admin,'POST',{reason:'End timeout recovery verification'});await api('/driver/availability',driver,'PUT',{available:false});}
   });
 
+  await t.test("financial request transactions reject revoked actors before checkout, cancellation, credit or transfer writes", async () => {
+    const courier = randomUUID();
+    await db.insert(profilesTable).values({ id: courier, clerkUserId: courier, displayName: "Financial request authority fixture", role: "driver", driverApproved: true });
+    const completed = await create(); await ready(completed.id);
+    await api("/driver/availability", courier, "PUT", { available: true });
+    await api(`/driver/orders/${completed.id}/claim`, courier, "POST");
+    await api(`/driver/orders/${completed.id}/pickup`, courier, "POST");
+    const code = await api(`/orders/${completed.id}/delivery-code`, ids.customer, "POST");
+    assert.equal((await api(`/driver/orders/${completed.id}/deliver`, courier, "POST", { code: code.data.code })).status, 200);
+    const unpaid = await create();
+    const [payout] = await db.select().from(payoutsTable).where(sql`${payoutsTable.orderId}=${completed.id} and ${payoutsTable.recipientProfileId}=${courier}`);
+    await db.insert(connectedAccountsTable).values({ profileId: courier, provider: "stripe_test", providerAccountId: `acct_authority_${courier}`, ready: true });
+    await db.update(paymentsTable).set({ provider: "stripe_test", providerPaymentId: `pi_authority_${completed.id}` }).where(eq(paymentsTable.orderId, completed.id));
+    await db.update(paymentsTable).set({ provider: "stripe_test" }).where(eq(paymentsTable.orderId, unpaid.id));
+    const prior = { provider: process.env.PAYMENT_PROVIDER, key: process.env.STRIPE_SECRET_KEY, webhook: process.env.STRIPE_WEBHOOK_SECRET };
+    process.env.PAYMENT_PROVIDER = "stripe_test"; process.env.STRIPE_SECRET_KEY = "sk_test_fixture"; process.env.STRIPE_WEBHOOK_SECRET = "whsec_fixture";
+    const snapshot = async () => ({
+      orders: await db.select().from(ordersTable).where(sql`${ordersTable.id} in (${unpaid.id},${completed.id})`).orderBy(ordersTable.id),
+      payments: await db.select().from(paymentsTable).where(sql`${paymentsTable.orderId} in (${unpaid.id},${completed.id})`).orderBy(paymentsTable.id),
+      jobs: await db.select().from(financialOperationsTable).where(sql`${financialOperationsTable.orderId} in (${unpaid.id},${completed.id})`),
+      credits: await db.select().from(partialRefundsTable).where(eq(partialRefundsTable.orderId, completed.id)),
+      refunds: await db.select().from(refundsTable).where(sql`${refundsTable.orderId} in (${unpaid.id},${completed.id})`),
+      payouts: await db.select().from(payoutsTable).where(eq(payoutsTable.orderId, completed.id)).orderBy(payoutsTable.id),
+      journals: await db.select().from(ledgerTransactionsTable).where(sql`${ledgerTransactionsTable.orderId} in (${unpaid.id},${completed.id})`).orderBy(ledgerTransactionsTable.id),
+      audits: await db.select().from(auditLogsTable).where(sql`${auditLogsTable.resourceId} in (${unpaid.id},${completed.id},${payout.id})`).orderBy(auditLogsTable.id),
+    });
+    const scenarios = [
+      { actor: ids.customer, patch: { isActive: false }, path: `/orders/${unpaid.id}/checkout`, body: {} },
+      { actor: ids.customer, patch: { isActive: false }, path: `/orders/${unpaid.id}/cancel`, body: { reason: "Revoked customer cancellation fixture" } },
+      { actor: ids.restaurant, patch: { isActive: false }, path: `/orders/${unpaid.id}/cancel`, body: { reason: "Revoked restaurant cancellation fixture" } },
+      { actor: ids.admin, patch: { role: "driver" as const }, path: `/orders/${completed.id}/cancel`, body: { reason: "Revoked administrator refund fixture" } },
+      { actor: ids.admin, patch: { role: "driver" as const }, path: `/admin/payouts/${payout.id}/transfer`, body: {} },
+      { actor: ids.admin, patch: { role: "driver" as const }, path: `/admin/orders/${completed.id}/partial-refunds`, body: { id: randomUUID(), amountCents: 100, fundingPolicy: "platform_goodwill_v1", reason: "Revoked administrator credit fixture" } },
+    ];
+    try {
+      for (const scenario of scenarios) {
+        const before = await snapshot();
+        const [actor] = await db.select().from(profilesTable).where(eq(profilesTable.id, scenario.actor));
+        const original = db.transaction.bind(db);
+        let release!: () => void, entered!: () => void, paused = false;
+        const gate = new Promise<void>(resolve => release = resolve), started = new Promise<void>(resolve => entered = resolve);
+        (db as any).transaction = async (...args: any[]) => { if (!paused) { paused = true; entered(); await gate; } return (original as any)(...args); };
+        const pending = api(scenario.path, scenario.actor, "POST", scenario.body);
+        try {
+          await started;
+          await db.update(profilesTable).set(scenario.patch).where(eq(profilesTable.id, actor.id));
+          (db as any).transaction = original; release();
+          const response = await pending;
+          assert.equal(response.status, 403, `${scenario.path}: ${JSON.stringify(response.data)}`);
+          assert.deepEqual(await snapshot(), before, "Revoked financial request must not alter money, order, queue or audit state");
+        } finally {
+          (db as any).transaction = original; release(); await pending;
+          await db.update(profilesTable).set({ role: actor.role, isActive: actor.isActive }).where(eq(profilesTable.id, actor.id));
+        }
+      }
+    } finally {
+      if (prior.provider === undefined) delete process.env.PAYMENT_PROVIDER; else process.env.PAYMENT_PROVIDER = prior.provider;
+      if (prior.key === undefined) delete process.env.STRIPE_SECRET_KEY; else process.env.STRIPE_SECRET_KEY = prior.key;
+      if (prior.webhook === undefined) delete process.env.STRIPE_WEBHOOK_SECRET; else process.env.STRIPE_WEBHOOK_SECRET = prior.webhook;
+      await db.update(financialOperationsTable).set({ state: "cancelled" }).where(sql`${financialOperationsTable.orderId} in (${unpaid.id},${completed.id})`);
+      await db.update(paymentsTable).set({ provider: "sandbox" }).where(eq(paymentsTable.orderId, unpaid.id));
+      await api(`/orders/${unpaid.id}/cancel`, ids.customer, "POST", { reason: "Close isolated financial request authority fixture" });
+    }
+  });
   await t.test("partial refunds are durable, cumulative, webhook-monotonic and combine with a remaining full refund",async()=>{
     const driver=randomUUID();await db.insert(profilesTable).values({id:driver,clerkUserId:driver,displayName:'Refund delivery fixture',role:'driver',driverApproved:true});await api('/driver/availability',driver,'PUT',{available:true});
     const order=await create();await ready(order.id);await api(`/driver/orders/${order.id}/claim`,driver,'POST');await api(`/driver/orders/${order.id}/pickup`,driver,'POST');const code=await api(`/orders/${order.id}/delivery-code`,ids.customer,'POST');assert.equal((await api(`/driver/orders/${order.id}/deliver`,driver,'POST',{code:code.data.code})).status,200);

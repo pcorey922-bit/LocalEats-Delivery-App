@@ -4,6 +4,27 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
+## November 15 current security/reliability release
+
+Deployed c44d222 independently passed 23 read-only checks with all ordering,
+live-charge and municipal gates OFF. Subsequent verified commits bind immutable
+financial request identity, reject unsupported providers, recheck driver custody
+authority and recheck administrator reconciliation authority after provider reads.
+Their exact three CI workflows passed; see ENGINEERING_CHECKPOINT.md for hashes.
+
+Final follow-up closes stale authority on queued checkout, cancellation, transfer
+and partial-credit requests. Six HTTP race cases deny mutations without altering
+financial/order/audit snapshots. Existing ownership/refund rules and already
+committed requests are preserved. Local total: 183 cases (one PostgreSQL-only
+check skipped locally), 14 CLI/staging checks, builds and browser workflow pass.
+No provider or hosted financial operation occurred; no migration/env change.
+
+Next gate: exact latest-SHA CI completion, then separately approved deployment
+and owner-session acceptance. No further reproduced defect in this focused review.
+Preserve closed operations and existing completed order. Geographic acceptance
+and provider settlement remain unverified/owner-controlled; never repeat the
+one-shot Geocodio suite or reconcile the historical payment without authorization.
+
 ## November 15 transactional authority follow-up
 
 a6feb5e financial identity and 3b4f6e3 driver mutation reauthorization have all

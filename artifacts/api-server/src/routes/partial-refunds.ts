@@ -16,6 +16,7 @@ import { audit } from "../lib/commerce";
 import { requirePaymentJournal } from "../lib/ledger";
 import { enqueueFinancialOperation } from "../lib/finance-queue";
 import { requireNoFinancialHold } from "../lib/financial-holds";
+import { requireLockedAdministrator } from "../lib/transaction-access";
 const router = Router();
 router.get(
   "/admin/orders/:orderId/partial-refunds",
@@ -52,6 +53,7 @@ router.post(
         .strict()
         .parse(req.body);
     const result = await db.transaction(async (tx) => {
+      await requireLockedAdministrator(tx, actor.id);
       const [order] = await tx
         .select()
         .from(ordersTable)
