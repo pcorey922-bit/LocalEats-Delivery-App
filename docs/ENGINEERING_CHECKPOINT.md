@@ -7,6 +7,40 @@ repository/branch; preserve all completed work. Do not restart completed checkou
 authentication, homepage, delivery or Stripe investigations. Do not follow the
 archived Android/iOS/signing tasks below: native development is deferred.
 
+### November 15 core-completion checkpoint — restaurant menu descriptions
+
+Current deployed SHA: 4934f2413756e0b88bc0da333ec7f906569de906. Remote HEAD was
+verified clean at that SHA; all three exact-SHA workflows completed successfully.
+Independent GET/OPTIONS staging report: 23/23 passed on November 15 at 07:31 UTC,
+revision matched, database/auth/pricing/Stripe TEST/webhook/worker configuration
+ready. Public/private ordering, live charges and municipal enforcement OFF.
+Positive owner-session/provider behavior was not tested; no hosted writes occurred.
+
+Confirmed core gap: menu-item create/edit prompts exposed only name/price, despite
+the existing API supporting descriptions. New accessible inline form supports
+name, optional description and exact decimal price, clearing descriptions, explicit
+cancel, retained input/error on failed saves and one in-flight submit. Partial
+updates preserve modifier groups, visibility, inventory and existing order snapshots.
+No migration/configuration/API change. Homepage and native code untouched.
+
+Validation: full typechecks and production builds; 183 app/API cases (182 passed,
+one PostgreSQL-only case skipped locally). Mobile browser regression uses the real
+local API/migrated disposable PGlite database, with simulated Clerk/payments; it
+covers invalid prices, create/edit/clear/cancel, pre-commit 503 recovery, duplicate
+in-flight submits, customer-visible descriptions and unchanged inventory/modifiers.
+Check the exact pushed commit's CI conclusions before deployment; pending is not pass.
+Logs: /tmp/rocoeats-menu-{build,tests,browser,browser-focused}.log.
+
+Scope review: guest support is already included in shared OrderActions on the guest
+order page, with capability-authorized endpoints. Do NOT duplicate it. Core order,
+dispatch, cancellation, support, inventory and financial workflows already exist.
+Next engineering action: finish the phone-friendly category management controls and
+surface failed menu-management mutations; then update the prioritized launch gates.
+Real provider refunds/disputes/Connect payouts, historical settlement, hosted backup
+recovery, always-on hosting, geographic accuracy approval and device acceptance are
+verification/owner gates, not evidence that these implemented workflows are absent.
+Preserve the completed $19.19 order and all closed safeguards; no deployment approved.
+
 ### November 15 current checkpoint — financial request authority
 
 Verified deployed c44d2228e5a8c7757659172acd896565fa638dd3 with 23/23 read-only

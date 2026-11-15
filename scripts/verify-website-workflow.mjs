@@ -1,4 +1,5 @@
 import { verifyCheckout } from './checkout-browser-checks.mjs';
+import { verifyMenuEditor } from './menu-editor-browser-checks.mjs';
 // Real website + API + migrated, disposable PGlite database. Only Clerk and
 // payment provider are simulated. This is NOT a Stripe TEST transaction.
 import assert from 'node:assert/strict';
@@ -79,6 +80,11 @@ try {
     assert.ok(response.ok, `${method} ${url}: ${response.status} ${await response.clone().text()}`);
     return response.json();
   }
+  if (process.env.ROCOEATS_MENU_ONLY === 'true') {
+    const restaurant = await actor('restaurant'), customer = await actor('customer');
+    await restaurant.goto(origin + '/restaurant');
+    await verifyMenuEditor({ restaurant, customer, api, origin, ids });
+  } else {
   await verifyCheckout({ actor, origin, ids });
   if (process.env.ROCOEATS_CHECKOUT_ONLY !== 'true') {
   const customer = await actor('customer');
@@ -227,9 +233,11 @@ try {
   await guest.unroute(availabilityApi);
   await guest.getByRole('button', { name: 'Retry availability', exact: true }).click();
   await guest.getByText('This restaurant is within its ordering hours.', { exact: true }).waitFor();
+  await verifyMenuEditor({ restaurant, customer, api, origin, ids });
   assert.deepEqual(browserErrors, []);
   console.log(`PASS: real website/API/PGlite workflow: search, modifiers, cart/address/quote, simulator payment, restaurant acceptance/preparation, driver availability/claim/navigation/pickup/handoff, delivery receipt, balanced ledger and two earnings records; guest browsing/session/cart. Simulated Clerk and payment only. Screenshots: ${web}`);
   console.log('PASS: live restaurant hours, paused/closed status, weekly hours and availability outage recovery. Only the outage response was intercepted.');
+  }
   }
   assert.deepEqual(browserErrors, []);
 } catch (error) {

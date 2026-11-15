@@ -4,6 +4,37 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
+## Current launch priorities — November 15 core-completion review
+
+Deployed 4934f2413756e0b88bc0da333ec7f906569de906 passed 23 read-only checks and
+all three GitHub workflows. All ordering/live-charge/municipal gates remain OFF.
+Historical release/deployment instructions below are superseded by this status.
+
+Implemented foundation: customer discovery/menus/guest checkout/tracking/cancellation/
+support; restaurant onboarding/approval/hours/inventory/modifiers/capacity/fulfillment;
+driver approval/duty/offers/navigation/handoff/earnings; administrator dispatch,
+recovery/support/configuration/refunds/reporting; durable Stripe TEST webhooks,
+ledger/refunds/credits/disputes/payout and reconciliation controls. Preserve these.
+
+Actionable software completion: restaurant menu descriptions are now editable via
+an accessible phone form instead of name/price-only prompts, with exact price
+validation and failure recovery. Next: category controls and mutation error visibility.
+
+Launch acceptance blockers (do not invent new features to avoid these gates):
+1. Geographic accuracy: independent public-building ground truth, unresolved office
+   provider-response evidence and owner accuracy acceptance/activation approval.
+   Preserve boundary/exclusions/ZIP 37854/30 m margin. No repeat provider suite.
+2. Financial/provider acceptance: completed $19.19 delivery remains intact; fee/net
+   settlement awaits explicit Stripe availability plus separate owner authorization.
+   Refund/dispute/Connect/payout scenarios have automated simulation coverage, not
+   real-provider acceptance. No transaction authorized in this session.
+3. Hosting/operations: Render Free sleeps; owner decision on always-on production
+   service and approved hosted backup/recovery drill before commercial operations.
+4. Owner/device acceptance: latest release in authorized customer/restaurant/driver/
+   admin sessions on Samsung; operational support/pricing/tax policy and launch
+   approval. Public/private ordering, live payments and municipal activation remain
+   separately gated. Native apps remain deferred.
+
 ## November 15 current security/reliability release
 
 Deployed c44d222 independently passed 23 read-only checks with all ordering,
