@@ -1,6 +1,7 @@
 import { requireLaunchServiceArea } from './municipal-delivery';
 import { requireTelephoneAcceptance } from "./telephone-confirmation";
 import { databaseNow } from "./database-clock";
+import { requireLockedAdministrator } from "./transaction-access";
 import { requireNoFinancialHold } from "./financial-holds";
 import { alias } from "drizzle-orm/pg-core";
 import { restoreUnacceptedInventory } from "./inventory";
@@ -1075,6 +1076,7 @@ export async function reconcileFinancialOperation(
     );
   const receipt = result;
   return db.transaction(async (tx) => {
+    await requireLockedAdministrator(tx, actor.id);
     await tx
       .select()
       .from(ordersTable)

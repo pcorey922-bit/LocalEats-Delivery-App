@@ -7,6 +7,30 @@ repository/branch; preserve all completed work. Do not restart completed checkou
 authentication, homepage, delivery or Stripe investigations. Do not follow the
 archived Android/iOS/signing tasks below: native development is deferred.
 
+### November 15 reconciliation authority follow-up
+
+Financial identity fix a6feb5ec4bf356efbed7b94183959c3f97a7172b and driver race fix
+3b4f6e35b167c2529f022658978be57b1609524e both have all three CI workflows passed.
+PostgreSQL CI exercised the notification FK lock-compatibility regression.
+
+Reproduced charge evidence being recorded after the fake provider reader revoked
+the administrator's role. Manual payment/dispute/operation reconciliation now
+rechecks active administrator permission under NO KEY UPDATE after provider reads,
+before order locks or financial writes. Provider I/O remains outside transactions;
+no evidence is fabricated and original immutable accounting checks remain.
+Tests cover role loss/deactivation during charge reads and role loss during
+dispute/operation reads, preserving ledger/balance/hold/job/audit state on denial.
+Existing legitimate reconciliation tests still pass. No real provider read or
+reconciliation of the completed staging order was performed.
+
+Local PASS: 182 app/API cases (181 pass, one PostgreSQL-only skip), 14 CLI/staging
+tests, typechecks/build, isolated website/API/PGlite delivery browser workflow.
+Logs /tmp/rocoeats-admin-reconciliation-{before,tests,build,workflow}.log and
+/tmp/rocoeats-core-integrity-cli.log. Exact pushed CI must complete before release.
+Next inspect the same stale-authority boundary when financial requests are queued
+(transfer/checkout/cancellation/partial credit), preserving existing role and
+ownership rules. Do not execute those operations against staging.
+
 ### November 15 next deployment verified; financial request identity
 
 ### November 15 transactional driver authorization

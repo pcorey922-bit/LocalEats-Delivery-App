@@ -17,6 +17,7 @@ import { CommerceError } from "./commerce-policy";
 import { stripeTest } from "./payment-provider";
 import { postJournal, requirePaymentJournal } from "./ledger";
 import { databaseNow } from "./database-clock";
+import { requireLockedAdministrator } from "./transaction-access";
 export async function requireNoFinancialHold(
   tx: Pick<Transaction, "select">,
   orderId: string,
@@ -235,6 +236,7 @@ export async function reconcileDispute(
   if (!observed) throw new CommerceError(404, "Financial hold not found");
   const proof = await read(observed.providerDisputeId); // Provider I/O is outside the database transaction.
   return db.transaction(async (tx) => {
+    await requireLockedAdministrator(tx, actor.id);
     await tx
       .select()
       .from(ordersTable)
@@ -325,6 +327,7 @@ export async function reconcilePayment(
     throw new CommerceError(409, "Recorded Stripe test payment is required");
   const proof = await read(observed.providerPaymentId);
   return db.transaction(async (tx) => {
+    await requireLockedAdministrator(tx, actor.id);
     await tx
       .select()
       .from(ordersTable)

@@ -4,6 +4,16 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
+## November 15 transactional authority follow-up
+
+a6feb5e financial identity and 3b4f6e3 driver mutation reauthorization have all
+three exact-SHA CI workflows passed, including PostgreSQL concurrency coverage.
+Manual payment/dispute/operation reconciliation now rechecks current administrator
+authority after provider-read latency before writing evidence, holds or journals.
+Local tests/build/browser regressions pass; real provider acceptance remains
+separate. No actual reconciliation, financial records or hosted settings changed.
+Next verify transactional authority on newly queued financial requests.
+
 ## November 15 financial queue integrity follow-up
 
 c44d2228e5a8c7757659172acd896565fa638dd3 is deployed and independently passed

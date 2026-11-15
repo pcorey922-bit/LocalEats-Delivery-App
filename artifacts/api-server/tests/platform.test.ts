@@ -2569,7 +2569,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
         assert.equal(held.attempts, 0);
         assert.equal(held.firstAttemptAt, null);
         const [actor] = await db.select().from(profilesTable).where(eq(profilesTable.id, ids.admin));
-        await assert.rejects(() => reconcileFinancialOperation(id, actor, "Inspect isolated foreign-provider fixture", async () => { reads++; return null; }), /provider/i);
+        await assert.rejects(() => reconcileFinancialOperation(id, actor, async () => { reads++; return undefined; }), /provider/i);
         assert.equal(reads, 0);
         await assert.rejects(() => executeStripeOperation(held), /provider/i);
         assert.equal(held.provider, "sandbox");
@@ -3677,6 +3677,13 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       assert.equal((await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.id,`partial_refund:${request.id}`)))[0].attempts,0);
       const heldJobId=`partial_refund:${request.id}`;
       await db.update(financialOperationsTable).set({state:'processing',firstAttemptAt:new Date(Date.now()-1000),leaseExpiresAt:new Date(0),leaseToken:randomUUID(),attempts:1}).where(eq(financialOperationsTable.id,heldJobId));
+      try {
+        await assert.rejects(() => reconcileFinancialOperation(heldJobId, actor, async () => {
+          await db.update(profilesTable).set({ role: "driver" }).where(eq(profilesTable.id, actor.id));
+          return { id: `re_after_hold_${request.id}`, status: "pending" };
+        }), (error: any) => error?.status === 403);
+      } finally { await db.update(profilesTable).set({ role: actor.role }).where(eq(profilesTable.id, actor.id)); }
+      assert.equal((await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.id,heldJobId)))[0].state, 'processing');
       await reconcileFinancialOperation(heldJobId,actor,async job=>{assert.equal(job.id,heldJobId);return {id:`re_after_hold_${request.id}`,status:'pending'};});
       assert.equal((await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.id,heldJobId)))[0].state,'pending');
       assert.equal((await db.select().from(financialHoldsTable).where(eq(financialHoldsTable.id,holdId)))[0].active,true);
@@ -3686,6 +3693,15 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       await processStripeEvent(event('evt_dispute_new','under_review',now+1));release();await assert.rejects(()=>pending,/changed during/);
       assert.equal((await db.select().from(providerBalanceEntriesTable).where(eq(providerBalanceEntriesTable.orderId,order.id))).length,0);
       await assert.rejects(()=>reconcileDispute(holdId,actor,'Reject mismatched evidence',async()=>({...proof,currency:'eur'})));
+      const [beforeRevocation] = await db.select().from(financialHoldsTable).where(eq(financialHoldsTable.id, holdId));
+      try {
+        await assert.rejects(() => reconcileDispute(holdId, actor, "Reject authority revoked during dispute evidence read", async () => {
+          await db.update(profilesTable).set({ role: "driver" }).where(eq(profilesTable.id, actor.id));
+          return proof;
+        }), (error: any) => error?.status === 403);
+      } finally { await db.update(profilesTable).set({ role: actor.role }).where(eq(profilesTable.id, actor.id)); }
+      assert.deepEqual((await db.select().from(financialHoldsTable).where(eq(financialHoldsTable.id, holdId)))[0], beforeRevocation);
+      assert.equal((await db.select().from(providerBalanceEntriesTable).where(eq(providerBalanceEntriesTable.orderId,order.id))).length, 0);
       const lost=await reconcileDispute(holdId,actor,'Record settled loss while owner reviews',async()=>({...proof,status:'lost',balances:[withdrawal]}));assert.equal(lost.active,true);
       const won=await reconcileDispute(holdId,actor,'Verify settled withdrawal and reinstatement',async()=>proof);assert.equal(won.active,false);assert.ok(won.releasedAt);
       await reconcileDispute(holdId,actor,'Idempotent provider evidence review',async()=>proof);
@@ -3713,6 +3729,17 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       journals: await db.select().from(ledgerTransactionsTable).where(eq(ledgerTransactionsTable.orderId,order.id)),
     });
     const beforeWait = await snapshots();
+    for (const revoked of [{ role: "driver" }, { isActive: false }] as const) {
+      try {
+        await assert.rejects(() => reconcilePayment(order.id, actor, "Reject authorization revoked during provider read", async () => {
+          await db.update(profilesTable).set(revoked).where(eq(profilesTable.id, actor.id));
+          return proof;
+        }), (error: any) => error?.status === 403);
+      } finally {
+        await db.update(profilesTable).set({ role: actor.role, isActive: actor.isActive }).where(eq(profilesTable.id, actor.id));
+      }
+      assert.deepEqual(await snapshots(), beforeWait, "Revoked authority must not create reconciliation evidence, journal or audit entries");
+    }
     for (const status of ['pending', 'unknown']) {
       await assert.rejects(() => reconcilePayment(order.id, actor, 'Preserve paid delivery while evidence waits', async () => ({ ...proof, balance: { ...proof.balance, status } } as any)), error => error instanceof ProviderEvidenceError && error.code === (status === 'pending' ? 'STRIPE_BALANCE_PENDING' : 'STRIPE_BALANCE_INVALID'));
       assert.deepEqual(await snapshots(), beforeWait);
