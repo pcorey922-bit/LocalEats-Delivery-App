@@ -7,6 +7,34 @@ repository/branch; preserve all completed work. Do not restart completed checkou
 authentication, homepage, delivery or Stripe investigations. Do not follow the
 archived Android/iOS/signing tasks below: native development is deferred.
 
+### November 15 next deployment verified; financial request identity
+
+Session started at clean remote c44d2228e5a8c7757659172acd896565fa638dd3; all three
+CI workflows passed. Owner deployed it. Independent 23/23 GET/OPTIONS checks now
+confirm that full SHA, healthy dependencies, public/private ordering OFF, live
+charges OFF and provisional_postal with municipal enforcement inactive. Report:
+/tmp/rocoeats-c44d222-postdeployment.json. No provider/diagnostic/financial calls.
+
+Reproduced two financial queue invariant failures with new local fixtures: same
+request ID accepted a different resource ID, and a job labelled for another
+provider reached an execution callback. Queue idempotency now binds provider and
+resource as well as order/kind/payload. Unsupported-provider jobs are held with
+OPERATION_PROVIDER_MISMATCH before attempts/I/O; Stripe execution and manual
+reconciliation reject them too. Original request identity/payload remains intact;
+no historical financial record is corrected or fabricated. No schema changes.
+
+Local PASS: 180 app/API tests, full typechecks/build, website/API/PGlite browser
+delivery regression (simulated payment/Clerk/provider only). Existing geography
+bypass fixtures now include explicit Stripe TEST provider identity so they still
+reach the intended geographic guard. Logs:
+/tmp/rocoeats-finance-identity-{before,tests,build,workflow}.log. Exact pushed CI
+must complete; pending is not success.
+
+Next actionable audit: driver release/arrival/pickup/delivery check permission
+before their transaction. Reproduce permission revocation between authentication
+and mutation; preserve owner-driver exception, custody and lock ordering. No
+hosted changes, provider lookup, ordering/enforcement activation or native work.
+
 ### November 15 post-deployment continuation
 
 Remote HEAD at session start was 4b2cea8fde2657b0b6d0dba5ecc0f39da7681b9a,

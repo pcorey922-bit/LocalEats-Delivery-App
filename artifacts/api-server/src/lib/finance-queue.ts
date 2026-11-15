@@ -27,6 +27,8 @@ export async function enqueueFinancialOperation(
     !operation ||
     operation.orderId !== input.orderId ||
     operation.kind !== input.kind ||
+    operation.resourceId !== input.resourceId ||
+    operation.provider !== "stripe_test" ||
     JSON.stringify(operation.payload) !== JSON.stringify(input.payload)
   ) {
     // JSONB does not preserve key ordering; compare canonicalized keys.
@@ -40,6 +42,8 @@ export async function enqueueFinancialOperation(
       !operation ||
       operation.orderId !== input.orderId ||
       operation.kind !== input.kind ||
+      operation.resourceId !== input.resourceId ||
+      operation.provider !== "stripe_test" ||
       canonical(operation.payload) !== canonical(input.payload)
     )
       throw new CommerceError(

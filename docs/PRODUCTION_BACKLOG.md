@@ -4,6 +4,16 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
+## November 15 financial queue integrity follow-up
+
+c44d2228e5a8c7757659172acd896565fa638dd3 is deployed and independently passed
+23 read-only checks. All ordering/live gates and municipal enforcement remain OFF.
+Financial operation idempotency now rejects conflicting resource/provider identity;
+unsupported-provider jobs are held before execution and rejected from Stripe
+reconciliation. Verified with 180 local app/API tests, builds and simulated-payment
+browser workflow. No schema, hosted record or provider operation changed.
+Next: reproduce stale authorization in driver custody actions before editing them.
+
 ## November 15 post-deployment status
 
 4b2cea8fde2657b0b6d0dba5ecc0f39da7681b9a is now deployed, with 23/23 independent

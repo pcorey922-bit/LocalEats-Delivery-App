@@ -514,6 +514,13 @@ async function claimOperation(): Promise<FinancialOperation | null> {
               a.createdAt.getTime() - b.createdAt.getTime(),
           )[0];
       if (!job) return null;
+      if (job.provider !== "stripe_test") {
+        await tx.update(operations).set({
+          state: "reconciliation", errorCode: "OPERATION_PROVIDER_MISMATCH",
+          leaseToken: null, leaseExpiresAt: null,
+        }).where(eq(operations.id, job.id));
+        return null;
+      }
       if (
         job.firstAttemptAt &&
         !(["refund", "partial_refund"].includes(job.kind) && job.result?.id) &&
@@ -591,6 +598,8 @@ async function claimOperation(): Promise<FinancialOperation | null> {
 export async function executeStripeOperation(
   job: FinancialOperation,
 ): Promise<OperationResult> {
+  if (job.provider !== "stripe_test")
+    throw new CommerceError(409, "Operation provider must be Stripe TEST");
   const stripe = stripeTest();
   const p = job.payload;
   if (job.kind === "checkout") {
@@ -1033,6 +1042,8 @@ export async function reconcileFinancialOperation(
     executor: Pick<typeof db, "select" | "execute">,
     candidate: FinancialOperation,
   ) => {
+    if (candidate.provider !== "stripe_test")
+      throw new CommerceError(409, "Operation provider must be Stripe TEST");
     if (["reconciliation", "failed"].includes(candidate.state)) return true;
     if (!["pending", "processing"].includes(candidate.state)) return false;
     const [hold] = await executor

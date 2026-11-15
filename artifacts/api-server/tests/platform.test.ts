@@ -61,6 +61,7 @@ import { processWebhookInbox } from "../src/lib/webhook-worker";
 import { processPayoutProvisioning } from "../src/lib/payout-onboarding";
 import { executeStripeOperation, processFinancialOperation, reconcileFinancialOperation } from "../src/lib/financial-operations";
 import { postJournal, journalRefund } from "../src/lib/ledger";
+import { enqueueFinancialOperation } from "../src/lib/finance-queue";
 const ids = {
   customer: randomUUID(),
   other: randomUUID(),
@@ -1026,7 +1027,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       const savedProvider=process.env.PAYMENT_PROVIDER, savedKey=process.env.STRIPE_SECRET_KEY;
       try {
         process.env.PAYMENT_PROVIDER='stripe_test';process.env.STRIPE_SECRET_KEY='sk_test_fixture';process.env.STRIPE_WEBHOOK_SECRET='whsec_fixture';
-        await assert.rejects(executeStripeOperation({id:'checkout:municipal-fixture',kind:'checkout',orderId:oldOrder.id,payload:{}} as any),/Geographic delivery verification is unavailable/);
+        await assert.rejects(executeStripeOperation({id:'checkout:municipal-fixture',provider:'stripe_test',kind:'checkout',orderId:oldOrder.id,payload:{}} as any),/Geographic delivery verification is unavailable/);
       } finally {process.env.PAYMENT_PROVIDER=savedProvider; if(savedKey===undefined)delete process.env.STRIPE_SECRET_KEY;else process.env.STRIPE_SECRET_KEY=savedKey;delete process.env.STRIPE_WEBHOOK_SECRET;}
       // Reads of historic orders remain possible without a geocoder or boundary approval.
       assert.equal((await api('/orders/me',ids.customer)).status,200);
@@ -1106,7 +1107,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       await db.update(paymentsTable).set({ provider: 'stripe_test' }).where(eq(paymentsTable.orderId, oldOrder.id));
       assert.equal((await api(`/orders/${oldOrder.id}/checkout`, ids.customer, 'POST')).status, 409);
       assert.equal((await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.orderId, oldOrder.id))).length, 0);
-      await assert.rejects(() => executeStripeOperation({ id: 'checkout:area-fixture', kind: 'checkout', orderId: oldOrder.id, payload: { amount: quote.data.totalCents, origin: 'https://staging.example' } } as any), /Rockwood/);
+      await assert.rejects(() => executeStripeOperation({ id: 'checkout:area-fixture', provider: 'stripe_test', kind: 'checkout', orderId: oldOrder.id, payload: { amount: quote.data.totalCents, origin: 'https://staging.example' } } as any), /Rockwood/);
       assert.equal((await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.orderId, oldOrder.id))).length, 0);
       const history = await api(`/orders/${oldOrder.id}`, ids.customer);
       assert.equal(history.status, 200); // Reading historical orders remains allowed.
@@ -2473,6 +2474,56 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
         );
       } finally {
         process.env.API_MUTATION_LIMIT_PER_MINUTE = "10000";
+      }
+    },
+  );
+  await t.test(
+    "financial idempotency binds provider and resource identity without modifying the original request",
+    async () => {
+      const order = await create();
+      const input = { id: `identity_${randomUUID()}`, orderId: order.id, kind: "checkout" as const, resourceId: randomUUID(), payload: { attempt: 1, amount: order.totalCents } };
+      try {
+        const first = await db.transaction(tx => enqueueFinancialOperation(tx, input));
+        assert.equal((await db.transaction(tx => enqueueFinancialOperation(tx, { ...input, payload: { amount: order.totalCents, attempt: 1 } }))).id, first.id);
+        await assert.rejects(() => db.transaction(tx => enqueueFinancialOperation(tx, { ...input, resourceId: randomUUID() })), /conflict/);
+        const [original] = await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.id, input.id));
+        assert.equal(original.resourceId, input.resourceId);
+        assert.deepEqual(original.payload, input.payload);
+        const foreign = { ...input, id: `foreign_${randomUUID()}` };
+        await db.insert(financialOperationsTable).values({ ...foreign, provider: "sandbox" });
+        await assert.rejects(() => db.transaction(tx => enqueueFinancialOperation(tx, foreign)), /conflict/);
+        const [unchanged] = await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.id, foreign.id));
+        assert.equal(unchanged.provider, "sandbox");
+        assert.equal(unchanged.resourceId, foreign.resourceId);
+      } finally {
+        await db.update(financialOperationsTable).set({ state: "cancelled" }).where(eq(financialOperationsTable.orderId, order.id));
+        await api(`/orders/${order.id}/cancel`, ids.customer, "POST", { reason: "Close isolated immutable queue identity fixture" });
+      }
+    },
+  );
+  await t.test(
+    "unknown financial providers are held before execution and cannot be reconciled through Stripe",
+    async () => {
+      const order = await create();
+      const id = `foreign_worker_${randomUUID()}`;
+      await db.insert(financialOperationsTable).values({ id, orderId: order.id, kind: "checkout", resourceId: randomUUID(), provider: "sandbox", payload: { attempt: 1 }, createdAt: new Date(-86400000), nextAttemptAt: new Date(0) });
+      try {
+        let executions = 0, reads = 0;
+        await processFinancialOperation(async () => { executions++; throw Error("Wrong provider must not execute"); });
+        assert.equal(executions, 0);
+        const [held] = await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.id, id));
+        assert.equal(held.state, "reconciliation");
+        assert.equal(held.errorCode, "OPERATION_PROVIDER_MISMATCH");
+        assert.equal(held.attempts, 0);
+        assert.equal(held.firstAttemptAt, null);
+        const [actor] = await db.select().from(profilesTable).where(eq(profilesTable.id, ids.admin));
+        await assert.rejects(() => reconcileFinancialOperation(id, actor, "Inspect isolated foreign-provider fixture", async () => { reads++; return null; }), /provider/i);
+        assert.equal(reads, 0);
+        await assert.rejects(() => executeStripeOperation(held), /provider/i);
+        assert.equal(held.provider, "sandbox");
+      } finally {
+        await db.update(financialOperationsTable).set({ state: "cancelled" }).where(eq(financialOperationsTable.id, id));
+        await api(`/orders/${order.id}/cancel`, ids.customer, "POST", { reason: "Close isolated provider mismatch fixture" });
       }
     },
   );
