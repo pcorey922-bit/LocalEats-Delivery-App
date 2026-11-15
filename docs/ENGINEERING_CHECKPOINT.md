@@ -7,6 +7,57 @@ repository/branch; preserve all completed work. Do not restart completed checkou
 authentication, homepage, delivery or Stripe investigations. Do not follow the
 archived Android/iOS/signing tasks below: native development is deferred.
 
+### November 15 guest-service acceptance and cancellation correction
+
+Completed/pushed menu commits:
+- 1424ea197e7903b2876c086de933feec3a3bfde1 — item descriptions and phone editor.
+- 810d0049b4cebe69410589b277c978c98b64f386 — category forms and menu errors.
+All THREE GitHub workflows completed SUCCESS for each exact SHA (push Validate,
+PR Validate, existing unsigned native workflow; no native changes).
+
+Confirmed core defect: OrderActions cancellation invalidated registered history
+and payment details but not guest order, restaurant confirmation or tracking.
+An already-cancelled order could retain stale status/payment controls until its
+10-second poll. Successful cancellation now awaits invalidation of all affected
+order/history/guest/confirmation/tracking/payment caches. Backend cancellation,
+refund authorization and financial behavior are unchanged.
+
+New browser acceptance covers actual guest menu/cart/address/quote/order creation,
+private tracking, support request, administrator decision, guest reply and unpaid
+cancellation with interval polling paused. Cancellation immediately updates tracking
+and confirmation, removes payment/cancel controls and persists across reload.
+The same test against a temporary bundle of PREVIOUS committed commerce-pages
+fails waiting for the immediate tracking GET; fixed code passes. Working sources
+were never reverted. Only disposable local data/simulated Clerk are used; no
+payment/checkout/provider call is made by this guest-service test.
+
+Validation PASS: 183 app/API cases (182 pass, one PostgreSQL-only local skip),
+14 CLI/readiness/config tests, full typechecks/API+web production builds, complete
+mobile website/API/PGlite delivery+ledger workflow and account/homepage/CSP browser
+regressions. Separate existing delivery/payment fixture uses the local simulator,
+not Stripe TEST acceptance. Only preexisting build chunk/annotation warnings.
+Logs: /tmp/rocoeats-core-final-{build,workflow,account}.log and
+/tmp/rocoeats-guest-service-{baseline,after}.log. Focused modes:
+ROCOEATS_MENU_ONLY=true or ROCOEATS_GUEST_SERVICE_ONLY=true with
+scripts/verify-website-workflow.mjs and existing Playwright environment paths.
+CI for this cancellation commit must be checked after push; pending is not success.
+
+Current staging stays 4934f2413756e0b88bc0da333ec7f906569de906, independently
+verified 23/23 read-only checks, all closed safeguards and municipal inactive.
+No migration/env changes are required for these UI improvements. No deployment,
+provider lookup, hosted record/financial mutation, native edit or PR merge occurred.
+
+Next exact engineering action: fetch/inspect this commit's THREE CI conclusions;
+repair any actual failures. Once green, await owner approval for the exact final
+SHA deployment to the existing service, then repeat read-only verification and
+owner Samsung acceptance. Do not invent more feature work: currently reviewed
+core lifecycle/support/finance workflows are implemented. Remaining launch gates
+are geographic real-evidence acceptance/activation, authorized real-provider
+financial scenarios and settlement, production uptime/hosted backup acceptance,
+and owner device/operations policy approval. Historical payment reconciliation
+requires explicit provider availability evidence AND separate owner authorization.
+Do not repeat the one-run Geocodio suite or open ordering for UI verification.
+
 ### November 15 menu-management completion follow-up
 
 Pushed 1424ea197e7903b2876c086de933feec3a3bfde1: menu descriptions/mobile item

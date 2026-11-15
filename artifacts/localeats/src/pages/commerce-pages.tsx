@@ -19,7 +19,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
-  getListMyOrdersQueryKey,
+  getListMyOrdersQueryKey, getGetMyOrderQueryKey,
 } from "@workspace/api-client-react";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 import type { Order } from "@workspace/api-client-react";
@@ -202,9 +202,15 @@ export function OrderActions({ order }: { order: Order }) {
         method: "POST",
         body: JSON.stringify({ reason: "Cancellation requested in app" }),
       }),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: getListMyOrdersQueryKey() });
-      void client.invalidateQueries({ queryKey: ["payment", order.id] });
+    onSuccess: async () => {
+      // Guest tracking uses a different cache from registered order history.
+      // Refresh all visible order state after cancellation, before re-enabling
+      // controls; do not leave a cancelled order offering payment until polling.
+      await Promise.all([
+        getListMyOrdersQueryKey(), getGetMyOrderQueryKey(order.id),
+        ["guest-order", order.id], ["order-confirmation", order.id],
+        ["tracking", order.id], ["payment", order.id],
+      ].map(queryKey => client.invalidateQueries({ queryKey })));
     },
   });
   const mayCancel =

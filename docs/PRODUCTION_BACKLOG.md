@@ -19,9 +19,14 @@ ledger/refunds/credits/disputes/payout and reconciliation controls. Preserve the
 Actionable software completion: restaurant menu descriptions are now editable via
 an accessible phone form instead of name/price-only prompts, with exact price
 validation and failure recovery. Category create/rename now use phone forms, and
-failed visibility/deletion actions show errors. Targeted local browser tests and
-full typechecks/build pass. Next: guest support/cancellation browser acceptance
-and final full regression/CI; do not duplicate the implemented guest support API/UI.
+failed visibility/deletion actions show errors. Both menu commits have three
+successful exact-SHA CI conclusions. Guest support already existed and now has
+full browser acceptance through administrator decision and guest reply. Confirmed
+stale cancellation UI is fixed: affected order/confirmation/tracking caches refresh
+immediately, with polling-paused regression. Full local browser/API workflow,
+account/homepage/CSP checks and typechecks/builds pass. Check final pushed CI; then
+the next release action is separately approved deployment and Samsung acceptance.
+No additional missing core workflow was established in this functional review.
 
 Launch acceptance blockers (do not invent new features to avoid these gates):
 1. Geographic accuracy: independent public-building ground truth, unresolved office
