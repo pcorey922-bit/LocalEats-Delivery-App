@@ -127,7 +127,10 @@ const payload = (query: string) => {
       country: "US",
       ...(unit ? { unit_type: "Suite", unit_number: "1" } : {}),
     },
-    location: { lng: -84.684, lat: airport ? 35.922333 : 35.865 },
+    location: {
+      lng: boundary ? -84.619035 : -84.684,
+      lat: boundary ? 35.876921 : airport ? 35.922333 : 35.865,
+    },
     untrusted_provider_text: secret,
   };
   return { results: ambiguous ? [r, r] : [r], ignored_key: secret };
@@ -195,6 +198,30 @@ test("fixed public suite caps lookups, excludes unsupported ZIP and does not act
   });
   assert.equal(calls, publicAccuracyRequestLimit);
   assert.equal(report.requestsMade, 5);
+  assert.equal(report.reportVersion, 2);
+  assert.equal(
+    report.cases.find((c) => c.id === "city-hall")?.rejectionReason,
+    null,
+  );
+  assert.equal(
+    report.cases.find((c) => c.id === "ambiguous-public-street")
+      ?.rejectionReason,
+    "invalid_input",
+  );
+  assert.equal(
+    report.cases.find((c) => c.id === "same-zip-outside-airport")
+      ?.rejectionReason,
+    "outside_boundary",
+  );
+  assert.equal(
+    report.cases.find((c) => c.id === "boundary-review-candidate")?.expected,
+    "reject",
+  );
+  assert.equal(
+    report.cases.find((c) => c.id === "boundary-review-candidate")
+      ?.expectationMet,
+    true,
+  );
   assert.equal(
     report.cases.find((c) => c.id === "city-hall")?.status,
     "accepted_by_validator",

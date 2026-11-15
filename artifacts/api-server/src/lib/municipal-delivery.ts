@@ -59,11 +59,28 @@ const unavailable = () =>
     503,
     "Geographic delivery verification is unavailable. Please try later or contact operations.",
   );
-const ineligible = () =>
-  new CommerceError(
-    409,
-    "This address cannot be verified inside the approved Rockwood delivery area. Contact operations for review.",
-  );
+export type GeographicRejectionReason =
+  | "invalid_input"
+  | "candidate_count"
+  | "invalid_provider_shape"
+  | "address_component_types"
+  | "unsupported_precision"
+  | "locality_mismatch"
+  | "street_mismatch"
+  | "unit_mismatch"
+  | "invalid_coordinates"
+  | "outside_boundary"
+  | "boundary_margin";
+export class GeographicValidationError extends CommerceError {
+  constructor(public readonly reason: GeographicRejectionReason) {
+    super(
+      409,
+      "This address cannot be verified inside the approved Rockwood delivery area. Contact operations for review.",
+    );
+  }
+}
+const ineligible = (reason: GeographicRejectionReason = "invalid_input") =>
+  new GeographicValidationError(reason);
 
 // Local distance projection is conservative for this small Tennessee service area.
 function segmentDistance(point: Point, a: Point, b: Point) {
@@ -203,14 +220,15 @@ export function validateGeocodioResult(
   inputAddress(address);
   const results = isRecord(data) ? data.results : undefined;
   // Do not silently select the first candidate from ambiguous provider results.
-  if (!Array.isArray(results) || results.length !== 1) throw ineligible();
+  if (!Array.isArray(results) || results.length !== 1)
+    throw ineligible("candidate_count");
   const result: unknown = results[0];
   if (
     !isRecord(result) ||
     !isRecord(result.address_components) ||
     !isRecord(result.location)
   )
-    throw ineligible();
+    throw ineligible("invalid_provider_shape");
   const components = result.address_components;
   if (
     typeof components.number !== "string" ||
@@ -220,21 +238,30 @@ export function validateGeocodioResult(
     (components.unit_type != null &&
       typeof components.unit_type !== "string") ||
     (components.unit_number != null &&
-      typeof components.unit_number !== "string") ||
+      typeof components.unit_number !== "string")
+  )
+    throw ineligible("address_component_types");
+  if (
     typeof result.match_type !== "string" ||
     result.accuracy !== 1 ||
     result.accuracy_type !== "rooftop" ||
-    !["rooftop", "building_centroid", "unit"].includes(result.match_type) ||
+    !["rooftop", "building_centroid", "unit"].includes(result.match_type)
+  )
+    throw ineligible("unsupported_precision");
+  if (
     canonical(components.country) !== "us" ||
     canonical(components.state) !== "tn" ||
     canonical(components.city) !== "rockwood" ||
     typeof components.zip !== "string" ||
-    !/^37854(?:-\d{4})?$/.test(components.zip ?? "") ||
+    !/^37854(?:-\d{4})?$/.test(components.zip ?? "")
+  )
+    throw ineligible("locality_mismatch");
+  if (
     street(
       `${components.number ?? ""} ${components.formatted_street ?? ""}`,
     ) !== street(address.street1)
   )
-    throw ineligible();
+    throw ineligible("street_mismatch");
   const unit = canonical(address.street2);
   if (
     unit &&
@@ -243,14 +270,21 @@ export function validateGeocodioResult(
     ).replace(/^apt |^ste |^suite |^unit |^#\s*/, "") !==
       unit.replace(/^apt |^ste |^suite |^unit |^#\s*/, "")
   )
-    throw ineligible();
+    throw ineligible("unit_mismatch");
   const { lng, lat } = result.location;
   if (
     typeof lng !== "number" ||
     typeof lat !== "number" ||
-    !safelyInsideBoundary([lng, lat], geometry)
+    !Number.isFinite(lng) ||
+    !Number.isFinite(lat) ||
+    Math.abs(lng) > 180 ||
+    Math.abs(lat) > 90
   )
-    throw ineligible();
+    throw ineligible("invalid_coordinates");
+  if (!safelyInsideBoundary([lng, lat], geometry, 0))
+    throw ineligible("outside_boundary");
+  if (!safelyInsideBoundary([lng, lat], geometry))
+    throw ineligible("boundary_margin");
   return { longitude: lng, latitude: lat, boundarySha256 };
 }
 export function geographicReadiness(env = process.env) {

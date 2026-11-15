@@ -1,5 +1,29 @@
 # Live Geocodio owner diagnostic — November 14, 2026
 
+## November 15 offline investigation (does not rewrite the saved report)
+
+The saved office summary proves one candidate, supported 1.0 rooftop/building-centroid
+precision and safe interior coordinates. It omits normalized address components and
+the exact rejection branch. The missing facts cannot be reconstructed from it.
+Regression reconstruction of the earlier CSV Ste 1 passes Suite 1, including
+abbreviation/punctuation/case variations. Missing/different unit, malformed number
+or unit types, street/house-number mismatch and locality mismatch each reproduce
+the same summary while failing distinct policy checks. None is uniquely proven
+as the live cause. An exact unit-mismatch claim would fabricate missing evidence.
+
+The CSV put the unit on the street line; the API query joined street and unit with
+a comma. That observable formatting difference is only a hypothesis about provider
+parsing, not evidence of a defect; query/admission rules were not relaxed.
+If existing saved provider request history contains the returned public address
+components, review it without a new lookup. Otherwise this historical cause remains
+unknown and the office case cannot be marked accepted. Do not repeat the suite.
+
+Code now emits sanitized finite rejection codes in version 2 reports. It preserves
+eligibility and public HTTP error text, and cannot backfill the historical report.
+The forestry expectation is corrected to reject for its proven excluded-hole point;
+this changes diagnostic classification only, not the approved boundary or 30 m rule.
+No one-shot allowance key/reset or hosted data changed.
+
 Evidence source: owner-transcribed complete sanitized three-screenshot report; no provider calls repeated. Mode `real_provider`, 5 requests / maximum 5. Boundary SHA-256 `e1ebc348ed9cc92ffe8ba8ba0d00873486c9fec851233d4190daad3538289d1f`. Overall `accuracyAcceptancePassed=false`, `activationReady=false`.
 
 | Case | Actual | Expected | Accuracy / geometry | Expectation |

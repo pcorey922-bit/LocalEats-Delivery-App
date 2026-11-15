@@ -1,11 +1,42 @@
 # RoCoEats resumable engineering checkpoint
 
-## READ FIRST — recovered website/backend continuation, November 14, 2026 UTC
+## READ FIRST — recovered website/backend continuation, November 15, 2026 UTC
 
 This section supersedes the historical checkpoints below. Resume the existing
 repository/branch; preserve all completed work. Do not restart completed checkout,
 authentication, homepage, delivery or Stripe investigations. Do not follow the
 archived Android/iOS/signing tasks below: native development is deferred.
+
+### November 15 recovery — sanitized geographic decisions
+
+Fetched branch at 2b1ef590769e8325a979b5114f898977c3776f6e (all three CI workflows
+completed successfully). Recovered four uncommitted geographic code/test files;
+no prior work overwritten. Latest independently verified deployed SHA remains
+13717a36e27967e60167764d1e7358c90e256a78, which passed 23 read-only checks.
+
+Recovered changes add typed, finite rejection codes to the existing validator;
+HTTP 409 text/eligibility remains unchanged. Version 2 diagnostic reports include
+only sanitized reason codes, never returned street/unit text or raw errors. The
+forestry case now expects rejection because its known point lies in an excluded
+hole, not an unresolved review outcome. No one-run claim key/reset changed; old
+stored reports are never rewritten or backfilled.
+
+Office investigation: CSV Ste 1 and Suite 1 pass the unchanged normalization.
+Offline variants prove malformed component types, street/locality mismatches and
+missing/different units can each reproduce the saved rejected summary. The live
+report omitted those fields and the rejection reason. Exact historical cause is
+NOT recoverable from that summary; a unit mismatch is a hypothesis, not proven.
+See delivery-area/geocodio-live-api-review-2026-11-14.md. Do not repeat lookups.
+
+Validation logs /tmp/rocoeats-recovered-geography-{tests,build,cli,account,workflow}.log.
+Local PASS: 172 app/API tests, 14 CLI/staging tests, typechecks, production builds,
+both mobile/account and website/API/PGlite delivery browser suites (simulated
+Clerk/payments only). Exact pushed commit CI must still complete after push.
+Next independent task: audit dispatch presence/assignment timing against database
+time and interrupted-request recovery. Preserve native code, all financial data,
+closed ordering/live gates and inactive municipal enforcement. Owner still needs
+to confirm diagnostic flag false and independent building ground truth; no keys
+in chat and no laptop/terminal requirements.
 
 ### Phone-only owner workflow — November 14, 2026
 

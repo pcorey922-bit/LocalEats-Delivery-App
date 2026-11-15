@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
   createMunicipalValidator,
+  GeographicValidationError,
   deliveryBoundaryGeometry,
   boundaryDistanceMeters,
   validateGeocodioResult,
@@ -66,6 +67,91 @@ const response = (data: unknown) =>
   new Response(JSON.stringify(data), {
     headers: { "content-type": "application/json" },
   });
+test("saved office CSV accepts suite abbreviations; several distinct mismatches fit the historical sanitized rejection", () => {
+  const row = ownerGeocodioObservations.rows.find(
+    (r) => r.caseId === "public-office-unit",
+  )!;
+  const c = row.csvFields;
+  const office = publicAccuracyCases.find((r) => r.id === row.caseId)!.address;
+  // Diagnostic reconstruction of selected CSV fields, NOT the missing live API
+  // address components or proof of that response's exact rejection reason.
+  const saved = {
+    results: [
+      {
+        accuracy: Number(c["Geocodio Accuracy Score"]),
+        accuracy_type: c["Geocodio Accuracy Type"],
+        match_type: c["Geocodio Match Type"],
+        location: {
+          lng: Number(c["Geocodio Longitude"]),
+          lat: Number(c["Geocodio Latitude"]),
+        },
+        address_components: {
+          number: c["Geocodio House Number"],
+          formatted_street: c["Geocodio Street"],
+          city: c["Geocodio City"],
+          state: c["Geocodio State / Province"],
+          zip: c["Geocodio Postal Code"],
+          country: c["Geocodio Country"],
+          unit_type: c["Geocodio Unit Type"],
+          unit_number: c["Geocodio Unit Number"],
+        } as Record<string, unknown>,
+      },
+    ],
+  };
+  for (const unit_type of ["Ste", "Ste.", "Suite", " SUITE ", "Unit", "#"]) {
+    const data = structuredClone(saved);
+    data.results[0].address_components.unit_type = unit_type;
+    assert.ok(validateGeocodioResult(data, office));
+  }
+  for (const [patch, reason] of [
+    [{ unit_type: undefined, unit_number: undefined }, "unit_mismatch"],
+    [{ unit_number: "2" }, "unit_mismatch"],
+    [{ unit_number: "01" }, "unit_mismatch"],
+    [{ unit_number: 1 }, "address_component_types"],
+    [{ number: 1070 }, "address_component_types"],
+    [{ number: "1071" }, "street_mismatch"],
+    [{ formatted_street: "S Gateway Ave" }, "street_mismatch"],
+    [{ country: "USA" }, "locality_mismatch"],
+    [{ zip: "37748" }, "locality_mismatch"],
+  ] as const) {
+    const data = structuredClone(saved);
+    Object.assign(data.results[0].address_components, patch);
+    // All alternatives retain the observed result count, score, precision and
+    // interior coordinate. The summary cannot distinguish these causes.
+    assert.throws(
+      () => validateGeocodioResult(data, office),
+      (error) =>
+        error instanceof GeographicValidationError &&
+        error.status === 409 &&
+        error.reason === reason,
+    );
+  }
+});
+
+test("diagnostic reasons distinguish ambiguous results, excluded holes and interior edge review without changing eligibility", () => {
+  assert.throws(
+    () => validateGeocodioResult({ results: [result, result] }, address),
+    (error) =>
+      error instanceof GeographicValidationError &&
+      error.reason === "candidate_count",
+  );
+  const edge = evidence();
+  edge.results[0].location = { lng: 0.0001, lat: 0.2 };
+  assert.throws(
+    () => validateGeocodioResult(edge, address, square),
+    (error) =>
+      error instanceof GeographicValidationError &&
+      error.reason === "boundary_margin",
+  );
+  const outside = evidence();
+  outside.results[0].location = { lng: -84.619035, lat: 35.876921 };
+  assert.throws(
+    () => validateGeocodioResult(outside, address),
+    (error) =>
+      error instanceof GeographicValidationError &&
+      error.reason === "outside_boundary",
+  );
+});
 test("polygon holes, exterior, exact edges and uncertain edge buffer fail closed", () => {
   assert.ok(safelyInsideBoundary([0.2, 0.2], square));
   for (const p of [

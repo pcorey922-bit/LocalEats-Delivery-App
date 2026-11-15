@@ -6,6 +6,7 @@ import {
   requestGeocodioEvidence,
   safelyInsideBoundary,
   validateGeocodioResult,
+  GeographicValidationError,
 } from "./municipal-delivery";
 
 // No custom address/file/URL input is supported. This suite cannot read customers,
@@ -54,7 +55,7 @@ export const publicAccuracyCases = [
       region: "TN",
       postalCode: "37854",
     },
-    expected: "review",
+    expected: "reject",
     source:
       "https://www.tn.gov/agriculture/forests/state-forests/lone-mountain.html",
   },
@@ -150,6 +151,7 @@ export async function runPublicAccuracy(
   } = {},
 ) {
   const report = {
+    reportVersion: 2,
     provider: "geocodio",
     mode: options.live ? "real_provider" : "dry_run",
     boundarySha256,
@@ -232,10 +234,19 @@ export async function runPublicAccuracy(
       continue;
     }
     let accepted = false;
+    let rejectionReason: string | null = null;
+    let validationUnavailable = false;
     try {
       validateGeocodioResult(evidence, c.address);
       accepted = true;
-    } catch {}
+    } catch (error) {
+      if (error instanceof GeographicValidationError)
+        rejectionReason = error.reason;
+      else {
+        rejectionReason = "validation_unavailable";
+        validationUnavailable = true;
+      }
+    }
     const details = observations(evidence);
     realAmbiguity ||= details.resultCount > 1;
     nearBoundary ||= details.candidates.some(
@@ -244,14 +255,18 @@ export async function runPublicAccuracy(
     );
     report.cases.push({
       id: c.id,
-      status: accepted ? "accepted_by_validator" : "rejected_by_validator",
+      status: validationUnavailable
+        ? "validation_unavailable"
+        : accepted
+          ? "accepted_by_validator"
+          : "rejected_by_validator",
+      rejectionReason,
       expected: c.expected,
-      expectationMet:
-        c.expected === "review"
-          ? null
-          : c.expected === "accept"
-            ? accepted
-            : !accepted,
+      expectationMet: validationUnavailable
+        ? false
+        : c.expected === "accept"
+          ? accepted
+          : !accepted,
       ...details,
     });
   }

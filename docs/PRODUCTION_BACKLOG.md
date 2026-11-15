@@ -4,6 +4,26 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
+## Current continuation — November 15, 2026
+
+Latest verified deployed release is 13717a36e27967e60167764d1e7358c90e256a78;
+23 read-only checks passed with public/private ordering and live charges OFF,
+Stripe TEST configured and municipal enforcement inactive. Historical release
+notes below are retained; do not redeploy or rerun the successful payment.
+Owner's live Geocodio report is preserved in
+delivery-area/geocodio-live-api-review-2026-11-14.md. Office rejection remains
+unresolved because normalized returned components/reason were not retained.
+Recovered code adds sanitized rejection reasons and deterministic suite/address
+mismatch tests; no admission rules or geography changed. Forestry rejection is
+correct for the excluded hole; its diagnostic expectation is now explicit reject.
+Do not reset/repeat the one-shot provider suite. Activation requires independent
+public-building verification, resolution of missing office evidence and separate
+owner authorization. Confirm diagnostic flag OFF through the owner's panel.
+
+Next engineering priority: dispatch clock consistency, assignment/custody recovery,
+then financial exception handling and notification reliability. Existing completed
+features should be audited/tested before changes; do not rebuild them.
+
 ## Rockwood boundary approved and deployed — provider acceptance and activation pending
 
 Deployed `9c095d3` independently passed all 23 read-only staging checks on
