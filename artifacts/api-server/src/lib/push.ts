@@ -6,6 +6,7 @@ import {
   and,
   eq,
   lt,
+  gte,
   lte,
   or,
   inArray,
@@ -177,10 +178,52 @@ async function summarize(
     })
     .where(eq(notificationsTable.id, notificationId));
 }
+
+async function recoverExhaustedClaim() {
+  return db.transaction(async (tx) => {
+    const expired = and(
+      eq(deliveries.state, "processing"),
+      gte(deliveries.attempts, 5),
+      lte(deliveries.leaseExpiresAt, sql`clock_timestamp()`),
+    );
+    // Match completion/admin-retry lock order: notification BEFORE delivery.
+    // Never take a live lease or hold this lock across provider I/O.
+    const [row] = await tx
+      .select({ id: deliveries.id, notificationId: deliveries.notificationId })
+      .from(deliveries)
+      .innerJoin(
+        notificationsTable,
+        eq(notificationsTable.id, deliveries.notificationId),
+      )
+      .where(expired)
+      .orderBy(asc(deliveries.leaseExpiresAt), asc(deliveries.id))
+      .for("update", { of: notificationsTable, skipLocked: true })
+      .limit(1);
+    if (!row) return false;
+    const [updated] = await tx
+      .update(deliveries)
+      .set({
+        state: "failed",
+        errorCode: "PROVIDER_ACKNOWLEDGEMENT_UNCONFIRMED",
+        leaseToken: null,
+        leaseExpiresAt: null,
+        acceptedAt: null,
+      })
+      .where(and(eq(deliveries.id, row.id), expired))
+      .returning({ id: deliveries.id });
+    if (!updated) return false;
+    await summarize(tx, row.notificationId);
+    return true;
+  });
+}
 export async function processPushDelivery(
   send: PushSender = sendPush,
   config: PushConfiguration = pushConfiguration(),
 ) {
+  // A crash during attempt five must not strand a processing row forever. Mark
+  // the unknown outcome for audited operator recovery; NEVER send attempt six.
+  // Clearing the lease token fences a delayed acknowledgement from the old worker.
+  if (await recoverExhaustedClaim()) return true;
   const now = await databaseNow();
   const claimed = await db.transaction(async (tx) => {
     const [row] = await tx

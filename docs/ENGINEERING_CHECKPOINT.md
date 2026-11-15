@@ -7,6 +7,54 @@ repository/branch; preserve all completed work. Do not restart completed checkou
 authentication, homepage, delivery or Stripe investigations. Do not follow the
 archived Android/iOS/signing tasks below: native development is deferred.
 
+### November 15 current checkpoint — notification recovery verified locally
+
+Completed preserved/recovered geographic work (a4f0caf2cfba2b324f4db15d2cd7813be108e0ff),
+dispatch database-time safety (a52385ffd609c3f882dd9e9335145d1a8dbf18de) and handoff
+expiry/idempotency (ba92d0f61b5e29393ba0c65b0a240def1fb98e20). First two commits'
+three workflows passed. Check handoff/latest exact-SHA workflow completion on GitHub.
+
+Reproduced an exhausted fifth push claim stranded in processing after lease expiry:
+the old selector excluded attempts >=5 forever, so admins could not use failed-job
+recovery. Fix transitions expired final processing claims to failed with generic
+unconfirmed-acknowledgement code, clears the lease token (late acknowledgements
+cannot overwrite it), and summarizes the notification. No sixth provider send.
+Notification-before-delivery lock order matches completion/admin retry; active
+leases remain untouched. Recovery works without provider configuration. Existing
+audited administrator retry remains the only way to send again; it does not claim
+that a device did/did not receive the earlier attempt. In-app inbox is preserved.
+This is shared backend work, not native development or provider/device acceptance.
+
+Local PASS: 176 app/API tests, 14 CLI/staging tests, full typechecks/production
+builds and local website/API/PGlite browser workflow. Mobile/account/CSP browser
+suite passed for the recovery commit; no later UI changes. All payments, Clerk,
+push responses in these tests are simulated. Reproduction failure log:
+/tmp/rocoeats-push-exhaustion-before.log. Passing logs:
+/tmp/rocoeats-push-exhaustion-{tests,build,workflow}.log. Latest CI pending push at
+checkpoint creation; never treat pending as success. Keep branch and PR unmerged.
+
+Focused audit of existing financial queue, webhook inbox, dispute holds, provider
+fee validation, stock reservation expiry and notification retries found existing
+coverage for locks, replay, durable leases and unknown-provider outcomes; preserve
+these implementations. No further confirmed defect from this focused review.
+Do not invent provider evidence or repeat prior end-to-end payment to fill gaps.
+
+Remaining blockers: office historical rejection cannot be uniquely determined
+from sanitized summary lacking returned components/reason; independently verify
+public-building locations using existing evidence/free official maps; owner must
+confirm temporary diagnostic flag false through Operations (no key sharing),
+review actual evidence and separately approve geographic activation/deployment.
+Stripe settlement for the completed $19.19 order still requires actual available
+provider evidence plus separate reconciliation authorization; do NOT retry now.
+Latest verified deployed SHA remains 13717a36e27967e60167764d1e7358c90e256a78.
+No hosted record/settings, payment, provider lookup, native source or migration
+changed. Public/private ordering and live charges stay OFF; Stripe TEST only.
+
+Resume: fetch branch/tree without overwriting changes; inspect exact latest SHA's
+three CI runs. Fix any genuine regression first. Otherwise owner-approved staging
+deployment and authenticated acceptance of the saved changes are the next gate;
+do not repeat local suites absent code changes/failures or reset one-shot lookup.
+
 ### November 15 handoff expiry follow-up
 
 Dispatch fix committed as a52385f (exact CI status must be read from GitHub).

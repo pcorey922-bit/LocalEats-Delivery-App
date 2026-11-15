@@ -3200,6 +3200,55 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     },
   );
   await t.test(
+    "expired fifth push claim becomes an actionable failure without a sixth send and fences late acknowledgements",
+    async () => {
+      const owner = randomUUID();
+      await db.insert(profilesTable).values({ id: owner, clerkUserId: owner, role: "customer", displayName: "Final push lease fixture" });
+      const [notice] = await db.insert(notificationsTable).values({ profileId: owner, eventKey: randomUUID(), title: "Final claim fixture", body: "Nonprivate local fixture" }).returning();
+      await db.insert(notificationDevicesTable).values({ profileId: owner, platform: "android", token: "final_push_claim_fixture_only" });
+      await fanOutPushNotifications();
+      const [task] = await db.select().from(pushDeliveriesTable).where(eq(pushDeliveriesTable.notificationId, notice.id));
+      await db.update(pushDeliveriesTable).set({ attempts: 4 }).where(eq(pushDeliveriesTable.id, task.id));
+      const config = { android: true, ios: false, testMode: true as const };
+      let release!: () => void, began!: () => void;
+      const gate = new Promise<void>(resolve => release = resolve), started = new Promise<void>(resolve => began = resolve);
+      let sends = 0;
+      const original = processPushDelivery(async () => { sends++; began(); await gate; }, config);
+      await started;
+      try {
+        const [claimed] = await db.select().from(pushDeliveriesTable).where(eq(pushDeliveriesTable.id, task.id));
+        assert.equal(claimed.attempts, 5);
+        assert.equal(await processPushDelivery(async () => { throw Error("Active final claim must not be touched"); }, config), false);
+        await db.update(pushDeliveriesTable).set({ leaseExpiresAt: new Date(0) }).where(eq(pushDeliveriesTable.id, task.id));
+        // Recovery must also work with provider configuration unavailable.
+        assert.equal(await processPushDelivery(async () => { sends++; }, { android: false, ios: false, testMode: true }), true);
+        let [saved] = await db.select().from(pushDeliveriesTable).where(eq(pushDeliveriesTable.id, task.id));
+        assert.equal(saved.state, "failed");
+        assert.equal(saved.attempts, 5);
+        assert.equal(saved.leaseToken, null);
+        assert.equal(saved.acceptedAt, null);
+        assert.equal(saved.errorCode, "PROVIDER_ACKNOWLEDGEMENT_UNCONFIRMED");
+        const [summary] = await db.select().from(notificationsTable).where(eq(notificationsTable.id, notice.id));
+        assert.equal(summary.pushState, "failed");
+        release(); await original;
+        [saved] = await db.select().from(pushDeliveriesTable).where(eq(pushDeliveriesTable.id, task.id));
+        assert.equal(saved.state, "failed", "Late original worker cannot overwrite the recovered state");
+        assert.equal(sends, 1);
+        assert.equal(await processPushDelivery(async () => { sends++; }, config), false);
+        const path = `/admin/push-deliveries/${task.id}/retry`;
+        assert.equal((await api(path, ids.customer, "POST", { reason: "Review unknown acknowledgement before retry" })).status, 403);
+        assert.equal((await api(path, ids.admin, "POST", { reason: "Reviewed unknown outcome; retry test notification" })).status, 202);
+        assert.equal(await processPushDelivery(async () => { sends++; }, config), true);
+        [saved] = await db.select().from(pushDeliveriesTable).where(eq(pushDeliveriesTable.id, task.id));
+        assert.equal(saved.state, "provider_accepted");
+        assert.equal(saved.attempts, 1);
+        assert.equal(sends, 2);
+      } finally {
+        release(); await original;
+      }
+    },
+  );
+  await t.test(
     "database clock controls job eligibility and leases despite application clock skew",
     async () => {
       const originalNow = Date.now;

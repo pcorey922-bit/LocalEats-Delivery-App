@@ -4,6 +4,26 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
+## November 15 verified engineering progress
+
+Recovered geographic diagnostics and office mismatch regressions; database-time
+driver presence/assignment/location checks; database-time handoff expiry and
+idempotent completion; exhausted fifth-attempt push lease recovery. Latest local
+suite: 176 app/API tests, 14 CLI/staging tests, typechecks/builds and local browser
+delivery regression pass. Provider/payment/device behavior remains simulated in
+these tests. See ENGINEERING_CHECKPOINT.md for commits, CI and resumption details.
+
+Notification recovery never sends an automatic sixth attempt. Unknown provider
+outcomes become failed/actionable; late acknowledgements are fenced, summaries
+recover, and the existing audited administrator retry is required for another send.
+No mobile build/source, hosted settings, real provider operation or finance record
+was changed. All ordering and live-charge gates remain closed.
+
+Remaining launch gates are owner-controlled deployment/authenticated staging
+acceptance, independent geographic ground truth and missing historical office
+components, diagnostic shutdown confirmation, and actual Stripe settlement evidence
+with separately authorized reconciliation. No claim of full production acceptance.
+
 ## Current continuation — November 15, 2026
 
 Latest verified deployed release is 13717a36e27967e60167764d1e7358c90e256a78;
