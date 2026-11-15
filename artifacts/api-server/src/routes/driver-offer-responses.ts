@@ -18,7 +18,7 @@ import { hasDriverAccess } from "../lib/owner-access";
 import { CommerceError } from "../lib/commerce-policy";
 import { databaseNow } from "../lib/database-clock";
 import { audit } from "../lib/commerce";
-import { presenceFreshMs } from "./dispatch";
+import { presenceIsFresh } from "../lib/driver-presence";
 const router = Router();
 router.post(
   "/driver/orders/:orderId/decline-offer",
@@ -62,10 +62,7 @@ router.post(
         .from(driverPresenceTable)
         .where(eq(driverPresenceTable.profileId, profile.id))
         .limit(1);
-      if (
-        !presence?.available ||
-        Date.now() - presence.heartbeatAt.getTime() > presenceFreshMs
-      )
+      if (!presenceIsFresh(presence, await databaseNow(tx)))
         throw new CommerceError(409, "Go online before responding to offers");
       const [busy] = await tx
         .select({ id: deliveriesTable.id })

@@ -3518,6 +3518,51 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     await assert.rejects(engine.exec(`UPDATE support_messages SET body='rewritten' WHERE id='${reply.id}'`));await assert.rejects(engine.exec(`DELETE FROM support_messages WHERE id='${reply.id}'`));await assert.rejects(engine.exec('TRUNCATE support_messages'));
   });
 
+  await t.test("dispatch uses database time for presence, optional offers and assignments; future/stale heartbeats require explicit reconnect", async () => {
+    const courier = randomUUID();
+    await db.insert(profilesTable).values({ id: courier, clerkUserId: courier, displayName: "Clock fixture", role: "driver", driverApproved: true });
+    const order = await create(); await ready(order.id);
+    const realNow = Date.now;
+    const declinePath = `/driver/orders/${order.id}/decline-offer`;
+    const assignment = { driverProfileId: courier, expectedDriverProfileId: null, expectedAssignedAt: null, reason: "Dispatch database-clock regression fixture" };
+    try {
+      for (const offset of [3600000, -3600000]) {
+        // Only real PostgreSQL has a clock independent from the JS host. The
+        // local PGlite lane still verifies all freshness and recovery behavior.
+        Date.now = process.env.TEST_DATABASE_URL ? () => realNow() + offset : realNow;
+        assert.equal((await api("/driver/availability", courier, "PUT", { available: true })).status, 200);
+        assert.equal((await api("/driver/availability", courier)).data.online, true);
+        assert.ok((await api("/driver/offers", courier)).data.some((o: any) => o.orderId === order.id));
+        assert.equal((await api("/driver/heartbeat", courier, "POST")).status, 200);
+        assert.equal((await api("/driver/location", courier, "POST", { latitude: 35.87, longitude: -84.68, accuracyMeters: 5, observedAt: new Date(realNow()).toISOString() })).status, 200);
+        const declined = await api(declinePath, courier, "POST", {});
+        assert.equal(declined.status, 200);
+        assert.ok(Math.abs(Date.parse(declined.data.expiresAt) - realNow() - 15 * 60000) < 30000);
+        assert.equal((await api(declinePath, courier, "DELETE", { expectedDeclineId: declined.data.declineId })).status, 200);
+        const assigned = await api(`/admin/orders/${order.id}/assignment`, ids.admin, "POST", assignment);
+        assert.equal(assigned.status, 200, JSON.stringify(assigned.data));
+        assert.ok(Math.abs(Date.parse(assigned.data.assignedAt) - realNow()) < 30000);
+        assert.equal((await api(`/driver/orders/${order.id}/claim`, courier, "POST")).status, 201);
+        assert.equal((await api(`/driver/orders/${order.id}/release`, courier, "POST")).status, 200);
+        for (const interval of [sql`interval '10 minutes'`, sql`interval '-2 minutes'`]) {
+          await db.update(driverPresenceTable).set({ heartbeatAt: sql`clock_timestamp()+${interval}` }).where(eq(driverPresenceTable.profileId, courier));
+          assert.equal((await api("/driver/availability", courier)).data.online, false);
+          assert.equal((await api("/driver/offers", courier)).status, 409);
+          assert.equal((await api("/driver/heartbeat", courier, "POST")).status, 409);
+          assert.equal((await api(declinePath, courier, "POST", {})).status, 409);
+          assert.equal((await api(`/driver/orders/${order.id}/claim`, courier, "POST")).status, 409);
+          assert.equal((await api(`/admin/orders/${order.id}/assignment`, ids.admin, "POST", assignment)).status, 409);
+          const dispatch = await api("/admin/dispatch", ids.admin);
+          assert.equal(dispatch.data.drivers.find((d: any) => d.profileId === courier).online, false);
+        }
+        assert.equal((await api("/driver/availability", courier, "PUT", { available: true })).status, 200);
+        assert.equal((await api("/driver/availability", courier)).data.online, true);
+      }
+    } finally {
+      Date.now = realNow;
+      await api(`/orders/${order.id}/cancel`, ids.admin, "POST", { reason: "Close isolated database-clock regression order" });
+    }
+  });
   await t.test("driver offer declines persist per courier, expire, fence stale reconsideration and serialize with claim/dispatch",async()=>{
     const couriers=[randomUUID(),randomUUID()];
     for(let i=0;i<couriers.length;i++)await db.insert(profilesTable).values({id:couriers[i],clerkUserId:couriers[i],displayName:`Decline fixture ${i}`,role:'driver',driverApproved:true});

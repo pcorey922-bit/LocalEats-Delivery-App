@@ -8,7 +8,9 @@ import {
 import { CommerceError } from "../lib/commerce-policy";
 import { hasDriverAccess } from "../lib/owner-access";
 import { notifyOrder, createEarnings, audit } from "../lib/commerce";
-import { driverDispatchState, presenceFreshMs } from "./dispatch";
+import { driverDispatchState } from "./dispatch";
+import { databaseNow } from "../lib/database-clock";
+import { presenceIsFresh } from "../lib/driver-presence";
 import { and, eq, isNull, isNotNull, desc, inArray, gt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { Router, type IRouter } from "express";
@@ -255,10 +257,7 @@ router.post(
         .from(driverPresenceTable)
         .where(eq(driverPresenceTable.profileId, profile.id))
         .limit(1);
-      if (
-        !presence?.available ||
-        Date.now() - presence.heartbeatAt.getTime() > presenceFreshMs
-      )
+      if (!presenceIsFresh(presence, await databaseNow(tx)))
         throw new CommerceError(409, "Go online before claiming a delivery");
       const [active] = await tx
         .select()
@@ -314,7 +313,7 @@ router.post(
         .set({
           driverProfileId: profile.id,
           status: "assigned",
-          assignedAt: new Date(),
+          assignedAt: await databaseNow(tx),
         })
         .where(
           and(

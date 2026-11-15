@@ -9,6 +9,28 @@ archived Android/iOS/signing tasks below: native development is deferred.
 
 ### November 15 recovery — sanitized geographic decisions
 
+### November 15 dispatch follow-up
+
+Recovered geographic code committed as a4f0caf2cfba2b324f4db15d2cd7813be108e0ff.
+Its push/PR Validate workflows passed; existing automatic native workflow must be
+checked for final completion (native development remains deferred).
+
+Dispatch now uses database time for online status, heartbeat writes, assignment
+timestamps, driver claims/declines, GPS timestamp windows, freshness/cooldown and
+operator waiting times. A shared presence check rejects future/invalid heartbeats
+and expires at exactly 90 seconds. Explicit reconnect restores duty; no penalty
+or profile-status change for optional declines. Availability/heartbeat/duty GPS
+also recheck application authorization inside the profile-locked transaction.
+No schema/hosted changes. Local PASS: 174 app/API tests, full typechecks/build,
+website/API/PGlite browser delivery regression (simulated payments). New HTTP
+regression covers future/stale presence, reconnect and optional offer/assignment
+flows; PostgreSQL CI additionally exercises +/-1h host clock skew (local PGlite
+shares JS host time). Logs /tmp/rocoeats-dispatch-clock-{tests,build,workflow}.log.
+
+Next: handoff-code expiry still compares database values with application time;
+investigate cross-instance expiry enforcement and idempotent completion. Do not
+perform hosted financial operations or repeat provider tests.
+
 Fetched branch at 2b1ef590769e8325a979b5114f898977c3776f6e (all three CI workflows
 completed successfully). Recovered four uncommitted geographic code/test files;
 no prior work overwritten. Latest independently verified deployed SHA remains

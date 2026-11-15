@@ -24,6 +24,13 @@ Next engineering priority: dispatch clock consistency, assignment/custody recove
 then financial exception handling and notification reliability. Existing completed
 features should be audited/tested before changes; do not rebuild them.
 
+November 15 dispatch fix: database clock now controls online freshness, heartbeat
+writes, claim/dispatch assignment times and location windows. Future/stale presence
+requires explicit reconnect; voluntary declines remain unpenalized. Availability,
+heartbeat and duty location recheck current application permission under the
+existing profile lock. Regression coverage includes independent PostgreSQL clock
+skew in CI. Next security/reliability audit: handoff-code expiry and retry behavior.
+
 ## Rockwood boundary approved and deployed — provider acceptance and activation pending
 
 Deployed `9c095d3` independently passed all 23 read-only staging checks on

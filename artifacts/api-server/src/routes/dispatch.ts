@@ -24,9 +24,11 @@ import {
 import { getActiveProfile, requireRole } from "../lib/current-profile";
 import { requireAuth } from "../middlewares/require-auth";
 import { CommerceError } from "../lib/commerce-policy";
+import { databaseNow } from "../lib/database-clock";
+import { presenceIsFresh } from "../lib/driver-presence";
+export { presenceFreshMs } from "../lib/driver-presence";
 const router: IRouter = Router();
 const uuid = z.string().uuid();
-export const presenceFreshMs = 90000;
 export async function driverDispatchState(profileId: string) {
   const [presence] = await db
     .select()
@@ -45,10 +47,7 @@ export async function driverDispatchState(profileId: string) {
     .limit(1);
   return {
     available: presence?.available ?? false,
-    online: Boolean(
-      presence?.available &&
-      Date.now() - presence.heartbeatAt.getTime() < presenceFreshMs,
-    ),
+    online: presenceIsFresh(presence, await databaseNow()),
     activeOrderId: active?.orderId ?? null,
   };
 }
@@ -80,7 +79,8 @@ router.put("/driver/availability", requireAuth, async (req, res) => {
       .where(eq(profilesTable.id, profile.id))
       .for("update")
       .limit(1);
-    if (available && !hasDriverAccess(current))
+    const [application] = await tx.select().from(driverApplicationsTable).where(eq(driverApplicationsTable.profileId, profile.id));
+    if (available && !hasDriverAccess(current, application))
       throw new CommerceError(403, "Driver approval is required to go online");
     const [previous] = await tx
       .select()
@@ -96,10 +96,10 @@ router.put("/driver/availability", requireAuth, async (req, res) => {
       });
     await tx
       .insert(driverPresenceTable)
-      .values({ profileId: profile.id, available })
+      .values({ profileId: profile.id, available, heartbeatAt: await databaseNow(tx) })
       .onConflictDoUpdate({
         target: driverPresenceTable.profileId,
-        set: { available, heartbeatAt: new Date() },
+        set: { available, heartbeatAt: sql`clock_timestamp()` },
       });
   });
   res.json(await driverDispatchState(profile.id));
@@ -119,18 +119,16 @@ router.post("/driver/heartbeat", requireAuth, async (req, res) => {
       .select()
       .from(driverPresenceTable)
       .where(eq(driverPresenceTable.profileId, profile.id));
-    if (
-      !hasDriverAccess(current) ||
-      !presence?.available ||
-      Date.now() - presence.heartbeatAt.getTime() >= presenceFreshMs
-    )
+    const [application] = await tx.select().from(driverApplicationsTable).where(eq(driverApplicationsTable.profileId, profile.id));
+    const now = await databaseNow(tx);
+    if (!hasDriverAccess(current, application) || !presenceIsFresh(presence, now))
       throw new CommerceError(
         409,
         "Reconnect explicitly before returning on duty",
       );
     await tx
       .update(driverPresenceTable)
-      .set({ heartbeatAt: new Date() })
+      .set({ heartbeatAt: now })
       .where(eq(driverPresenceTable.profileId, profile.id));
   });
   res.json({ online: true });
@@ -150,12 +148,6 @@ router.post("/driver/location", requireAuth, async (req, res) => {
     })
     .strict()
     .parse(req.body);
-  const age = Date.now() - position.observedAt.getTime();
-  if (age > 120000 || age < -30000)
-    throw new CommerceError(
-      400,
-      "Location timestamp is stale or in the future",
-    );
   const accepted = await db.transaction(async (tx) => {
     const [current] = await tx
       .select()
@@ -166,11 +158,11 @@ router.post("/driver/location", requireAuth, async (req, res) => {
       .select()
       .from(driverPresenceTable)
       .where(eq(driverPresenceTable.profileId, profile.id));
-    if (
-      !hasDriverAccess(current) ||
-      !presence?.available ||
-      Date.now() - presence.heartbeatAt.getTime() >= presenceFreshMs
-    )
+    const [application] = await tx.select().from(driverApplicationsTable).where(eq(driverApplicationsTable.profileId, profile.id));
+    const now = await databaseNow(tx);
+    const age = now.getTime() - position.observedAt.getTime();
+    if (age > 120000 || age < -30000) throw new CommerceError(400, "Location timestamp is stale or in the future");
+    if (!hasDriverAccess(current, application) || !presenceIsFresh(presence, now))
       throw new CommerceError(409, "Go online before sharing duty location");
     const [previous] = await tx
       .select()
@@ -179,10 +171,10 @@ router.post("/driver/location", requireAuth, async (req, res) => {
     if (previous && position.observedAt <= previous.observedAt) return false;
     await tx
       .insert(driverDutyLocationsTable)
-      .values({ profileId: profile.id, ...position })
+      .values({ profileId: profile.id, ...position, receivedAt: now })
       .onConflictDoUpdate({
         target: driverDutyLocationsTable.profileId,
-        set: { ...position, receivedAt: new Date() },
+        set: { ...position, receivedAt: now },
       });
     return true;
   });
@@ -208,12 +200,6 @@ router.post(
       })
       .strict()
       .parse(req.body);
-    const age = Date.now() - position.observedAt.getTime();
-    if (age > 120000 || age < -30000)
-      throw new CommerceError(
-        400,
-        "Location timestamp is stale or in the future",
-      );
     const result = await db.transaction(async (tx) => {
       // Keep the same profile-before-order lock order used by driver claim.
       const [current] = await tx.select().from(profilesTable)
@@ -222,6 +208,9 @@ router.post(
         .where(eq(driverApplicationsTable.profileId, profile.id));
       if (!hasDriverAccess(current, application))
         throw new CommerceError(403, "Driver access is required");
+      const now = await databaseNow(tx);
+      const age = now.getTime() - position.observedAt.getTime();
+      if (age > 120000 || age < -30000) throw new CommerceError(400, "Location timestamp is stale or in the future");
       const [order] = await tx
         .select()
         .from(ordersTable)
@@ -255,7 +244,7 @@ router.post(
         .limit(1);
       if (previous && previous.observedAt >= position.observedAt)
         return { accepted: false, reason: "older_position" };
-      if (previous && Date.now() - previous.receivedAt.getTime() < 5000)
+      if (previous && now.getTime() - previous.receivedAt.getTime() < 5000)
         throw new CommerceError(
           429,
           "Location updates are limited to one every five seconds",
@@ -266,13 +255,14 @@ router.post(
           ...position,
           deliveryId: delivery.id,
           driverProfileId: profile.id,
+          receivedAt: now,
         })
         .onConflictDoUpdate({
           target: deliveryLocationsTable.deliveryId,
           set: {
             ...position,
             driverProfileId: profile.id,
-            receivedAt: new Date(),
+            receivedAt: now,
           },
         });
       return { accepted: true };
@@ -320,8 +310,9 @@ router.get("/orders/:orderId/tracking", requireCustomerAuth, async (req, res) =>
     ? await db.select({displayName:profilesTable.displayName}).from(profilesTable).where(eq(profilesTable.id,delivery.driverProfileId)).limit(1)
     : [];
   const associated = Boolean(location && delivery?.driverProfileId===location.driverProfileId);
+  const now = await databaseNow();
   const fresh = Boolean(
-    associated && location && Date.now() - location.observedAt.getTime() <= 120000,
+    associated && location && now.getTime() - location.observedAt.getTime() <= 120000 && now.getTime() - location.observedAt.getTime() >= -30000,
   );
   res.setHeader("Cache-Control","no-store");
   res.json({
@@ -389,10 +380,7 @@ router.post(
             409,
             "Select an active, approved driver with an unexpired application",
           );
-        if (
-          !presence?.available ||
-          Date.now() - presence.heartbeatAt.getTime() >= presenceFreshMs
-        )
+        if (!presenceIsFresh(presence, await databaseNow(tx)))
           throw new CommerceError(409, "The selected driver must be online");
         const [decline]=await tx.select({id:driverOfferDeclinesTable.id}).from(driverOfferDeclinesTable).where(and(eq(driverOfferDeclinesTable.driverProfileId,driver.id),eq(driverOfferDeclinesTable.orderId,orderId),gt(driverOfferDeclinesTable.expiresAt,sql`now()`))).limit(1);
         if(decline)throw new CommerceError(409,"This driver declined the offer. Choose another driver or ask them to reconsider.");
@@ -453,7 +441,7 @@ router.post(
       const status = input.driverProfileId ? "assigned" : "unassigned";
       const assignedAt = input.driverProfileId
         ? new Date(
-            Math.max(Date.now(), (previous?.assignedAt?.getTime() ?? 0) + 1),
+            Math.max((await databaseNow(tx)).getTime(), (previous?.assignedAt?.getTime() ?? 0) + 1),
           )
         : null;
       const [delivery] = await tx
@@ -610,11 +598,12 @@ router.get("/admin/dispatch", requireAuth, async (req, res) => {
         ? { browserKey: mapKey, mapId }
         : null;
   res.setHeader("Cache-Control", "no-store");
+  const now = await databaseNow();
   res.json({
     mapConfig,
     orders: orders.map((o) => ({
       ...o,
-      waitingMinutes: Math.floor((Date.now() - o.placedAt.getTime()) / 60000),
+      waitingMinutes: Math.max(0, Math.floor((now.getTime() - o.placedAt.getTime()) / 60000)),
     })),
     drivers: drivers.map(
       ({
@@ -642,9 +631,7 @@ router.get("/admin/dispatch", requireAuth, async (req, res) => {
         const online = Boolean(
           d.isActive &&
           approved &&
-          d.available &&
-          d.heartbeatAt &&
-          Date.now() - d.heartbeatAt.getTime() < presenceFreshMs,
+          presenceIsFresh(d, now),
         );
         const activeOrder = activeAssignments.find(
           (o) => o.driverProfileId === d.profileId,
@@ -652,7 +639,7 @@ router.get("/admin/dispatch", requireAuth, async (req, res) => {
         const location =
           online &&
           dutyLocation &&
-          Date.now() - dutyLocation.receivedAt.getTime() < 15 * 60 * 1000
+          now.getTime() - dutyLocation.receivedAt.getTime() >= 0 && now.getTime() - dutyLocation.receivedAt.getTime() < 15 * 60 * 1000
             ? {
                 latitude: dutyLocation.latitude,
                 longitude: dutyLocation.longitude,
@@ -682,7 +669,7 @@ router.get("/admin/dispatch", requireAuth, async (req, res) => {
             ? "not_sharing"
             : !location
               ? "missing"
-              : Date.now() - location.observedAt.getTime() > 120000
+              : now.getTime() - location.observedAt.getTime() > 120000 || now.getTime() - location.observedAt.getTime() < -30000
                 ? "stale"
                 : "fresh",
         };
