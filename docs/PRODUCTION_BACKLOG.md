@@ -4,6 +4,22 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
+## November 15 post-deployment status
+
+4b2cea8fde2657b0b6d0dba5ecc0f39da7681b9a is now deployed, with 23/23 independent
+read-only staging checks passed and all three exact-SHA CI workflows successful.
+Municipal enforcement independently confirmed inactive (provisional_postal),
+public/private ordering and live charges OFF. Owner confirms diagnostic disabled;
+no provider suite or historical payment is to be repeated. Prior pending-deploy
+notes below are historical, not a request to redeploy old releases.
+
+New fix: audited webhook/push manual retries now schedule against database time,
+so host clock drift cannot defer the requested recovery. Existing authorization,
+audit reasons, terminal-state checks and provider limits are preserved. 177
+app/API tests and typecheck/build pass locally; exact pushed CI must finish.
+Next: expose existing timeout escalations to affected customers without repeated
+alerts or changing financial/order state.
+
 ## November 15 verified engineering progress
 
 Recovered geographic diagnostics and office mismatch regressions; database-time

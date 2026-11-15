@@ -3249,6 +3249,46 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     },
   );
   await t.test(
+    "audited webhook and notification retries are immediately due on database time despite host clock skew",
+    async () => {
+      const RealDate = Date;
+      const config = { android: true, ios: false, testMode: true as const };
+      for (const offset of [3600000, -3600000]) {
+        const id = `evt_retry_clock_${randomUUID()}`;
+        await db.insert(webhookInboxTable).values({ id, eventType: "retry.clock.fixture", state: "dead_letter", attempts: 10, payload: { id, type: "retry.clock.fixture", livemode: false, data: { object: {} } } });
+        const owner = randomUUID();
+        await db.insert(profilesTable).values({ id: owner, clerkUserId: owner, role: "customer", displayName: "Retry clock fixture" });
+        const [notice] = await db.insert(notificationsTable).values({ profileId: owner, eventKey: randomUUID(), title: "Retry clock fixture", body: "Local fixture only", pushState: "failed" }).returning();
+        const [device] = await db.insert(notificationDevicesTable).values({ profileId: owner, platform: "android", token: `retry_clock_fixture_${owner}` }).returning();
+        const [task] = await db.insert(pushDeliveriesTable).values({ notificationId: notice.id, deviceId: device.id, state: "failed", attempts: 5 }).returning();
+        try {
+          // PostgreSQL CI supplies independent time. Local PGlite shares the JS
+          // clock, so local runs cover the same retry/authorization behavior.
+          if (process.env.TEST_DATABASE_URL) globalThis.Date = new Proxy(RealDate, {
+            construct(target, args, newTarget) { return Reflect.construct(target, args.length ? args : [RealDate.now() + offset], newTarget); },
+            get(target, key, receiver) { return key === "now" ? () => RealDate.now() + offset : Reflect.get(target, key, receiver); },
+          });
+          const webhookPath = `/admin/webhook-inbox/${id}/retry`, pushPath = `/admin/push-deliveries/${task.id}/retry`;
+          const reason = { reason: "Reviewed fixture outcome and repaired processing dependency" };
+          assert.equal((await api(webhookPath, ids.customer, "POST", reason)).status, 403);
+          assert.equal((await api(pushPath, ids.customer, "POST", reason)).status, 403);
+          assert.equal((await api(webhookPath, ids.admin, "POST", reason)).status, 202);
+          assert.equal((await api(pushPath, ids.admin, "POST", reason)).status, 202);
+          const due = await db.execute<{ due: boolean }>(sql`select next_attempt_at<=clock_timestamp() as due from webhook_inbox where id=${id} union all select next_attempt_at<=clock_timestamp() as due from push_deliveries where id=${task.id}`);
+          assert.ok(due.rows.every(row => row.due), "Manual retry must be due immediately, not delayed by host time");
+          let processed = 0, sent = 0;
+          assert.equal(await processWebhookInbox(async event => { assert.equal(event.id, id); processed++; }), true);
+          assert.equal(await processPushDelivery(async (_platform, _token, notificationId) => { assert.equal(notificationId, notice.id); sent++; }, config), true);
+          assert.equal(processed, 1); assert.equal(sent, 1);
+          assert.equal((await api(webhookPath, ids.admin, "POST", reason)).status, 409);
+          assert.equal((await api(pushPath, ids.admin, "POST", reason)).status, 409);
+          const audits = await db.select().from(auditLogsTable).where(sql`${auditLogsTable.resourceId} in (${id},${task.id})`);
+          assert.equal(audits.length, 2);
+        } finally { globalThis.Date = RealDate; }
+      }
+    },
+  );
+  await t.test(
     "database clock controls job eligibility and leases despite application clock skew",
     async () => {
       const originalNow = Date.now;

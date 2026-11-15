@@ -9,6 +9,28 @@ archived Android/iOS/signing tasks below: native development is deferred.
 
 ### November 15 current checkpoint — notification recovery verified locally
 
+### November 15 post-deployment continuation
+
+Remote HEAD at session start was 4b2cea8fde2657b0b6d0dba5ecc0f39da7681b9a,
+clean tree and all three CI workflows successful. Owner deployed that exact
+commit and reported Stripe TEST/webhook/pricing ready, ordering closed and
+Geocodio diagnostic disabled/completed. Engineering independently reran all
+23 read-only staging checks: exact SHA, health/database/auth/pricing/workers ready,
+public/private ordering and live charges false, geographic mode provisional_postal,
+municipalEnforcementEnabled=false. Report /tmp/rocoeats-4b2cea8-postdeployment.json.
+This verifies deployed code/configuration, NOT real driver timing, push receipt,
+financial settlement or another provider transaction. Do not repeat provider calls.
+
+Found manual webhook/push recovery scheduling still used application time while
+workers use database time. Changed both audited retry routes to clock_timestamp();
+no authorization, reason requirement, retry state, financial or allowance changes.
+Regression uses isolated held jobs/fake sender; PostgreSQL CI tests +/-1h host
+clock drift with a Date constructor proxy, PGlite verifies ordinary behavior.
+Local PASS: 177 app/API tests, full typechecks/build. Logs:
+/tmp/rocoeats-retry-clock-{tests,build}.log. Push and inspect exact commit CI.
+Next independent task: customer-visible delay notifications for existing order
+timeout incidents; preserve current timeout policies and no-show custody guards.
+
 Completed preserved/recovered geographic work (a4f0caf2cfba2b324f4db15d2cd7813be108e0ff),
 dispatch database-time safety (a52385ffd609c3f882dd9e9335145d1a8dbf18de) and handoff
 expiry/idempotency (ba92d0f61b5e29393ba0c65b0a240def1fb98e20). First two commits'

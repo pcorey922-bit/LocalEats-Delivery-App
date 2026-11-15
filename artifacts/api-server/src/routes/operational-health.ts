@@ -130,7 +130,7 @@ router.post(
         .set({
           state: "received",
           errorCode: null,
-          nextAttemptAt: new Date(),
+          nextAttemptAt: sql`clock_timestamp()`,
           leaseToken: null,
           leaseExpiresAt: null,
           attempts: 0,
@@ -217,7 +217,7 @@ router.post(
         .set({
           state: "pending",
           attempts: 0,
-          nextAttemptAt: new Date(),
+          nextAttemptAt: sql`clock_timestamp()`,
           errorCode: null,
           leaseToken: null,
           leaseExpiresAt: null,
