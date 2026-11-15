@@ -7,7 +7,23 @@ repository/branch; preserve all completed work. Do not restart completed checkou
 authentication, homepage, delivery or Stripe investigations. Do not follow the
 archived Android/iOS/signing tasks below: native development is deferred.
 
-### November 15 recovery — sanitized geographic decisions
+### November 15 handoff expiry follow-up
+
+Dispatch fix committed as a52385f (exact CI status must be read from GitHub).
+Customer handoff issuance/expiry and arrival/pickup/delivery/proof timestamps now
+use database time. A slow application clock cannot extend an expired handoff;
+a fast clock cannot prematurely reject valid proof. Existing code secrecy,
+five-attempt limit, customer-only issuance and idempotent completion remain.
+Local PASS: 175 app/API tests, typechecks/build, website/API/PGlite delivery browser
+regression (simulated payments). Concurrent valid retries produce one delivery
+event and exactly two earnings records; expired proof produces no earnings.
+PostgreSQL CI tests +/-1h host clock skew; PGlite shares the host clock locally.
+Logs /tmp/rocoeats-handoff-clock-{tests,build,workflow}.log. No financial/provider
+calls, deployed changes or historical record edits performed.
+
+Next audit: a push worker crash during its fifth attempt may strand an expired
+processing lease at the retry cap. Reproduce offline, preserve late-ack fencing,
+and require existing audited admin retry rather than an automatic sixth send.
 
 ### November 15 dispatch follow-up
 
@@ -30,6 +46,8 @@ shares JS host time). Logs /tmp/rocoeats-dispatch-clock-{tests,build,workflow}.l
 Next: handoff-code expiry still compares database values with application time;
 investigate cross-instance expiry enforcement and idempotent completion. Do not
 perform hosted financial operations or repeat provider tests.
+
+### November 15 recovery — sanitized geographic decisions
 
 Fetched branch at 2b1ef590769e8325a979b5114f898977c3776f6e (all three CI workflows
 completed successfully). Recovered four uncommitted geographic code/test files;

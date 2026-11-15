@@ -48,8 +48,7 @@ router.post("/orders/:orderId/delivery-code", requireCustomerAuth, async (req, r
     throw new CommerceError(400, "Invalid order");
   const code = String(randomInt(0, 1000000)).padStart(6, "0");
   const salt = randomUUID();
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-  await db.transaction(async (tx) => {
+  const expiresAt = await db.transaction(async (tx) => {
     const [order] = await tx
       .select()
       .from(ordersTable)
@@ -70,6 +69,7 @@ router.post("/orders/:orderId/delivery-code", requireCustomerAuth, async (req, r
         409,
         "A handoff code is available after driver pickup",
       );
+    const expiresAt = new Date((await databaseNow(tx)).getTime() + 15 * 60 * 1000);
     await tx
       .update(deliveriesTable)
       .set({
@@ -79,6 +79,7 @@ router.post("/orders/:orderId/delivery-code", requireCustomerAuth, async (req, r
       })
       .where(eq(deliveriesTable.id, delivery.id));
     await audit(tx, profile.id, "delivery.handoff_code.issued", orderId);
+    return expiresAt;
   });
   res.setHeader("Cache-Control", "no-store");
   res.json({ code, expiresAt });
@@ -455,7 +456,7 @@ router.post("/driver/orders/:orderId/arrive", requireAuth, async (req, res) => {
         "Only the assigned driver can confirm arrival before pickup",
       );
     if (delivery.arrivedAt) return { orderId, arrivedAt: delivery.arrivedAt };
-    const arrivedAt = new Date();
+    const arrivedAt = await databaseNow(tx);
     await tx
       .update(deliveriesTable)
       .set({ arrivedAt })
@@ -539,6 +540,7 @@ router.post(
       if (action === "pickup" && delivery.status === "picked_up")
         return "picked_up";
       if (delivery.status !== fromDelivery) return false;
+      const now = await databaseNow(tx);
       if (action === "deliver") {
         const code = req.body?.code;
         if (typeof code !== "string" || !/^\d{6}$/.test(code))
@@ -546,7 +548,7 @@ router.post(
         if (
           !delivery.handoffHash ||
           !delivery.handoffExpiresAt ||
-          delivery.handoffExpiresAt.getTime() <= Date.now() ||
+          delivery.handoffExpiresAt.getTime() <= now.getTime() ||
           delivery.handoffAttempts >= 5
         )
           return "invalid_proof";
@@ -567,7 +569,7 @@ router.post(
       }
       const [order] = await tx
         .update(ordersTable)
-        .set({ status: toOrder })
+        .set({ status: toOrder, updatedAt: now })
         .where(
           and(eq(ordersTable.id, orderId), eq(ordersTable.status, fromOrder)),
         )
@@ -578,10 +580,10 @@ router.post(
         .set({
           status: toDelivery,
           ...(action === "pickup"
-            ? { pickedUpAt: new Date() }
+            ? { pickedUpAt: now }
             : {
-                deliveredAt: new Date(),
-                proofConfirmedAt: new Date(),
+                deliveredAt: now,
+                proofConfirmedAt: now,
                 handoffHash: null,
                 handoffExpiresAt: null,
               }),

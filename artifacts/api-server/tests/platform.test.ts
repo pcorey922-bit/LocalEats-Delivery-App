@@ -3518,6 +3518,44 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     await assert.rejects(engine.exec(`UPDATE support_messages SET body='rewritten' WHERE id='${reply.id}'`));await assert.rejects(engine.exec(`DELETE FROM support_messages WHERE id='${reply.id}'`));await assert.rejects(engine.exec('TRUNCATE support_messages'));
   });
 
+  await t.test("database-clock handoff expiry blocks expired codes and concurrent delivery retries create earnings once", async () => {
+    const courier = randomUUID();
+    await db.insert(profilesTable).values({ id: courier, clerkUserId: courier, displayName: "Handoff clock fixture", role: "driver", driverApproved: true });
+    const realNow = Date.now;
+    for (const offset of [3600000, -3600000]) {
+      const order = await create(); await ready(order.id);
+      try {
+        Date.now = process.env.TEST_DATABASE_URL ? () => realNow() + offset : realNow;
+        assert.equal((await api("/driver/availability", courier, "PUT", { available: true })).status, 200);
+        assert.equal((await api(`/driver/orders/${order.id}/claim`, courier, "POST")).status, 201);
+        assert.equal((await api(`/driver/orders/${order.id}/arrive`, courier, "POST")).status, 200);
+        assert.equal((await api(`/driver/orders/${order.id}/pickup`, courier, "POST")).status, 200);
+        const proofPath = `/orders/${order.id}/delivery-code`;
+        const deliveryPath = `/driver/orders/${order.id}/deliver`;
+        const issued = await api(proofPath, ids.customer, "POST");
+        assert.equal(issued.status, 200);
+        assert.ok(Math.abs(Date.parse(issued.data.expiresAt) - realNow() - 15 * 60000) < 30000);
+        await db.update(deliveriesTable).set({ handoffExpiresAt: sql`clock_timestamp()-interval '1 minute'` }).where(eq(deliveriesTable.orderId, order.id));
+        assert.equal((await api(deliveryPath, courier, "POST", { code: issued.data.code })).status, 400);
+        assert.equal((await api(`/orders/${order.id}`, ids.customer)).data.status, "out_for_delivery");
+        assert.equal((await db.select().from(payoutsTable).where(eq(payoutsTable.orderId, order.id))).length, 0);
+        const renewed = await api(proofPath, ids.customer, "POST");
+        assert.equal(renewed.status, 200);
+        const attempts = await Promise.all([api(deliveryPath, courier, "POST", { code: renewed.data.code }), api(deliveryPath, courier, "POST", { code: renewed.data.code })]);
+        assert.deepEqual(attempts.map(r => r.status), [200, 200]);
+        const [delivery] = await db.select().from(deliveriesTable).where(eq(deliveriesTable.orderId, order.id));
+        assert.equal(delivery.status, "delivered");
+        assert.ok(Math.abs(delivery.deliveredAt!.getTime() - realNow()) < 30000);
+        assert.equal(delivery.deliveredAt!.getTime(), delivery.proofConfirmedAt!.getTime());
+        assert.equal(delivery.handoffHash, null);
+        const events = await db.select().from(orderEventsTable).where(eq(orderEventsTable.orderId, order.id));
+        assert.equal(events.filter(e => e.toStatus === "delivered").length, 1);
+        assert.equal((await db.select().from(payoutsTable).where(eq(payoutsTable.orderId, order.id))).length, 2);
+      } finally {
+        Date.now = realNow;
+      }
+    }
+  });
   await t.test("dispatch uses database time for presence, optional offers and assignments; future/stale heartbeats require explicit reconnect", async () => {
     const courier = randomUUID();
     await db.insert(profilesTable).values({ id: courier, clerkUserId: courier, displayName: "Clock fixture", role: "driver", driverApproved: true });

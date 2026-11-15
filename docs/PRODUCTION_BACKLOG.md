@@ -31,6 +31,12 @@ heartbeat and duty location recheck current application permission under the
 existing profile lock. Regression coverage includes independent PostgreSQL clock
 skew in CI. Next security/reliability audit: handoff-code expiry and retry behavior.
 
+Handoff follow-up: issuance, expiration and completion timestamps now use database
+time too. Expired proof stays blocked despite a slow application clock; concurrent
+valid completion retries create one delivery event and two earnings records once.
+Next concrete recovery gap: inspect fifth-attempt push claims after worker crashes;
+never infer device receipt or automatically send beyond the retry cap.
+
 ## Rockwood boundary approved and deployed — provider acceptance and activation pending
 
 Deployed `9c095d3` independently passed all 23 read-only staging checks on
