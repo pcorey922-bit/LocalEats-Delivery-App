@@ -7,6 +7,25 @@ repository/branch; preserve all completed work. Do not restart completed checkou
 authentication, homepage, delivery or Stripe investigations. Do not follow the
 archived Android/iOS/signing tasks below: native development is deferred.
 
+### November 15 menu-management completion follow-up
+
+Pushed 1424ea197e7903b2876c086de933feec3a3bfde1: menu descriptions/mobile item
+form. Exact-SHA CI was running when this follow-up was prepared; inspect all three.
+Category create/rename now use accessible inline forms with name validation,
+explicit cancel, disabled pending controls and retained drafts on failed saves.
+Menu visibility/removal/category-deletion errors are visible; destructive controls
+cannot race an open editor or duplicate their own pending request.
+
+Targeted real local API/mobile browser PASS: category create/rename/cancel, blank
+name rejection, pre-commit 503 recovery, denied deletion preserves category,
+successful retry clears errors, failed visibility update preserves availability.
+Prior item editor regressions also PASS. Full typechecks/production build PASS.
+No schema, hosted record/settings, provider call or homepage/native changes.
+Logs: /tmp/rocoeats-category-{typecheck,build,browser}.log.
+Next: browser acceptance of existing guest support and cancellation, followed by
+full local browser regression and exact-SHA GitHub CI. Do not rebuild guest support:
+shared OrderActions already renders it with guest-capability authorization.
+
 ### November 15 core-completion checkpoint — restaurant menu descriptions
 
 Current deployed SHA: 4934f2413756e0b88bc0da333ec7f906569de906. Remote HEAD was

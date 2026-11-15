@@ -1,0 +1,66 @@
+import assert from 'node:assert/strict';
+
+export async function verifyMenuCategories({ restaurant, api, ids }) {
+  const categories = async () => (await api('restaurant', '/restaurants/me')).categories;
+  const editor = restaurant.getByRole('region', { name: 'Add menu category', exact: true });
+  await restaurant.getByRole('button', { name: 'Add category', exact: true }).click();
+  const name = editor.getByLabel('Category name', { exact: true });
+  await name.fill('   ');
+  await editor.getByRole('button', { name: 'Save category', exact: true }).click();
+  await editor.getByRole('alert').filter({ hasText: 'Enter a category name.' }).waitFor();
+  await name.fill('Sides and drinks');
+  const endpoint = '**/api/restaurants/me/categories';
+  await restaurant.route(endpoint, route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Intentional pre-commit category outage' }) }));
+  await editor.getByRole('button', { name: 'Save category', exact: true }).click();
+  await editor.getByRole('alert').filter({ hasText: 'We could not confirm the save.' }).waitFor();
+  assert.equal(await name.inputValue(), 'Sides and drinks');
+  assert.equal((await categories()).some(c => c.name === 'Sides and drinks'), false);
+  await restaurant.unroute(endpoint);
+  await editor.getByRole('button', { name: 'Save category', exact: true }).click();
+  await editor.waitFor({ state: 'detached' });
+  const matches = (await categories()).filter(c => c.name === 'Sides and drinks');
+  assert.equal(matches.length, 1);
+  const categoryId = matches[0].id;
+  const category = restaurant.locator('section.roco-card').filter({ has: restaurant.getByRole('heading', { name: 'Sides and drinks', exact: true }) });
+  await category.getByRole('button', { name: 'Rename', exact: true }).click();
+  const rename = restaurant.getByRole('region', { name: 'Rename menu category', exact: true });
+  assert.equal(await rename.getByLabel('Category name', { exact: true }).inputValue(), 'Sides and drinks');
+  await rename.getByLabel('Category name', { exact: true }).fill('Extras');
+  await rename.getByRole('button', { name: 'Save category', exact: true }).click();
+  await rename.waitFor({ state: 'detached' });
+  assert.equal((await categories()).find(c => c.id === categoryId).name, 'Extras');
+  const renamed = restaurant.locator('section.roco-card').filter({ has: restaurant.getByRole('heading', { name: 'Extras', exact: true }) });
+  await renamed.getByRole('button', { name: 'Rename', exact: true }).click();
+  await rename.getByLabel('Category name', { exact: true }).fill('Discarded edit');
+  await rename.getByRole('button', { name: 'Cancel editing', exact: true }).click();
+  assert.equal((await categories()).find(c => c.id === categoryId).name, 'Extras');
+
+  const deletion = `**/api/restaurants/me/categories/${categoryId}`;
+  await restaurant.route(deletion, route => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'Menu access rejected for this test' }) }));
+  restaurant.once('dialog', dialog => dialog.accept());
+  await renamed.getByRole('button', { name: 'Delete', exact: true }).click();
+  await restaurant.getByRole('alert').filter({ hasText: 'Menu change could not be confirmed:' }).waitFor();
+  assert.ok((await categories()).some(c => c.id === categoryId), 'Denied deletion preserves the category');
+  await restaurant.unroute(deletion);
+  restaurant.once('dialog', dialog => dialog.accept());
+  await renamed.getByRole('button', { name: 'Delete', exact: true }).click();
+  await renamed.waitFor({ state: 'detached' });
+  assert.equal((await categories()).some(c => c.id === categoryId), false);
+  assert.equal(await restaurant.getByRole('alert').filter({ hasText: 'Menu change could not be confirmed:' }).count(), 0, 'Successful retry clears the mutation error');
+
+  const main = (await categories()).find(c => c.id === ids.category);
+  const item = main.items.find(i => i.id === ids.item);
+  const row = restaurant.locator('.roco-menu-item').filter({ has: restaurant.locator('strong', { hasText: /^Local supper$/ }) });
+  const itemEndpoint = `**/api/restaurants/me/menu-items/${ids.item}`;
+  await restaurant.route(itemEndpoint, route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Intentional visibility outage' }) }));
+  await row.getByRole('button', { name: 'Hide', exact: true }).click();
+  await restaurant.getByRole('alert').filter({ hasText: 'Menu change could not be confirmed:' }).waitFor();
+  assert.equal((await categories()).flatMap(c => c.items).find(i => i.id === ids.item).isAvailable, item.isAvailable);
+  await restaurant.unroute(itemEndpoint);
+  await row.getByRole('button', { name: 'Hide', exact: true }).click();
+  await row.getByRole('button', { name: 'Show', exact: true }).waitFor();
+  assert.equal((await categories()).flatMap(c => c.items).find(i => i.id === ids.item).isAvailable, false);
+  await row.getByRole('button', { name: 'Show', exact: true }).click();
+  await row.getByRole('button', { name: 'Hide', exact: true }).waitFor();
+  console.log('PASS: phone category create/rename/cancel, blank-name rejection, failed-save recovery, denied-delete visibility and safe retry; failed visibility change preserves the menu. Real local API; injected failures only.');
+}
