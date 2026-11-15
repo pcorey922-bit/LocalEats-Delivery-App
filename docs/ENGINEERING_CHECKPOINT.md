@@ -7,8 +7,6 @@ repository/branch; preserve all completed work. Do not restart completed checkou
 authentication, homepage, delivery or Stripe investigations. Do not follow the
 archived Android/iOS/signing tasks below: native development is deferred.
 
-### November 15 current checkpoint — notification recovery verified locally
-
 ### November 15 post-deployment continuation
 
 Remote HEAD at session start was 4b2cea8fde2657b0b6d0dba5ecc0f39da7681b9a,
@@ -30,6 +28,27 @@ Local PASS: 177 app/API tests, full typechecks/build. Logs:
 /tmp/rocoeats-retry-clock-{tests,build}.log. Push and inspect exact commit CI.
 Next independent task: customer-visible delay notifications for existing order
 timeout incidents; preserve current timeout policies and no-show custody guards.
+
+### November 15 customer delay follow-up
+
+Retry scheduling fix committed as 366020905d2efcb85a459b80e0f5bb12ce7c8b44;
+inspect its exact workflow conclusions on GitHub. Existing timeout incidents now
+send one transactional, deduplicated delay notice per incident/version to the
+order's affected members (customer, restaurant and assigned driver). Confirmation
+and unassigned-ready delays reuse current policy thresholds. Retained-arrival
+pickup delays notify without releasing custody; pre-arrival automatic expiration
+keeps its existing reassignment notice, avoiding a redundant pickup-delay alert.
+No policy, fee, order/payment state, territory or permission change.
+
+Local PASS: 178 app/API tests and typechecks/production builds. The new regression
+repeats/concurrently runs timing workers through confirmation, dispatch and arrived
+pickup phases, checks recipient scope/deduplication, then completes normal pickup,
+customer handoff and two earnings records. Logs:
+/tmp/rocoeats-delay-notifications-{tests,build,workflow}.log. Local website/API/
+PGlite browser workflow also passed; exact pushed CI remains pending at commit
+creation. Provider/payment responses remain simulated.
+
+### November 15 earlier checkpoint — notification recovery verified locally
 
 Completed preserved/recovered geographic work (a4f0caf2cfba2b324f4db15d2cd7813be108e0ff),
 dispatch database-time safety (a52385ffd609c3f882dd9e9335145d1a8dbf18de) and handoff

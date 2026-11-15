@@ -45,6 +45,7 @@ async function openIncident(
   kind: Kind,
   phaseKey: string,
   now: Date,
+  announceDelay = true,
 ) {
   const [previous] = await tx
     .select()
@@ -97,6 +98,30 @@ async function openIncident(
     phaseKey,
     version: incident.version,
   });
+  if (announceDelay) {
+    const messages: Record<Kind, [string, string]> = {
+      restaurant_response: [
+        "Restaurant confirmation delayed (test)",
+        "Restaurant confirmation is taking longer than expected. Operations has been alerted. Open your order for updates.",
+      ],
+      driver_unassigned: [
+        "Finding an available driver (test)",
+        "Your order is ready, and we are still finding an available driver. Operations has been alerted.",
+      ],
+      driver_pickup: [
+        "Pickup is taking longer than expected (test)",
+        "The driver has reported arrival, but pickup is taking longer than expected. Operations has been alerted.",
+      ],
+    };
+    // Same transaction/incident version as the operational escalation. Repeated
+    // worker checks or restarts do not duplicate recipient alerts.
+    await notifyOrder(
+      tx,
+      orderId,
+      `delay:${incident.id}:${incident.version}`,
+      ...messages[kind],
+    );
+  }
 }
 export async function processOrderTiming() {
   return db.transaction(async (tx) => {
@@ -128,7 +153,10 @@ export async function processOrderTiming() {
                 "ready_for_pickup",
               ]),
             ),
-            and(eq(ordersTable.confirmationMode,"telephone"),eq(ordersTable.status,"placed")),
+            and(
+              eq(ordersTable.confirmationMode, "telephone"),
+              eq(ordersTable.status, "placed"),
+            ),
             exists(unresolved),
           ),
         ),
@@ -152,14 +180,24 @@ export async function processOrderTiming() {
       .select()
       .from(deliveriesTable)
       .where(eq(deliveriesTable.orderId, order.id));
-    const [telephone]=order.confirmationMode==="telephone" ? await tx.select().from(telephoneConfirmationsTable).where(eq(telephoneConfirmationsTable.orderId,order.id)) : [];
+    const [telephone] =
+      order.confirmationMode === "telephone"
+        ? await tx
+            .select()
+            .from(telephoneConfirmationsTable)
+            .where(eq(telephoneConfirmationsTable.orderId, order.id))
+        : [];
     const activeKeys = new Set<string>();
     const overdue = (time: Date | null | undefined, minutes: number) =>
       !!time && now.getTime() - time.getTime() >= minutes * 60000;
     if (
-      (payment?.status === "succeeded" || (telephone && ["pending","contacted"].includes(telephone.status))) &&
+      (payment?.status === "succeeded" ||
+        (telephone && ["pending", "contacted"].includes(telephone.status))) &&
       ["placed", "pending", "restaurant_received"].includes(order.status) &&
-      overdue(telephone ? order.placedAt : payment?.processedAt, policy.restaurantResponseMinutes)
+      overdue(
+        telephone ? order.placedAt : payment?.processedAt,
+        policy.restaurantResponseMinutes,
+      )
     ) {
       activeKeys.add("restaurant_response:acceptance");
       await openIncident(
@@ -181,7 +219,16 @@ export async function processOrderTiming() {
       ) {
         const phase = `${delivery.driverProfileId}:${delivery.assignedAt!.toISOString()}`;
         activeKeys.add(`driver_pickup:${phase}`);
-        await openIncident(tx, order.id, "driver_pickup", phase, now);
+        // Pre-arrival expiry sends its own finding-another-driver update below.
+        // Only retained arrivals need an additional delayed-pickup update.
+        await openIncident(
+          tx,
+          order.id,
+          "driver_pickup",
+          phase,
+          now,
+          Boolean(delivery.arrivedAt),
+        );
         // Arrival indicates possible handoff activity: retain custody and escalate.
         if (!delivery.arrivedAt) {
           const formerDriver = delivery.driverProfileId;

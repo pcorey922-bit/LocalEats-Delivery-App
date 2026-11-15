@@ -20,6 +20,13 @@ app/API tests and typecheck/build pass locally; exact pushed CI must finish.
 Next: expose existing timeout escalations to affected customers without repeated
 alerts or changing financial/order state.
 
+Customer delay follow-up: new confirmation/driver-unassigned incidents notify the
+customer and restaurant once per incident/version; arrived pickup delays notify
+assigned members while retaining custody. Pre-arrival expiry keeps its existing
+reassignment update. No new timeouts or financial actions. 178 local app/API tests
+and builds pass; new test follows repeated/concurrent reviews through normal
+delivery and two earnings records. Check latest exact-SHA browser/CI completion.
+
 ## November 15 verified engineering progress
 
 Recovered geographic diagnostics and office mismatch regressions; database-time

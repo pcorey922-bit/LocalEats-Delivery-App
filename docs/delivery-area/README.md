@@ -304,7 +304,16 @@ before accuracy acceptance/activation. `providerAccuracyAcceptancePassed` and
 `geographicActivationAuthorized` stay false. No additional lookups, hosted record
 changes, payments or financial operations were performed for this evaluation.
 
-### Recommended phone-only direct API verification — prepared, NOT deployed
+### Phone-only direct API verification — completed; do not repeat
+
+Current status November 15: the owner completed the one-shot live suite and
+reported the temporary diagnostic disabled. Exact deployed 4b2cea8 independently
+passed 23 read-only checks with municipal enforcement inactive, public/private
+ordering and live charges OFF. Saved live evidence and unresolved office result:
+[live API review](geocodio-live-api-review-2026-11-14.md). No new provider requests
+or allowance reset is authorized. Setup instructions below are historical; use
+GET/Refresh verification status to inspect saved results only. Do not re-enable
+the diagnostic, replace keys or repeat the CSV/API suite as a resumption step.
 
 The owner requires Samsung browser/dashboard management, without a laptop,
 developer installations, command lines or keys shared through chat/GitHub. This

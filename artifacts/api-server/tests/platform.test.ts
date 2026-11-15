@@ -3414,6 +3414,47 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       assert.equal((await api(ack,ids.admin,'POST',{...body,version:recovered.version})).status,409);
     }finally{await db.delete(platformSettingsTable).where(eq(platformSettingsTable.settingKey,'order_timing_policy'));await api(`/orders/${order.id}/cancel`,ids.admin,'POST',{reason:'End response timeout verification'});}
   });
+  await t.test("new timeout phases notify affected members once, preserve custody and recover through normal delivery", async () => {
+    const courier = randomUUID();
+    await db.insert(profilesTable).values({ id: courier, clerkUserId: courier, displayName: "Delay notification fixture", role: "driver", driverApproved: true });
+    const order = await create(); await pay(order.id);
+    const review = async () => { await db.update(ordersTable).set({ timingReviewAt: new Date(0) }).where(eq(ordersTable.id, order.id)); await Promise.all([processOrderTiming(), processOrderTiming()]); };
+    const notices = () => db.select().from(notificationsTable).where(eq(notificationsTable.orderId, order.id));
+    const phaseNotices = async (kind: string) => {
+      const incidents = await db.select().from(orderIncidentsTable).where(eq(orderIncidentsTable.orderId, order.id));
+      const incident = incidents.find(i => i.kind === kind)!; assert.ok(incident);
+      return (await notices()).filter(n => n.eventKey === `${order.id}:delay:${incident.id}:1`);
+    };
+    await db.update(paymentsTable).set({ processedAt: new Date(0) }).where(eq(paymentsTable.orderId, order.id));
+    await review(); await review();
+    let rows = await phaseNotices("restaurant_response");
+    assert.deepEqual(rows.map(n => n.profileId).sort(), [ids.customer, ids.restaurant].sort());
+    assert.ok(rows.every(n => /confirmation is taking longer/.test(n.body)));
+    assert.equal((await api(`/orders/${order.id}`, ids.customer)).data.status, "placed");
+    for (const status of ["accepted", "preparing", "ready_for_pickup"]) assert.equal((await api(`/orders/${order.id}`, ids.restaurant, "PATCH", { status })).status, 200);
+    await db.update(orderEventsTable).set({ createdAt: new Date(0) }).where(sql`${orderEventsTable.orderId}=${order.id} and ${orderEventsTable.toStatus}='ready_for_pickup'`);
+    await review(); await review();
+    rows = await phaseNotices("driver_unassigned");
+    assert.deepEqual(rows.map(n => n.profileId).sort(), [ids.customer, ids.restaurant].sort());
+    assert.ok(rows.every(n => /finding an available driver/.test(n.body)));
+    assert.equal((await api("/driver/availability", courier, "PUT", { available: true })).status, 200);
+    assert.equal((await api(`/driver/orders/${order.id}/claim`, courier, "POST")).status, 201);
+    assert.equal((await api(`/driver/orders/${order.id}/arrive`, courier, "POST")).status, 200);
+    await db.update(deliveriesTable).set({ assignedAt: new Date(0) }).where(eq(deliveriesTable.orderId, order.id));
+    await review(); await review();
+    rows = await phaseNotices("driver_pickup");
+    assert.deepEqual(rows.map(n => n.profileId).sort(), [ids.customer, ids.restaurant, courier].sort());
+    const [delivery] = await db.select().from(deliveriesTable).where(eq(deliveriesTable.orderId, order.id));
+    assert.equal(delivery.driverProfileId, courier); assert.equal(delivery.status, "assigned");
+    assert.equal((await api(`/driver/orders/${order.id}/pickup`, courier, "POST")).status, 200);
+    const proof = await api(`/orders/${order.id}/delivery-code`, ids.customer, "POST");
+    assert.equal((await api(`/driver/orders/${order.id}/deliver`, courier, "POST", { code: proof.data.code })).status, 200);
+    await review(); await review();
+    const incidents = await db.select().from(orderIncidentsTable).where(eq(orderIncidentsTable.orderId, order.id));
+    assert.ok(incidents.every(i => i.status === "resolved"));
+    assert.equal((await notices()).filter(n => n.eventKey.includes(":delay:")).length, 7);
+    assert.equal((await db.select().from(payoutsTable).where(eq(payoutsTable.orderId, order.id))).length, 2);
+  });
   await t.test("driver timeouts release only before arrival and recover without duplicate assignment or alerts",async()=>{
     const driver=randomUUID();await db.insert(profilesTable).values({id:driver,clerkUserId:driver,displayName:'Timeout driver fixture',role:'driver',driverApproved:true});
     await api('/driver/availability',driver,'PUT',{available:true});
