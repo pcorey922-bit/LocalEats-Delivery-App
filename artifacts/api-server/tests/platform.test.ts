@@ -62,6 +62,7 @@ import { processPayoutProvisioning } from "../src/lib/payout-onboarding";
 import { executeStripeOperation, processFinancialOperation, reconcileFinancialOperation } from "../src/lib/financial-operations";
 import { postJournal, journalRefund } from "../src/lib/ledger";
 import { enqueueFinancialOperation } from "../src/lib/finance-queue";
+import { requireLockedDriverAccess } from "../src/lib/driver-access";
 const ids = {
   customer: randomUUID(),
   other: randomUUID(),
@@ -1412,6 +1413,57 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     assert.equal((await api(path,ids.admin,"POST",{...initial,expectedDriverProfileId:ids.driver2,expectedAssignedAt:current.assignedAt?.toISOString()})).status,409);
     const code=await api(`/orders/${order.id}/delivery-code`,ids.customer,"POST");
     assert.equal((await api(`/driver/orders/${order.id}/deliver`,ids.driver2,"POST",{code:code.data.code})).status,200);
+  });
+  await t.test("driver custody actions recheck authorization after a concurrent approval revocation", async () => {
+    for (const action of ["release", "arrive", "pickup", "deliver"]) {
+      const courier = randomUUID();
+      await db.insert(profilesTable).values({ id: courier, clerkUserId: courier, displayName: `Revocation ${action} fixture`, role: "driver", driverApproved: true });
+      const order = await create(); await ready(order.id);
+      await api("/driver/availability", courier, "PUT", { available: true });
+      assert.equal((await api(`/driver/orders/${order.id}/claim`, courier, "POST")).status, 201);
+      let body: { code: string } | undefined;
+      if (action === "deliver") {
+        assert.equal((await api(`/driver/orders/${order.id}/pickup`, courier, "POST")).status, 200);
+        const proof = await api(`/orders/${order.id}/delivery-code`, ids.customer, "POST");
+        body = { code: proof.data.code };
+      }
+      const [before] = await db.select().from(deliveriesTable).where(eq(deliveriesTable.orderId, order.id));
+      const original = db.transaction.bind(db);
+      let release!: () => void, entered!: () => void, paused = false;
+      const gate = new Promise<void>(resolve => release = resolve), started = new Promise<void>(resolve => entered = resolve);
+      (db as any).transaction = async (...args: any[]) => { if (!paused) { paused = true; entered(); await gate; } return (original as any)(...args); };
+      const pending = api(`/driver/orders/${order.id}/${action}`, courier, "POST", body);
+      try {
+        await started;
+        assert.equal((await api(`/admin/drivers/${courier}/approval`, ids.admin, "PATCH", { approved: false })).status, 200);
+        (db as any).transaction = original; release();
+        const response = await pending;
+        assert.equal(response.status, 403, `${action}: ${JSON.stringify(response.data)}`);
+        const [after] = await db.select().from(deliveriesTable).where(eq(deliveriesTable.orderId, order.id));
+        assert.deepEqual(after, before, "Revoked in-flight actions must not change custody, proof or delivery timestamps");
+        assert.equal((await db.select().from(payoutsTable).where(eq(payoutsTable.orderId, order.id))).length, 0);
+      } finally {
+        (db as any).transaction = original; release(); await pending;
+        await api(`/orders/${order.id}/cancel`, ids.admin, "POST", { reason: "Close isolated approval-race fixture" });
+      }
+    }
+  });
+  await t.test("driver permission lock permits concurrent notification FK checks", { skip: !process.env.TEST_DATABASE_URL }, async () => {
+    const courier = randomUUID();
+    await db.insert(profilesTable).values({ id: courier, clerkUserId: courier, displayName: "Permission lock fixture", role: "driver", driverApproved: true });
+    let release!: () => void, entered!: () => void;
+    const gate = new Promise<void>(resolve => release = resolve), started = new Promise<void>(resolve => entered = resolve);
+    const held = db.transaction(async tx => { await requireLockedDriverAccess(tx, courier); entered(); await gate; });
+    await started;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const writer = db.insert(notificationsTable).values({ profileId: courier, eventKey: randomUUID(), title: "Concurrent FK fixture", body: "Local notification fixture" }).then(() => true);
+    try {
+      const completed = await Promise.race([writer, new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), 5000); })]);
+      assert.equal(completed, true, "Permission checks must not block notification foreign-key checks while waiting for order locks");
+    } finally {
+      if (timer) clearTimeout(timer);
+      release(); await held; await writer;
+    }
   });
   await t.test("pickup and reassignment cannot both change custody, and the final driver earns the delivery", async () => {
     for (const driver of [ids.driver, ids.driver2]) {

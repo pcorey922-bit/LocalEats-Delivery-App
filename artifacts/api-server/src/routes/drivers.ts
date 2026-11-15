@@ -11,6 +11,7 @@ import { notifyOrder, createEarnings, audit } from "../lib/commerce";
 import { driverDispatchState } from "./dispatch";
 import { databaseNow } from "../lib/database-clock";
 import { presenceIsFresh } from "../lib/driver-presence";
+import { requireLockedDriverAccess } from "../lib/driver-access";
 import { and, eq, isNull, isNotNull, desc, inArray, gt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { Router, type IRouter } from "express";
@@ -363,6 +364,7 @@ router.post(
     )
       throw new CommerceError(400, "Invalid order ID");
     await db.transaction(async (tx) => {
+      await requireLockedDriverAccess(tx, profile.id);
       const [order] = await tx
         .select()
         .from(ordersTable)
@@ -432,6 +434,7 @@ router.post("/driver/orders/:orderId/arrive", requireAuth, async (req, res) => {
   )
     throw new CommerceError(400, "Invalid order ID");
   const result = await db.transaction(async (tx) => {
+    await requireLockedDriverAccess(tx, profile.id);
     const [order] = await tx
       .select()
       .from(ordersTable)
@@ -506,6 +509,7 @@ router.post(
       action === "pickup" ? "ready_for_pickup" : "out_for_delivery";
     const toOrder = action === "pickup" ? "out_for_delivery" : "delivered";
     const result = await db.transaction(async (tx) => {
+      await requireLockedDriverAccess(tx, profile.id);
       await tx
         .select()
         .from(ordersTable)

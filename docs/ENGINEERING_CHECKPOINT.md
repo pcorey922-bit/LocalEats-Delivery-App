@@ -9,6 +9,26 @@ archived Android/iOS/signing tasks below: native development is deferred.
 
 ### November 15 next deployment verified; financial request identity
 
+### November 15 transactional driver authorization
+
+Financial request identity fix committed as a6feb5e (inspect exact CI on GitHub).
+Reproduced an authenticated driver request completing release after an admin had
+revoked approval while it waited to enter its transaction. Release, arrival,
+pickup and delivery now recheck active role, current application/approval and
+license under a profile lock before the order lock. The existing configured
+owner-driver exception is preserved. NO KEY UPDATE serializes permission writes
+without blocking notification FK checks; a multi-connection PostgreSQL-only
+regression verifies that compatibility (skipped in single-connection PGlite).
+No client protocol, custody rule, role grant or provider operation changed.
+
+Local PASS: 182 app/API tests total, 181 passed/one PostgreSQL-only skip, full
+typechecks/build and website/API/PGlite browser workflow. Four deterministic
+revocation interleavings return 403 without custody/proof/timestamp/earnings
+changes. Logs /tmp/rocoeats-driver-authorization-{before,tests,build,workflow}.log.
+CI must complete and exercise the multi-connection check before deployment.
+Next: inspect manual financial reconciliation authorization after provider-read
+latency; no real reconciliation or provider request is authorized.
+
 Session started at clean remote c44d2228e5a8c7757659172acd896565fa638dd3; all three
 CI workflows passed. Owner deployed it. Independent 23/23 GET/OPTIONS checks now
 confirm that full SHA, healthy dependencies, public/private ordering OFF, live

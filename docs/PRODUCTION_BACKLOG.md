@@ -14,6 +14,13 @@ reconciliation. Verified with 180 local app/API tests, builds and simulated-paym
 browser workflow. No schema, hosted record or provider operation changed.
 Next: reproduce stale authorization in driver custody actions before editing them.
 
+Reproduced/fixed driver revocation race: release, arrival, pickup and completion
+revalidate permission transactionally before locking the order. Existing owner
+exception and custody rules remain. Local suite 182 tests (one PostgreSQL-only
+lock-compatibility check skipped locally), builds and browser workflow pass; CI
+must verify the real PostgreSQL concurrency check. Next audit: stale administrator
+authority across manual financial provider-read latency.
+
 ## November 15 post-deployment status
 
 4b2cea8fde2657b0b6d0dba5ecc0f39da7681b9a is now deployed, with 23/23 independent
