@@ -12,6 +12,7 @@ import { MobileAuthorize } from "./pages/mobile-authorize";
 import { Capacitor } from "@capacitor/core";
 import { GuestCheckoutAccess, GuestOrderPage } from "./pages/guest-order";
 import { DriverDutySession } from "./pages/driver-duty-session";
+import { BackgroundDutyRecovery } from './pages/background-duty-location';
 import { AccountAccess, AccountSetupChoices } from "./pages/account-access";
 import { AccountSettings } from "./pages/account-settings";
 import { workspaceLinks } from "./lib/workspace-links";
@@ -365,7 +366,7 @@ function ClerkRoutes() {
   return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`}
     localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your RoCoEats account' } }, signUp: { start: { title: 'Find your place here', subtitle: 'Create your RoCoEats account' } } }}
     routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}>
-    <ApiAuthentication /><MobileLifecycle /><ClerkQueryClientCacheInvalidator /><DriverDutySession /><Router />
+    <ApiAuthentication /><MobileLifecycle /><ClerkQueryClientCacheInvalidator /><BackgroundDutyRecovery /><DriverDutySession /><Router />
   </ClerkProvider>;
 }
 

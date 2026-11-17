@@ -20,9 +20,16 @@ is already supported outside private staging and now regression-tested. Staging
 Dedicated driver Android/iOS identities, entry/navigation and isolated return
 links are implemented using existing auth/API/driver workflows. Local browser/
 API/build tests pass; verify all four native CI matrix builds after push. Customer
-identities/signing remain preserved. Next actionable core work: explicit opt-in
-background driver tracking with revocable scoped authorization and native service
-privacy controls; preserve current foreground/reconnect behavior. Native development is now
+identities/signing remain preserved. All four baseline native builds and both
+Validate workflows passed for ee14a3093170aa1e916fda362cc8fcbc4c867416.
+Opt-in driver background tracking is now implemented with existing revocable
+Clerk/approval/presence checks, driver-only native HTTP/permission configuration,
+private Android service, orphan watcher cleanup and stop/expiry safeguards. Local
+189 app/API cases, consent UI/full browser regressions, typechecks/builds and both
+Capacitor syncs pass. Verify new native plugin/merged-permission CI before release.
+Next actionable engineering: dedicated driver signed staging target using existing
+owner signing infrastructure, followed by owner-authorized real-device background
+GPS/Clerk-renewal/battery/push acceptance. No physical acceptance is claimed. Native development is now
 explicitly authorized; older deferral notes below are historical. Background GPS,
 real push, signed releases and physical iOS acceptance remain genuine unfinished
 native/provider/device gates, not implied by compilation.

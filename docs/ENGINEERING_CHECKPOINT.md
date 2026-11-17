@@ -8,6 +8,55 @@ authentication, homepage, delivery or Stripe investigations. The owner explicitl
 on November 17. This supersedes historical native deferral notes. Shared website/
 backend completion comes first; reuse existing native code and signing infrastructure.
 
+### November 17 opt-in background driver location checkpoint
+
+Dedicated app baseline ee14a3093170aa1e916fda362cc8fcbc4c867416 completed all THREE
+CI workflows SUCCESS, including android(customer), android(driver), ios(customer)
+and ios(driver). Those are actual unsigned native debug/release compilations and
+binary identity/scheme checks, NOT physical-device or signed release acceptance.
+
+Implemented a driver-only opt-in background location candidate using free MIT
+@capacitor-community/background-geolocation 1.3.1 (pinned). Explicit session consent
+and OS location/Android notification permission precede watcher creation. Existing
+Clerk authentication and driver approval/presence/ownership checks authorize every
+heartbeat/location request; no new bypass endpoint, credentials or migration.
+The controller fetches the current assignment instead of retaining an old order,
+throttles uploads to 30s, rejects stale/invalid/simulated fixes, serializes uploads,
+recovers transient failures and stops on 401/403/409. Stop/offline/session loss
+abort further uploads, including requests interrupted before later pipeline steps.
+Restart requires explicit reconnect/consent; saved watch IDs (not tokens/positions)
+allow cleanup of a watcher left by WebView reload. Foreground sharing is preserved.
+
+Customer builds exclude the plugin/background permission declarations. Driver
+builds alone enable the documented native HTTP/legacy bridge required beyond
+Android's WebView background throttling. Driver iOS permission plist and Android
+manifest are generated from customer files (ignored artifacts, no duplicated core
+source). Upstream exported Android tracking service is overridden app-private;
+notification uses a transparent white utensil icon. Native CI inspects compiled
+Android export/FGS permissions and iOS location-purpose/background-mode boundaries.
+No background sharing was activated on a real device or hosted account.
+
+Local PASS: 189 app/API cases (188 pass, one PostgreSQL-only skip), metadata/manifest
+CLI tests, two native privacy-checker tests, full typechecks/production builds,
+sequential driver then customer Capacitor synchronization (customer generated native
+files unchanged), frozen lockfile install, customer/API/PGlite delivery workflow,
+driver/account/homepage/CSP browser suites, and dedicated background consent UI.
+Native bridge/API/GPS in consent tests are simulated. Actual screen-locked HTTP,
+Clerk renewal, OS restart/permission behavior, battery and device push remain
+unverified. See /tmp/rocoeats-background-* logs and scripts/verify-background-browser.mjs.
+The new plugin's real native compilation/merged-permission CI is pending push;
+inspect all four native jobs and both Validate conclusions, fix actual failures.
+
+Next exact engineering action: finish exact-SHA CI; then prepare the existing
+owner-controlled signed staging workflow for the dedicated driver audience without
+changing customer defaults or exposing signing keys. Keep iOS signing/provisioning
+owner-controlled. Use docs/ANDROID_STAGING_TEST.md's consent/background acceptance
+steps only after a configured signed driver build, shared website deployment and
+separate supervised device-test authorization. Never install unsigned/unconfigured
+CI artifacts or claim simulated GPS establishes physical behavior.
+No Render deployment/configuration, hosted records, payment/refund/transfer/
+reconciliation, Geocodio call, geographic activation or PR merge occurred.
+
 ### November 17 dedicated-driver native build checkpoint
 
 Website release 91ee3eab21c1a3b70a0e393f3edfa1f6fbd0cac4 has all THREE CI

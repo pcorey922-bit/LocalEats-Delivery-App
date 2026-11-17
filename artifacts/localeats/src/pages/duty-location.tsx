@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Geolocation } from "@capacitor/geolocation";
 import { useAppForeground } from "../hooks/use-app-foreground";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
+import { Capacitor } from '@capacitor/core';
 export function DutyLocation({
   available,
   activeOrderId,
@@ -103,8 +104,9 @@ export function DutyLocation({
         {available && lastSent
           ? `Last successful upload ${new Date(lastSent).toLocaleTimeString()}. `
           : ""}
-        Background tracking is not available in this build. Keep the driver
-        workspace open for location updates.
+        {import.meta.env.VITE_APP_AUDIENCE === 'driver' && Capacitor.isNativePlatform()
+          ? 'Background sharing is off. You can explicitly enable it for this session below.'
+          : 'Keep the driver workspace open for location updates. Background sharing requires the dedicated driver app and separate consent.'}
       </p>
       {available && message && <p className="roco-alert">{message}</p>}
     </div>

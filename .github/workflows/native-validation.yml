@@ -66,6 +66,8 @@ jobs:
           apk="artifacts/localeats/android/app/build/outputs/apk/debug/app-debug.apk"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" | grep -F "package: name='$ROCOEATS_NATIVE_APP_ID'"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -F "\"$ROCOEATS_NATIVE_SCHEME\""
+          "$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" manifest print "$apk" > "$RUNNER_TEMP/rocoeats-manifest.xml"
+          python3 scripts/verify-native-privacy.py android "$ROCOEATS_NATIVE_AUDIENCE" "$RUNNER_TEMP/rocoeats-manifest.xml"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.audience == 'driver' && 'RoCoEats-Driver' || 'RoCoEats' }}-Android-release-unsigned-unconfigured
@@ -100,7 +102,7 @@ jobs:
       - name: Resolve iOS packages with bounded transport retries
         run: bash ../../../scripts/retry-native-dependencies.sh xcodebuild -resolvePackageDependencies -project App/App.xcodeproj -scheme App -clonedSourcePackagesDirPath "$RUNNER_TEMP/rocoeats-ios-packages"
         working-directory: artifacts/localeats/ios
-      - run: xcodebuild -project App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -clonedSourcePackagesDirPath "$RUNNER_TEMP/rocoeats-ios-packages" -disableAutomaticPackageResolution -derivedDataPath build ROCOEATS_APP_ID="$ROCOEATS_NATIVE_APP_ID" ROCOEATS_APP_NAME="$ROCOEATS_NATIVE_APP_NAME" ROCOEATS_URL_SCHEME="$ROCOEATS_NATIVE_SCHEME" CODE_SIGNING_ALLOWED=NO build
+      - run: xcodebuild -project App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -clonedSourcePackagesDirPath "$RUNNER_TEMP/rocoeats-ios-packages" -disableAutomaticPackageResolution -derivedDataPath build ROCOEATS_INFO_PLIST="$ROCOEATS_NATIVE_INFO_PLIST" ROCOEATS_APP_ID="$ROCOEATS_NATIVE_APP_ID" ROCOEATS_APP_NAME="$ROCOEATS_NATIVE_APP_NAME" ROCOEATS_URL_SCHEME="$ROCOEATS_NATIVE_SCHEME" CODE_SIGNING_ALLOWED=NO build
         working-directory: artifacts/localeats/ios
       - name: Verify compiled iOS identity and return scheme
         run: |
@@ -108,9 +110,10 @@ jobs:
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")" = "$ROCOEATS_NATIVE_APP_ID"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$plist")" = "$ROCOEATS_NATIVE_APP_NAME"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:0:CFBundleURLSchemes:0' "$plist")" = "$ROCOEATS_NATIVE_SCHEME"
+          python3 scripts/verify-native-privacy.py ios "$ROCOEATS_NATIVE_AUDIENCE" "$plist"
       - run: ditto -c -k --keepParent artifacts/localeats/ios/build/Build/Products/Debug-iphonesimulator/App.app "$RUNNER_TEMP/RoCoEats-iOS-simulator.zip"
       - name: Validate unsigned iOS device release compilation
-        run: xcodebuild -project App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -clonedSourcePackagesDirPath "$RUNNER_TEMP/rocoeats-ios-packages" -disableAutomaticPackageResolution -derivedDataPath release-build ROCOEATS_APP_ID="$ROCOEATS_NATIVE_APP_ID" ROCOEATS_APP_NAME="$ROCOEATS_NATIVE_APP_NAME" ROCOEATS_URL_SCHEME="$ROCOEATS_NATIVE_SCHEME" CODE_SIGNING_ALLOWED=NO build
+        run: xcodebuild -project App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -clonedSourcePackagesDirPath "$RUNNER_TEMP/rocoeats-ios-packages" -disableAutomaticPackageResolution -derivedDataPath release-build ROCOEATS_INFO_PLIST="$ROCOEATS_NATIVE_INFO_PLIST" ROCOEATS_APP_ID="$ROCOEATS_NATIVE_APP_ID" ROCOEATS_APP_NAME="$ROCOEATS_NATIVE_APP_NAME" ROCOEATS_URL_SCHEME="$ROCOEATS_NATIVE_SCHEME" CODE_SIGNING_ALLOWED=NO build
         working-directory: artifacts/localeats/ios
       - run: ditto -c -k --keepParent artifacts/localeats/ios/release-build/Build/Products/Release-iphoneos/App.app "$RUNNER_TEMP/RoCoEats-iOS-release-unsigned.zip"
       - uses: actions/upload-artifact@v4

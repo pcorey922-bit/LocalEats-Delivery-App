@@ -72,6 +72,8 @@ jobs:
           PLAYWRIGHT_CORE_PATH="$RUNNER_TEMP/rocoeats-browser/node_modules/playwright-core" \
             CHROMIUM_PATH="$(command -v google-chrome)" \
             node scripts/verify-website-workflow.mjs
+      - name: Verify native permission boundary checker
+        run: python3 scripts/test_native_privacy.py
       - name: Verify dedicated driver app shared UI and authorization
         timeout-minutes: 5
         run: |
@@ -79,7 +81,15 @@ jobs:
             PLAYWRIGHT_CORE_PATH="$RUNNER_TEMP/rocoeats-browser/node_modules/playwright-core" \
             CHROMIUM_PATH="$(command -v google-chrome)" \
             node scripts/verify-website-workflow.mjs
+      - name: Verify driver background consent and stop controls
+        run: |
+          PLAYWRIGHT_CORE_PATH="$RUNNER_TEMP/rocoeats-browser/node_modules/playwright-core" \
+            CHROMIUM_PATH="$(command -v google-chrome)" \
+            node scripts/verify-background-browser.mjs
       - name: Build deployable website and API container
+        # Native bridge/permission calls in this preceding check are mocked.
+        # Real binary permission boundaries run in native-validation.yml.
+        # The container build below remains the normal customer website.
         run: docker build --tag rocoeats:ci .
       - name: Verify packaged migrations as non-root without pnpm on PATH
         run: |

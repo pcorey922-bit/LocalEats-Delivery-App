@@ -6,6 +6,7 @@ def audienceConfig = new groovy.json.JsonSlurper().parse(rootProject.file('../..
 android {
     namespace = "com.rocoeats.app"
     compileSdk = rootProject.ext.compileSdkVersion
+    sourceSets.main.manifest.srcFile(audience == 'driver' ? 'src/driver/AndroidManifest.xml' : 'src/main/AndroidManifest.xml')
     defaultConfig {
         applicationId audienceConfig.id
         minSdkVersion rootProject.ext.minSdkVersion
@@ -13,6 +14,11 @@ android {
         manifestPlaceholders = [rocoeatsScheme: audienceConfig.scheme]
         resValue "string", "app_name", audienceConfig.name
         resValue "string", "title_activity_main", audienceConfig.name
+        if (audience == 'driver') {
+            resValue "string", "capacitor_background_geolocation_notification_channel_name", "RoCoEats on-duty location"
+            resValue "string", "capacitor_background_geolocation_notification_icon", "drawable/ic_rocoeats_tracking"
+            resValue "string", "capacitor_background_geolocation_notification_color", "#EFBD68"
+        }
         versionCode Integer.parseInt(System.getenv("ROCOEATS_ANDROID_VERSION_CODE") ?: "1")
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"

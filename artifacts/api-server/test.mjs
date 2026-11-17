@@ -13,6 +13,7 @@ try {
     ["account-read", "tests/account-read.test.ts"],
     ["cart-line", "tests/cart-line.test.ts"],
     ["duty-intent", "tests/duty-intent.test.ts"],
+    ["background-duty", "tests/background-duty.test.ts"],
     ["navigation", "tests/navigation.test.ts"],
     ["mobile-api", "tests/mobile-api.test.ts"],
     ["commerce-policy", "src/lib/commerce-policy.test.ts"],

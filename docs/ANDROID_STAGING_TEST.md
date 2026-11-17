@@ -17,6 +17,38 @@ The shared website containing the driver browser-return link must be deployed
 before an authorized real driver app sign-in test. Keep ordering/live/municipal
 safeguards OFF; do not repeat payment or geocoding acceptance for native builds.
 
+## Future supervised driver background-location acceptance
+
+Do not begin until the latest shared website is deployed, the configured signed
+**driver** staging APK is available, and the owner authorizes this device exercise.
+Unsigned/unconfigured compile artifacts are not a substitute. Keep both ordering
+flags OFF, Stripe TEST/live charges OFF and municipal enforcement OFF. No order,
+payment, provider verification or customer address is needed for this exercise.
+
+1. On Samsung, open the driver app and use the existing approved driver or owner
+   identity. Verify the existing role; do not submit another owner application.
+2. Go online explicitly. Review session background-location consent, enable it and
+   grant the required device permissions. Android must show its ongoing location
+   notification. Declining permission must leave background sharing stopped.
+3. Keep owner Operations open in a separate Chrome session. Observe fresh location,
+   then leave the driver app backgrounded for MORE than five minutes. Confirm GPS
+   updates continue in Operations, not just an online badge.
+4. With Chrome last active, lock the screen for over five minutes. Unlock back into
+   Chrome and refresh Operations BEFORE opening the driver app. Check that the
+   latest GPS timestamp was updated during the locked interval and is fresh. A
+   foreground refresh after returning to the driver app is not background evidence.
+5. Stop background sharing, then go offline. Verify the notification disappears and
+   dispatch position clears. Reopen/restart the app: it must not silently resume GPS;
+   explicit reconnect and fresh consent are required. Restore prior availability.
+6. Record app SHA/build, Android/One UI version, permission choice, timestamps,
+   locked-screen results and battery observations. Report failures without sharing
+   private coordinates/tokens. Separate iOS physical acceptance is still required.
+
+This candidate uses existing authenticated driver APIs; expired/revoked/off-duty
+access stops sharing. Android uses native HTTP to avoid WebView throttling; actual
+Clerk session renewal and OS behavior remain device acceptance gates. The customer
+app deliberately does not acquire the driver background plugin/permissions.
+
 **Physical Samsung installation and launch passed (owner-confirmed, November 9).**
 The owner installed this exact signed APK on a Samsung Galaxy S22 Ultra; Play Protect
 allowed installation, the app opened, and appearance matched the website. Android/

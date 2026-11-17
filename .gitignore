@@ -66,3 +66,6 @@ Thumbs.db
 
 **/ios/build/
 **/ios/release-build/
+artifacts/localeats/android/app/src/driver/AndroidManifest.xml
+artifacts/localeats/ios/App/App/Driver-Info.plist
+__pycache__/
