@@ -49,6 +49,48 @@ changed files/migrations and build identities. Record source SHA/run/artifact an
 CI before handoff. Physical retry and sanitized timeout code, if any, remain owner
 acceptance; never request private tokens or weaken role checks. Keep all gates OFF.
 
+### Repair release pointers — no Render deployment required
+
+Primary fix: **adbefc65a953fe42afbc7fc3059d8ea345b97e26**. Its three CI runs:
+44069984094 (push Validate), 44069995211 (PR Validate), 44069994748 (four native
+compile jobs); pending at this record, inspect exact conclusions before release.
+Full customer order-through-delivery browser regressions also passed locally.
+
+Baseline-compatible APK backport: **18bbca77700e5d2ea4c0d8ba3b10b065608d45cf**
+on supplemental branch **fix/driver-staging-session-recovery**, based on deployed
+6cc3c7848b7196aa00a26fc40676d939aa0c0a56. This is packaging isolation only; main
+work stays on feature/rocoeats-launch-readiness. Do not merge/deploy the repair
+branch over main. Only session/UI/tests/docs changed: NO API handler, schema,
+migration, notification-capability bypass, role grant or financial change.
+Local backport: 191 API/app passes, one PG-only skip; production/typecheck and
+actual driver recovery browser checks pass. Main source has 195 passes/one skip.
+Real PostgreSQL, native builds and signer must complete in GitHub:
+- Validate: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44070539424
+- Customer/driver Android/iOS compile: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44070575802
+- Protected DRIVER staging signer: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44070581572
+Signing initialization was NOT run. No signing credential read/displayed. Actual
+android-staging job must succeed (not skipped); its existing signature/package/
+privacy/secret scans and cleanup must pass. Download the artifact named
+RoCoEats-Driver-Android-Staging-Test-APK from that signer run after success; inspect
+APP_IDENTITY.json for this exact backport SHA and com.rocoeats.driver.staging.
+
+Samsung acceptance after signer/CI success: GitHub signer run → artifact → download
+ZIP → My Files → Extract → open driver APK and update the existing installation.
+Keep security protections; do not uninstall or clear app storage. Open existing
+session: verify controls or bounded error within ~20 seconds (Clerk initialization
+already has its own ~15-second fallback). If error, report only ACCOUNT_API_TIMEOUT,
+ACCOUNT_SESSION_TIMEOUT, ACCOUNT_401 or ACCOUNT_403 and visible text; never send
+tokens/cookies. Retry once; explicit sign-out/sign-in is available. Restart and
+check session recovery again. No order/payment or availability change needed for
+this diagnostic. Physical controls/GPS/push remain unverified until owner evidence.
+
+No Render deploy, Environment edit or migration 0029 is necessary for this repair.
+Newer main notification work still requires separate approval/deployment; preserve
+it. Hosted 6cc passed 23/23 checks; all ordering/live/municipal gates OFF. No hosted
+business data, provider, financial or configuration operation occurred. Do not
+repeat Geocodio or settlement. Next action: inspect all exact-SHA CI and signer,
+preserve artifact identity/certificate evidence and obtain physical update result.
+
 ### Resume pointer — source d430e9f, November 17
 
 Latest functional source: **d430e9ff8c29ef281cae437c5382e774ea3af5d8**,

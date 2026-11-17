@@ -18,6 +18,19 @@ Next owner gate: update signed APK, retry existing driver session and report any
 sanitized timeout code; then authorized physical GPS/background and push acceptance.
 No ordering, permissions, provider/financial operations or hosted settings changed.
 
+## Isolated APK repair handoff
+
+Primary fix adbefc65a953fe42afbc7fc3059d8ea345b97e26 preserves newer development.
+APK source 18bbca77700e5d2ea4c0d8ba3b10b065608d45cf on supplemental
+fix/driver-staging-session-recovery backports only the session/UI repair onto
+hosted 6cc. No migration 0029 or backend deploy needed. Existing protected signer
+run 44070581572 builds the driver artifact; compile run 44070575802 and Validate
+44070539424 must succeed. These were pending when this record was written; inspect
+GitHub before claiming acceptance. See checkpoint for exact Samsung update steps.
+Next blocker is physical post-update outcome: controls or sanitized phase/status
+code, then session restart/GPS/push evidence. Never infer a phone provider/network
+cause from offline test success. No additional independent core defect established.
+
 ## Latest source/checkpoint
 
 Functional source d430e9ff8c29ef281cae437c5382e774ea3af5d8 fixes notification
