@@ -318,6 +318,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       const originalPublic=process.env.CLERK_PUBLISHABLE_KEY;
       process.env.CLERK_PUBLISHABLE_KEY="pk_test_fixture";process.env.ROCOEATS_ORDERING_ENABLED="false";
       const readiness=await api("/mobile/readiness",null);assert.equal(readiness.status,200);assert.equal(readiness.data.privateTestStaging,true);assert.equal(readiness.data.orderingEnabled,false);assert.equal("secretKey" in readiness.data,false);
+      assert.deepEqual(readiness.data.nativeAppReturnSchemes,{customer:'rocoeats',driver:'rocoeats-driver'});
       process.env.ROCOEATS_ORDERING_ENABLED="true";if(originalPublic===undefined)delete process.env.CLERK_PUBLISHABLE_KEY;else process.env.CLERK_PUBLISHABLE_KEY=originalPublic;
       const verifier="A".repeat(43),challenge=createHash("sha256").update(verifier).digest("base64url");
       const start=await api("/mobile/auth/start",null,"POST",{challenge});assert.equal(start.status,201,JSON.stringify(start.data));

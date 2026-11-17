@@ -80,7 +80,7 @@ export function DriverDutySession() {
         activeOrderId={state.data?.activeOrderId ?? null}
       />}
       {import.meta.env.VITE_APP_AUDIENCE === 'driver' && Capacitor.isNativePlatform() && <section aria-label="Background location permission">
-        {!background ? <><label className="roco-field"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)}/>I want to share my driver location with authorized dispatch while this app is in the background during this on-duty session.</label><button className="roco-button" disabled={!consent} onClick={() => { setError(''); setBackground(true); }}>Enable background location for this session</button></> : <button className="roco-button" onClick={() => { setBackground(false); setConsent(false); }}>Stop background sharing; use foreground only</button>}
+        {!background ? <><label className="roco-field"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)}/>I want to share my driver location with authorized dispatch and active order participants while this app is in the background during this on-duty session.</label><button className="roco-button" disabled={!consent} onClick={() => { setError(''); setBackground(true); }}>Enable background location for this session</button></> : <button className="roco-button" onClick={() => { setBackground(false); setConsent(false); }}>Stop background sharing; use foreground only</button>}
       </section>}
       {error && <p role="alert">{error}</p>}
     </aside>

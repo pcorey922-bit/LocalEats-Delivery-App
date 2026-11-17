@@ -12,7 +12,7 @@ export function driverNativeManifests(android, ios) {
   // generated overlay. Override the upstream exported service to be app-private.
   if (!android.includes('xmlns:tools=')) android = android.replace('<manifest ', '<manifest xmlns:tools="http://schemas.android.com/tools" ');
   android = android.replace('</application>', '<service android:name="com.equimaps.capacitor_background_geolocation.BackgroundGeolocationService" android:exported="false" tools:replace="android:exported"/>\n    </application>');
-  const purpose = 'With your consent, RoCoEats Driver shares your location with authorized dispatch while on duty, including in the background. Go offline to stop sharing.';
+  const purpose = 'With your consent, RoCoEats Driver shares your location with authorized dispatch and active order participants while on duty, including in the background. Go offline to stop sharing.';
   ios = ios.replace(/(<key>NSLocationWhenInUseUsageDescription<\/key>\s*<string>)[^<]*(<\/string>)/, `$1${purpose}$2`);
   const extra = `<key>NSLocationAlwaysAndWhenInUseUsageDescription</key><string>${purpose}</string><key>UIBackgroundModes</key><array><string>location</string></array>`;
   if (ios.includes('<key>UIBackgroundModes</key>') || ios.includes('<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>')) throw Error('Review existing iOS background declarations before generating driver permissions');

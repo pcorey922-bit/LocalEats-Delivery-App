@@ -9,6 +9,10 @@ class NativePrivacyTests(unittest.TestCase):
     def test_exported_service_and_customer_permission_expansion_are_rejected(self):
         source = f'''<manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"/><application><service android:name="{module.SERVICE}" android:exported="false" android:foregroundServiceType="location"/></application></manifest>'''
         module.verify_android(source, True)
+        for value in ('8', '0x8', '0x00000008'):
+            module.verify_android(source.replace('foregroundServiceType="location"', f'foregroundServiceType="{value}"'), True)
+        for value in ('', 'dataSync', 'camera', '4', '0x18'):
+            with self.assertRaises(AssertionError): module.verify_android(source.replace('foregroundServiceType="location"', f'foregroundServiceType="{value}"'), True)
         with self.assertRaises(AssertionError): module.verify_android(source.replace('exported="false"', 'exported="true"'), True)
         with self.assertRaises(AssertionError): module.verify_android(source, False)
         module.verify_android('<manifest><application/></manifest>', False)

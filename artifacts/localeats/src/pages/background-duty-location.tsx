@@ -48,5 +48,5 @@ export function BackgroundDutyLocation({ onFatal }: { onFatal: (message: string)
     void session.start().catch(() => { if (!disposed) onFatal('Background location could not start. Check location and notification permissions, then reconnect explicitly.'); });
     return () => { disposed = true; void session.stop().catch(() => onFatal('Location service could not stop. Disable location permission in device settings and reopen RoCoEats.')); };
   }, [onFatal]);
-  return <section aria-label="Background driver location"><p role="status">{message}</p><p>Sharing continues while this session remains authorized, including while the app is backgrounded. Android shows an ongoing notification; iOS shows its location indicator. Going offline stops sharing. A restart or expired session requires explicit reconnect. Keep your device charged.</p></section>;
+  return <section aria-label="Background driver location"><p role="status">{message}</p><p>Sharing continues while this session remains authorized, including while the app is backgrounded. Authorized participants in your active delivery can also view your shared position. Android shows an ongoing notification; iOS shows its location indicator. Going offline stops sharing. A restart or expired session requires explicit reconnect. Keep your device charged.</p></section>;
 }

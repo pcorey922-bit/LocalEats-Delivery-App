@@ -13,6 +13,7 @@ import { guestRateLimit } from "../lib/guest-access";
 import { databaseNow } from "../lib/database-clock";
 import { audit } from "../lib/commerce";
 import { CommerceError } from "../lib/commerce-policy";
+import nativeApps from '../../../../config/native-audiences.json';
 const router = Router(),
   proof = z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   uuid = z.string().uuid();
@@ -28,6 +29,7 @@ router.get("/mobile/readiness", (_req, res) => {
     .status(configured ? 200 : 503)
     .json({
       nativeProtocolVersion: 1,
+      nativeAppReturnSchemes: { customer: nativeApps.customer.scheme, driver: nativeApps.driver.scheme },
       privateTestStaging: configured,
       orderingEnabled: orderingEnabled(),
       publicOrderingEnabled: process.env.ROCOEATS_ORDERING_ENABLED === "true",

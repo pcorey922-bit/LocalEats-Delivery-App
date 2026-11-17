@@ -8,6 +8,69 @@ authentication, homepage, delivery or Stripe investigations. The owner explicitl
 on November 17. This supersedes historical native deferral notes. Shared website/
 backend completion comes first; reuse existing native code and signing infrastructure.
 
+### November 17 staging APK handoff and Android verifier correction
+
+Completed source checkpoints: 91ee3eab21c1a3b70a0e393f3edfa1f6fbd0cac4 (public
+customer information/access/branding) and ee14a3093170aa1e916fda362cc8fcbc4c867416
+(dedicated apps). Both have all three CI workflows SUCCESS; ee14 has FOUR actual
+native debug/release compilation/identity jobs successful.
+Background candidate 8868e0dccaf00e23b224fa4a3d8b94a57a28fd3f passed both Validate
+workflows, both iOS builds and customer Android. Driver Android compiled all
+variants, then failed its verifier's symbolic foregroundServiceType comparison.
+The correction accepts only symbolic location or its exact Android ServiceInfo
+flag 8 (decimal/hex); it still rejects missing/unrelated/combined flags and requires
+an app-private service. New CI prints the decoded flag to confirm the evidence.
+Do not describe 8868's native workflow as successful or deploy it as the final SHA.
+
+Existing manual signed staging workflow now selects customer (unchanged default)
+or driver, preserving owner key handling and customer artifact names. Driver APK
+has its own package/artifact and APP_IDENTITY.json source SHA. Actual compiled
+staging manifests are checked in unsigned CI too; signature/secret scans stay in
+the existing owner-controlled signing job. No signing workflow was dispatched.
+The old emulator fixture remains explicitly customer-only; no emulator repair.
+
+Read-only native readiness now reports fixed app return schemes. Signed driver
+packaging requires deployed rocoeats-driver support, exact false public/private/
+effective ordering and live-charge flags, and matching public Clerk TEST config.
+Missing/string/falsy substitutes cannot pass. Old configured customer packaging
+remains compatible. No auth protocol, account role, owner permission or financial
+record changed. Background consent now explicitly includes authorized active order
+participants as well as dispatch, matching actual delivery-location visibility.
+
+Local PASS: 189 app/API cases (188 pass, PostgreSQL-only concurrency skip), full
+build/typecheck, native metadata/preflight tests, four Python permission/APK-policy
+tests and updated consent browser test. Full customer/driver/account/CSP browser
+regressions passed for the background candidate immediately before this focused
+readiness/policy change. Logs /tmp/rocoeats-signed-driver-{tests,build,cli,consent}.log.
+For THIS commit, inspect both Validate runs and ALL FOUR native jobs after push.
+Pending, absent, skipped signing or unsigned builds are not signed/device evidence.
+
+Resume: fetch branch and compare tree; inspect latest exact-SHA CI. Prioritize any
+actual failure. Once green, owner must deploy the final SHA to the existing Render
+service (no direct Render account access here), preserve all env values/closed
+safeguards, then engineering repeats 23 GET/OPTIONS checks. No migration or new
+hosted variable is required. After deployment, the existing workflow can produce a
+configured signed driver APK with target=staging/audience=driver; never reinitialize
+owner signing. Owner phone instructions are in docs/ANDROID_STAGING_TEST.md.
+
+Implemented/verified vs actual acceptance:
+- Website/shared backend: broad local integration/browser/PG CI coverage, one
+  owner-confirmed historical real Stripe TEST delivery; new source NOT deployed.
+- Customer + driver Android/iOS: native compilation baseline verified; background
+  plugin iOS compilation verified, corrected final Android permission check pending.
+- Background consent/controller: simulated bridge/API verified; real locked-screen
+  HTTP, Clerk renewal, permission recovery and battery remain device gates.
+- Signed driver APK: workflow prepared; actual artifact blocked until new shared
+  staging deployment. Customer signing identity preserved. Signed iOS distribution
+  requires owner Apple provisioning/account access and physical iOS device.
+- Push: outbox behavior tested; app-specific Firebase/APNs setup and actual receipt
+  remain owner/provider gates. No provider lookup or account created.
+- Legal/contact, municipal accuracy/office evidence, historical fee settlement and
+  commercial payouts, always-on hosting/hosted recovery remain owner/real-evidence
+  gates. Keep all ordering/live/municipal controls OFF. No financial retry allowed.
+No new deployment, hosted records/settings, financial operation, external provider
+lookup, domain migration, paid resource or PR merge occurred.
+
 ### November 17 opt-in background driver location checkpoint
 
 Dedicated app baseline ee14a3093170aa1e916fda362cc8fcbc4c867416 completed all THREE

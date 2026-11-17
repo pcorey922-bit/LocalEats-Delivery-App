@@ -17,6 +17,29 @@ The shared website containing the driver browser-return link must be deployed
 before an authorized real driver app sign-in test. Keep ordering/live/municipal
 safeguards OFF; do not repeat payment or geocoding acceptance for native builds.
 
+## Prepare a current signed driver APK entirely from the phone
+
+First require the final source SHA's CI success and owner deployment of that exact
+SHA to the EXISTING Render service. Manual Deploy → Deploy a specific commit; do
+not edit environment variables or enable ordering. After Render reports Live,
+engineering performs read-only verification. Driver packaging refuses an older
+website lacking the dedicated return scheme, even if its general health is good.
+
+Then open GitHub Actions → native-validation.yml → Run workflow. Select branch
+feature/rocoeats-launch-readiness, target **staging**, audience **driver**. Leave
+signing initialization alone. Engineering can trigger this existing workflow after
+readiness is verified; the owner need not use a terminal. No signing secret should
+be displayed or copied into chat. Customer remains the default and its old artifact
+name is unchanged. Do not select the customer-only emulator smoke target for driver.
+
+After actual workflow success, open **RoCoEats-Driver-Android-Staging-Test-APK**.
+APP_IDENTITY.json records the source SHA and com.rocoeats.driver.staging package;
+SHA256SUMS.txt and signing-certificate.txt accompany the verified APK. Download the
+ZIP in Samsung Chrome, extract it in My Files, and install the driver APK while
+keeping normal device security protections enabled. A skipped signing job or an
+unsigned/unconfigured artifact does not satisfy this step. Do not start a payment
+or order. Driver device acceptance below remains separate from artifact creation.
+
 ## Future supervised driver background-location acceptance
 
 Do not begin until the latest shared website is deployed, the configured signed

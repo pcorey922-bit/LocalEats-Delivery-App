@@ -12,7 +12,13 @@ def verify_android(source, driver):
     permissions = {item.get(ANDROID + 'name') for item in root.findall('uses-permission')}
     if driver:
         assert service is not None and service.get(ANDROID + 'exported') == 'false', 'Background service must be app-private'
-        assert service.get(ANDROID + 'foregroundServiceType') == 'location', 'Location foreground service type required'
+        # ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION is 0x8. Binary-manifest
+        # decoders may retain the symbolic name or emit its numeric flag value.
+        service_type = service.get(ANDROID + 'foregroundServiceType', '')
+        try: location_type = service_type == 'location' or int(service_type, 0) == 8
+        except ValueError: location_type = False
+        assert location_type, 'Location-only foreground service type required; decoded value: ' + service_type
+        print('Verified location-only foreground service type:', service_type)
         assert 'android.permission.FOREGROUND_SERVICE_LOCATION' in permissions
         assert 'android.permission.POST_NOTIFICATIONS' in permissions
     else:

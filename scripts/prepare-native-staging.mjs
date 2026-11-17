@@ -1,5 +1,16 @@
 import { readFile, appendFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { nativeAudienceEnvironment } from './prepare-native-audience.mjs';
+export function assertNativeStagingReadiness(state, config, audience = 'customer') {
+ const app = nativeAudienceEnvironment(audience);
+ if(state.nativeProtocolVersion!==1 || state.privateTestStaging!==true ||
+    state.orderingEnabled!==false || state.publicOrderingEnabled!==false ||
+    state.privateTestOrderingEnabled!==false || state.liveChargesEnabled!==false ||
+    state.clerkPublishableKey!==config.clerkPublishableKey)
+   throw Error('Staging must confirm all closed ordering/payment gates and matching public Clerk configuration');
+ if(audience==='driver' && state.nativeAppReturnSchemes?.driver!==app.ROCOEATS_NATIVE_SCHEME)
+   throw Error('Deploy the shared website with dedicated driver sign-in return support before packaging the driver APK');
+}
 export function nativeStagingEnvironment(config) {
  if(Object.keys(config).sort().join(',')!=='apiOrigin,clerkPublishableKey')throw Error('Only public native settings are permitted');
  if(config.apiOrigin!=='https://localeats-delivery-app.onrender.com')throw Error('Native testing must use the approved staging origin');

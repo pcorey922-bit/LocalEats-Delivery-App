@@ -4,6 +4,28 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
+## November 17 current release gate
+
+Website 91ee3ea and dedicated native baseline ee14a30 have all three CI workflows
+passed, including four customer/driver Android/iOS build jobs for ee14. Background
+8868e0d passed shared Validate and iOS/customer Android, but its driver Android
+verifier failed on the foreground-service flag representation after compilation.
+A semantic-equivalence fix keeps location-only/private-service requirements; verify
+latest exact-SHA CI before release. Do NOT call the old failed native run a pass.
+
+Prepared existing signed APK workflow for customer/driver selection, private key
+handling unchanged, exact package/asset scans, artifact source identity and compiled
+staging-manifest checks. Driver packaging fails closed until the shared website's
+return-scheme capability is deployed. Native preflight requires explicit closed
+public/private/effective ordering and live-charge flags. No signing job was run.
+
+Next: all latest CI conclusions, owner-controlled existing Render deploy, read-only
+staging verification, then configured signed driver APK and supervised phone
+background/session acceptance. Owner-approved legal/contact text, Apple signing/
+iOS device, app-specific push setup, geographic accuracy, provider settlement and
+production hosting/backup acceptance remain genuine external gates. No independent
+core workflow gap beyond those documented was established by the current tests.
+
 ## November 17 current priorities — full-platform authorization
 
 Recovered f31aac9a27a7731bf7ab66f1cb1d65da903e084e has all THREE CI workflows

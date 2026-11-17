@@ -73,7 +73,9 @@ jobs:
             CHROMIUM_PATH="$(command -v google-chrome)" \
             node scripts/verify-website-workflow.mjs
       - name: Verify native permission boundary checker
-        run: python3 scripts/test_native_privacy.py
+        run: |
+          python3 scripts/test_native_privacy.py
+          python3 scripts/test_staging_apk_policy.py
       - name: Verify dedicated driver app shared UI and authorization
         timeout-minutes: 5
         run: |
