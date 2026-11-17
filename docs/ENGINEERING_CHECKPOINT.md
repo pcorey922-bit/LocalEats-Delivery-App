@@ -8,6 +8,28 @@ authentication, homepage, delivery or Stripe investigations. The owner explicitl
 on November 17. This supersedes historical native deferral notes. Shared website/
 backend completion comes first; reuse existing native code and signing infrastructure.
 
+### Resume pointer — source d430e9f, November 17
+
+Latest functional source: **d430e9ff8c29ef281cae437c5382e774ea3af5d8**,
+following notification implementation 43d9f467deba30820cd561cbdcfc1e8dabc7e849.
+Source d430's push Validate completed SUCCESS, including PostgreSQL, strict
+backup/restore, browser regressions, container migration/startup and health checks:
+https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44044790407 .
+At this documentation checkpoint, PR Validate 44044800393 and native matrix
+44044800367 are pending; inspect exact-SHA conclusions before claiming success.
+This documentation-only commit also triggers CI; inspect its own runs on resume.
+No new application deployment occurred. Hosted source and verified signed driver
+APK remain 6cc3c7848b7196aa00a26fc40676d939aa0c0a56 as detailed below.
+
+Next owner-only actions: install the signed 6cc driver artifact on Samsung and
+verify sign-in/background GPS without ordering; separately approve deployment of
+the final CI-verified source to enable new notification status/app-topic support
+and additive migration 0029. Keep Environment unchanged and every safety gate
+closed. Re-enroll existing staging push devices after that deployment to record
+their actual staging app identity. Actual Firebase/APNs setup/receipt and physical
+Apple signing/device verification require owner access. No independent missing
+core workflow is currently established beyond these documented acceptance gates.
+
 ### Current continuation — deployed verification and signed driver artifact
 
 Owner-deployed source **6cc3c7848b7196aa00a26fc40676d939aa0c0a56** independently
