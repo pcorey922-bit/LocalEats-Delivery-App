@@ -8,6 +8,74 @@ authentication, homepage, delivery or Stripe investigations. The owner explicitl
 on November 17. This supersedes historical native deferral notes. Shared website/
 backend completion comes first; reuse existing native code and signing infrastructure.
 
+### Current continuation — deployed verification and signed driver artifact
+
+Owner-deployed source **6cc3c7848b7196aa00a26fc40676d939aa0c0a56** independently
+passed all 23 read-only staging checks November 17. Public/private/effective
+ordering, live charges and municipal enforcement are OFF; Stripe TEST. Real
+390px browser checks rendered homepage, About, How It Works, Support, FAQ, legal
+publication placeholders and Restaurants without overflow or page errors. All
+five homepage links and navy/gold branding remain. Anonymous restaurant discovery
+shows the intentional private-staging invitation state; no authorization weakened.
+No hosted write request, provider lookup or financial operation was performed.
+All three exact-6cc CI workflows succeeded, including four native build jobs.
+
+**Signed driver APK now exists**, built from that exact deployed source through
+existing protected signing (no key initialization/rotation/disclosure):
+- Run: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44039742923
+- Artifact: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44039742923/artifacts/14308852404
+- Name: RoCoEats-Driver-Android-Staging-Test-APK; expires December 17, 2026 UTC.
+- APK: RoCoEats-Driver-Android-Staging-Test.apk, com.rocoeats.driver.staging,
+  4,999,253 bytes; SHA256 a787fe6fc497c72fe16362f419ab91dcfc8c4f026f3a095e0e3c7e2ec161a8ba.
+- v2 signature verified against existing owner's public certificate; private
+  location-only foreground service and packaged-secret checks passed. Temporary
+  signing files were removed. Independently verified downloaded archive identity,
+  APK hash and certificate evidence. Signing job succeeded, not skipped.
+Samsung: open artifact while signed into GitHub, download ZIP, My Files → Extract,
+open APK with normal security protections. No laptop required. Driver installation,
+Clerk return, lock-screen GPS/session renewal and push receipt still need physical
+acceptance. This artifact DOES NOT include notification changes below.
+
+**Current source work: notification enrollment/status and dedicated APNs identity.**
+Native notifications now distinguish OS permission, platform configuration,
+current-account server registration and unverified receipt; enrollment survives
+reload and failed opt-out remains retryable while native opt-out is still tried.
+Browser users see in-app inbox guidance. Dedicated driver workspace exposes the
+same controls. New status API is authenticated/account-scoped, no-store and
+returns no token. Revocation accepts the saved device ID with legacy token support.
+APNs previously hard-coded the customer topic; enrollment now records actual app
+ID from the native bridge using a four-owned-app allowlist, and the worker passes
+that stored identity to APNs. No provider sends were performed during development. Legacy staging devices must explicitly re-enroll to record their staging app topic; defaults preserve the original customer identity.
+
+Migration **0029_notification_app_identity** is additive: existing devices default
+to the original customer app, all order/financial records untouched. Driver and
+customer staging identities are distinct; database and server reject unknown IDs.
+Deploy through the existing migration runner only after approval. New signed app
+packaging fails closed until deployed readiness advertises notification status/app
+identity support; don't package this new source against old 6cc backend. Existing
+6cc signed APK remains a valid background/device acceptance candidate.
+
+Validation: 192 app/API tests passed, zero failures, one local PostgreSQL-only
+skip (CI must exercise PostgreSQL); includes account isolation/reassignment,
+legacy revocation, four APNs identities, migration record preservation/constraint,
+and injected routing without provider requests. Native bridge browser checks pass
+registration reload, outage retry/native opt-out and configuration states. Final
+build/browser/CI conclusions must be checked for the pushed SHA before release.
+
+Next: finish regression validation, push this grouped improvement and inspect all
+three exact-SHA workflows. Owner-only gates remain existing Render deployment,
+physical Samsung/iOS acceptance, app-specific Firebase/APNs setup and Apple
+provisioning. Do not repeat Geocodio or historical settlement operations. Municipal
+enforcement and ordering remain OFF. Historical notes below are superseded.
+
+Local validation for current notification source completed: production API/website
+build and all typechecks; 192 app/API passes, zero failures, one PG-only local
+skip; native staging/audience preflight tests; background/notification browser
+fixture, mobile account/signup/browser recovery and full simulated customer and
+dedicated-driver delivery workflows. These are offline/local simulations, not
+real push/GPS/payment acceptance. GitHub CI is pending until this source is pushed;
+inspect both Validate workflows and all four native jobs for its exact SHA.
+
 ### VERIFIED RELEASE HANDOFF — November 17, 2026
 
 Code SHA 9e1a1622c2cad674ed04fa003718793dde968bb5 is pushed with ALL THREE CI

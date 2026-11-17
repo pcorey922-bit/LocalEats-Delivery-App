@@ -94,7 +94,7 @@ async function api(
     },
     body: data ? JSON.stringify(data) : undefined,
   });
-  return { status: response.status, data: await response.json() };
+  return { status: response.status, data: response.status === 204 ? null : await response.json() };
 }
 const input = () => ({
   restaurantId: ids.business,
@@ -318,7 +318,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       const originalPublic=process.env.CLERK_PUBLISHABLE_KEY;
       process.env.CLERK_PUBLISHABLE_KEY="pk_test_fixture";process.env.ROCOEATS_ORDERING_ENABLED="false";
       const readiness=await api("/mobile/readiness",null);assert.equal(readiness.status,200);assert.equal(readiness.data.privateTestStaging,true);assert.equal(readiness.data.orderingEnabled,false);assert.equal("secretKey" in readiness.data,false);
-      assert.deepEqual(readiness.data.nativeAppReturnSchemes,{customer:'rocoeats',driver:'rocoeats-driver'});
+      assert.deepEqual(readiness.data.nativeAppReturnSchemes,{customer:'rocoeats',driver:'rocoeats-driver'});assert.equal(readiness.data.notificationDeviceStatusVersion,1);
       process.env.ROCOEATS_ORDERING_ENABLED="true";if(originalPublic===undefined)delete process.env.CLERK_PUBLISHABLE_KEY;else process.env.CLERK_PUBLISHABLE_KEY=originalPublic;
       const verifier="A".repeat(43),challenge=createHash("sha256").update(verifier).digest("base64url");
       const start=await api("/mobile/auth/start",null,"POST",{challenge});assert.equal(start.status,201,JSON.stringify(start.data));
@@ -1784,6 +1784,27 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       );
     },
   );
+  await t.test('device enrollment status and revocation are account-scoped without returning push tokens', async () => {
+    const input = { platform: 'android', token: 'device_status_fixture_token_123456' };
+    const saved = await api('/notification-devices', ids.customer, 'POST', input);
+    assert.equal(saved.status, 201);
+    const id = saved.data.deviceId;
+    assert.match(id, /^[0-9a-f-]{36}$/);
+    const status = await api(`/notification-devices/${id}`, ids.customer);
+    assert.equal(status.status, 200); assert.deepEqual(status.data, { registered: true, platform: 'android', appId: 'com.rocoeats.app' });
+    assert.equal((await api(`/notification-devices/${id}`, null)).status, 401);
+    assert.equal((await api(`/notification-devices/${id}`, ids.other)).status, 404);
+    assert.equal((await api('/notification-devices', ids.other, 'DELETE', { deviceId: id })).status, 204);
+    assert.equal((await api(`/notification-devices/${id}`, ids.customer)).status, 200);
+    assert.equal((await api('/notification-devices', ids.other, 'POST', input)).data.deviceId, id);
+    assert.equal((await api(`/notification-devices/${id}`, ids.customer)).status, 404);
+    assert.equal((await api(`/notification-devices/${id}`, ids.other)).status, 200);
+    assert.equal((await api('/notification-devices', ids.customer, 'DELETE', { token: input.token })).status, 204);
+    assert.equal((await api(`/notification-devices/${id}`, ids.other)).status, 200);
+    assert.equal((await api('/notification-devices', ids.other, 'DELETE', { deviceId: id })).status, 204);
+    assert.equal((await api(`/notification-devices/${id}`, ids.other)).status, 404);
+    assert.equal((await api('/notification-devices', ids.other, 'DELETE', { deviceId: id, token: input.token })).status, 400);
+  });
   await t.test(
     "notification reads cannot alter another account inbox",
     async () => {
@@ -2975,6 +2996,21 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       }
     },
   );
+  await t.test('customer and driver app push deliveries retain distinct APNs topic identity', async () => {
+    const customer = await api('/notification-devices', ids.customer, 'POST', { platform: 'ios', token: 'c'.repeat(64), appId: 'com.rocoeats.app' });
+    const driver = await api('/notification-devices', ids.customer, 'POST', { platform: 'ios', token: 'd'.repeat(64), appId: 'com.rocoeats.driver.staging' });
+    assert.equal(customer.status, 201); assert.equal(driver.status, 201);
+    assert.equal((await api('/notification-devices', ids.customer, 'POST', { platform: 'ios', token: 'e'.repeat(64), appId: 'untrusted.topic' })).status, 400);
+    const [notice] = await db.insert(notificationsTable).values({ profileId: ids.customer, eventKey: randomUUID(), title: 'Native app routing fixture', body: 'Synthetic notification only' }).returning();
+    await db.insert(pushDeliveriesTable).values([{ notificationId: notice.id, deviceId: customer.data.deviceId }, { notificationId: notice.id, deviceId: driver.data.deviceId }]);
+    const seen: string[] = [];
+    const send = async (_platform: string, _token: string, id: string, appId?: string) => { assert.equal(id, notice.id); seen.push(appId!); };
+    assert.equal(await processPushDelivery(send, { android: false, ios: true, testMode: true }), true);
+    assert.equal(await processPushDelivery(send, { android: false, ios: true, testMode: true }), true);
+    assert.deepEqual(seen.sort(), ['com.rocoeats.app', 'com.rocoeats.driver.staging']);
+    await api('/notification-devices', ids.customer, 'DELETE', { deviceId: customer.data.deviceId });
+    await api('/notification-devices', ids.customer, 'DELETE', { deviceId: driver.data.deviceId });
+  });
   await t.test(
     "push fan-out retains individual receipts and retries only unsuccessful devices",
     async () => {

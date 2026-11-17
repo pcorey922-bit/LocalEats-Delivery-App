@@ -4,6 +4,31 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
+## Current actionable gate — November 17 signed driver and notifications
+
+Deployed 6cc3c7848b7196aa00a26fc40676d939aa0c0a56 passed 23 read-only checks
+and actual mobile-width public-page checks. Closed ordering/live/municipal gates.
+Existing protected workflow produced and verified a signed driver staging APK:
+[run 44039742923](https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44039742923),
+[download artifact](https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44039742923/artifacts/14308852404).
+Physical installation/login/background GPS remain unverified; use the phone steps
+in ANDROID_STAGING_TEST.md. Customer's previous signed APK remains unchanged.
+
+Confirmed native push gap fixed in current source: durable, account-scoped device
+status/retryable opt-out, clear configuration versus permission versus receipt,
+and distinct allowlisted customer/driver APNs topics instead of customer-only.
+Migration 0029 preserves existing devices as customer, touches no business records.
+Real Firebase/APNs receipt remains unverified; no provider sends in automation.
+New packaging requires deploying this backend capability first; don't confuse
+6cc artifact with these newer changes. Finish exact-SHA CI before deployment handoff.
+
+Next independent engineering action: inspect any genuine CI failures, then preserve
+clean source. Remaining launch gates require owner/device/provider access rather
+than another speculative core rewrite: physical locked-screen GPS/Clerk renewal,
+app-specific push configuration/receipt, Apple provisioning/iOS device, approved
+legal/contact content, geographic ground truth, authorized settlement scenarios,
+and production uptime/recovery. Keep all ordering/live/municipal gates closed.
+
 ## Verified code release — November 17
 
 9e1a1622c2cad674ed04fa003718793dde968bb5 passed both Validate workflows and the

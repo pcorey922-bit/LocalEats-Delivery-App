@@ -22,6 +22,7 @@ import {
   pushDeliveriesTable as deliveries,
 } from "@workspace/db";
 import { logger } from "./logger";
+import { nativePushTopic } from './native-push-app';
 export function pushConfiguration() {
   return {
     android: Boolean(process.env.FIREBASE_SERVICE_ACCOUNT_JSON),
@@ -33,7 +34,8 @@ export function pushConfiguration() {
     testMode: true,
   };
 }
-async function sendApns(token: string, notificationId: string) {
+async function sendApns(token: string, notificationId: string, appId: string) {
+  const topic = nativePushTopic(appId);
   const now = Math.floor(Date.now() / 1000);
   const header = Buffer.from(
     JSON.stringify({ alg: "ES256", kid: process.env.APNS_KEY_ID }),
@@ -63,7 +65,7 @@ async function sendApns(token: string, notificationId: string) {
       ":method": "POST",
       ":path": `/3/device/${token}`,
       authorization: `bearer ${data}.${signature}`,
-      "apns-topic": "com.rocoeats.app",
+      "apns-topic": topic,
       "apns-push-type": "alert",
       "apns-collapse-id": notificationId,
     });
@@ -94,8 +96,9 @@ async function sendPush(
   platform: string,
   token: string,
   notificationId: string,
+  appId = 'com.rocoeats.app',
 ) {
-  if (platform === "ios") return sendApns(token, notificationId);
+  if (platform === "ios") return sendApns(token, notificationId, appId);
   await sendFcm(token, notificationId);
 }
 // A provider acknowledgement is not proof that a device displayed a message.
@@ -143,6 +146,7 @@ type PushSender = (
   platform: string,
   token: string,
   notificationId: string,
+  appId?: string,
 ) => Promise<void>;
 function invalidToken(error: unknown) {
   const code = (error as { code?: string })?.code;
@@ -306,7 +310,7 @@ export async function processPushDelivery(
       errorCode = "DEVICE_UNREGISTERED";
     } else
       await Promise.race([
-        send(current.platform, current.token, claimed.notification.id),
+        send(current.platform, current.token, claimed.notification.id, current.appId),
         new Promise<never>((_, reject) => {
           timer = setTimeout(
             () => reject(new Error("Push acknowledgement timed out")),

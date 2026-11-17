@@ -1,3 +1,4 @@
+import { PushPreferences } from './push-preferences';
 import { useAccountProfile } from '../hooks/use-account-profile';
 import { TelephoneDispatch } from "./telephone-dispatch";
 import { RestaurantConfirmation, useRestaurantConfirmation } from "./restaurant-confirmation";
@@ -316,7 +317,7 @@ export function NotificationsPage() {
       <Link href="/">← RoCoEats</Link>
       <h1>Notifications</h1>
       <p>Order, delivery, refund, and earnings updates are saved here.</p>
-      <PushEnrollment />
+      <PushPreferences />
       <ErrorText error={inbox.error} />
       <ErrorText error={mark.error} />
       {inbox.isPending ? (
@@ -607,25 +608,6 @@ export function OperationsCommerce() {
       ))}
       <PricingSettings current={config.data?.pricing ?? null} />
     </main>
-  );
-}
-import { registerPush } from "../lib/mobile";
-function PushEnrollment() {
-  const enroll = useMutation({ mutationFn: registerPush });
-  return (
-    <div>
-      <button
-        className="roco-button"
-        disabled={enroll.isPending}
-        onClick={() => enroll.mutate()}
-      >
-        Enable mobile push notifications
-      </button>
-      <p>
-        {enroll.isSuccess ? "Device registered for test push updates." : ""}
-      </p>
-      <ErrorText error={enroll.error} />
-    </div>
   );
 }
 export function RestaurantAvailability() {

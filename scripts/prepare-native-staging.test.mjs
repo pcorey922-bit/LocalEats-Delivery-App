@@ -7,7 +7,8 @@ test('native staging admits only approved HTTPS and public development configura
 });
 test('committed native configuration contains exactly safe public settings',async()=>{nativeStagingEnvironment(JSON.parse(await readFile(new URL('../config/native-staging.json',import.meta.url),'utf8')));});
 test('signed app preflight requires explicit closed gates and deployed driver callback capability',()=>{
- const state={nativeProtocolVersion:1,privateTestStaging:true,orderingEnabled:false,publicOrderingEnabled:false,privateTestOrderingEnabled:false,liveChargesEnabled:false,clerkPublishableKey:valid.clerkPublishableKey};
+ const state={nativeProtocolVersion:1,notificationDeviceStatusVersion:1,privateTestStaging:true,orderingEnabled:false,publicOrderingEnabled:false,privateTestOrderingEnabled:false,liveChargesEnabled:false,clerkPublishableKey:valid.clerkPublishableKey};
+ assert.throws(()=>assertNativeStagingReadiness({...state,notificationDeviceStatusVersion:undefined},valid),/Deploy notification/);
  assertNativeStagingReadiness(state,valid);
  for(const key of ['orderingEnabled','publicOrderingEnabled','privateTestOrderingEnabled','liveChargesEnabled']){
   for(const value of [undefined,null,0,'false',true])assert.throws(()=>assertNativeStagingReadiness({...state,[key]:value},valid));

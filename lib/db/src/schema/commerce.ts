@@ -94,10 +94,11 @@ export const notificationDevicesTable = pgTable("notification_devices", {
     .references(() => profilesTable.id),
   token: text("token").notNull().unique(),
   platform: varchar("platform", { length: 20 }).notNull(),
+  appId: varchar('app_id', { length: 100 }).notNull().default('com.rocoeats.app'),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-});
+}, (t) => [check('notification_device_app_id_allowed', sql`${t.appId} in ('com.rocoeats.app', 'com.rocoeats.app.staging', 'com.rocoeats.driver', 'com.rocoeats.driver.staging')`)]);
 
 export const pushDeliveriesTable = pgTable(
   "push_deliveries",

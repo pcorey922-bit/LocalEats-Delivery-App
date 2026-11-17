@@ -1,5 +1,31 @@
 # Owner-controlled Android staging test
 
+## Verified driver APK available — November 17
+
+The existing protected signer completed successfully for deployed source
+**6cc3c7848b7196aa00a26fc40676d939aa0c0a56**. No new key or paid service.
+
+1. On Samsung Chrome, sign into GitHub and open
+   [the driver artifact](https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44039742923/artifacts/14308852404).
+2. Download **RoCoEats-Driver-Android-Staging-Test-APK** ZIP. In **My Files →
+   Downloads**, extract it and open **RoCoEats-Driver-Android-Staging-Test.apk**.
+   Keep normal security protections enabled; stop if installation is blocked.
+3. The app is **RoCoEats Driver**, package **com.rocoeats.driver.staging**.
+   Use your existing approved owner/driver identity. Do not create another account
+   or order, enable ordering, or initiate a payment.
+4. Record installation/sign-in and then follow the supervised background-location
+   checks below when ready. Binary verification does not establish physical GPS,
+   session renewal, notification delivery or store approval.
+
+[Successful run](https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44039742923).
+Artifact expires December 17, 2026 UTC. APK SHA256:
+`a787fe6fc497c72fe16362f419ab91dcfc8c4f026f3a095e0e3c7e2ec161a8ba`.
+APK is 4,999,253 bytes, v2 signed, existing owner's certificate matched. Actual
+private location-only service and secret scans passed; temporary signer removed.
+This build precedes the newer push-status/APNs-identity work. That work requires
+an approved backend deployment before producing a replacement APK. Do not repeat
+signer initialization. Older instructions below describe the reusable workflow.
+
 ## November 17 customer and dedicated driver build identities
 
 Customer identity/signing below remains unchanged. The shared native projects now
@@ -11,7 +37,7 @@ releases. Do not replace the existing signed APK or repeat signing initializatio
 
 The driver app uses existing approval, duty, offers, navigation, handoff, earnings
 and support. A reload still requires explicit reconnect; background location and
-push receipt remain unverified/uncompleted. Driver-specific Firebase/APNs identity,
+push receipt remain physically unverified. Driver-specific Firebase/APNs identity,
 signed releases, iOS provisioning and physical-device acceptance remain separate.
 The shared website containing the driver browser-return link must be deployed
 before an authorized real driver app sign-in test. Keep ordering/live/municipal

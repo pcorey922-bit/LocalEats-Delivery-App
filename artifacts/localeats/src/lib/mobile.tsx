@@ -30,6 +30,7 @@ export function registerPush(): Promise<void> {
     const permission = await PushNotifications.requestPermissions();
     if (permission.receive !== "granted")
       throw new Error("Notification permission was not granted");
+    const appId = (await App.getInfo()).id;
     await new Promise<void>((resolve, reject) => {
       const handles: Array<{ remove: () => Promise<void> }> = [];
       const cleanup = () => {
@@ -48,11 +49,13 @@ export function registerPush(): Promise<void> {
         handles.push(
           await PushNotifications.addListener("registration", async (token) => {
             try {
-              await customFetch("/api/notification-devices", {
+              const result = await customFetch<{ deviceId?: string }>("/api/notification-devices", {
                 method: "POST",
-                body: JSON.stringify({ token: token.value, platform }),
+                body: JSON.stringify({ token: token.value, platform, appId }),
               });
               localStorage.setItem("rocoeats-push-token", token.value);
+              if (result.deviceId) localStorage.setItem('rocoeats-push-device-id', result.deviceId);
+              else localStorage.removeItem('rocoeats-push-device-id');
               cleanup();
               resolve();
             } catch (error) {
@@ -84,18 +87,22 @@ export function registerPush(): Promise<void> {
 }
 export async function unregisterPush() {
   const token = localStorage.getItem("rocoeats-push-token");
+  const deviceId = localStorage.getItem('rocoeats-push-device-id');
   // A device that was never enrolled may have no Firebase app configuration.
-  if (!token) return;
-  try {
-    await customFetch("/api/notification-devices", {
-      method: "DELETE",
-      body: JSON.stringify({ token }),
-    });
-  } finally {
+  if (!token && !deviceId) return;
+  let failure: unknown;
+  try { await customFetch("/api/notification-devices", {
+    method: "DELETE", body: JSON.stringify(deviceId ? { deviceId } : { token }),
+  }); } catch (error) { failure = error; }
+  // Do not clear the saved registration when the server could not revoke it.
+  // This retains an explicit retry instead of reporting a false opt-out.
+  try { if (Capacitor.isNativePlatform()) await PushNotifications.unregister(); }
+  catch (error) { failure ??= error; }
+  if (!failure) {
     localStorage.removeItem("rocoeats-push-token");
-    if (Capacitor.isNativePlatform())
-      await PushNotifications.unregister().catch(() => {});
+    localStorage.removeItem('rocoeats-push-device-id');
   }
+  if (failure) throw failure;
 }
 export function MobileLifecycle() {
   const {isSignedIn}=useAuth();

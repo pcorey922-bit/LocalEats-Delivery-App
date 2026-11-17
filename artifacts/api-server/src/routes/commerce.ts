@@ -56,6 +56,7 @@ import {
   stripeTest,
 } from "../lib/payment-provider";
 import { pushConfiguration } from "../lib/push";
+import { nativePushAppIds } from '../lib/native-push-app';
 import { ensureAccepting, openAt } from "../lib/restaurant-availability";
 const router: IRouter = Router();
 const uuid = z.string().uuid();
@@ -418,12 +419,23 @@ router.get("/notification-devices/config", requireAuth, async (req, res) => {
   if (!(await getActiveProfile(req, res))) return;
   res.json(pushConfiguration());
 });
+router.get('/notification-devices/:deviceId', requireAuth, async (req, res) => {
+  const profile = await getActiveProfile(req, res);
+  if (!profile) return;
+  const id = z.string().uuid().parse(req.params.deviceId);
+  const [device] = await db.select({ platform: notificationDevicesTable.platform, appId: notificationDevicesTable.appId })
+    .from(notificationDevicesTable).where(and(eq(notificationDevicesTable.id, id), eq(notificationDevicesTable.profileId, profile.id)));
+  res.setHeader('Cache-Control', 'no-store');
+  if (!device) { res.status(404).json({ error: 'Device registration is not available for this account' }); return; }
+  res.json({ registered: true, platform: device.platform, appId: device.appId });
+});
 router.post("/notification-devices", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
   if (!profile) return;
   const input = z
     .object({
       platform: z.enum(["android", "ios"]),
+      appId: z.enum(nativePushAppIds).default('com.rocoeats.app'),
       token: z
         .string()
         .trim()
@@ -435,28 +447,28 @@ router.post("/notification-devices", requireAuth, async (req, res) => {
     .parse(req.body);
   if (input.platform === "ios" && !/^[a-f0-9]{64}$/i.test(input.token))
     throw new CommerceError(400, "Invalid APNs device token");
-  await db
+  const [device] = await db
     .insert(notificationDevicesTable)
     .values({ ...input, profileId: profile.id })
     .onConflictDoUpdate({
       target: notificationDevicesTable.token,
-      set: { profileId: profile.id, platform: input.platform },
-    });
-  res.status(201).json({ registered: true });
+      set: { profileId: profile.id, platform: input.platform, appId: input.appId },
+    }).returning({ id: notificationDevicesTable.id });
+  res.status(201).json({ registered: true, deviceId: device.id });
 });
 router.delete("/notification-devices", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
   if (!profile) return;
-  const { token } = z
-    .object({ token: z.string().min(16).max(4096) })
-    .strict()
-    .parse(req.body);
+  const input = z.union([
+    z.object({ token: z.string().min(16).max(4096) }).strict(),
+    z.object({ deviceId: z.string().uuid() }).strict(),
+  ]).parse(req.body);
   await db
     .delete(notificationDevicesTable)
     .where(
       and(
         eq(notificationDevicesTable.profileId, profile.id),
-        eq(notificationDevicesTable.token, token),
+        'deviceId' in input ? eq(notificationDevicesTable.id, input.deviceId) : eq(notificationDevicesTable.token, input.token),
       ),
     );
   res.status(204).end();

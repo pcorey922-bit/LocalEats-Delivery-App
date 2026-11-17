@@ -204,6 +204,13 @@
       "when": 1794201000000,
       "tag": "0028_mobile_auth_flows",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794898800000,
+      "tag": "0029_notification_app_identity",
+      "breakpoints": true
     }
   ]
 }

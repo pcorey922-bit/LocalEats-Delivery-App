@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { nativeAudienceEnvironment } from './prepare-native-audience.mjs';
 export function assertNativeStagingReadiness(state, config, audience = 'customer') {
  const app = nativeAudienceEnvironment(audience);
+ if(state.notificationDeviceStatusVersion!==1) throw Error('Deploy notification device status/app identity support before packaging this app revision');
  if(state.nativeProtocolVersion!==1 || state.privateTestStaging!==true ||
     state.orderingEnabled!==false || state.publicOrderingEnabled!==false ||
     state.privateTestOrderingEnabled!==false || state.liveChargesEnabled!==false ||

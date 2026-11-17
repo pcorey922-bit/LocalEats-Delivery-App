@@ -29,6 +29,7 @@ router.get("/mobile/readiness", (_req, res) => {
     .status(configured ? 200 : 503)
     .json({
       nativeProtocolVersion: 1,
+      notificationDeviceStatusVersion: 1,
       nativeAppReturnSchemes: { customer: nativeApps.customer.scheme, driver: nativeApps.driver.scheme },
       privateTestStaging: configured,
       orderingEnabled: orderingEnabled(),
