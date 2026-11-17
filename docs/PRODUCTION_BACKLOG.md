@@ -17,9 +17,12 @@ is already supported outside private staging and now regression-tested. Staging
 401 is intentional; do not relax its access control to satisfy external crawlers.
 184 local app/API cases, builds/typechecks and full browser regressions pass.
 
-Next actionable core work: dedicated driver Android/iOS build identities and
-entry/navigation/return links, reusing existing auth/API/driver workflows. Customer
-native implementations/signing remain preserved. Native development is now
+Dedicated driver Android/iOS identities, entry/navigation and isolated return
+links are implemented using existing auth/API/driver workflows. Local browser/
+API/build tests pass; verify all four native CI matrix builds after push. Customer
+identities/signing remain preserved. Next actionable core work: explicit opt-in
+background driver tracking with revocable scoped authorization and native service
+privacy controls; preserve current foreground/reconnect behavior. Native development is now
 explicitly authorized; older deferral notes below are historical. Background GPS,
 real push, signed releases and physical iOS acceptance remain genuine unfinished
 native/provider/device gates, not implied by compilation.

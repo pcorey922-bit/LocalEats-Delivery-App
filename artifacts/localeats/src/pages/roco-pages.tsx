@@ -51,13 +51,14 @@ const money = (cents: number) => new Intl.NumberFormat('en-US', { style: 'curren
 const invalidate = (client: ReturnType<typeof useQueryClient>, ...keys: ReadonlyArray<readonly unknown[]>) => keys.forEach(queryKey => { void client.invalidateQueries({ queryKey }); });
 const statusText = (s: string) => s.replaceAll('_', ' ');
 
-function Logo() { return <Link className="roco-logo" href="/"><img src={`${import.meta.env.BASE_URL}logo.svg`} width="42" height="42" alt=""/><span>RoCoEats</span></Link>; }
+function Logo() { return <Link className="roco-logo" href="/"><img src={`${import.meta.env.BASE_URL}logo.svg`} width="42" height="42" alt=""/><span>{import.meta.env.VITE_APP_AUDIENCE === 'driver' ? 'RoCoEats Driver' : 'RoCoEats'}</span></Link>; }
 function Shell({ children }: { children: React.ReactNode }) {
   const { isSignedIn, userId } = useAuth(); const { signOut } = useClerk();
   const profile = useMyProfile();
   const role = profile.data?.role;
+  const driverApp = import.meta.env.VITE_APP_AUDIENCE === 'driver';
   return <div className="roco-page"><header className="roco-header roco-wrap"><Logo/><ResponsiveNavigation className="roco-nav" label="Main navigation">
-    <Link href="/restaurants">Find food</Link>{isSignedIn && <><Link href="/dashboard">Dashboard</Link><Link href="/orders">Orders</Link>{role === 'restaurant' && <Link href="/restaurant">Restaurant</Link>}{['admin','driver'].includes(role??'') && <Link href="/driver">Driver</Link>}<Link href="/notifications">Notifications</Link><Link href="/account">Account</Link>{role === 'admin' && <><Link href="/admin">Administrator</Link><Link href="/operations">Dispatch &amp; orders</Link></>}<button onClick={async () => { if(userId)dutyIntent.set(userId,false); await customFetch('/api/driver/availability',{method:'PUT',body:JSON.stringify({available:false})}).catch(()=>{}); await unregisterPush().catch(()=>{}); await signOut({ redirectUrl: '/' }); }}>Sign out</button></>}
+    <>{!driverApp && <Link href="/restaurants">Find food</Link>}</>{isSignedIn && <>{!driverApp && <><Link href="/dashboard">Dashboard</Link><Link href="/orders">Orders</Link></>}{driverApp && <Link href="/earnings">Earnings</Link>}{role === 'restaurant' && <Link href="/restaurant">Restaurant</Link>}{['admin','driver'].includes(role??'') && <Link href="/driver">Driver</Link>}<Link href="/notifications">Notifications</Link><Link href="/account">Account</Link>{role === 'admin' && <><Link href="/admin">Administrator</Link><Link href="/operations">Dispatch &amp; orders</Link></>}<button onClick={async () => { if(userId)dutyIntent.set(userId,false); await customFetch('/api/driver/availability',{method:'PUT',body:JSON.stringify({available:false})}).catch(()=>{}); await unregisterPush().catch(()=>{}); await signOut({ redirectUrl: '/' }); }}>Sign out</button></>}
     {!isSignedIn && <><Link href="/cart">Continue as Guest</Link><Link href="/guest/order">Guest order</Link><Link href="/sign-in">Sign in</Link><Link href="/sign-up">Create account</Link><Link href="/sign-up?join=restaurant">Partner With RoCoEats</Link><Link href="/sign-up?join=driver">Drive With RoCoEats</Link></>}
   </ResponsiveNavigation></header><CommerceBanner/>{children}<footer className="roco-wrap"><InformationLinks/></footer></div>;
 }

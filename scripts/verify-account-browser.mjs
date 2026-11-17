@@ -22,6 +22,7 @@ await build({
   platform: "browser",
   jsx: "automatic",
   define: {
+    "import.meta.env.VITE_APP_AUDIENCE": '"customer"',
     "process.env.NODE_ENV": '"development"',
     "import.meta.env.VITE_API_ORIGIN": '"https://qa.onrender.com"',
     "import.meta.env.BASE_URL": '"/"',

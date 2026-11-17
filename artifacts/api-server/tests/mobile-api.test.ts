@@ -69,6 +69,12 @@ test("mobile return links contain navigation only and reject malformed or author
  const {mobileReturnRoute}=await import("../../localeats/src/lib/mobile-return");
  assert.equal(mobileReturnRoute("rocoeats://orders",true),"/guest/order");assert.equal(mobileReturnRoute("rocoeats://auth"),"/sign-in");
  for(const value of ["bad","https://evil.example.test/orders","rocoeats://orders?token=secret","rocoeats://orders#access=secret","rocoeats://admin","rocoeats://user:pass@orders"])assert.equal(mobileReturnRoute(value),null);
+ assert.equal(mobileReturnRoute('rocoeats-driver://auth', false, 'driver'), '/sign-in');
+ assert.equal(mobileReturnRoute('rocoeats-driver://earnings', false, 'driver'), '/earnings');
+ assert.equal(mobileReturnRoute('rocoeats-driver://orders', false, 'driver'), '/driver');
+ assert.equal(mobileReturnRoute('rocoeats-driver://auth'), null);
+ assert.equal(mobileReturnRoute('rocoeats://auth', false, 'driver'), null);
+ for (const raw of ['rocoeats-driver://auth?ticket=secret', 'rocoeats-driver://auth#token=secret', 'rocoeats-driver://admin', 'rocoeats-driver://user:password@auth']) assert.equal(mobileReturnRoute(raw, false, 'driver'), null);
 });
 
 test("native Clerk bearer tokens are never automatically attached to third-party URLs",async()=>{

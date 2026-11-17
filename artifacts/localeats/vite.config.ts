@@ -2,6 +2,9 @@ import path from 'path';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
+import { appMetadata } from './src/lib/app-audience';
+const audience = process.env.ROCOEATS_NATIVE_AUDIENCE ?? 'customer';
+appMetadata(audience); // Reject unknown identities before packaging anything.
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 
@@ -10,6 +13,7 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invali
 const basePath = process.env.BASE_PATH || '/';
 
 export default defineConfig({
+  define: { 'import.meta.env.VITE_APP_AUDIENCE': JSON.stringify(audience) },
   base: basePath,
   plugins: [
     react(),

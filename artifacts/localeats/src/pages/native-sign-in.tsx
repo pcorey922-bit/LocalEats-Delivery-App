@@ -127,6 +127,11 @@ export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; chec
         role,
         checkout,
       };
+      if (import.meta.env.VITE_APP_AUDIENCE === 'driver') {
+        const fragment = new URLSearchParams(url.hash.slice(1));
+        fragment.set('app', 'driver');
+        url.hash = fragment.toString();
+      }
       localStorage.setItem(storageKey, JSON.stringify(saved));
       setPending(saved);
       await Browser.open({ url: url.toString() });

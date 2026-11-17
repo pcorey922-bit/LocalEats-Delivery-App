@@ -1,5 +1,22 @@
 # Owner-controlled Android staging test
 
+## November 17 customer and dedicated driver build identities
+
+Customer identity/signing below remains unchanged. The shared native projects now
+also support ROCOEATS_NATIVE_AUDIENCE=driver during development builds:
+com.rocoeats.driver, RoCoEats Driver, rocoeats-driver://auth. CI compiles separate
+customer/driver Android and iOS variants and verifies actual IDs/schemes. Unsigned,
+unconfigured CI artifacts are compile evidence, not phone-installable staging
+releases. Do not replace the existing signed APK or repeat signing initialization.
+
+The driver app uses existing approval, duty, offers, navigation, handoff, earnings
+and support. A reload still requires explicit reconnect; background location and
+push receipt remain unverified/uncompleted. Driver-specific Firebase/APNs identity,
+signed releases, iOS provisioning and physical-device acceptance remain separate.
+The shared website containing the driver browser-return link must be deployed
+before an authorized real driver app sign-in test. Keep ordering/live/municipal
+safeguards OFF; do not repeat payment or geocoding acceptance for native builds.
+
 **Physical Samsung installation and launch passed (owner-confirmed, November 9).**
 The owner installed this exact signed APK on a Samsung Galaxy S22 Ultra; Play Protect
 allowed installation, the app opened, and appearance matched the website. Android/

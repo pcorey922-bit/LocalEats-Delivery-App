@@ -3,6 +3,7 @@ import { verifyMenuEditor } from './menu-editor-browser-checks.mjs';
 import { verifyMenuCategories } from './menu-category-browser-checks.mjs';
 import { verifyGuestService } from './guest-service-browser-checks.mjs';
 import { verifyPublicInformation } from './public-information-browser-checks.mjs';
+import { verifyDriverApp } from './driver-app-browser-checks.mjs';
 // Real website + API + migrated, disposable PGlite database. Only Clerk and
 // payment provider are simulated. This is NOT a Stripe TEST transaction.
 import assert from 'node:assert/strict';
@@ -34,7 +35,7 @@ try {
   await build({
     stdin: { contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import App from './src/App'; createRoot(document.getElementById('root')).render(<App/>);`, resolveDir: path.join(root, 'artifacts/localeats'), loader: 'tsx' },
     outfile: path.join(web, 'app.js'), bundle: true, platform: 'browser', format: 'esm', jsx: 'automatic', logLevel: 'silent',
-    define: { 'process.env.NODE_ENV': '"development"', 'import.meta.env.BASE_URL': '"/"', 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': '"fixture"', 'import.meta.env.VITE_CLERK_PROXY_URL': 'undefined', 'import.meta.env.VITE_API_ORIGIN': 'undefined', 'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': 'undefined', 'import.meta.env.VITE_GOOGLE_MAPS_MAP_ID': 'undefined' },
+    define: { 'import.meta.env.VITE_APP_AUDIENCE': JSON.stringify(process.env.ROCOEATS_DRIVER_APP_BROWSER === 'true' ? 'driver' : 'customer'), 'process.env.NODE_ENV': '"development"', 'import.meta.env.BASE_URL': '"/"', 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': '"fixture"', 'import.meta.env.VITE_CLERK_PROXY_URL': 'undefined', 'import.meta.env.VITE_API_ORIGIN': 'undefined', 'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': 'undefined', 'import.meta.env.VITE_GOOGLE_MAPS_MAP_ID': 'undefined' },
     plugins: [{ name: 'test-only-clerk', setup(b) {
       b.onResolve({ filter: /^@clerk\/react\/internal$/ }, () => ({ path: 'internal', namespace: 'clerk-fixture' }));
       b.onResolve({ filter: /^@clerk\/react$/ }, () => ({ path: 'react', namespace: 'clerk-fixture' }));
@@ -83,7 +84,9 @@ try {
     assert.ok(response.ok, `${method} ${url}: ${response.status} ${await response.clone().text()}`);
     return response.json();
   }
-  if (process.env.ROCOEATS_PUBLIC_INFO_ONLY === 'true') {
+  if (process.env.ROCOEATS_DRIVER_APP_BROWSER === 'true') {
+    await verifyDriverApp({ actor, api, origin });
+  } else if (process.env.ROCOEATS_PUBLIC_INFO_ONLY === 'true') {
     await verifyPublicInformation({ actor, origin });
   } else if (process.env.ROCOEATS_GUEST_SERVICE_ONLY === 'true') {
     await verifyGuestService({ actor, api, origin, ids });

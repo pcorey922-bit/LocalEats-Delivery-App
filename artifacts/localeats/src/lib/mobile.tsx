@@ -119,7 +119,8 @@ export function MobileLifecycle() {
       }),
     );
     const returnToApp=async(raw:string)=>{
-      const route=mobileReturnRoute(raw,!!readGuestToken()&&!signedIn.current);if(!route)return;
+      const audience=import.meta.env.VITE_APP_AUDIENCE === 'driver' ? 'driver' : 'customer';
+      const route=mobileReturnRoute(raw,!!readGuestToken()&&!signedIn.current,audience);if(!route)return;
       await Browser.close().catch(()=>{});if(disposed)return;
       navigate(route);void client.invalidateQueries();
     };

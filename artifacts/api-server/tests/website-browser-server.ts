@@ -11,6 +11,7 @@ export const ids = {
   otherCustomer: '11111111-1111-4111-8111-111111111112',
   restaurant: '22222222-2222-4222-8222-222222222222',
   driver: '33333333-3333-4333-8333-333333333333',
+  unapprovedDriver: '33333333-3333-4333-8333-333333333334',
   admin: '44444444-4444-4444-8444-444444444444',
   business: '55555555-5555-4555-8555-555555555555',
   category: '66666666-6666-4666-8666-666666666666',
@@ -33,6 +34,7 @@ export async function start(root: string) {
     await db.insert(profilesTable).values({ id: ids[role], clerkUserId: ids[role], role, displayName: `Browser ${role}`, driverApproved: role === 'driver' });
   }
   await db.insert(profilesTable).values({ id: ids.otherCustomer, clerkUserId: ids.otherCustomer, role: 'customer', displayName: 'Other browser customer' });
+  await db.insert(profilesTable).values({ id: ids.unapprovedDriver, clerkUserId: ids.unapprovedDriver, role: 'driver', displayName: 'Unapproved browser driver', driverApproved: false });
   process.env.LOCALEATS_ADMIN_CLERK_USER_IDS = ids.admin;
   process.env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS = ids.admin;
   await db.insert(restaurantsTable).values({ id: ids.business, ownerProfileId: ids.restaurant, name: 'Browser Test Kitchen', description: 'Disposable local workflow fixture', street1: '100 Test Pickup', city: 'Rockwood', region: 'TN', postalCode: '37854', status: 'approved', acceptingOrders: true });

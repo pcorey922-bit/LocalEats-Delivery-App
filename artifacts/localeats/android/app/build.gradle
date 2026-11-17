@@ -1,13 +1,18 @@
 apply plugin: 'com.android.application'
+def audience = System.getenv('ROCOEATS_NATIVE_AUDIENCE') ?: 'customer'
+if (!(audience in ['customer', 'driver'])) throw new GradleException('Unknown native app audience')
+def audienceConfig = new groovy.json.JsonSlurper().parse(rootProject.file('../../../config/native-audiences.json'))[audience]
 
 android {
     namespace = "com.rocoeats.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.rocoeats.app"
+        applicationId audienceConfig.id
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        manifestPlaceholders = [rocoeatsScheme: "rocoeats"]
+        manifestPlaceholders = [rocoeatsScheme: audienceConfig.scheme]
+        resValue "string", "app_name", audienceConfig.name
+        resValue "string", "title_activity_main", audienceConfig.name
         versionCode Integer.parseInt(System.getenv("ROCOEATS_ANDROID_VERSION_CODE") ?: "1")
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -47,8 +52,8 @@ android {
             initWith release
             applicationIdSuffix ".staging"
             versionNameSuffix "-staging"
-            resValue "string", "app_name", "RoCoEats Staging"
-            resValue "string", "title_activity_main", "RoCoEats Staging"
+            resValue "string", "app_name", "${audienceConfig.name} Staging"
+            resValue "string", "title_activity_main", "${audienceConfig.name} Staging"
             debuggable false
             jniDebuggable false
             matchingFallbacks = ["release"]

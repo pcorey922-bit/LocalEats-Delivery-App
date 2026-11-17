@@ -99,7 +99,7 @@ const clerkAppearance = {
 };
 
 function BrandLink() {
-  return <a className="portal-brand" href={basePath || '/'} data-testid="link-portal-brand"><img src={`${basePath}/logo.svg`} alt="" />RoCoEats</a>;
+  return <a className="portal-brand" href={basePath || '/'} data-testid="link-portal-brand"><img src={`${basePath}/logo.svg`} alt="" />{import.meta.env.VITE_APP_AUDIENCE === 'driver' ? 'RoCoEats Driver' : 'RoCoEats'}</a>;
 }
 
 function PortalHeader({ active }: { active: 'dashboard' | 'account' }) {
@@ -109,7 +109,7 @@ function PortalHeader({ active }: { active: 'dashboard' | 'account' }) {
   return <header className="portal-topbar">
     <BrandLink />
     <ResponsiveNavigation className="portal-nav" label="Account navigation">
-      <a className={active === 'dashboard' ? 'portal-nav-current' : ''} href={`${basePath}/dashboard${entry.query}`} data-testid="link-dashboard">Dashboard</a>
+      <a className={active === 'dashboard' ? 'portal-nav-current' : ''} href={`${basePath}${import.meta.env.VITE_APP_AUDIENCE === 'driver' ? '/driver' : '/dashboard'}${entry.query}`} data-testid="link-dashboard">{import.meta.env.VITE_APP_AUDIENCE === 'driver' ? 'Driver workspace' : 'Dashboard'}</a>
       <a className={active === 'account' ? 'portal-nav-current' : ''} href={`${basePath}/account${entry.query}`} data-testid="link-account">Account</a>
       <a href={`${basePath}${entry.access}`}>Access check</a>
       {profile.data?.role === 'admin' && <a href={`${basePath}/admin`}>Administrator</a>}
@@ -156,7 +156,10 @@ function Protected({ children, signInPath = "/sign-in" }: { children: ReactNode;
 }
 
 function useJoinLinks() {
-  return accountEntryLinks(useSearch());
+  const search = useSearch();
+  const params = new URLSearchParams(search);
+  if (import.meta.env.VITE_APP_AUDIENCE === 'driver' && !params.has('join')) params.set('join', 'driver');
+  return accountEntryLinks(params.toString());
 }
 
 function SignInPage() {
@@ -209,7 +212,7 @@ function AccountSetup() {
   const missing = profile.isError && isNotFound(profile.error);
   const start = () => provision.mutate((user?.fullName?.trim() || (role === 'restaurant' ? 'Restaurant partner' : role === 'driver' ? 'RoCoEats driver' : 'RoCoEats customer')).slice(0, 120));
   useEffect(() => {
-    if (profile.data) setLocation(accountDestination(profile.data.role, checkout), { replace: true });
+    if (profile.data) setLocation(import.meta.env.VITE_APP_AUDIENCE === 'driver' ? '/driver' : accountDestination(profile.data.role, checkout), { replace: true });
     else if (missing && hasIntent && isLoaded && userId && !attempted.current) {
       attempted.current = true;
       start();
@@ -301,7 +304,7 @@ function AccountAccessPage() {
 
 function Router() {
   return <RoutedErrorBoundary><Switch>
-    <Route path="/" component={HomePage} />
+    <Route path="/" component={import.meta.env.VITE_APP_AUDIENCE === 'driver' ? () => <Redirect to="/driver"/> : HomePage} />
     {['/about', '/how-it-works', '/support', '/faq', '/privacy', '/terms'].map(path => <Route key={path} path={path} component={InformationPage}/>)}
     <Route path="/restaurants" component={DiscoveryPage} />
     <Route path="/restaurants/:restaurantId" component={RestaurantMenuPage} />

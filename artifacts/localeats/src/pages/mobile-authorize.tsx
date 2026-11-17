@@ -3,6 +3,7 @@ import { useAuth, useUser, SignIn } from "@clerk/react";
 import { useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
+import { appReturnScheme } from '../lib/app-audience';
 const key = "rocoeats-browser-auth-approval:v1";
 function request() {
   try {
@@ -15,13 +16,15 @@ function request() {
       /^[a-z0-9-]{36}$/.test(id) &&
       /^[A-Za-z0-9_-]{43}$/.test(state)
     ) {
-      sessionStorage.setItem(key, JSON.stringify({ id, state }));
+      const app = params.get('app') === 'driver' ? 'driver' : 'customer';
+      sessionStorage.setItem(key, JSON.stringify({ id, state, app }));
       history.replaceState(null, "", location.pathname);
-      return { id, state };
+      return { id, state, app };
     }
     return JSON.parse(sessionStorage.getItem(key) || "null") as {
       id: string;
       state: string;
+      app?: string;
     } | null;
   } catch {
     return null;
@@ -35,7 +38,7 @@ export function MobileAuthorize() {
     mutationFn: () =>
       customFetch("/api/mobile/auth/approve", {
         method: "POST",
-        body: JSON.stringify(flow),
+        body: JSON.stringify({ id: flow?.id, state: flow?.state }),
       }),
     onSuccess: () => sessionStorage.removeItem(key),
   });
@@ -88,8 +91,8 @@ export function MobileAuthorize() {
         {approve.isSuccess && (
           <>
             <p>Approved. Return to the app to complete secure sign-in.</p>
-            <a className="roco-button" href="rocoeats://auth">
-              Return to RoCoEats app
+            <a className="roco-button" href={`${appReturnScheme(flow.app)}://auth`}>
+              Return to {flow.app === 'driver' ? 'RoCoEats Driver' : 'RoCoEats'} app
             </a>
           </>
         )}

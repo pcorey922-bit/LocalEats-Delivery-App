@@ -8,6 +8,51 @@ authentication, homepage, delivery or Stripe investigations. The owner explicitl
 on November 17. This supersedes historical native deferral notes. Shared website/
 backend completion comes first; reuse existing native code and signing infrastructure.
 
+### November 17 dedicated-driver native build checkpoint
+
+Website release 91ee3eab21c1a3b70a0e393f3edfa1f6fbd0cac4 has all THREE CI
+workflows completed SUCCESS. Staging remains 4934f24; no new deployment performed.
+
+Added separate customer/driver app build identities using existing Capacitor,
+Android and iOS projects. Default customer ID/name/scheme/signing remain unchanged.
+Driver: com.rocoeats.driver / RoCoEats Driver / rocoeats-driver. Public metadata
+lives in config/native-audiences.json; ROCOEATS_NATIVE_AUDIENCE=driver selects it
+at build time only. Unknown audiences fail packaging. No hosted env change.
+Android namespace remains compatible with existing Java activity; iOS uses scoped
+app build settings. CI matrices compile BOTH audiences on Android and iOS, inspect
+actual APK/Info.plist IDs/schemes, and keep separate unsigned artifacts. Existing
+owner signing jobs and private keys are untouched. Real compile conclusions must
+be checked after push; local Linux builds do not establish iOS compilation.
+
+Driver app root/sign-in/setup enter the existing driver workspace and offer driver
+navigation. Selecting this build grants no permission: server approval, current
+roles and owner-driver exception remain authoritative. Customer accounts stay
+customers and are denied driver controls. Existing explicit reconnect after reload
+prevents silent GPS resumption. No background GPS capability is claimed.
+Distinct callback schemes reject wrong-app/decorated links. Browser auth flow uses
+a sanitized app hint in the URL fragment only to choose a fixed return link;
+approval body stays id/state, proof-of-possession and server auth unchanged.
+Deploy this shared website revision before real driver callback acceptance.
+
+Local PASS: 184 app/API cases (183 pass, one PostgreSQL-only skip), identity/unsafe
+input CLI checks, full typechecks/production build, driver web production build,
+account/homepage/CSP browser suite, complete customer website/API/PGlite delivery/
+ledger regression, and dedicated driver browser approval/duty/reconnect/role-denial/
+owner-exception tests. Simulated browser approvals verify fixed customer/driver
+return schemes without transmitting an app role as authorization. No real account,
+provider call, native installation, signed release or physical device acceptance.
+Logs /tmp/rocoeats-{native-audience-*,driver-app-browser.log,driver-web-build.log,
+native-customer-workflow.log}; tests in scripts/driver-app-browser-checks.mjs.
+
+Next: inspect exact-SHA CI including ALL FOUR native matrix jobs; fix real failures.
+Then implement explicit opt-in background driver tracking with scoped, revocable
+server authorization and native privacy/foreground-service controls, using existing
+location APIs where appropriate. Foreground location, heartbeat and on-duty rules
+already exist; do not replace them or claim background delivery from browser mocks.
+Independent native blockers: app-specific push configuration, launcher asset
+review, signed driver/iOS releases and real-device consent/background/push evidence.
+No financial transactions, geographic activation, hosted writes or PR merge.
+
 ### November 17 recovery and customer-information release
 
 Recovered clean remote HEAD f31aac9a27a7731bf7ab66f1cb1d65da903e084e; all three
