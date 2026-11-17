@@ -98,7 +98,7 @@ export const notificationDevicesTable = pgTable("notification_devices", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-}, (t) => [check('notification_device_app_id_allowed', sql`${t.appId} in ('com.rocoeats.app', 'com.rocoeats.app.staging', 'com.rocoeats.driver', 'com.rocoeats.driver.staging')`)]);
+}, (t) => [check('notification_device_app_id_allowed', sql`${t.appId}::text in ('com.rocoeats.app', 'com.rocoeats.app.staging', 'com.rocoeats.driver', 'com.rocoeats.driver.staging')`)]);
 
 export const pushDeliveriesTable = pgTable(
   "push_deliveries",

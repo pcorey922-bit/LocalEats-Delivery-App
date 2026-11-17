@@ -76,6 +76,17 @@ dedicated-driver delivery workflows. These are offline/local simulations, not
 real push/GPS/payment acceptance. GitHub CI is pending until this source is pushed;
 inspect both Validate workflows and all four native jobs for its exact SHA.
 
+CI correction after 43d9f467deba30820cd561cbdcfc1e8dabc7e849: both Validate
+runs passed API/PostgreSQL tests but failed strict backup schema comparison.
+PostgreSQL deparsed the varchar IN-list constraint into different equivalent array
+casts after restore. Migration 0029 and schema now use explicit app_id::text;
+new regression reparses pg_get_constraintdef and requires exact equality. The
+backup guard remains strict. Local REAL disposable PostgreSQL now passes all
+**193 tests, zero skips/failures**, then backup/restore verifies exact rows,
+sequences, schema and balanced/immutable journal guards. No hosted database touched.
+Typechecks pass. Inspect the corrective commit's three workflows before release;
+43d9's Validate failures are historical and must not be called successful.
+
 ### VERIFIED RELEASE HANDOFF — November 17, 2026
 
 Code SHA 9e1a1622c2cad674ed04fa003718793dde968bb5 is pushed with ALL THREE CI

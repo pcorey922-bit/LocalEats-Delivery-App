@@ -19,7 +19,7 @@ status/retryable opt-out, clear configuration versus permission versus receipt,
 and distinct allowlisted customer/driver APNs topics instead of customer-only.
 Migration 0029 preserves existing devices as customer, touches no business records.
 Real Firebase/APNs receipt remains unverified; no provider sends in automation.
-New packaging requires deploying this backend capability first; don't confuse
+Strict backup/restore caught PostgreSQL varchar-array cast deparse differences; explicit text constraint and round-trip regression fix these without weakening recovery checks. All 193 app/API cases pass on local real PostgreSQL (no skips), followed by strict restore verification. New packaging requires deploying this backend capability first; don't confuse
 6cc artifact with these newer changes. Finish exact-SHA CI before deployment handoff.
 
 Next independent engineering action: inspect any genuine CI failures, then preserve

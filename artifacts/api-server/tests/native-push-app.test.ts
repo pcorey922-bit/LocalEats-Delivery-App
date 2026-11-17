@@ -48,6 +48,26 @@ test("device identity migration preserves legacy registrations and rejects unkno
       ).rows[0].app_id,
       "com.rocoeats.app",
     );
+    // pg_dump restores the deparsed expression; its second deparse must match.
+    // Explicit text input avoids PostgreSQL rewriting varchar-array casts.
+    const definition = async () =>
+      (
+        await db.query<{ definition: string }>(
+          "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname='notification_device_app_id_allowed'",
+        )
+      ).rows[0].definition;
+    const originalDefinition = await definition();
+    await db.exec(
+      "ALTER TABLE notification_devices DROP CONSTRAINT notification_device_app_id_allowed",
+    );
+    await db.exec(
+      `ALTER TABLE notification_devices ADD CONSTRAINT notification_device_app_id_allowed ${originalDefinition}`,
+    );
+    assert.equal(
+      await definition(),
+      originalDefinition,
+      "restored constraint must retain the exact schema fingerprint",
+    );
     await db.exec(
       "INSERT INTO notification_devices VALUES ('driver','other-token','fixture-profile','ios','com.rocoeats.driver');",
     );
