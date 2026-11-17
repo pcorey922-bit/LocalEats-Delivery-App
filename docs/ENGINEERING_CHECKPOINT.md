@@ -8,6 +8,35 @@ authentication, homepage, delivery or Stripe investigations. The owner explicitl
 on November 17. This supersedes historical native deferral notes. Shared website/
 backend completion comes first; reuse existing native code and signing infrastructure.
 
+### Isolated physical driver loading repair — November 17
+
+This supplemental staging APK branch is based on deployed
+6cc3c7848b7196aa00a26fc40676d939aa0c0a56. It backports ONLY the bounded account
+read/session recovery fix from adbefc65a953fe42afbc7fc3059d8ea345b97e26.
+Primary development work remains on feature/rocoeats-launch-readiness, including
+un-deployed notification migration 0029; none of those notification/schema changes
+are included here. Do not deploy this branch, merge it over primary, or initialize
+signing. No backend or migration deployment is required for this APK repair.
+
+Owner confirms installation, launch and eventual browser sign-in of the original
+6cc driver APK; endless post-authentication skeletons remain physically observed.
+Offline reproduction establishes a code defect: account reads can wait forever
+on Clerk renewal after 401, outside the normal HTTP deadline. Query offline hints
+can pause startup too. Full reads/renewal now have a 20-second deadline, abort and
+late-credential fencing, explicit retry/access/sign-out and sanitized failure codes.
+Exact phone API/provider failure remains unobserved; do not invent a root cause
+or claim physical acceptance. App/native return schemes, Clerk protocol, all
+server roles and security gates are preserved. No provider operation or hosted
+mutation was used. Read-only staging remains 6cc and passes 23 checks.
+
+Build through existing native-validation.yml target=compile and target=staging,
+audience=driver using THIS branch and existing owner key. Verify exact source SHA,
+CI and artifact identity/signature before handoff. Keep public/private ordering,
+live charges and municipal enforcement OFF; Stripe TEST only. Next owner-only
+step: update APK normally (do not clear data), reopen existing session, report
+whether controls appear or sanitized ACCOUNT_SESSION_TIMEOUT/ACCOUNT_API_TIMEOUT/
+ACCOUNT_401/ACCOUNT_403 appears. No credentials, coordinates, payment or new order.
+
 ### VERIFIED RELEASE HANDOFF — November 17, 2026
 
 Code SHA 9e1a1622c2cad674ed04fa003718793dde968bb5 is pushed with ALL THREE CI

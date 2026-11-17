@@ -40,6 +40,48 @@ export async function verifyDriverApp({ actor, api, origin }) {
   await owner.getByRole('button', { name: 'Go offline', exact: true }).waitFor();
   await owner.getByRole('button', { name: 'Go offline', exact: true }).click();
   assert.equal((await api('admin', '/profiles/me')).role, 'admin', 'Owner driver exception preserves administrator role');
+  // Physical-device failure reproduction: 401 followed by Clerk never settling.
+  // Only Clerk/OS transport is simulated; profile/driver role APIs remain real.
+  const recovery = await actor('driver');
+  await recovery.clock.install();
+  await recovery.goto(origin + '/about');
+  await recovery.evaluate(() => sessionStorage.setItem('qa-stall-refresh', '1'));
+  await recovery.route('**/api/profiles/me', route => route.fulfill({ status: 401, contentType: 'application/json', body: '{"error":"Session expired"}' }));
+  await recovery.goto(origin + '/driver');
+  await recovery.waitForFunction(() => window.qaTokenRefreshes > 0);
+  await recovery.clock.fastForward(21000);
+  await recovery.getByText(/ACCOUNT_SESSION_TIMEOUT/).waitFor();
+  assert.equal(await recovery.getByRole('button', { name: 'Go online', exact: true }).count(), 0);
+  await recovery.getByRole('button', { name: 'Sign out and sign in again', exact: true }).waitFor();
+  await recovery.reload();
+  await recovery.waitForFunction(() => window.qaTokenRefreshes > 0);
+  await recovery.clock.fastForward(21000);
+  await recovery.getByText(/ACCOUNT_SESSION_TIMEOUT/).waitFor();
+  await recovery.unroute('**/api/profiles/me');
+  await recovery.evaluate(() => sessionStorage.removeItem('qa-stall-refresh'));
+  await recovery.getByRole('button', { name: 'Retry', exact: true }).click();
+  await recovery.getByRole('button', { name: 'Go online', exact: true }).waitFor();
+  // Transport never resolving must also leave skeletons, with no automatic writes.
+  let stalledReads = 0;
+  await recovery.route('**/api/profiles/me', () => { stalledReads++; });
+  await recovery.reload();
+  await recovery.waitForFunction(() => document.querySelector('[aria-label="Checking driver access"]'));
+  await recovery.clock.fastForward(21000);
+  await recovery.getByText(/ACCOUNT_API_TIMEOUT/).waitFor();
+  assert.equal(stalledReads, 1);
+  await recovery.unroute('**/api/profiles/me');
+  await recovery.getByRole('button', { name: 'Retry', exact: true }).click();
+  await recovery.getByRole('button', { name: 'Go online', exact: true }).waitFor();
+  let deniedReads = 0;
+  await recovery.route('**/api/profiles/me', route => { deniedReads++; return route.fulfill({ status: 403, contentType: 'application/json', body: '{"error":"Access denied"}' }); });
+  await recovery.reload();
+  await recovery.getByText(/ACCOUNT_403/).waitFor();
+  assert.equal(deniedReads, 1, 'Forbidden role is not retried or auto-provisioned');
+  assert.equal(await recovery.getByRole('button', { name: 'Go online', exact: true }).count(), 0);
+  await recovery.unroute('**/api/profiles/me');
+  await recovery.getByRole('button', { name: 'Retry', exact: true }).click();
+  await recovery.getByRole('button', { name: 'Go online', exact: true }).waitFor();
+  console.log('PASS: stalled Clerk renewal and hung profile transport exit skeletons with phase-specific codes; restart, explicit retry and role denial preserve server authorization. Browser/native sessions are simulated.');
   const flow = { id: '11111111-1111-4111-8111-111111111119', state: 'Z'.repeat(43) };
   await owner.route('**/api/mobile/auth/approve', async route => {
     assert.deepEqual(route.request().postDataJSON(), flow, 'Presentation audience is never sent as authorization');
@@ -52,6 +94,6 @@ export async function verifyDriverApp({ actor, api, origin }) {
     assert.equal(await owner.getByRole('link', { name: /^Return to RoCoEats/ }).getAttribute('href'), `${scheme}://auth`);
   }
   await owner.unroute('**/api/mobile/auth/approve');
-  for (const page of [driver, unapproved, customer, owner]) assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  for (const page of [driver, unapproved, customer, owner, recovery]) assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   console.log('PASS: dedicated driver root/sign-in intent, driver-only navigation, approved duty/reload/offline, unapproved denial, customer role preservation and owner-driver exception. Real local API, simulated Clerk; no native/device/provider claim.');
 }

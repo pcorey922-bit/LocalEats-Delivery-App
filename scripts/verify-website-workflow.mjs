@@ -43,7 +43,7 @@ try {
         ? 'export const publishableKeyFromHost=(_host,key)=>key;'
         : `import { useSyncExternalStore } from 'react';
            const subscribe=callback=>{window.addEventListener('qa-auth-change',callback);return()=>window.removeEventListener('qa-auth-change',callback)};
-           export const useAuth=()=>{useSyncExternalStore(subscribe,()=>String(window.qaAuthReady)+String(window.qaUserId));return{isLoaded:window.qaAuthReady!==false,isSignedIn:!!window.qaUserId,userId:window.qaUserId,getToken:async(options)=>{if(options?.skipCache){window.qaTokenRefreshes=(window.qaTokenRefreshes||0)+1;return 'qa-refreshed-token'}return null}}};
+           export const useAuth=()=>{useSyncExternalStore(subscribe,()=>String(window.qaAuthReady)+String(window.qaUserId));return{isLoaded:window.qaAuthReady!==false,isSignedIn:!!window.qaUserId,userId:window.qaUserId,getToken:async(options)=>{if(options?.skipCache){window.qaTokenRefreshes=(window.qaTokenRefreshes||0)+1;if(sessionStorage.getItem('qa-stall-refresh')==='1')return new Promise(()=>{});return 'qa-refreshed-token'}return null}}};
            export const useUser=()=>({isLoaded:true,user:window.qaUserId?{id:window.qaUserId,fullName:'Browser tester'}:null});
            export const ClerkProvider=({children})=>children;
            export const SignIn=()=>null, SignUp=()=>null;

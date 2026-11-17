@@ -2,7 +2,7 @@ import "./lib/zod-csp";
 import { ConnectionNotice } from './components/connection-notice';
 import { ResponsiveNavigation } from './components/responsive-navigation';
 import { useAccountProfile } from './hooks/use-account-profile';
-import { accountReadOptions, sessionRead } from './lib/account-read';
+import { accountReadOptions, sessionRead, accountReadMessage } from './lib/account-read';
 import { useGuestToken } from './lib/guest-session';
 import { HomePage } from './pages/home';
 import { InformationPage } from './pages/information';
@@ -228,7 +228,7 @@ function AccountSetup() {
       <h1>Let’s finish your setup</h1>
       {status === 403 ? <><p role="alert">This account does not have access to the workspace. Private staging requires an invitation.</p><a href={`${basePath}${access}`}>Check account access</a></> :
         status === 401 ? <button className="roco-button" onClick={() => void signOut({ redirectUrl: `${basePath}/sign-in${query}` }).catch(() => window.location.reload())}>Sign in again to continue</button> :
-        <QueryError retry={() => provision.isError ? start() : void profile.refetch()} message="We couldn’t finish connecting your account. Check your connection and try again." />}
+        <QueryError retry={() => provision.isError ? start() : void profile.refetch()} message={accountReadMessage(profile.error)} />}
     </section></div></main>;
   }
   if (missing && !hasIntent) return <main className="roco-main"><h1>Choose your account type</h1><AccountSetupChoices/></main>;
@@ -263,7 +263,7 @@ function DashboardPage() {
   const [, setLocation] = useLocation();
   const profile = useProfileQuery();
   const { getToken } = useAuth();
-  const dashboard = useGetMyDashboard({ query: { queryKey: [...getGetMyDashboardQueryKey(), profile.data?.id], enabled: !!profile.data, queryFn: ({ signal }) => sessionRead(headers => getMyDashboard({ signal, headers }), getToken), ...accountReadOptions } });
+  const dashboard = useGetMyDashboard({ query: { queryKey: [...getGetMyDashboardQueryKey(), profile.data?.id], enabled: !!profile.data, queryFn: ({ signal }) => sessionRead((headers, requestSignal) => getMyDashboard({ signal: requestSignal, headers }), getToken, { signal }), ...accountReadOptions } });
   useEffect(() => {
     if (!profile.data && profile.isError && isNotFound(profile.error)) setLocation(entry.setup, { replace: true });
   }, [profile.data, profile.isError, profile.error, entry.setup, setLocation]);

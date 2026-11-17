@@ -1,3 +1,12 @@
+# Staging repair branch scope
+
+This branch ONLY backports native account-loading recovery from primary source
+adbefc65a953fe42afbc7fc3059d8ea345b97e26 onto deployed 6cc3c784. No migration
+0029, backend deployment or notification capability bypass. Preserve primary branch
+work; do not merge/deploy this repair branch. Verify CI and signed artifact, then
+owner physical session/restart/driver controls. Exact phone failure cause remains
+unverified without device evidence. All ordering/live/municipal gates stay OFF.
+
 # Persistent production backlog
 
 Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
