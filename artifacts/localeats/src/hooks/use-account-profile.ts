@@ -8,7 +8,7 @@ export function useAccountProfile() {
     queryKey: [...getGetMyProfileQueryKey(), userId],
     enabled: !!isLoaded && !!isSignedIn,
     staleTime: 15000,
-    queryFn: ({ signal }) => sessionRead(headers => getMyProfile({ signal, headers }), getToken),
+    queryFn: ({ signal }) => sessionRead((headers, requestSignal) => getMyProfile({ signal: requestSignal, headers }), getToken, { signal }),
     ...accountReadOptions,
   } });
 }

@@ -8,6 +8,47 @@ authentication, homepage, delivery or Stripe investigations. The owner explicitl
 on November 17. This supersedes historical native deferral notes. Shared website/
 backend completion comes first; reuse existing native code and signing infrastructure.
 
+### Confirmed physical driver blocker — November 17 continuation
+
+Owner physically installed/launched signed driver APK from **6cc3c7848b7196aa00a26fc40676d939aa0c0a56** on Samsung Galaxy S22 Ultra. Browser sign-in initially
+failed but later SUCCEEDED. Driver workspace remains skeletons after restart.
+Installation is accepted; native authenticated dashboard/GPS/push are NOT accepted.
+Latest remote at investigation start was d0d3a738ad9fd73893a70c46b9cc43a31c0d1db0,
+with all three workflows successful. Do not assume its notification changes are
+hosted: read-only verification again confirmed actual hosted **6cc3c784**, 23/23
+checks passed, all ordering/live/municipal safeguards closed. No hosted data or
+configuration was changed and no financial/provider operation performed.
+
+Reproduced software defect: sessionRead's HTTP request had a timeout, but the
+subsequent Clerk getToken({skipCache:true}) after 401 had NONE. A stalled refresh
+therefore left profile/dashboard promises pending forever, outside the fetch
+abort deadline. Default query network mode could also pause a read behind a stale
+native offline hint. Phone's exact failing authenticated request/response is not
+observable without its session; do not claim the offline reproduction proves that
+specific physical transport/provider cause. Earlier initial sign-in failure is
+not independently diagnosed and must not be explained as bad internet.
+
+Current fix: bound full account read/renewal to 20 seconds, propagate abort and
+fence late credentials, no automatic retries after deadline, use bounded reads
+independently of offline hints, sanitize API-versus-session timeout codes. Driver
+profile/offers/deliveries retain server role checks and show retry/access/actual
+sign-out recovery. No role grants, auth protocol, database migration or financial
+rules changed. Customer dashboard and saved-address reads share cancellation.
+Regression tests reproduce never-settling Clerk renewal and API transport, restart,
+explicit retry, 403 denial and successful recovery with real local role APIs and
+SIMULATED Clerk. 195 app/API tests passed, zero failures, one local PG-only skip;
+typechecks/production build, account/signup and driver browser checks passed.
+Customer full order/delivery/ledger and checkout regressions also passed with simulated payments. Exact-SHA CI must finish before release claims.
+
+Release requirement: owner has NOT authorized deploying migration 0029 for this
+repair. Preserve latest main development work; backport ONLY this tested UI/session
+fix to an isolated staging-repair branch based on deployed 6cc. Its signed APK
+must use the existing protected signer and existing public staging settings, with
+no notification-capability gate bypass or hosted deployment. Inspect backport's
+changed files/migrations and build identities. Record source SHA/run/artifact and
+CI before handoff. Physical retry and sanitized timeout code, if any, remain owner
+acceptance; never request private tokens or weaken role checks. Keep all gates OFF.
+
 ### Resume pointer — source d430e9f, November 17
 
 Latest functional source: **d430e9ff8c29ef281cae437c5382e774ea3af5d8**,

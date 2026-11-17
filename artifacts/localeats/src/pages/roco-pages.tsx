@@ -6,7 +6,7 @@ import { MenuItemEditor } from './menu-item-editor';
 import { ConnectionNotice } from '../components/connection-notice';
 import { ResponsiveNavigation } from '../components/responsive-navigation';
 import { useAccountProfile } from '../hooks/use-account-profile';
-import { accountReadOptions, sessionRead } from '../lib/account-read';
+import { accountReadOptions, sessionRead, accountReadMessage } from '../lib/account-read';
 import { CheckoutAddresses } from './checkout-addresses';
 import { useGuestToken } from '../lib/guest-session';
 import { accountStatus } from "../lib/account-entry";
@@ -134,7 +134,7 @@ export function CartPage() {
   const [tipCents, setTipCents] = useState(0); const [placed, setPlaced] = useState<Order | null>(null);
   type Quote = {subtotalCents:number;deliveryFeeCents:number;serviceFeeCents:number;taxCents:number;tipCents:number;totalCents:number};
   const addressKey = [...getListMyAddressesQueryKey(), isSignedIn ? 'customer' : 'guest', principal];
-  const addresses = useListMyAddresses({ query: { queryKey: addressKey, enabled: !!isLoaded && !!principal, queryFn: ({ signal }) => isSignedIn ? sessionRead(headers => listMyAddresses({ signal, headers }), getToken) : listMyAddresses({ signal }), ...accountReadOptions } });
+  const addresses = useListMyAddresses({ query: { queryKey: addressKey, enabled: !!isLoaded && !!principal, queryFn: ({ signal }) => isSignedIn ? sessionRead((headers, requestSignal) => listMyAddresses({ signal: requestSignal, headers }), getToken, { signal }) : listMyAddresses({ signal }), ...accountReadOptions } });
   const selectedAddressId = !addresses.isError && addresses.data?.some(address => address.id === addressId) ? addressId : '';
   useEffect(() => {
     if (!addresses.data || addresses.isError) return;
@@ -269,18 +269,21 @@ type DriverDelivery = {
   deliveryAddress?: { street1: string; street2?: string | null; city: string; region: string; postalCode: string; deliveryInstructions?: string | null };
 };
 export function DriverPage() {
+  const { getToken, userId } = useAuth();
+  const { signOut } = useClerk();
+  const [signOutFailed, setSignOutFailed] = useState(false);
   const profile = useMyProfile();
   const client = useQueryClient();
   const enabled = ['driver','admin'].includes(profile.data?.role??'');
-  const offers = useQuery({ queryKey: ['driver-offers'], queryFn: () => customFetch<DriverDelivery[]>('/api/driver/offers'), enabled, refetchInterval: 15000 });
-  const deliveries = useQuery({ queryKey: ['driver-deliveries'], queryFn: () => customFetch<DriverDelivery[]>('/api/driver/deliveries'), enabled, refetchInterval: 15000 });
+  const offers = useQuery({ queryKey: ['driver-offers'], queryFn: ({ signal }) => sessionRead((headers, requestSignal) => customFetch<DriverDelivery[]>('/api/driver/offers', { headers, signal: requestSignal }), getToken, { signal }), ...accountReadOptions, enabled, refetchInterval: 15000 });
+  const deliveries = useQuery({ queryKey: ['driver-deliveries'], queryFn: ({ signal }) => sessionRead((headers, requestSignal) => customFetch<DriverDelivery[]>('/api/driver/deliveries', { headers, signal: requestSignal }), getToken, { signal }), ...accountReadOptions, enabled, refetchInterval: 15000 });
   const update = useMutation({
     mutationFn: ({ orderId, action }: { orderId: string; action: string }) => customFetch(`/api/driver/orders/${orderId}/${action}`, { method: 'POST' }),
     onSuccess: () => { void client.invalidateQueries({queryKey:['driver-declined-offers']}); void client.invalidateQueries({queryKey:['driver-availability']}); void client.invalidateQueries({ queryKey: ['driver-offers'] }); void client.invalidateQueries({ queryKey: ['driver-deliveries'] }); },
   });
   if (profile.isLoading) return <Shell><Loading label="Checking driver access"/></Shell>;
   if (profile.isError && accountStatus(profile.error) === 404) return <Redirect to="/account/setup?join=driver" />;
-  if (profile.isError) return <Shell><main className="roco-main"><PageIntro eyebrow="Driver access" title="We couldn’t open your workspace."/><LoadError retry={() => void profile.refetch()} message={accountStatus(profile.error) === 403 ? "This account does not have driver workspace access. Private staging requires an invitation." : "Check your connection or sign in again."}/><p><Link href="/account/access?join=driver">Check account access</Link> · <Link href="/sign-in?join=driver">Sign in again</Link></p></main></Shell>;
+  if (profile.isError) return <Shell><main className="roco-main"><PageIntro eyebrow="Driver access" title="We couldn’t open your workspace."/><LoadError retry={() => void profile.refetch()} message={accountReadMessage(profile.error)}/><p><Link href="/account/access?join=driver">Check account access</Link> · <button className="roco-button" onClick={() => { setSignOutFailed(false); if (userId) dutyIntent.set(userId, false); void unregisterPush().catch(() => {}).then(() => signOut({ redirectUrl: "/sign-in?join=driver" })).catch(() => setSignOutFailed(true)); }}>Sign out and sign in again</button></p>{signOutFailed && <p role="alert">Sign-out could not finish. Retry or reopen the app. No account permissions changed.</p>}</main></Shell>;
   if (!enabled) return <Shell><main className="roco-main"><PageIntro eyebrow="Driver access" title="Your delivery workspace.">Sign in with an active, administrator-approved driver profile to view deliveries.</PageIntro><p><Link href="/account/access?join=driver">Check driver access</Link></p></main></Shell>;
   const card = (d: DriverDelivery, offer: boolean) => <article className="roco-card" key={d.orderId}>
     {d.status==='picked_up'&&d.orderStatus==='out_for_delivery'&&<DriverHandoff orderId={d.orderId} onCompleted={()=>{void client.invalidateQueries({queryKey:['driver-availability']});void client.invalidateQueries({queryKey:['driver-deliveries']});void client.invalidateQueries({queryKey:['driver-offers']});}}/>}
@@ -298,8 +301,8 @@ export function DriverPage() {
   </article>;
   return <Shell><main className="roco-main"><PageIntro eyebrow="Driver" title="Local deliveries.">Paid orders ready for pickup appear here. Customer addresses are available after you claim a delivery.</PageIntro>
     {update.isError && <p className="roco-alert" role="alert">{update.error.message}</p>}
-    {profile.data?.role==='admin'&&<p className="roco-notice">Administrator delivery workspace · Your administrator access stays active. Delivery eligibility is verified by the server. <Link href="/admin">Return to owner dashboard</Link></p>}<DriverApplication/><SupportDesk/><DriverAvailability/>{import.meta.env.VITE_APP_AUDIENCE === 'driver' && <PushPreferences/>}<h2>My deliveries</h2>{deliveries.isPending ? <Loading/> : deliveries.isError ? <LoadError retry={() => void deliveries.refetch()} message={deliveries.error.message}/> : <div className="roco-list">{deliveries.data?.length ? deliveries.data.map(d => card(d, false)) : <p>No assigned deliveries.</p>}</div>}
-    <h2>Available offers</h2>{offers.isPending ? <Loading/> : offers.isError ? <LoadError retry={() => void offers.refetch()} message={offers.error.message}/> : <div className="roco-list">{offers.data?.length ? offers.data.map(d => card(d, true)) : <p>No paid deliveries available right now.</p>}</div>}
+    {profile.data?.role==='admin'&&<p className="roco-notice">Administrator delivery workspace · Your administrator access stays active. Delivery eligibility is verified by the server. <Link href="/admin">Return to owner dashboard</Link></p>}<DriverApplication/><SupportDesk/><DriverAvailability/>{import.meta.env.VITE_APP_AUDIENCE === 'driver' && <PushPreferences/>}<h2>My deliveries</h2>{deliveries.isPending ? <Loading/> : deliveries.isError ? <LoadError retry={() => void deliveries.refetch()} message={accountReadMessage(deliveries.error)}/> : <div className="roco-list">{deliveries.data?.length ? deliveries.data.map(d => card(d, false)) : <p>No assigned deliveries.</p>}</div>}
+    <h2>Available offers</h2>{offers.isPending ? <Loading/> : offers.isError ? <LoadError retry={() => void offers.refetch()} message={accountReadMessage(offers.error)}/> : <div className="roco-list">{offers.data?.length ? offers.data.map(d => card(d, true)) : <p>No paid deliveries available right now.</p>}</div>}
     <DeclinedOffers/>
   </main></Shell>;
 }

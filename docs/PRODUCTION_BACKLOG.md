@@ -4,6 +4,20 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
+## Priority: physical driver dashboard/session recovery
+
+Samsung installation/launch from deployed 6cc3c784 PASSED; browser sign-in later
+SUCCEEDED. Endless authenticated skeletons remain a launch blocker. Reproduced
+unbounded Clerk renewal after API 401; full read/session deadline, cancellation,
+late-token fencing, bounded native offline-hint handling and explicit driver
+retry/sign-out controls now fix that code path. Exact phone transport response
+remains unobserved; don't assert provider acceptance or a guessed physical cause.
+Local unit/API/build/account/driver/customer order-through-delivery browser checks pass; finish exact-SHA CI. Backport only repair onto deployed 6cc for signed replacement APK,
+without migration 0029/backend deployment. Preserve newer notification development.
+Next owner gate: update signed APK, retry existing driver session and report any
+sanitized timeout code; then authorized physical GPS/background and push acceptance.
+No ordering, permissions, provider/financial operations or hosted settings changed.
+
 ## Latest source/checkpoint
 
 Functional source d430e9ff8c29ef281cae437c5382e774ea3af5d8 fixes notification
