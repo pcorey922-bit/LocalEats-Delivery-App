@@ -72,6 +72,21 @@ try {
   await page.getByRole('button', { name: 'Refresh notification status', exact: true }).click();
   await page.getByRole('status').filter({ hasText: 'Push delivery is not configured' }).waitFor();
   assert.equal(await page.getByRole('button', { name: 'Enable mobile push notifications', exact: true }).count(), 0);
+  // Upgraded installations can revoke legacy token-only enrollment without
+  // granting permission again or first registering with the new status API.
+  await page.evaluate(() => {
+    localStorage.setItem('rocoeats-push-token', 'legacy_fixture_token_not_real');
+    localStorage.setItem('qa-server-push', 'true');
+  });
+  await page.reload();
+  await page.evaluate(() => { window.bgPermission = false; });
+  await page.getByRole('button', { name: 'Refresh notification status', exact: true }).click();
+  await page.getByText('Notifications are blocked in device settings.', { exact: false }).waitFor();
+  await page.getByRole('button', { name: 'Disable push for this device', exact: true }).click();
+  await page.getByRole('status').filter({ hasText: 'Push registration removed' }).waitFor();
+  assert.deepEqual(await page.evaluate(() => window.pushRevocation), { token: 'legacy_fixture_token_not_real' });
+  assert.equal(await page.evaluate(() => localStorage.getItem('rocoeats-push-token')), null);
+  assert.equal(await page.getByRole('button', { name: 'Disable push for this device', exact: true }).count(), 0);
   assert.deepEqual(errors, []);
-  console.log('PASS: native push permission/configuration/current-account registration are distinguished; server-confirmed enrollment survives reload, failed removal stays retryable with native opt-out attempted, provider-unconfigured state is clear. All push/native APIs simulated; no vendor request.');
+  console.log('PASS: native push permission/configuration/current-account registration are distinguished; server-confirmed enrollment survives reload, failed removal stays retryable with native opt-out attempted, provider-unconfigured state is clear; legacy token-only devices can opt out with permission denied. All push/native APIs simulated; no vendor request.');
 } finally { await browser?.close(); await new Promise(resolve => server.close(resolve)); }

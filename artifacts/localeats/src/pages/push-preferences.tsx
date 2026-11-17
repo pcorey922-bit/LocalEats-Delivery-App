@@ -19,6 +19,13 @@ function savedDevice() {
     return null;
   }
 }
+function hasLegacyRegistration() {
+  try {
+    return !!localStorage.getItem("rocoeats-push-token");
+  } catch {
+    return false;
+  }
+}
 export function PushPreferences() {
   const { userId } = useAuth();
   const native = Capacitor.isNativePlatform(),
@@ -172,7 +179,7 @@ export function PushPreferences() {
           )}
         </>
       )}
-      {(deviceId || disable.isError) && (
+      {(deviceId || hasLegacyRegistration() || disable.isError) && (
         <button
           className="roco-button"
           disabled={disable.isPending || enroll.isPending}

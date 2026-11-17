@@ -15,9 +15,15 @@ following notification implementation 43d9f467deba30820cd561cbdcfc1e8dabc7e849.
 Source d430's push Validate completed SUCCESS, including PostgreSQL, strict
 backup/restore, browser regressions, container migration/startup and health checks:
 https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44044790407 .
-At this documentation checkpoint, PR Validate 44044800393 and native matrix
-44044800367 are pending; inspect exact-SHA conclusions before claiming success.
-This documentation-only commit also triggers CI; inspect its own runs on resume.
+PR Validate 44044800393 and native matrix 44044800367 also completed SUCCESS;
+all FOUR native customer/driver Android/iOS jobs actually succeeded. Signed and
+emulator jobs were intentionally skipped in this compile matrix (the 6cc signed
+artifact below is separate). Documentation checkpoint d250ddec18fd57d2c451b47dc9b0fd45ac46eae3
+preserves the source handoff. Current follow-up fixes legacy token-only native
+push opt-out: older devices can revoke enrollment without first granting
+permission/re-enrolling. Browser regression proves token revocation with denied
+OS permission, local retry state and native unregister. Production build and
+typechecks pass. Inspect this follow-up commit's exact-SHA CI before release.
 No new application deployment occurred. Hosted source and verified signed driver
 APK remain 6cc3c7848b7196aa00a26fc40676d939aa0c0a56 as detailed below.
 

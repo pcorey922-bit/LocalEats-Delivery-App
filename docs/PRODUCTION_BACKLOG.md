@@ -8,8 +8,10 @@ Never enable public ordering, add billing or publish native apps without approva
 
 Functional source d430e9ff8c29ef281cae437c5382e774ea3af5d8 fixes notification
 identity and strict PostgreSQL restore. Push Validate 44044790407 SUCCESS;
-PR Validate 44044800393/native 44044800367 pending at checkpoint creation. Inspect
-this documentation commit's CI too. Hosted and signed APK source is still 6cc3c78.
+PR Validate 44044800393 and native 44044800367 also SUCCESS, including all four
+actual native jobs. Current follow-up makes legacy token-only push opt-out
+accessible even when OS permission is denied; browser regression, typechecks and
+production build pass. Verify this follow-up commit's exact-SHA CI. Hosted and signed APK source is still 6cc3c78.
 Next: exact-SHA CI conclusions, owner Samsung APK/sign-in/background acceptance,
 separately approved existing Render deployment with additive migration 0029, then
 app-specific real push setup/receipt. No activation/provider/financial operation.

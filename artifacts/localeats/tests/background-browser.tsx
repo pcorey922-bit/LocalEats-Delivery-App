@@ -9,7 +9,7 @@ import { PushPreferences } from '../src/pages/push-preferences';
 const qa = window as unknown as {
   bgPermission: boolean; bgStarts: number; bgRemovals: string[]; bgUploads: number;
   bgDenied: boolean; emitFix?: (fix: unknown) => void; offline: () => void;
-  pushConfigured: boolean; pushRegistered: boolean; pushDeleteFails: boolean;
+  pushConfigured: boolean; pushRegistered: boolean; pushDeleteFails: boolean; pushRevocation?: unknown;
 };
 qa.bgPermission = true; qa.bgStarts = 0; qa.bgRemovals = []; qa.bgUploads = 0; qa.bgDenied = false;
 qa.offline = () => dutyIntent.set('driver-fixture', false);
@@ -20,6 +20,7 @@ window.fetch = async (input, options) => {
   if (url === '/api/notification-devices/config') return Response.json({ android: qa.pushConfigured, ios: false });
   if (url === '/api/notification-devices') {
     if (options?.method === 'DELETE') {
+      qa.pushRevocation = JSON.parse(String(options.body));
       if (qa.pushDeleteFails) return Response.json({ error: 'Simulated removal outage' }, { status: 503 });
       qa.pushRegistered = false; localStorage.setItem('qa-server-push', 'false'); return new Response(null, { status: 204 });
     }
