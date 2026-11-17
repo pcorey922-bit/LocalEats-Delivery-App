@@ -1,3 +1,5 @@
+import { RestaurantAccessState } from '../components/restaurant-access-state';
+import { InformationLinks } from '../components/information-links';
 import { MenuCategoryEditor } from './menu-category-editor';
 import { MenuItemEditor } from './menu-item-editor';
 import { ConnectionNotice } from '../components/connection-notice';
@@ -36,7 +38,7 @@ import {
   listMyAddresses, getListMyOrdersQueryKey, getListRestaurantsQueryKey, useCreateMyOrder,
   useCreateMyRestaurant, useCreateMyRestaurantCategory, useCreateMyRestaurantMenuItem, useDeleteMyRestaurantCategory,
   useDeleteMyAddress, useDeleteMyRestaurantMenuItem, useGetAdminFinance, useGetAdminOverview, useGetMyOrder, useGetMyRestaurant,
-  useGetRestaurant, useHealthCheck, useListAdminProfiles, useListAdminRestaurants, useListMyAddresses, useListMyOrders,
+  useGetRestaurant, useListAdminProfiles, useListAdminRestaurants, useListMyAddresses, useListMyOrders,
   useUpdateMyAddress,
   useListRestaurants, useUpdateAdminProfile, useUpdateAdminRestaurantStatus, useUpdateMyRestaurant,
   useUpdateMyRestaurantCategory, useUpdateMyRestaurantMenuItem, useUpdateOrderStatus,
@@ -49,7 +51,7 @@ const money = (cents: number) => new Intl.NumberFormat('en-US', { style: 'curren
 const invalidate = (client: ReturnType<typeof useQueryClient>, ...keys: ReadonlyArray<readonly unknown[]>) => keys.forEach(queryKey => { void client.invalidateQueries({ queryKey }); });
 const statusText = (s: string) => s.replaceAll('_', ' ');
 
-function Logo() { return <Link className="roco-logo" href="/"><span className="roco-logo-mark"><Utensils size={18} /></span><span>RoCoEats</span></Link>; }
+function Logo() { return <Link className="roco-logo" href="/"><img src={`${import.meta.env.BASE_URL}logo.svg`} width="42" height="42" alt=""/><span>RoCoEats</span></Link>; }
 function Shell({ children }: { children: React.ReactNode }) {
   const { isSignedIn, userId } = useAuth(); const { signOut } = useClerk();
   const profile = useMyProfile();
@@ -57,7 +59,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return <div className="roco-page"><header className="roco-header roco-wrap"><Logo/><ResponsiveNavigation className="roco-nav" label="Main navigation">
     <Link href="/restaurants">Find food</Link>{isSignedIn && <><Link href="/dashboard">Dashboard</Link><Link href="/orders">Orders</Link>{role === 'restaurant' && <Link href="/restaurant">Restaurant</Link>}{['admin','driver'].includes(role??'') && <Link href="/driver">Driver</Link>}<Link href="/notifications">Notifications</Link><Link href="/account">Account</Link>{role === 'admin' && <><Link href="/admin">Administrator</Link><Link href="/operations">Dispatch &amp; orders</Link></>}<button onClick={async () => { if(userId)dutyIntent.set(userId,false); await customFetch('/api/driver/availability',{method:'PUT',body:JSON.stringify({available:false})}).catch(()=>{}); await unregisterPush().catch(()=>{}); await signOut({ redirectUrl: '/' }); }}>Sign out</button></>}
     {!isSignedIn && <><Link href="/cart">Continue as Guest</Link><Link href="/guest/order">Guest order</Link><Link href="/sign-in">Sign in</Link><Link href="/sign-up">Create account</Link><Link href="/sign-up?join=restaurant">Partner With RoCoEats</Link><Link href="/sign-up?join=driver">Drive With RoCoEats</Link></>}
-  </ResponsiveNavigation></header><CommerceBanner/>{children}</div>;
+  </ResponsiveNavigation></header><CommerceBanner/>{children}<footer className="roco-wrap"><InformationLinks/></footer></div>;
 }
 function PageIntro({ eyebrow, title, children }: { eyebrow: string; title: string; children?: React.ReactNode }) {
   return <><div className="roco-kicker">{eyebrow}</div><h1 className="roco-title">{title}</h1>{children && <p className="roco-subtitle">{children}</p>}</>;
@@ -76,12 +78,11 @@ function RoleGate({ allowed }: { allowed: string[] }) {
 
 export function DiscoveryPage() {
   const [search, setSearch] = useState('');
-  const directory = useListRestaurants({ search: search || undefined });
-  const health = useHealthCheck({ query: { queryKey: ['/api/healthz'], staleTime: 60_000, retry: false } });
+  const directory = useListRestaurants({ search: search || undefined }, { query: { queryKey: getListRestaurantsQueryKey({ search: search || undefined }), retry: false } });
   const restaurants = directory.data || [];
   return <Shell><main className="roco-main"><div className="roco-kicker">Roane County · Tennessee</div><h1 className="roco-title">Local food,<br/>right around here.</h1><p className="roco-subtitle">Find approved restaurants serving our community. Only listings currently approved by RoCoEats appear here.</p>
-    <div className="roco-toolbar"><label className="roco-field" style={{ maxWidth: 430 }}>Search approved restaurants<input className="roco-input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Restaurant name"/></label><div className="roco-meta"><MapPin size={13} style={{ verticalAlign: 'middle' }}/> Roane County, TN <span style={{ marginLeft: 13 }}>API {health.isLoading ? 'checking' : health.isError ? 'unavailable' : health.data?.status || 'available'}</span></div></div>
-    {directory.isLoading ? <div className="roco-grid">{[1,2,3].map(i => <div className="roco-card" key={i}><div className="portal-skeleton portal-loading-block"/><div className="portal-skeleton portal-loading-block" style={{ height: 80 }}/></div>)}</div> : directory.isError ? <LoadError retry={() => void directory.refetch()} message="Restaurant listings are unavailable right now."/> : restaurants.length ? <div className="roco-grid">{restaurants.map(r => <article className="roco-card roco-restaurant-card" key={r.id}><div><div className="roco-meta">Approved local restaurant</div><h2 style={{ marginTop: 14 }}>{r.name}</h2><p>{r.description || 'A local restaurant in Roane County.'}</p></div><div className="roco-row"><span className="roco-meta">{r.city}, {r.region}</span><Link className="roco-button primary" href={`/restaurants/${r.id}`}>View menu <ArrowRight size={14}/></Link></div></article>)}</div> : <div className="roco-empty"><div className="roco-kicker">The table is getting ready</div><h2>No approved restaurants yet</h2><p>There are no approved restaurants to show{search ? ` for “${search}”` : ''}. We will list businesses here when they complete review. No listings or activity have been added for demonstration.</p></div>}
+    <div className="roco-toolbar"><label className="roco-field" style={{ maxWidth: 430 }}>Search approved restaurants<input className="roco-input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Restaurant name"/></label><div className="roco-meta"><MapPin size={13} style={{ verticalAlign: 'middle' }}/> Roane County, TN </div></div>
+    {directory.isLoading ? <div className="roco-grid">{[1,2,3].map(i => <div className="roco-card" key={i}><div className="portal-skeleton portal-loading-block"/><div className="portal-skeleton portal-loading-block" style={{ height: 80 }}/></div>)}</div> : directory.isError ? <RestaurantAccessState error={directory.error} retry={() => void directory.refetch()}/> : restaurants.length ? <div className="roco-grid">{restaurants.map(r => <article className="roco-card roco-restaurant-card" key={r.id}><div><div className="roco-meta">Approved local restaurant</div><h2 style={{ marginTop: 14 }}>{r.name}</h2><p>{r.description || 'A local restaurant in Roane County.'}</p></div><div className="roco-row"><span className="roco-meta">{r.city}, {r.region}</span><Link className="roco-button primary" href={`/restaurants/${r.id}`}>View menu <ArrowRight size={14}/></Link></div></article>)}</div> : <div className="roco-empty"><div className="roco-kicker">The table is getting ready</div><h2>No approved restaurants yet</h2><p>There are no approved restaurants to show{search ? ` for “${search}”` : ''}. We will list businesses here when they complete review. No listings or activity have been added for demonstration.</p></div>}
     <div className="roco-notice" style={{ marginTop: 30 }}>RoCoEats ordering is in development. Restaurant discovery reflects approved records, but delivery service and payment processing are not represented as active.</div>
   </main></Shell>;
 }
@@ -97,7 +98,7 @@ export function RestaurantMenuPage() {
     setCart(old=>old.some(i=>i.lineId===lineId)?old.map(i=>i.lineId===lineId?{...i,quantity:i.quantity+1}:i):[...old,{lineId,modifiers,customization,specialInstructions,menuItemId:item.id,name:item.name,priceCents:item.priceCents+extra,quantity:1,restaurantId,restaurantName:menu.data?.name||''}]);
   };
   if (menu.isLoading) return <Shell><Loading label="Loading restaurant menu"/></Shell>;
-  if (menu.isError || !menu.data) return <Shell><main className="roco-main"><LoadError retry={() => void menu.refetch()} message="This approved restaurant menu could not be found."/></main></Shell>;
+  if (menu.isError || !menu.data) return <Shell><main className="roco-main"><RestaurantAccessState error={menu.error} retry={() => void menu.refetch()}/></main></Shell>;
   return <Shell><main className="roco-main"><PageIntro eyebrow={`${menu.data.city}, ${menu.data.region} · approved restaurant`} title={menu.data.name}>{menu.data.description || 'Browse the current menu from this Roane County restaurant.'}</PageIntro>
     <div className="roco-toolbar">{cartWarning&&<p role="alert">{cartWarning}</p>}<div className="roco-meta">{menu.data.street1} · {menu.data.city}, {menu.data.region} {menu.data.postalCode}</div><Link className="roco-button primary" href="/cart"><ShoppingBag size={15}/> Cart ({cart.reduce((n, i) => n + i.quantity, 0)})</Link></div>
     <RestaurantStatus restaurantId={restaurantId}/>

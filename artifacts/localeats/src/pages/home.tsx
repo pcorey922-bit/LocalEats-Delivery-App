@@ -1,5 +1,6 @@
 import { ArrowRight, Bike, MapPin, ShoppingBag, Store, UserRound, UtensilsCrossed } from 'lucide-react';
 import { Link } from 'wouter';
+import { InformationLinks } from '../components/information-links';
 
 const actions = [
   { title: 'Sign In', href: '/sign-in', icon: UserRound },
@@ -31,6 +32,6 @@ export function HomePage() {
       <p className="roco-home-status">We’re preparing for launch. You can explore restaurants and menus; ordering and payments are currently closed.</p>
       <p className="roco-home-help">Already placed a guest test order? <Link href="/guest/order">Track your guest order</Link></p>
     </main>
-    <footer className="roco-home-footer">Made for Roane County, Tennessee.<span>Local food. Local drivers. Delivered.</span></footer>
+    <footer className="roco-home-footer"><InformationLinks/>Made for Roane County, Tennessee.<span>Local food. Local drivers. Delivered.</span></footer>
   </div>;
 }

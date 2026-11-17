@@ -5,6 +5,7 @@ import { useAccountProfile } from './hooks/use-account-profile';
 import { accountReadOptions, sessionRead } from './lib/account-read';
 import { useGuestToken } from './lib/guest-session';
 import { HomePage } from './pages/home';
+import { InformationPage } from './pages/information';
 import { accountDestination, accountEntryLinks, accountStatus } from "./lib/account-entry";
 import { NativeSignIn } from "./pages/native-sign-in";
 import { MobileAuthorize } from "./pages/mobile-authorize";
@@ -301,6 +302,7 @@ function AccountAccessPage() {
 function Router() {
   return <RoutedErrorBoundary><Switch>
     <Route path="/" component={HomePage} />
+    {['/about', '/how-it-works', '/support', '/faq', '/privacy', '/terms'].map(path => <Route key={path} path={path} component={InformationPage}/>)}
     <Route path="/restaurants" component={DiscoveryPage} />
     <Route path="/restaurants/:restaurantId" component={RestaurantMenuPage} />
     <Route path="/cart" component={SignedInCheckout} />

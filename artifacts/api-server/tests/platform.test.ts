@@ -347,6 +347,28 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       const closed=await fetch(origin+"/api/profiles/me",{method:"OPTIONS",headers:{origin:"https://localhost","access-control-request-method":"GET"}});assert.equal(closed.headers.get("access-control-allow-origin"),null);
     }finally{process.env.NODE_ENV=prior;}
   });
+  await t.test("public discovery works with ordering closed while staging and customer mutations remain protected", async () => {
+    const keys = ['ROCOEATS_PRIVATE_STAGING', 'ROCOEATS_ORDERING_ENABLED', 'ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED'] as const;
+    const previous = keys.map(key => process.env[key]);
+    try {
+      process.env.ROCOEATS_PRIVATE_STAGING = 'false';
+      process.env.ROCOEATS_ORDERING_ENABLED = 'false';
+      process.env.ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED = 'false';
+      const listing = await api('/restaurants', null);
+      assert.equal(listing.status, 200);
+      assert.ok(listing.data.some((r: {id: string}) => r.id === ids.business));
+      for (const restaurant of listing.data) assert.deepEqual(Object.keys(restaurant).sort(), ['city','description','id','name','region']);
+      assert.equal((await api(`/restaurants/${ids.business}`, null)).status, 200);
+      assert.equal((await api('/orders/me', null)).status, 401);
+      assert.equal((await api('/addresses/me', null)).status, 401);
+      assert.equal((await api('/orders', ids.customer, 'POST', {...input(), expectedTotalCents: 10000}, randomUUID())).status, 503);
+      process.env.ROCOEATS_PRIVATE_STAGING = 'true';
+      assert.equal((await api('/restaurants', null)).status, 401);
+      assert.equal((await api(`/restaurants/${ids.business}`, null)).status, 401);
+    } finally {
+      keys.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });
+    }
+  });
   await t.test("private staging admits only server-listed identities and preserves role checks and signed webhooks", async () => {
     const previousOwners = process.env.LOCALEATS_ADMIN_CLERK_USER_IDS;
     try {

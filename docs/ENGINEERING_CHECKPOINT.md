@@ -1,11 +1,54 @@
 # RoCoEats resumable engineering checkpoint
 
-## READ FIRST — recovered website/backend continuation, November 15, 2026 UTC
+## READ FIRST — website and native continuation, November 17, 2026 UTC
 
 This section supersedes the historical checkpoints below. Resume the existing
 repository/branch; preserve all completed work. Do not restart completed checkout,
-authentication, homepage, delivery or Stripe investigations. Do not follow the
-archived Android/iOS/signing tasks below: native development is deferred.
+authentication, homepage, delivery or Stripe investigations. The owner explicitly authorized customer and dedicated driver Android/iOS development
+on November 17. This supersedes historical native deferral notes. Shared website/
+backend completion comes first; reuse existing native code and signing infrastructure.
+
+### November 17 recovery and customer-information release
+
+Recovered clean remote HEAD f31aac9a27a7731bf7ab66f1cb1d65da903e084e; all three
+exact-SHA workflows completed SUCCESS (Validate push/PR and unsigned native).
+No interrupted edits were lost. PR #1 remains open/draft/unmerged.
+Independent staging verification on November 17: 23/23 GET/OPTIONS checks passed,
+deployed 4934f2413756e0b88bc0da333ec7f906569de906 matched. Database/auth/pricing/
+Stripe TEST/webhook/worker configuration ready; public/private ordering, live
+charges and municipal enforcement OFF. No provider call or hosted write occurred.
+
+External review findings verified against implementation:
+- Anonymous /api/restaurants 401 is intentional private-staging protection. With
+  private staging disabled, approved directory/menu reads already work while
+  ordering remains closed. New API regression verifies safe directory fields,
+  protected addresses/order history, blocked creation and staging 401 restoration.
+- Website misleadingly called access denial a restaurant outage. New 401/403
+  invitation/session guidance and distinct network error/retry preserve all gates.
+- logo.svg was a legacy green heart, while workspace headers used gold utensils.
+  Homepage/auth/workspaces now share one navy/gold utensil SVG; five homepage
+  actions/layout unchanged. Native launcher assets still require separate review.
+- Added public About, How It Works, Contact & Support, FAQ and explicit unpublished
+  Privacy/Terms integration routes with accessible links. Actual support uses
+  existing authenticated orders/private guest capabilities. No contact details,
+  legal terms, restaurant counts or service promises were invented. Owner/legal
+  approval of actual policies/contact details remains a launch/store gate.
+
+PASS: 184 app/API cases (183 pass, one PostgreSQL-only local skip), full typechecks/
+production builds, account/homepage/CSP browser tests and complete real local
+website/API/PGlite delivery+ledger/menu/guest-support regression. New public pages
+pass at 320/390/768px; simulated 401/403/503 recover correctly. Clerk/payments are
+simulated in browser tests, not provider acceptance. Logs /tmp/rocoeats-nov17-*
+include staging JSON and info-{build,tests,browser,account,workflow}.log.
+
+Next engineering action: verify this release's three pushed CI conclusions; add
+separate driver native app identity/entry/return scheme using existing shared
+Capacitor implementation, preserving customer identifiers/signing. Validate real
+Android/iOS compilation in CI; builds are not signed/store/device acceptance.
+No deployment access currently available; provide final verified SHA for owner's
+existing Render service. No schema/environment changes required by website work.
+All financial/geographic/ordering safeguards and historical acceptance blockers
+remain. Never repeat the exhausted Geocodio diagnostic or historical reconciliation.
 
 ### November 15 guest-service acceptance and cancellation correction
 

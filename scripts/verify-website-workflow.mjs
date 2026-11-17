@@ -2,6 +2,7 @@ import { verifyCheckout } from './checkout-browser-checks.mjs';
 import { verifyMenuEditor } from './menu-editor-browser-checks.mjs';
 import { verifyMenuCategories } from './menu-category-browser-checks.mjs';
 import { verifyGuestService } from './guest-service-browser-checks.mjs';
+import { verifyPublicInformation } from './public-information-browser-checks.mjs';
 // Real website + API + migrated, disposable PGlite database. Only Clerk and
 // payment provider are simulated. This is NOT a Stripe TEST transaction.
 import assert from 'node:assert/strict';
@@ -82,7 +83,9 @@ try {
     assert.ok(response.ok, `${method} ${url}: ${response.status} ${await response.clone().text()}`);
     return response.json();
   }
-  if (process.env.ROCOEATS_GUEST_SERVICE_ONLY === 'true') {
+  if (process.env.ROCOEATS_PUBLIC_INFO_ONLY === 'true') {
+    await verifyPublicInformation({ actor, origin });
+  } else if (process.env.ROCOEATS_GUEST_SERVICE_ONLY === 'true') {
     await verifyGuestService({ actor, api, origin, ids });
   } else if (process.env.ROCOEATS_MENU_ONLY === 'true') {
     const restaurant = await actor('restaurant'), customer = await actor('customer');
@@ -241,6 +244,7 @@ try {
   await verifyMenuEditor({ restaurant, customer, api, origin, ids });
   await verifyMenuCategories({ restaurant, api, ids });
   await verifyGuestService({ actor, api, origin, ids });
+  await verifyPublicInformation({ actor, origin });
   assert.deepEqual(browserErrors, []);
   console.log(`PASS: real website/API/PGlite workflow: search, modifiers, cart/address/quote, simulator payment, restaurant acceptance/preparation, driver availability/claim/navigation/pickup/handoff, delivery receipt, balanced ledger and two earnings records; guest browsing/session/cart. Simulated Clerk and payment only. Screenshots: ${web}`);
   console.log('PASS: live restaurant hours, paused/closed status, weekly hours and availability outage recovery. Only the outage response was intercepted.');

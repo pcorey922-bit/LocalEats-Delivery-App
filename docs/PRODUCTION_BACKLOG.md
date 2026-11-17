@@ -4,6 +4,32 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
+## November 17 current priorities — full-platform authorization
+
+Recovered f31aac9a27a7731bf7ab66f1cb1d65da903e084e has all THREE CI workflows
+SUCCESS. Staging 4934f2413756e0b88bc0da333ec7f906569de906 independently passed
+23 read-only checks November 17; all ordering/live/municipal gates OFF.
+
+Completed customer gaps: explicit staging/invitation browsing states, shared
+navy/gold website logo, About/How It Works/Support/FAQ and unpublished legal
+publication routes. Anonymous public directory/menu access with ordering closed
+is already supported outside private staging and now regression-tested. Staging
+401 is intentional; do not relax its access control to satisfy external crawlers.
+184 local app/API cases, builds/typechecks and full browser regressions pass.
+
+Next actionable core work: dedicated driver Android/iOS build identities and
+entry/navigation/return links, reusing existing auth/API/driver workflows. Customer
+native implementations/signing remain preserved. Native development is now
+explicitly authorized; older deferral notes below are historical. Background GPS,
+real push, signed releases and physical iOS acceptance remain genuine unfinished
+native/provider/device gates, not implied by compilation.
+
+Owner-only launch decisions: approved Privacy/Terms and public contact details;
+geographic ground-truth/office evidence/activation; separately authorized Stripe
+settlement/refund/dispute/payout provider acceptance; production uptime/backups;
+physical-device acceptance. No domain migration, ordering activation, provider
+transaction, paid service, production launch or PR merge authorized here.
+
 ## Current launch priorities — November 15 core-completion review
 
 Deployed 4934f2413756e0b88bc0da333ec7f906569de906 passed 23 read-only checks and
