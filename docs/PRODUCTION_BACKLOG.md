@@ -4,6 +4,22 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
+## Verified code release — November 17
+
+9e1a1622c2cad674ed04fa003718793dde968bb5 passed both Validate workflows and the
+entire four-job native matrix (customer/driver Android/iOS), including compiled
+privacy/identity/staging-package checks. Android's actual decoded foreground
+service value is 0x8, confirming the verifier-format fix; prior 8868's failed run
+is historical. No signed artifact or physical background/push acceptance is claimed.
+
+Actionable next gate: owner deploys the exact final verified checkpoint SHA to the
+existing Render service, Environment unchanged; engineering verifies read-only,
+then creates the configured signed driver APK through the prepared existing signer.
+No additional standalone core workflow defect was established after these tests.
+Remaining real device/provider/legal/hosting gates are listed in the checkpoint;
+continue from evidence rather than rebuilding completed features or repeating the
+Geocodio diagnostic/payment. All ordering/live/municipal safeguards remain closed.
+
 ## November 17 current release gate
 
 Website 91ee3ea and dedicated native baseline ee14a30 have all three CI workflows

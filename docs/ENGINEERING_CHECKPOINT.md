@@ -8,6 +8,43 @@ authentication, homepage, delivery or Stripe investigations. The owner explicitl
 on November 17. This supersedes historical native deferral notes. Shared website/
 backend completion comes first; reuse existing native code and signing infrastructure.
 
+### VERIFIED RELEASE HANDOFF — November 17, 2026
+
+Code SHA 9e1a1622c2cad674ed04fa003718793dde968bb5 is pushed with ALL THREE CI
+workflows completed SUCCESS:
+- Validate push: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44034287757
+- Validate PR: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44034295800
+- Native matrix: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44034295741
+All FOUR native jobs succeeded: customer/driver Android and customer/driver iOS.
+Debug/release/staging Android variants, iOS simulator/device release compilation,
+actual package IDs, return schemes and permission boundaries were verified.
+The driver log proves the earlier false failure: decoded service type was 0x8,
+Android's location-only flag. The corrected checker passed along with private
+service/permission and staging package/security checks. No safeguard was bypassed.
+
+This handoff commit changes documentation only; source remains the verified code
+above. Inspect its automatic CI conclusions as usual before choosing a deployment
+SHA. Latest deployed staging was independently confirmed 4934f24 at session start,
+23/23 read-only checks passed, closed ordering/live/municipal gates. No agent
+Render deployment, signer dispatch, hosted mutation or provider operation occurred.
+
+Next action requires owner's existing Render session: Manual Deploy → Deploy a
+specific commit from feature/rocoeats-launch-readiness, using the final verified
+SHA reported for this checkpoint. Preserve all Environment values; no new variable,
+migration, service or resource is required. Wait for Live and let engineering run
+read-only checks. Then the existing protected workflow can build target=staging,
+audience=driver without reinitializing signing. Do not use unsigned CI artifacts
+for phone acceptance. See ANDROID_STAGING_TEST.md for exact browser/phone steps.
+
+Remaining acceptance gates are owner/device/provider controlled: locked-screen GPS
+and Clerk renewal/battery, app-specific real push, Apple signing/provisioning and
+physical iOS, approved legal/contact content, geographic accuracy/office evidence,
+authorized fee settlement/refund/dispute/payout evidence and production uptime/
+hosted recovery. The website/shared lifecycle and native candidate implementations
+are not a claim of commercial launch readiness. Keep public/private ordering,
+live charges and municipal enforcement OFF; Stripe TEST only; no Geocodio repeat,
+historical reconciliation or financial operation without separate authorization.
+
 ### November 17 staging APK handoff and Android verifier correction
 
 Completed source checkpoints: 91ee3eab21c1a3b70a0e393f3edfa1f6fbd0cac4 (public
