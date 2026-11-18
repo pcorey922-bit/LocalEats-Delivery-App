@@ -8,6 +8,52 @@ authentication, homepage, delivery or Stripe investigations. The owner explicitl
 on November 17. This supersedes historical native deferral notes. Shared website/
 backend completion comes first; reuse existing native code and signing infrastructure.
 
+### Current release pointers — November 18, physical acceptance still pending
+
+Main functional/security source **bbdf34edf37eb669cb5590d5d1a4c9ae041d0c31**
+has ALL THREE workflows SUCCESS:
+- Validate push: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44259901101
+- Validate PR: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44259910004
+- Four native jobs: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44259910020
+Prior 29551e9 audit failures are historical, not successful validation.
+
+Replacement APK source **4c247335583fd24022650dc5bac64d63ab987845** on existing
+supplemental branch **fix/driver-staging-session-recovery** (18bb parent). It
+contains the tested client handoff/actual-entry guard and necessary audit fix,
+but EXCLUDES notification migration 0029 and newer notification APIs. Existing
+Clerk TEST proxy remains bypassed; no hosted/backend deployment is required.
+Do not deploy/merge this supplemental branch over main. No signing setup changed.
+
+Exact repair runs were pending when this checkpoint was written; check real
+conclusions before claiming ready:
+- Validate: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44260685822
+- Both customer/driver Android/iOS compile: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44260755182
+- Actual protected DRIVER signer: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44260761946
+Signing initialization is skipped by design; android-staging itself must succeed.
+Artifact name: RoCoEats-Driver-Android-Staging-Test-APK. After success, inspect
+APP_IDENTITY.json (4c247335... / com.rocoeats.driver.staging), manifest versionCode
+higher than installed 135, v2 signature/existing owner certificate, APK checksum,
+startup recovery literals and key-material cleanup. No credential may be printed.
+
+Local exact APK source: 198 app/API passes, one PG-only skip; production builds/
+typechecks, full account/handoff tests and actual native-entry restored/withheld
+provider cases PASS. Production security audit clear. Main source: 202 passes,
+one local PG skip, plus full customer/driver/browser regressions. These simulate
+SDK/native/provider behavior; no physical success, push receipt or GPS acceptance.
+Hosted 6cc3c784 again passed 23 read-only checks; all ordering/live/municipal gates
+closed. No provider, financial, settings, permissions or database operation.
+
+After all checks/signing: Samsung → successful signer run → download NEW artifact
+ZIP → My Files → Extract → open APK to UPDATE existing app. No uninstall/storage
+clear/security bypass. Restore existing session, or approve one fresh browser
+request. Callback must not demand repeated approval; controls or a fixed NATIVE_*
+error with reload/cancel recovery must appear within 30 FOREGROUND seconds. Share
+only visible code/text; no tokens, cookies or credentials. If a prior one-use
+activation was interrupted, use cancel pending sign-in/reload explicitly; never
+silently re-consume it. Then verify a fresh request once. GPS/background/push work
+remains blocked on this physical outcome. No Render deploy or 0029 approval needed
+for this APK. This documentation commit also triggers CI; inspect its exact runs.
+
 ### November 18 CI security correction — separate from handset defect
 
 Native repair source 29551e94c17948cf08b247e0dcc3f7c5f2463a47 was pushed; its

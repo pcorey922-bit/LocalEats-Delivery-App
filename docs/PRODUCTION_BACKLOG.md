@@ -4,6 +4,21 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
+## Current verified source and candidate APK
+
+Main bbdf34edf37eb669cb5590d5d1a4c9ae041d0c31 has all three CI workflows
+SUCCESS, including four actual native build jobs. Replacement APK source
+4c247335583fd24022650dc5bac64d63ab987845 is on existing supplemental
+fix/driver-staging-session-recovery, excluding migration 0029/new notification API.
+Its Validate 44260685822, native compile 44260755182 and protected driver signer
+44260761946 were pending at checkpoint creation; inspect exact conclusions. No
+signer reinitialization. Exact APK source locally passes 198 tests/one PG skip,
+production/typecheck and account/native-entry bootstrap tests; production audit clear.
+See checkpoint for phone update and acceptance steps. Previous 18bb physical
+acceptance FAILED. Next owner-only gate: one updated APK handoff/restart test,
+controls OR bounded NATIVE_* code. No further speculative rewrite; GPS/push/device
+acceptance follows actual evidence. No Render deployment/financial operation.
+
 ## CI dependency gate, November 18
 
 29551e9 Validate failed on new unpatched HIGH picomatch advisory, before tests.
