@@ -1,3 +1,13 @@
+### CI fixture correction — November 18
+
+Initial blank-workspace repair Validate failed at the background-GPS browser test:
+its mocked profile omitted createdAt (required by the existing real API contract).
+Correct the test fixture, do NOT relax profile validation. Protected APK run
+44268689778 built version 148, but its source 6d2d5a2 failed that fixture check;
+do NOT hand that artifact to the owner. Build the replacement from the corrected
+supplemental HEAD after focused GPS tests and exact-SHA Validate pass. Product
+client code remains identical to the locally tested repair. No backend deployment.
+
 ### November 18 — version 144 physical blank-workspace investigation
 
 Supersedes the earlier request to test v144 as a candidate: owner physically

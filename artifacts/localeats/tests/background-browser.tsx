@@ -27,7 +27,7 @@ window.fetch = async (input, options) => {
     qa.pushRegistered = true; localStorage.setItem('qa-server-push', 'true'); return Response.json({ registered: true, deviceId: '11111111-1111-4111-8111-111111111119' }, { status: 201 });
   }
   if (url.startsWith('/api/notification-devices/')) return qa.pushRegistered ? Response.json({ registered: true, platform: 'android', appId: 'com.rocoeats.driver.staging' }) : Response.json({ error: 'Not registered' }, { status: 404 });
-  if (url === '/api/profiles/me') return Response.json({ id: 'driver-fixture', role: 'driver', displayName: 'Fixture Driver', isActive: true });
+  if (url === '/api/profiles/me') return Response.json({ id: 'driver-fixture', role: 'driver', displayName: 'Fixture Driver', createdAt: '2026-11-18T00:00:00.000Z' });
   if (url === '/api/driver/availability') return Response.json({ approved: true, available: true, online: true, activeOrderId: null });
   if (url === '/api/driver/location') { qa.bgUploads++; return qa.bgDenied ? Response.json({ error: 'Access revoked' }, { status: 403 }) : Response.json({ accepted: true }); }
   return Response.json({ online: true });

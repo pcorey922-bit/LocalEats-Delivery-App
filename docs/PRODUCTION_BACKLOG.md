@@ -1,3 +1,10 @@
+### CI correction before APK handoff
+
+Background GPS browser fixture must include the existing API's required createdAt.
+Keep strict validation; initial source 1c3b0d1/6d2d5a2 Validate failed this mocked
+fixture. v148 signed artifact is withheld. Verify corrected exact source CI and
+new signed APK before physical retest. See checkpoint for original failure proof.
+
 ## Current blocker — physical driver workspace, November 18
 
 v144 installs/authenticates, but physical driver controls remain UNVERIFIED and
