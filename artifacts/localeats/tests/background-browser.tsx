@@ -14,7 +14,7 @@ qa.offline = () => dutyIntent.set('driver-fixture', false);
 dutyIntent.set('driver-fixture', true);
 window.fetch = async (input) => {
   const url = String(input);
-  if (url === '/api/profiles/me') return Response.json({ id: 'driver-fixture', role: 'driver', displayName: 'Fixture Driver', isActive: true });
+  if (url === '/api/profiles/me') return Response.json({ id: 'driver-fixture', role: 'driver', displayName: 'Fixture Driver', createdAt: '2026-11-18T00:00:00.000Z' });
   if (url === '/api/driver/availability') return Response.json({ approved: true, available: true, online: true, activeOrderId: null });
   if (url === '/api/driver/location') { qa.bgUploads++; return qa.bgDenied ? Response.json({ error: 'Access revoked' }, { status: 403 }) : Response.json({ accepted: true }); }
   return Response.json({ online: true });
