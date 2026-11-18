@@ -1,15 +1,12 @@
+import { useNativeStartup } from '../components/native-startup-boundary';
+import { accountAccessResponse } from '../lib/account-response';
+import { accountReadOptions, accountReadMessage, sessionRead } from '../lib/account-read';
 import { useAuth } from "@clerk/react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearch } from "wouter";
 import { accountEntryLinks } from '../lib/account-entry';
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
-type Access = {
-  ownerConfigured: boolean; ownerMatched: boolean; ownerDriverConfigured: boolean;
-  ownerDriverMatched: boolean; profileStatus: string; role: string | null;
-  privateStaging?: boolean; stagingAdmitted?: boolean;
-  administrator: boolean; superAdministrator: boolean; driver: boolean;
-};
 export function AccountSetupChoices() {
   return <div><p>Choose the account type you intended to register.</p>
     <p>{(['customer', 'restaurant', 'driver'] as const).map(role => <Link className="roco-button" key={role} href={`/account/setup?join=${role}`}>Set up as {role === 'restaurant' ? 'a restaurant' : role === 'driver' ? 'a driver' : 'a customer'}</Link>)}</p>
@@ -17,18 +14,19 @@ export function AccountSetupChoices() {
 }
 export function AccountAccess() {
   const entry = accountEntryLinks(useSearch());
-  const { isSignedIn, userId } = useAuth();
+  const { isSignedIn, userId, getToken } = useAuth();
   const [copyStatus,setCopyStatus] = useState("");
-  const result = useQuery({ queryKey: ["session-access", userId], enabled: !!isSignedIn, networkMode: "always",
-    queryFn: () => customFetch<Access>("/api/session/access"), retry: false, staleTime: 0 });
+  const result = useQuery({ queryKey: ["session-access", userId], enabled: !!isSignedIn,
+    queryFn: ({ signal }) => sessionRead(async (headers, requestSignal) => accountAccessResponse(await customFetch("/api/session/access", { headers, signal: requestSignal })), getToken, { signal }), ...accountReadOptions, staleTime: 0 });
   const access = result.data;
-  return <main className="roco-main"><Link href={`/dashboard${entry.query}`}>← Dashboard</Link><h1>Account access</h1>
+  useNativeStartup('PROFILE', result.isError || !!access);
+  return <main className="roco-main"><Link href={import.meta.env.VITE_APP_AUDIENCE === 'driver' ? '/driver' : `/dashboard${entry.query}`}>{import.meta.env.VITE_APP_AUDIENCE === 'driver' ? '← Driver workspace' : '← Dashboard'}</Link><h1>Account access</h1>
     <p>These permissions come from the server. Your Google sign-in must belong to the Clerk identity configured in Render.</p>
     <p>Your signed-in Clerk User ID: <code style={{overflowWrap:'anywhere'}}>{userId}</code></p>
     <button className="roco-button" onClick={async()=>{try{await navigator.clipboard.writeText(userId??'');setCopyStatus('Copied. Paste only into your protected Render settings.');}catch{setCopyStatus('Select your User ID above and copy it manually.');}}}>Copy my Clerk User ID</button>
     {copyStatus&&<p role="status">{copyStatus}</p>}
-    {result.isLoading && <p role="status">Checking access…</p>}
-    {result.isError && <p role="alert">Access could not be checked. Sign in again or retry. Check your connection or reload this page.</p>}
+    {result.isPending && <p role="status">Checking account permissions. If this does not finish, retry or reopen the app.</p>}
+    {result.isError && <p role="alert">{accountReadMessage(result.error)}</p>}
     <button className="roco-button" disabled={result.isFetching} onClick={() => void result.refetch()}>Refresh access</button>
     {access && <section className="roco-card"><dl>
       {[["Profile", access.profileStatus], ["Role", access.superAdministrator ? "Super Administrator (owner)" : access.role ?? "Setup required"],

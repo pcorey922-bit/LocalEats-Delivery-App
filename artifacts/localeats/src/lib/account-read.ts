@@ -1,8 +1,9 @@
+import { AccountResponseError } from './account-response';
 import { accountStatus } from './account-entry';
 
 // Only use for reads: a network retry must never replay checkout or account writes.
 export function retryAccountRead(failureCount: number, error: unknown) {
-  if (error instanceof AccountReadTimeout || failureCount >= 2 || (error instanceof Error && error.name === 'AbortError')) return false;
+  if (error instanceof AccountResponseError || error instanceof AccountReadTimeout || failureCount >= 2 || (error instanceof Error && error.name === 'AbortError')) return false;
   const status = accountStatus(error);
   return status === undefined || status === 408 || status === 429 || (status >= 500 && status <= 599);
 }
@@ -18,7 +19,7 @@ export class AccountReadTimeout extends Error {
   }
 }
 export function accountReadMessage(error: unknown) {
-  if (error instanceof AccountReadTimeout) return error.message;
+  if (error instanceof AccountReadTimeout || error instanceof AccountResponseError) return error.message;
   const status = accountStatus(error);
   if (status === 401) return 'Your app session could not be verified. Sign out and sign in again. Code: ACCOUNT_401.';
   if (status === 403) return 'The server denied workspace access. Check account access; no permissions were changed. Code: ACCOUNT_403.';

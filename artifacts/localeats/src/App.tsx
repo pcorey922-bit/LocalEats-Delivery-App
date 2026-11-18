@@ -335,7 +335,7 @@ function Router() {
     <Route path="/sign-up/*?" component={SignUpPage} />
     <Route path="/account/setup" component={AccountSetup} />
     <Route path="/account" component={() => <Protected><AccountPage /></Protected>} />
-    <Route path="/dashboard" component={() => <Protected><DashboardPage /></Protected>} />
+    <Route path="/dashboard" component={() => import.meta.env.VITE_APP_AUDIENCE === 'driver' ? <Redirect to="/driver"/> : <Protected><DashboardPage /></Protected>} />
     <Route component={NotFound} />
   </Switch></RoutedErrorBoundary>;
 }

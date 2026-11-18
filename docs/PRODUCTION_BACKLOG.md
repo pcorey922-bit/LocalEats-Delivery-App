@@ -1,3 +1,17 @@
+## Current blocker — physical driver workspace, November 18
+
+v144 installs/authenticates, but physical driver controls remain UNVERIFIED and
+Access permissions never appear. Existing account IDs/roles must not be changed
+without server evidence. Reproduced empty-success rendering defect is fixed by
+runtime profile/access validation, bounded access read/retry and dedicated driver
+Dashboard routing. 203 local tests pass / one PG-only skip; builds/types, actual
+native-entry, account and driver browser regressions pass. These do not identify
+the handset transport response; sanitized error codes enable the next safe test.
+Next: exact-SHA CI and protected signed supplemental APK, then physical controls/
+restart or visible code. No backend deploy/migration 0029 needed. Keep all gates
+closed, no provider calls/financial actions. Historical APK acceptance tasks below
+are superseded by this owner evidence; do not reinstall 18bb/4c/v144 as a repair.
+
 ## Current acceptance gate — verified final APK, November 18
 
 Main functional source cfaf340ecbc7b57eb845271d7a54d454001df8f4: all three

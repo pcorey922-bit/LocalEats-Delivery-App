@@ -1,3 +1,43 @@
+### November 18 — version 144 physical blank-workspace investigation
+
+Supersedes the earlier request to test v144 as a candidate: owner physically
+confirmed browser sign-in completes and Account Access shows signed-in identity.
+Driver controls are NOT accepted. Driver workspace appears blank; Access page
+shows identity/copy/refresh but no Profile/Role/Driver access fields. No evidence
+establishes that server permissions changed; do not grant access or change IDs.
+
+Before app changes: actual-main native browser regression reproduced the Access
+screen silently omitting permissions after HTTP 200 JSON null, with no error.
+Normal account/menu/access -> Driver navigation passed. Source confirms profile
+and access readers trusted TypeScript types without runtime response validation;
+legacy /dashboard could render a header without dashboard data. This proves UI
+failure paths, NOT that the handset actually received null. Its raw authenticated
+HTTP response is unavailable; exact native transport cause remains unverified.
+
+Client-only correction: validate existing profile/permission response contracts;
+empty/text/malformed successes fail closed with sanitized ACCOUNT_PROFILE or
+ACCOUNT_ACCESS_RESPONSE_INVALID_{EMPTY,TEXT,SHAPE} codes. No role inferred or
+changed. Access reads now use the existing bounded sessionRead/one-401-refresh
+path and explicit loading/error/retry. Mark a resolved Access screen ready so the
+outer startup watchdog does not later replace it. Dedicated driver /dashboard
+and Access back link route to /driver; website/customer routing is preserved.
+
+Local validation: 203 app/API tests PASS, one PostgreSQL-only local skip; production
+build/typechecks PASS; actual native-entry browser regressions PASS (null profile
+and permissions, stalled Access read, 403, explicit recovery, legacy route/menu,
+restart). Existing account/native-handoff and full driver browser regressions PASS.
+Native/Clerk and interrupted responses are simulated; local API/DB are disposable.
+No hosted mutation, backend deployment, migration 0029, provider lookup or financial
+action. Ordering/live/municipal protections remain unchanged.
+
+Next: inspect exact pushed CI; backport client/test correction to existing repair
+branch without newer notification APIs/migration 0029; use existing protected signer.
+Verify source/certificate/version before phone retest. Samsung acceptance requires
+usable approved-driver controls and restart restoration OR exact visible safe
+ACCOUNT_* / NATIVE_* code. Do not repeat account creation, change allowlists or
+claim provider/device acceptance from automated tests. Continue GPS/push acceptance
+after real authenticated workspace evidence; no speculative auth rewrite.
+
 ### VERIFIED replacement APK and recovered checkpoint — November 18, 2026 UTC
 
 This section supersedes older pending/outage/artifact instructions below.
