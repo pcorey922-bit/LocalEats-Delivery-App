@@ -14,6 +14,7 @@ try {
     ["cart-line", "tests/cart-line.test.ts"],
     ["duty-intent", "tests/duty-intent.test.ts"],
     ["background-duty", "tests/background-duty.test.ts"],
+    ["native-startup", "tests/native-startup.test.ts"],
     ["native-push-app", "tests/native-push-app.test.ts"],
     ["navigation", "tests/navigation.test.ts"],
     ["mobile-api", "tests/mobile-api.test.ts"],

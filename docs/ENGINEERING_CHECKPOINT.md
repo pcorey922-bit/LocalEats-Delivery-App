@@ -8,6 +8,67 @@ authentication, homepage, delivery or Stripe investigations. The owner explicitl
 on November 17. This supersedes historical native deferral notes. Shared website/
 backend completion comes first; reuse existing native code and signing infrastructure.
 
+### November 18 — 18bb repair FAILED physical acceptance; native handoff repair
+
+Authoritative main HEAD at resume: a6f22ef578297ce37cad575dc1b2070a4842849a.
+Installed APK: 18bbca77700e5d2ea4c0d8ba3b10b065608d45cf, version code 135.
+Owner confirms installation and browser approval, then another approval request
+and indefinitely skeletons, NO ACCOUNT_* error. The previous account-read fix is
+NOT physical acceptance and did not cover this observed startup failure. Preserve
+it as bounded-read protection, not a claimed handset root-cause explanation.
+
+Before changing app source, reproduced an earlier boundary with the unchanged
+18bb-compatible source: successful ticket/finalize followed by Browser.close()
+never resolving prevented account navigation. Browser regression failed waiting
+for account/setup (4 s); no profile request/deadline ever began. Source also
+awaited ticket/finalize without deadlines, persisted no consumption phase, and
+always routed auth callbacks back to sign-in. Static public Clerk 6 source confirms
+finalize awaits setActive/getToken before session emission; don't invent a default
+redirect/network explanation or claim the exact handset promise was observed.
+
+Current client-only correction:
+- Browser dismissal no longer gates navigation or auth callbacks.
+- Ticket redemption/activation have bounded, sanitized per-stage errors, with
+  active-session confirmation and incomplete session tasks rejected (not bypassed).
+- One in-flight operation per saved request survives route/StrictMode reattachment.
+  Duplicate auth callbacks preserve pending/active sessions instead of reopening
+  sign-in. Persisted phase distinguishes waiting from consumed/activating; interrupted
+  consumption fails closed, while an already active restored session is reused.
+- Polling pauses in background. No ticket is persisted or placed in a deep link.
+- Native startup watchdog wraps the ACTUAL main.tsx lazy app outside Clerk and
+  routing: 30 foreground seconds, phase changes do not extend it. SDK loading or
+  unmounting cannot bypass recovery. Late completion cannot clear a latched error;
+  reload is explicit. Existing role/profile/20-second account guards are preserved.
+- Unavailable optional native/push listeners are handled without unhandled startup
+  rejections. This is not proof of push delivery/configuration.
+- Diagnostics contain fixed NATIVE_* phase/error codes only, no IDs, URLs, provider
+  errors, tokens or cookies. No hosted diagnostic endpoint or logging was added.
+
+Local validation completed: 199 app/API passes, zero failures, one PG-only skip;
+production/typechecks and final account/native handoff tests passed. Actual main-entry
+browser test verifies withheld Clerk produces recovery and a restored/restarted
+approved session reaches controls without auto-starting GPS (simulated SDK/native,
+real disposable local API). Full driver and customer order-through-delivery browser regressions also pass;
+exact-SHA CI must complete. No physical success claim yet. No provider calls/transactions,
+permissions/settings changes or migration deployment. Existing order/ledger untouched.
+
+Release: preserve main's newer notification work and un-deployed migration 0029.
+Backport ONLY this client repair onto existing supplemental staging repair branch
+fix/driver-staging-session-recovery (18bb parent) and use protected signer. No
+backend deployment is required by this patch. Check compiled package, certificate,
+higher versionCode and packaged startup codes before physical handoff. Do not
+initialize signing or deploy the supplemental branch over main.
+
+Next: complete regression validation, commit/push main and backport, inspect all
+exact-SHA CI/actual signing steps, record artifact identity and give phone update
+steps. Owner retest must establish controls OR a bounded NATIVE_* error before
+GPS/background/push acceptance continues. No repeat Geocodio/financial operation.
+November 18 read-only hosted verification: exact 6cc3c784 revision, 23/23 PASS,
+public/private/effective ordering false, live charges false, municipal enforcement
+false, Stripe TEST and database/auth dependencies ready.
+
+Historical checkpoints below are superseded by this physical rejection.
+
 ### Confirmed physical driver blocker — November 17 continuation
 
 Owner physically installed/launched signed driver APK from **6cc3c7848b7196aa00a26fc40676d939aa0c0a56** on Samsung Galaxy S22 Ultra. Browser sign-in initially

@@ -1,4 +1,5 @@
-import { mobileReturnRoute } from "./mobile-return";
+import { readNativeRequest } from './native-auth-request';
+import { mobileReturnRoute, mobileCallbackRoute } from "./mobile-return";
 import { readGuestToken } from "./guest-session";
 import { useEffect, useRef } from "react";
 import { useAuth } from "@clerk/react";
@@ -116,9 +117,14 @@ export function MobileLifecycle() {
     const retain = async (
       promise: Promise<{ remove: () => Promise<void> }>,
     ) => {
-      const handle = await promise;
-      if (disposed) await handle.remove();
-      else handles.push(handle);
+      try {
+        const handle = await promise;
+        if (disposed) await handle.remove();
+        else handles.push(handle);
+      } catch {
+        // A missing optional native/push capability must not reject app startup.
+        // Permission/configuration and actual push receipt are reported separately.
+      }
     };
     void retain(
       App.addListener("appStateChange", (state) => {
@@ -127,9 +133,12 @@ export function MobileLifecycle() {
     );
     const returnToApp=async(raw:string)=>{
       const audience=import.meta.env.VITE_APP_AUDIENCE === 'driver' ? 'driver' : 'customer';
-      const route=mobileReturnRoute(raw,!!readGuestToken()&&!signedIn.current,audience);if(!route)return;
-      await Browser.close().catch(()=>{});if(disposed)return;
-      navigate(route);void client.invalidateQueries();
+      const hasGuest=!!readGuestToken()&&!signedIn.current;
+      if (!mobileReturnRoute(raw,hasGuest,audience)) return;
+      // Native dismissal can fail or never settle. It is not an auth prerequisite.
+      void Browser.close().catch(()=>{}); if(disposed)return;
+      const route=mobileCallbackRoute(raw,hasGuest,audience,!!signedIn.current,!!readNativeRequest());
+      if(route) navigate(route); void client.invalidateQueries();
     };
     void retain(App.addListener("appUrlOpen",event=>returnToApp(event.url)));
     void App.getLaunchUrl().then(result=>{if(result&&!disposed)void returnToApp(result.url);}).catch(()=>{});

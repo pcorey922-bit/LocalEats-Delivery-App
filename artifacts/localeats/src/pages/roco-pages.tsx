@@ -1,3 +1,4 @@
+import { useNativeStartup } from '../components/native-startup-boundary';
 import { PushPreferences } from './push-preferences';
 import { RestaurantAccessState } from '../components/restaurant-access-state';
 import { InformationLinks } from '../components/information-links';
@@ -281,6 +282,7 @@ export function DriverPage() {
     mutationFn: ({ orderId, action }: { orderId: string; action: string }) => customFetch(`/api/driver/orders/${orderId}/${action}`, { method: 'POST' }),
     onSuccess: () => { void client.invalidateQueries({queryKey:['driver-declined-offers']}); void client.invalidateQueries({queryKey:['driver-availability']}); void client.invalidateQueries({ queryKey: ['driver-offers'] }); void client.invalidateQueries({ queryKey: ['driver-deliveries'] }); },
   });
+  useNativeStartup(profile.data ? 'DRIVER_DATA' : 'PROFILE', profile.isError || (!!profile.data && (!enabled || !offers.isPending && !deliveries.isPending)));
   if (profile.isLoading) return <Shell><Loading label="Checking driver access"/></Shell>;
   if (profile.isError && accountStatus(profile.error) === 404) return <Redirect to="/account/setup?join=driver" />;
   if (profile.isError) return <Shell><main className="roco-main"><PageIntro eyebrow="Driver access" title="We couldn’t open your workspace."/><LoadError retry={() => void profile.refetch()} message={accountReadMessage(profile.error)}/><p><Link href="/account/access?join=driver">Check account access</Link> · <button className="roco-button" onClick={() => { setSignOutFailed(false); if (userId) dutyIntent.set(userId, false); void unregisterPush().catch(() => {}).then(() => signOut({ redirectUrl: "/sign-in?join=driver" })).catch(() => setSignOutFailed(true)); }}>Sign out and sign in again</button></p>{signOutFailed && <p role="alert">Sign-out could not finish. Retry or reopen the app. No account permissions changed.</p>}</main></Shell>;

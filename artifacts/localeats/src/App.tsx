@@ -1,3 +1,6 @@
+import { nativeStartup } from './lib/native-startup';
+import { useNativeStartup } from './components/native-startup-boundary';
+import { readNativeRequest } from './lib/native-auth-request';
 import "./lib/zod-csp";
 import { ConnectionNotice } from './components/connection-notice';
 import { ResponsiveNavigation } from './components/responsive-navigation';
@@ -166,9 +169,12 @@ function useJoinLinks() {
 function SignInPage() {
   const { role, checkout, query, setup } = useJoinLinks();
   const { isLoaded, isSignedIn } = useAuth();
+  const native = Capacitor.isNativePlatform(), pending = native && !!readNativeRequest();
+  useNativeStartup('RESTORING', !!isLoaded && !isSignedIn && !pending, !pending);
   if (!isLoaded) return <SessionLoading />;
+  if (native && pending) return <NativeSignIn role={role} checkout={checkout}/>;
   if (isSignedIn) return <Redirect to={setup} />;
-  if(Capacitor.isNativePlatform())return <NativeSignIn role={role} checkout={checkout}/>;
+  if (native) return <NativeSignIn role={role} checkout={checkout}/>;
   return <div className="portal-auth-backdrop" data-testid="page-sign-in">
     <section className="portal-auth-story"><BrandLink /><div className="portal-auth-copy"><div className="portal-eyebrow" style={{ color: '#e8b35e' }}>A neighborly start</div><h1>Good food,<br />closer to <em>home.</em></h1><p>Your RoCoEats account is the first step toward a more connected food community in Roane County.</p></div><div className="portal-auth-foot">ROANE COUNTY, TENNESSEE · LOCAL FOOD, LOCAL PEOPLE</div></section>
     <section className="portal-auth-form"><a className="roco-button" href="/cart">Continue as Guest</a><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up${query}`} forceRedirectUrl={`${basePath}${setup}`} signUpForceRedirectUrl={`${basePath}${setup}`} /></section>
@@ -178,9 +184,12 @@ function SignInPage() {
 function SignUpPage() {
   const { role, checkout, query, setup } = useJoinLinks();
   const { isLoaded, isSignedIn } = useAuth();
+  const native = Capacitor.isNativePlatform(), pending = native && !!readNativeRequest();
+  useNativeStartup('RESTORING', !!isLoaded && !isSignedIn && !pending, !pending);
   if (!isLoaded) return <SessionLoading />;
+  if (native && pending) return <NativeSignIn role={role} checkout={checkout}/>;
   if (isSignedIn) return <Redirect to={setup} />;
-  if(Capacitor.isNativePlatform())return <NativeSignIn role={role} checkout={checkout}/>;
+  if (native) return <NativeSignIn role={role} checkout={checkout}/>;
   return <div className="portal-auth-backdrop" data-testid="page-sign-up">
     <section className="portal-auth-story"><BrandLink /><div className="portal-auth-copy"><div className="portal-eyebrow" style={{ color: '#e8b35e' }}>Made for Roane County</div><h1>There’s room<br />at the <em>table.</em></h1><p>Create your account to continue.</p></div><div className="portal-auth-foot">A LOCAL IDEA TAKING SHAPE IN ROANE COUNTY</div></section>
     <section className="portal-auth-form"><a className="roco-button" href="/cart">Continue as Guest</a><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in${query}`} forceRedirectUrl={`${basePath}${setup}`} signInForceRedirectUrl={`${basePath}${setup}`} /></section>
@@ -211,6 +220,7 @@ function AccountSetup() {
   });
   const attempted = useRef(false);
   const missing = profile.isError && isNotFound(profile.error);
+  useNativeStartup('PROFILE', !!(profile.isError && !missing) || provision.isError);
   const start = () => provision.mutate((user?.fullName?.trim() || (role === 'restaurant' ? 'Restaurant partner' : role === 'driver' ? 'RoCoEats driver' : 'RoCoEats customer')).slice(0, 120));
   useEffect(() => {
     if (profile.data) setLocation(import.meta.env.VITE_APP_AUDIENCE === 'driver' ? '/driver' : accountDestination(profile.data.role, checkout), { replace: true });
@@ -360,13 +370,20 @@ function ApiAuthentication() {
   return null;
 }
 
+function NativeSessionProbe() {
+  const { isLoaded } = useAuth();
+  useNativeStartup('RESTORING', false, !isLoaded);
+  useEffect(() => () => { if (Capacitor.isNativePlatform()) nativeStartup.report('RESTORING'); }, []);
+  return null;
+}
+
 function ClerkRoutes() {
   const [, setLocation] = useLocation();
   if (!clerkPubKey) throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY');
   return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`}
     localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your RoCoEats account' } }, signUp: { start: { title: 'Find your place here', subtitle: 'Create your RoCoEats account' } } }}
     routerPush={(to) => setLocation(stripBase(to))} routerReplace={(to) => setLocation(stripBase(to), { replace: true })}>
-    <ApiAuthentication /><MobileLifecycle /><ClerkQueryClientCacheInvalidator /><BackgroundDutyRecovery /><DriverDutySession /><Router />
+    <NativeSessionProbe /><ApiAuthentication /><MobileLifecycle /><ClerkQueryClientCacheInvalidator /><BackgroundDutyRecovery /><DriverDutySession /><Router />
   </ClerkProvider>;
 }
 

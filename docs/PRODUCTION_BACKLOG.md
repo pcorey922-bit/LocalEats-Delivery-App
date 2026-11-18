@@ -4,6 +4,24 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
+## Current blocker — native handoff before account loading, November 18
+
+18bbca7 FAILED physical acceptance: browser approval/another approval, then endless
+skeletons without ACCOUNT_* recovery. Do not claim its account timeout fixed the
+phone. Reproduced successful auth blocked by awaited Browser.close() BEFORE profile
+loading; SDK ticket/finalization waits were also unbounded. Fix optional dismissal,
+single-flight/phase-aware one-use handoff, callback replay, active-session proof and
+an independent actual-main startup watchdog. Keep session tasks/role checks intact.
+Optional push-listener failures must not reject app initialization. No backend,
+migration, secrets or financial changes needed. Exact handset promise remains
+unobserved; fixed phase-only diagnostics support next physical evidence safely.
+
+Local 199 unit/API passes (one local PG skip), builds, account/handoff/bootstrap,
+driver recovery and full customer delivery regressions pass. Finish exact-SHA CI, backport only client changes to the existing 18bb staging-repair
+branch, verify a newly signed same-package/certificate APK, then one phone retest.
+Do not deploy migration 0029 or main for this repair. GPS/push/device acceptance
+remains blocked until controls or a bounded diagnostic appears. Keep all gates OFF.
+
 ## Priority: physical driver dashboard/session recovery
 
 Samsung installation/launch from deployed 6cc3c784 PASSED; browser sign-in later

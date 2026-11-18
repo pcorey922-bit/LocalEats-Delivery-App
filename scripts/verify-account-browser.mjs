@@ -42,7 +42,7 @@ await build({
           namespace: "qa-browser",
         }));
         b.onLoad({ filter: /.*/, namespace: "qa-browser" }, () => ({
-          contents: `export const Browser={open:async({url})=>{window.qaNativeOpened.push(url)},close:async()=>{}};`,
+          contents: `export const Browser={open:async({url})=>{window.qaNativeOpened.push(url)},close:async()=>{if(window.qaStallBrowserClose)return new Promise(()=>{})}};`,
           loader: "js",
         }));
       },
@@ -74,7 +74,7 @@ await build({
               location.assign(forceRedirectUrl);
             }},"Complete simulated Clerk sign-in"),React.createElement("a",{href:signInUrl||signUpUrl},signInUrl?"Use existing sign-in":"Create signup account"));
             export const SignUp=start, SignIn=start;
-            export const useSignIn=()=>({signIn:{ticket:async({ticket})=>{window.qaNativeTickets.push(ticket);return{error:null}},finalize:async()=>{window.qaSignedIn=true;return{error:null}}}});
+            export const useSignIn=()=>({signIn:{ticket:async({ticket})=>{window.qaNativeTickets.push(ticket);if(window.qaStallTicket)return new Promise(()=>{});return{error:null}},finalize:async(options)=>{window.qaFinalizations=(window.qaFinalizations||0)+1;if(window.qaStallFinalize)return new Promise(resolve=>{window.qaFinishFinalize=()=>{window.qaSignedIn=true;resolve({error:null})}});await options?.navigate?.({session:{status:window.qaPendingTask?'pending':'active',currentTask:window.qaPendingTask?{key:'setup_mfa'}:null},decorateUrl:path=>path});window.qaSignedIn=true;return{error:null}}}});
             export const useClerk=()=>({
               openUserProfile:()=>{window.securityOpened=true},
               addListener:()=>()=>{},
@@ -440,6 +440,53 @@ try {
     ),
     null,
   );
+  const closeStall = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await closeStall.goto("http://127.0.0.1:" + server.address().port + "/?native=true&join=restaurant");
+  await closeStall.evaluate(() => { window.qaStallBrowserClose = true; });
+  await closeStall.getByRole('button', { name: 'Sign in or create account in browser', exact: true }).click();
+  await closeStall.waitForURL(url => url.pathname === '/account/setup' && url.searchParams.get('join') === 'restaurant', { timeout: 4000 });
+  await closeStall.close();
+  for (const [flag, code] of [['qaStallTicket', 'NATIVE_TICKET_TIMEOUT'], ['qaStallFinalize', 'NATIVE_ACTIVATION_TIMEOUT'], ['qaPendingTask', 'NATIVE_SESSION_TASK_REQUIRED']]) {
+    const stalled = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await stalled.clock.install();
+    await stalled.goto('http://127.0.0.1:' + server.address().port + '/?native=true');
+    await stalled.evaluate(flag => { window[flag] = true; }, flag);
+    await stalled.getByRole('button', { name: 'Sign in or create account in browser', exact: true }).click();
+    await stalled.waitForFunction(() => window.qaNativeTickets.length === 1);
+    if (flag === 'qaStallFinalize') await stalled.waitForFunction(() => window.qaFinalizations === 1);
+    if (flag !== 'qaPendingTask') await stalled.clock.fastForward(16000);
+    await stalled.getByRole('alert').filter({ hasText: code }).waitFor();
+    assert.equal(await stalled.evaluate(() => window.qaNativeTickets.length), 1);
+    if (flag === 'qaStallFinalize') {
+      await stalled.evaluate(() => window.qaFinishFinalize());
+      await stalled.clock.fastForward(500);
+      await stalled.getByRole('alert').filter({ hasText: code }).waitFor();
+    }
+    await stalled.getByRole('button', { name: 'Reload app', exact: true }).waitFor();
+    await stalled.close();
+  }
+  for (const restored of [false, true]) {
+    const restarted = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await restarted.addInitScript(() => localStorage.setItem('rocoeats-native-auth:v1', JSON.stringify({ id: '11111111-1111-4111-8111-111111111115', verifier: 'V'.repeat(43), expiresAt: new Date(Date.now() + 300000).toISOString(), phase: 'activating', role: 'driver' })));
+    await restarted.goto('http://127.0.0.1:' + server.address().port + '/?native=true' + (restored ? '&nativeRestored=true' : ''));
+    if (restored) await restarted.waitForURL(url => url.pathname === '/account/setup' && url.searchParams.get('join') === 'driver');
+    else await restarted.getByRole('alert').filter({ hasText: 'NATIVE_HANDOFF_INTERRUPTED' }).waitFor();
+    assert.equal(await restarted.evaluate(() => window.qaNativeTickets.length), 0);
+    assert.equal(await restarted.evaluate(() => window.qaNativeOpened.length), 0, 'Restart never silently requests another approval');
+    await restarted.close();
+  }
+  const blocked = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await blocked.clock.install();
+  await blocked.goto('http://127.0.0.1:' + server.address().port + '/?startupBlocked=true');
+  await blocked.clock.fastForward(10000);
+  await blocked.evaluate(() => window.qaStartupPhase('ACTIVATING'));
+  await blocked.clock.fastForward(10000);
+  await blocked.evaluate(() => window.qaStartupPhase('PROFILE'));
+  await blocked.clock.fastForward(11000);
+  await blocked.getByRole('alert').filter({ hasText: 'NATIVE_STARTUP_TIMEOUT_PROFILE' }).waitFor();
+  await blocked.getByRole('button', { name: 'Reload app', exact: true }).waitFor();
+  await blocked.close();
+  console.log('Native handoff PASS: browser dismissal cannot block navigation; stalled ticket/finalization and pending tasks fail closed; outside-provider startup watchdog survives phase churn. All Clerk/native behavior simulated.');
   await nativePage.close();
   const importPage = await browser.newPage({
     viewport: { width: 390, height: 844 },
