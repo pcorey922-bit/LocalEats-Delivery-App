@@ -26,6 +26,7 @@ export const nativeStartup = {
     };
   },
   block(code: string) {
+    if (snapshot.failure) return; // Keep the first causal diagnostic until reload.
     snapshot = {
       ...snapshot,
       ready: false,

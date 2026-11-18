@@ -446,6 +446,28 @@ try {
   await closeStall.getByRole('button', { name: 'Sign in or create account in browser', exact: true }).click();
   await closeStall.waitForURL(url => url.pathname === '/account/setup' && url.searchParams.get('join') === 'restaurant', { timeout: 4000 });
   await closeStall.close();
+  const lateStart = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await lateStart.clock.install();
+  await lateStart.goto('http://127.0.0.1:' + server.address().port + '/?native=true');
+  await lateStart.evaluate(() => {
+    const original = window.fetch;
+    window.fetch = async (...args) => {
+      if (String(args[0]) === '/api/mobile/auth/start') {
+        window.qaStartHeld = true;
+        await new Promise(resolve => { window.qaFinishStart = resolve; });
+      }
+      return original(...args);
+    };
+  });
+  await lateStart.getByRole('button', { name: 'Sign in or create account in browser', exact: true }).click();
+  await lateStart.waitForFunction(() => window.qaStartHeld);
+  await lateStart.clock.fastForward(31000);
+  await lateStart.getByRole('alert').filter({ hasText: 'NATIVE_STARTUP_TIMEOUT_BROWSER_OPEN' }).waitFor();
+  await lateStart.evaluate(() => window.qaFinishStart());
+  await lateStart.clock.fastForward(250);
+  assert.equal(await lateStart.evaluate(() => window.qaNativeOpened.length), 0, 'Late response must not open another approval after recovery');
+  await lateStart.getByRole('alert').filter({ hasText: 'NATIVE_STARTUP_TIMEOUT_BROWSER_OPEN' }).waitFor();
+  await lateStart.close();
   for (const [flag, code] of [['qaStallTicket', 'NATIVE_TICKET_TIMEOUT'], ['qaStallFinalize', 'NATIVE_ACTIVATION_TIMEOUT'], ['qaPendingTask', 'NATIVE_SESSION_TASK_REQUIRED']]) {
     const stalled = await browser.newPage({ viewport: { width: 390, height: 844 } });
     await stalled.clock.install();

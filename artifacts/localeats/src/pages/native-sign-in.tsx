@@ -19,6 +19,7 @@ export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; chec
     { signIn } = useSignIn(),
     latest = useRef(signIn);
   latest.current = signIn;
+  const starting = useRef(false);
   const [, navigate] = useLocation();
   const signedIn = useRef(isSignedIn); signedIn.current = isSignedIn;
   useEffect(() => { if (!pending && isLoaded && !busy) nativeStartup.report('READY', true); }, [pending, isLoaded, busy]);
@@ -70,13 +71,15 @@ export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; chec
       void Browser.close().catch(() => {});
       navigate(nativeAccountReturn(pending.role, pending.checkout === true));
     }).catch(cause => {
-      if (detached) return;
+      if (detached || cause instanceof NativeStepError && cause.code === 'NATIVE_HANDOFF_CANCELED' && readNativeRequest()?.id !== pending.id) return;
       clearNativeRequest(pending.id); setPending(null); nativeStartup.block(cause instanceof NativeStepError ? cause.code : 'NATIVE_HANDOFF_FAILED');
       setError(cause instanceof NativeStepError ? cause.message : 'Secure sign-in did not finish. Code: NATIVE_HANDOFF_FAILED. Start again.');
     });
     return () => { detached = true; }; // Single-flight owns cancellation, not route remounts.
   }, [pending, isLoaded, navigate]);
   async function start() {
+    if (starting.current || readNativeRequest() || nativeStartup.get().failure) return;
+    starting.current = true;
     setBusy(true);
     setError("");
     nativeStartup.report('BROWSER_OPEN');
@@ -90,6 +93,7 @@ export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; chec
             ),
           ),
         );
+      if (nativeStartup.get().failure) throw new NativeStepError('NATIVE_START_CANCELED_RELOAD');
       const response = await customFetch<{
         id: string;
         expiresAt: string;
@@ -98,6 +102,7 @@ export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; chec
         method: "POST",
         body: JSON.stringify({ challenge }),
       });
+      if (nativeStartup.get().failure) throw new NativeStepError('NATIVE_START_CANCELED_RELOAD');
       const url = new URL(response.authorizationUrl);
       if (
         url.origin !== import.meta.env.VITE_API_ORIGIN ||
@@ -129,6 +134,7 @@ export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; chec
       clearNativeRequest(); setPending(null); nativeStartup.block(cause instanceof NativeStepError ? cause.code : 'NATIVE_START_FAILED');
       setError(cause instanceof NativeStepError ? cause.message : 'Secure sign-in could not start. Code: NATIVE_START_FAILED. Reload the app.');
     } finally {
+      starting.current = false;
       setBusy(false);
     }
   }

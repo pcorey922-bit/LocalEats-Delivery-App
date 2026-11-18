@@ -1,3 +1,15 @@
+## Final fence / command-service continuity — November 18
+
+4c24733 is superseded: late auth-start completion could open a browser after the
+startup deadline. Final first-error/cancellation/start-single-flight fence and
+regression pass locally on main; build/typechecks pass. Command service then
+lost transport while starting backport validation. Verified work is preserved via
+GitHub commits; inspect exact new CI. Existing signing must be dispatched AGAIN
+for final supplemental branch HEAD (target staging, audience driver); old reruns
+keep old SHA. No signing-policy workaround, backend deploy, migration 0029 or
+financial action. Resume dirty worktrees with compare/stash/fast-forward, preserving
+recovery copies. Phone physical outcome remains the next real acceptance gate.
+
 # Included source security correction
 
 Keep production audit enabled. Remove unused unpatched picomatch matching wrapper,
