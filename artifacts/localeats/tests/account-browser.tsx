@@ -1,3 +1,5 @@
+import { NativeStartupBoundary } from '../src/components/native-startup-boundary';
+import { nativeStartup } from '../src/lib/native-startup';
 import { PaymentReconciliation } from '../src/pages/financial-reconciliation';
 import App from "../src/App";
 import { NativeSignIn } from "../src/pages/native-sign-in";
@@ -109,9 +111,9 @@ if (location.pathname === "/signup-fixture") {
   if (query.has("expired")) sessionStorage.setItem("qa-signup-expired", "1");
   history.replaceState(null, "", "/sign-up" + location.search);
 }
-window.qaSignedIn = signupFixture ? sessionStorage.getItem("qa-signup-session") === "signed-in" : !["guest=true", "native=true", "importGuest=true"].some(
+window.qaSignedIn = location.search.includes("nativeRestored=true") || (signupFixture ? sessionStorage.getItem("qa-signup-session") === "signed-in" : !["guest=true", "native=true", "importGuest=true"].some(
   (v) => location.search.includes(v),
-);
+));
 window.qaGuestContacts = [];
 window.qaGuestAddresses = [];
 window.qaPricingReady = false;
@@ -427,13 +429,14 @@ window.fetch = async (url, options = {}) => {
   }
   throw Error("Unexpected QA request " + url);
 };
+(window as unknown as {qaStartupPhase:(phase:any)=>void}).qaStartupPhase = phase => nativeStartup.report(phase);
 createRoot(document.getElementById("root")!).render(
-  signupFixture ? <App /> : <QueryClientProvider
+  location.search.includes('startupBlocked=true') ? <NativeStartupBoundary enabled><div className="portal-skeleton">Simulated provider withholds app children</div></NativeStartupBoundary> : signupFixture ? <App /> : <QueryClientProvider
     client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
   >
     <p>SIMULATED authentication and API: component QA only</p>
     {location.search.includes('checkoutCsp=true') ? <CheckoutPanel orderId="fixture-csp"/> : location.search.includes('reconciliation=true') ? <PaymentReconciliation orderId="fixture-reconciliation"/> : location.search.includes('cartSync=true') ? <React.StrictMode><CartProbe name="menu"/><CartProbe name="checkout"/></React.StrictMode> : location.search.includes("native=true") ? (
-      <NativeSignIn role={location.search.includes("join=restaurant") ? "restaurant" : undefined} />
+      <NativeStartupBoundary enabled><NativeSignIn role={location.search.includes("join=restaurant") ? "restaurant" : undefined} /></NativeStartupBoundary>
     ) : location.search.includes("importGuest=true") ? (
       <ImportGuestLink />
     ) : !window.qaSignedIn ? (

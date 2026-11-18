@@ -1,3 +1,4 @@
+import { NativeStartupBoundary } from './components/native-startup-boundary';
 import "./lib/zod-csp";
 import { createRoot } from "react-dom/client";
 
@@ -25,8 +26,8 @@ createRoot(document.getElementById("root")!, {
   },
 }).render(
   <ErrorBoundary>
-    <Suspense fallback={<p>Loading RoCoEats…</p>}>
+    <NativeStartupBoundary><Suspense fallback={<p>Loading RoCoEats…</p>}>
       <App />
-    </Suspense>
+    </Suspense></NativeStartupBoundary>
   </ErrorBoundary>,
 );

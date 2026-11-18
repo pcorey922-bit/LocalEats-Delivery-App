@@ -3,6 +3,7 @@ import { verifyMenuEditor } from './menu-editor-browser-checks.mjs';
 import { verifyMenuCategories } from './menu-category-browser-checks.mjs';
 import { verifyGuestService } from './guest-service-browser-checks.mjs';
 import { verifyPublicInformation } from './public-information-browser-checks.mjs';
+import { verifyNativeStartupBootstrap } from './native-startup-browser-checks.mjs';
 import { verifyDriverApp } from './driver-app-browser-checks.mjs';
 // Real website + API + migrated, disposable PGlite database. Only Clerk and
 // payment provider are simulated. This is NOT a Stripe TEST transaction.
@@ -33,10 +34,14 @@ try {
   await writeFile(path.join(web, 'index.html'), '<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/app.css"><div id="root"></div><script type="module" src="/app.js"></script></html>');
   await writeFile(path.join(web, 'logo.svg'), await readFile(path.join(root, 'artifacts/localeats/public/logo.svg')));
   await build({
-    stdin: { contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import App from './src/App'; createRoot(document.getElementById('root')).render(<App/>);`, resolveDir: path.join(root, 'artifacts/localeats'), loader: 'tsx' },
-    outfile: path.join(web, 'app.js'), bundle: true, platform: 'browser', format: 'esm', jsx: 'automatic', logLevel: 'silent',
-    define: { 'import.meta.env.VITE_APP_AUDIENCE': JSON.stringify(process.env.ROCOEATS_DRIVER_APP_BROWSER === 'true' ? 'driver' : 'customer'), 'process.env.NODE_ENV': '"development"', 'import.meta.env.BASE_URL': '"/"', 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': '"fixture"', 'import.meta.env.VITE_CLERK_PROXY_URL': 'undefined', 'import.meta.env.VITE_API_ORIGIN': 'undefined', 'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': 'undefined', 'import.meta.env.VITE_GOOGLE_MAPS_MAP_ID': 'undefined' },
+    stdin: { contents: process.env.ROCOEATS_NATIVE_BOOT_BROWSER === 'true' ? `import './src/main.tsx';` : `import React from 'react'; import {createRoot} from 'react-dom/client'; import App from './src/App'; createRoot(document.getElementById('root')).render(<App/>);`, resolveDir: path.join(root, 'artifacts/localeats'), loader: 'tsx' },
+    outfile: path.join(web, 'app.js'), bundle: true, platform: 'browser', format: 'esm', jsx: 'automatic', logLevel: 'silent', loader: { '.css': 'empty' },
+    define: { 'import.meta.env.VITE_DEMO_MODE': '"false"', 'import.meta.env.DEV': 'false', 'import.meta.env.VITE_APP_AUDIENCE': JSON.stringify((process.env.ROCOEATS_DRIVER_APP_BROWSER === 'true' || process.env.ROCOEATS_NATIVE_BOOT_BROWSER === 'true') ? 'driver' : 'customer'), 'process.env.NODE_ENV': '"development"', 'import.meta.env.BASE_URL': '"/"', 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': '"fixture"', 'import.meta.env.VITE_CLERK_PROXY_URL': 'undefined', 'import.meta.env.VITE_API_ORIGIN': 'undefined', 'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': 'undefined', 'import.meta.env.VITE_GOOGLE_MAPS_MAP_ID': 'undefined' },
     plugins: [{ name: 'test-only-clerk', setup(b) {
+      b.onResolve({ filter: /^@\// }, args => b.resolve(path.join(root, 'artifacts/localeats/src', args.path.slice(2)), { kind: args.kind, resolveDir: root, namespace: 'file' }));
+      b.onResolve({ filter: /^@capacitor\/core$/ }, () => ({ path: 'core', namespace: 'native-fixture-core' }));
+      b.onResolve({ filter: /^\//, namespace: 'native-fixture-core' }, args => ({ path: args.path, namespace: 'file' }));
+      b.onLoad({ filter: /.*/, namespace: 'native-fixture-core' }, () => { const source = path.join(root, 'artifacts/localeats/node_modules/@capacitor/core/dist/index.js'); return { loader: 'js', contents: `export * from ${JSON.stringify(source)}; import {Capacitor as original} from ${JSON.stringify(source)}; export const Capacitor={...original,isNativePlatform:()=>!!window.qaNativeBootstrap,getPlatform:()=>window.qaNativeBootstrap?'android':'web'};` }; });
       b.onResolve({ filter: /^@clerk\/react\/internal$/ }, () => ({ path: 'internal', namespace: 'clerk-fixture' }));
       b.onResolve({ filter: /^@clerk\/react$/ }, () => ({ path: 'react', namespace: 'clerk-fixture' }));
       b.onLoad({ filter: /.*/, namespace: 'clerk-fixture' }, args => ({ resolveDir: path.join(root, 'artifacts/localeats'), loader: 'js', contents: args.path === 'internal'
@@ -45,7 +50,7 @@ try {
            const subscribe=callback=>{window.addEventListener('qa-auth-change',callback);return()=>window.removeEventListener('qa-auth-change',callback)};
            export const useAuth=()=>{useSyncExternalStore(subscribe,()=>String(window.qaAuthReady)+String(window.qaUserId));return{isLoaded:window.qaAuthReady!==false,isSignedIn:!!window.qaUserId,userId:window.qaUserId,getToken:async(options)=>{if(options?.skipCache){window.qaTokenRefreshes=(window.qaTokenRefreshes||0)+1;if(sessionStorage.getItem('qa-stall-refresh')==='1')return new Promise(()=>{});return 'qa-refreshed-token'}return null}}};
            export const useUser=()=>({isLoaded:true,user:window.qaUserId?{id:window.qaUserId,fullName:'Browser tester'}:null});
-           export const ClerkProvider=({children})=>children;
+           export const ClerkProvider=({children})=>window.qaProviderBlocked?null:children;
            export const SignIn=()=>null, SignUp=()=>null;
            export const useSignIn=()=>({});
            export const useClerk=()=>({addListener:()=>()=>{},signOut:async()=>{location.assign('/')}});` }));
@@ -54,7 +59,7 @@ try {
   const backendFile = path.join(backend, 'server.mjs');
   await build({
     entryPoints: [path.join(root, 'artifacts/api-server/tests/website-browser-server.ts')], outfile: backendFile, bundle: true, platform: 'node', format: 'esm',
-    external: ['@electric-sql/pglite', 'stripe', 'express', 'pg', 'cors', 'pino', 'pino-http', 'http-proxy-middleware', '@clerk/shared/*', 'firebase-admin/*'],
+    external: ['@electric-sql/pglite', 'stripe', 'express', 'pg', 'cors', 'pino', 'pino-http', '@clerk/shared/*', 'firebase-admin/*'],
     plugins: [{ name: 'isolated-services', setup(b) {
       b.onResolve({ filter: /^@workspace\/db$/ }, () => ({ path: path.join(root, 'artifacts/api-server/tests/database.ts') }));
       b.onResolve({ filter: /^@clerk\/express$/ }, () => ({ path: path.join(root, 'artifacts/api-server/tests/clerk.ts') }));
@@ -84,7 +89,9 @@ try {
     assert.ok(response.ok, `${method} ${url}: ${response.status} ${await response.clone().text()}`);
     return response.json();
   }
-  if (process.env.ROCOEATS_DRIVER_APP_BROWSER === 'true') {
+  if (process.env.ROCOEATS_NATIVE_BOOT_BROWSER === 'true') {
+    await verifyNativeStartupBootstrap({ actor, origin });
+  } else if (process.env.ROCOEATS_DRIVER_APP_BROWSER === 'true') {
     await verifyDriverApp({ actor, api, origin });
   } else if (process.env.ROCOEATS_PUBLIC_INFO_ONLY === 'true') {
     await verifyPublicInformation({ actor, origin });
@@ -256,6 +263,7 @@ try {
   assert.deepEqual(browserErrors, []);
 } catch (error) {
   console.error('Website workflow failed. Local artifacts:', web);
+  console.error('Local fixture page errors:', browserErrors);
   for (const [index, page] of pages.entries()) {
     if (page.isClosed()) continue;
     console.error(`Actor ${index} at ${page.url()}:`, (await page.locator('body').innerText()).slice(-6000));

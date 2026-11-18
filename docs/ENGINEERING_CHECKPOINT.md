@@ -1,3 +1,50 @@
+# Security audit correction included — November 18
+
+Main security source bbdf34edf37eb669cb5590d5d1a4c9ae041d0c31 removes newly
+unpatched vulnerable picomatch wrapper (GHSA-fc5q-39xc-vjpf), retaining exact
+already-used httpxy 0.5.5 forwarding engine. No audit suppression. Fixed Clerk
+upstream/headers/gzip/cookies/status semantics and TEST bypass verified in local
+HTTP fixtures. This narrow middleware/dependency source repair is included only
+to satisfy unchanged security CI; it is NOT the handset failure explanation.
+No Render deploy is needed for the client repair; the existing TEST proxy is
+bypassed. No business API, database, migration or hosted setting is changed.
+Migration 0029 and newer notification capabilities remain excluded. Verify all
+backport tests/builds/security audit/compile/signing before handing over its APK.
+
+# November 18 — second physical driver repair candidate
+
+Parent APK 18bbca77700e5d2ea4c0d8ba3b10b065608d45cf FAILED physical acceptance:
+browser approval repeated and startup skeletons never reached ACCOUNT_* recovery.
+This supplemental branch backports ONLY the native handoff/startup repair from
+primary 29551e94c17948cf08b247e0dcc3f7c5f2463a47. Existing primary notification work/migration
+0029 stays excluded. Do not deploy this branch or merge over primary.
+
+Before source changes, reproduced old successful ticket/finalize stuck awaiting
+Browser.close(), never reaching account requests. Fixed nonblocking dismissal,
+bounded ticket/activation, single-flight request phases/callbacks, restored active
+session reuse, fail-closed interrupted consumption, and actual main-entry watchdog
+outside lazy app/Clerk/routes. Fixed codes only; no token/cookie/provider logs.
+Missing optional native push listeners cannot reject startup. Session tasks and
+all backend approval/role/PKCE/expiry/single-use checks remain intact. No backend,
+schema, migration, credentials, hosted settings or financial changes needed.
+
+Main local 199 tests pass (one PG-only skip), builds/typechecks and account/native
+handoff/bootstrap/driver/customer regressions pass. Backport local validation: 198 app/API passes, zero failures, one PG-only skip;
+production/typechecks, full account/handoff and actual-entry bootstrap tests pass.
+Production audit reports no known vulnerabilities. Exact-SHA CI/signing must complete before claiming release ready. Root SDK/native
+provider behavior remains simulated; prior physical failure is NOT accepted.
+Use existing native-validation.yml target=compile and target=staging, audience=driver,
+without signing initialization. Verify package/certificate/new versionCode and
+packaged NATIVE_STARTUP_TIMEOUT_* / handoff codes. Keep all gates OFF; Stripe TEST.
+
+After CI/signing: Samsung downloads artifact ZIP, My Files Extract, opens driver
+APK to update existing installation (no uninstall/clear storage/security bypass).
+Existing session should restore; fresh browser approval must not repeat. A stalled
+startup must show a fixed NATIVE_* phase code and reload/cancel recovery within
+30 foreground seconds. Report ONLY visible code/text, never tokens/cookies. GPS
+and push physical acceptance wait for usable controls. No Render deployment or
+migration 0029 is authorized/required here. Preserve historical evidence below.
+
 # RoCoEats resumable engineering checkpoint
 
 ## READ FIRST — website and native continuation, November 17, 2026 UTC

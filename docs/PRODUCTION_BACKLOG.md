@@ -1,3 +1,19 @@
+# Included source security correction
+
+Keep production audit enabled. Remove unused unpatched picomatch matching wrapper,
+use same pre-existing httpxy forwarding engine, verify local proxy compatibility.
+This is unrelated to handset root cause and requires no hosted change for the APK.
+No business API/schema/migration 0029 or financial changes. Validate exact-SHA CI.
+
+# Current isolated repair scope — November 18
+
+18bb physical acceptance FAILED. This candidate backports primary 29551e94c17948cf08b247e0dcc3f7c5f2463a47
+client-only handoff/startup correction. No backend/schema/migration 0029/signing
+configuration changes. Verify exact-SHA CI and signed APK, then one physical
+post-update handoff/startup test with fixed stage codes. No repeat approval loop
+or indefinite skeleton is accepted. GPS/push require later device evidence.
+Do not deploy/merge this supplemental branch over primary. All gates stay OFF.
+
 # Staging repair branch scope
 
 This branch ONLY backports native account-loading recovery from primary source

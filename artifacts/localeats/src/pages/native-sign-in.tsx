@@ -4,28 +4,15 @@ import { useAuth, useSignIn } from "@clerk/react";
 import { Browser } from "@capacitor/browser";
 import { Link, useLocation } from "wouter";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
-type Pending = { id: string; verifier: string; expiresAt: string; role?: JoinRole; checkout?: boolean };
-const storageKey = "rocoeats-native-auth:v1";
-function previous(): Pending | null {
-  try {
-    const v = JSON.parse(localStorage.getItem(storageKey) || "null");
-    return v &&
-      /^[a-z0-9-]{36}$/.test(v.id) &&
-      /^[A-Za-z0-9_-]{43}$/.test(v.verifier) &&
-      Date.parse(v.expiresAt) > Date.now()
-      ? v
-      : null;
-  } catch {
-    return null;
-  }
-}
+import { readNativeRequest, saveNativeRequest, clearNativeRequest, runNativeRequest, nativeRequestRunning, type NativeRequest } from '../lib/native-auth-request';
+import { nativeStartup, nativeStep, NativeStepError } from '../lib/native-startup';
 const encoded = (v: Uint8Array) =>
   btoa(String.fromCharCode(...v))
     .replace(/=/g, "")
     .replace(/\+/g, "-")
     .replace(/\//g, "_");
 export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; checkout?: boolean } = {}) {
-  const [pending, setPending] = useState<Pending | null>(previous),
+  const [pending, setPending] = useState<NativeRequest | null>(readNativeRequest),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const { isLoaded, isSignedIn } = useAuth(),
@@ -33,66 +20,66 @@ export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; chec
     latest = useRef(signIn);
   latest.current = signIn;
   const [, navigate] = useLocation();
+  const signedIn = useRef(isSignedIn); signedIn.current = isSignedIn;
+  useEffect(() => { if (!pending && isLoaded && !busy) nativeStartup.report('READY', true); }, [pending, isLoaded, busy]);
   useEffect(() => {
-    if (!pending || !isLoaded || isSignedIn) return;
-    let cancelled = false;
-    const controller = new AbortController();
-    void (async () => {
-      try {
-        while (!cancelled) {
-          if (Date.parse(pending.expiresAt) <= Date.now())
-            throw Error("Sign-in expired. Start again.");
-          const response = await customFetch<{
-            pending?: boolean;
-            ticket?: string;
-          }>("/api/mobile/auth/redeem", {
-            method: "POST",
-            signal: controller.signal,
-            body: JSON.stringify({
-              id: pending.id,
-              verifier: pending.verifier,
-            }),
-          });
-          if (cancelled) return;
-          if (response.ticket) {
-            const result = await latest.current.ticket({
-              ticket: response.ticket,
-            });
-            if (result.error)
-              throw Error("Sign-in could not finish. Start again.");
-            const finalized = await latest.current.finalize();
-            if (finalized.error)
-              throw Error("Sign-in could not activate. Start again.");
-            localStorage.removeItem(storageKey);
-            setPending(null);
-            await Browser.close().catch(() => {});
-            navigate(nativeAccountReturn(pending.role, pending.checkout === true));
-            return;
-          }
-          if (!response.pending)
-            throw Error("Unexpected sign-in response. Start again.");
-          await new Promise((r) => setTimeout(r, 2000));
+    if (!pending || !isLoaded) return;
+    let detached = false;
+    if (signedIn.current && !nativeRequestRunning(pending.id)) {
+      clearNativeRequest(pending.id); setPending(null); nativeStartup.report('PROFILE');
+      navigate(nativeAccountReturn(pending.role, pending.checkout === true)); return;
+    }
+    void runNativeRequest(pending, async signal => {
+      while (true) {
+        signal.throwIfAborted();
+        if (Date.parse(pending.expiresAt) <= Date.now()) throw new NativeStepError('NATIVE_APPROVAL_EXPIRED');
+        if (!nativeStartup.isForeground()) { await new Promise(resolve => setTimeout(resolve, 500)); continue; }
+        nativeStartup.report('REDEEMING');
+        saveNativeRequest({ ...pending, phase: 'redeeming' });
+        const response = await nativeStep('NATIVE_REDEEM_TIMEOUT', () => customFetch<{ pending?: boolean; ticket?: string }>('/api/mobile/auth/redeem', {
+          method: 'POST', signal, body: JSON.stringify({ id: pending.id, verifier: pending.verifier }),
+        }), signal);
+        if (response.ticket) {
+          // Never persist a ticket. Mark consumption so a killed process cannot
+          // silently redeem the same one-use request and demand repeated approval.
+          saveNativeRequest({ ...pending, phase: 'activating' });
+          nativeStartup.report('TICKET');
+          const result = await nativeStep('NATIVE_TICKET_TIMEOUT', () => latest.current.ticket({ ticket: response.ticket! }), signal);
+          if (result.error) throw new NativeStepError('NATIVE_TICKET_REJECTED');
+          nativeStartup.report('ACTIVATING');
+          let activationConfirmed = false;
+          const finalized = await nativeStep('NATIVE_ACTIVATION_TIMEOUT', () => latest.current.finalize({ navigate: async ({ session }) => {
+            if (session.status !== 'active' || session.currentTask) throw new NativeStepError('NATIVE_SESSION_TASK_REQUIRED');
+            activationConfirmed = true;
+            // Router navigation happens AFTER Clerk emits its activated session.
+            // An incomplete session must not redirect into hosted tasks/WebView UI.
+          } }), signal);
+          if (finalized.error) throw finalized.error instanceof NativeStepError ? finalized.error : new NativeStepError('NATIVE_ACTIVATION_REJECTED');
+          if (!activationConfirmed) throw new NativeStepError('NATIVE_ACTIVATION_UNCONFIRMED');
+          signal.throwIfAborted(); return;
         }
-      } catch (e) {
-        if (!cancelled) {
-          localStorage.removeItem(storageKey);
-          setPending(null);
-          setError(
-            e instanceof Error
-              ? e.message
-              : "Sign-in interrupted. Start again.",
-          );
-        }
+        if (!response.pending) throw new NativeStepError('NATIVE_REDEEM_RESPONSE_INVALID');
+        saveNativeRequest({ ...pending, phase: 'waiting' });
+        nativeStartup.report('WAITING_APPROVAL', true);
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
-    })();
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [pending, isLoaded, isSignedIn, navigate]);
+    }).then(() => {
+      if (detached) return;
+      clearNativeRequest(pending.id); setPending(null); nativeStartup.report('PROFILE');
+      // Browser dismissal is optional UX. It MUST NOT gate navigation or startup.
+      void Browser.close().catch(() => {});
+      navigate(nativeAccountReturn(pending.role, pending.checkout === true));
+    }).catch(cause => {
+      if (detached) return;
+      clearNativeRequest(pending.id); setPending(null); nativeStartup.block(cause instanceof NativeStepError ? cause.code : 'NATIVE_HANDOFF_FAILED');
+      setError(cause instanceof NativeStepError ? cause.message : 'Secure sign-in did not finish. Code: NATIVE_HANDOFF_FAILED. Start again.');
+    });
+    return () => { detached = true; }; // Single-flight owns cancellation, not route remounts.
+  }, [pending, isLoaded, navigate]);
   async function start() {
     setBusy(true);
     setError("");
+    nativeStartup.report('BROWSER_OPEN');
     try {
       const verifier = encoded(crypto.getRandomValues(new Uint8Array(32))),
         challenge = encoded(
@@ -120,7 +107,8 @@ export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; chec
         url.password
       )
         throw Error("Unsafe sign-in destination rejected");
-      const saved = {
+      const saved: NativeRequest = {
+        phase: "waiting",
         id: response.id,
         expiresAt: response.expiresAt,
         verifier,
@@ -132,13 +120,14 @@ export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; chec
         fragment.set('app', 'driver');
         url.hash = fragment.toString();
       }
-      localStorage.setItem(storageKey, JSON.stringify(saved));
+      saveNativeRequest(saved);
       setPending(saved);
-      await Browser.open({ url: url.toString() });
-    } catch {
-      setError(
-        "Could not start secure sign-in. Check your connection and that the latest mobile backend is deployed.",
-      );
+      nativeStartup.report('BROWSER_OPEN');
+      await nativeStep('NATIVE_BROWSER_OPEN_TIMEOUT', () => Browser.open({ url: url.toString() }), new AbortController().signal);
+      nativeStartup.report('WAITING_APPROVAL', true);
+    } catch (cause) {
+      clearNativeRequest(); setPending(null); nativeStartup.block(cause instanceof NativeStepError ? cause.code : 'NATIVE_START_FAILED');
+      setError(cause instanceof NativeStepError ? cause.message : 'Secure sign-in could not start. Code: NATIVE_START_FAILED. Reload the app.');
     } finally {
       setBusy(false);
     }
@@ -174,8 +163,9 @@ export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; chec
             <button
               className="roco-button"
               onClick={() => {
-                localStorage.removeItem(storageKey);
-                setPending(null);
+                const phase = readNativeRequest()?.phase;
+                if (phase === 'activating') nativeStartup.block('NATIVE_ACTIVATION_CANCELED_RELOAD');
+                clearNativeRequest(); setPending(null);
               }}
             >
               Cancel this sign-in
