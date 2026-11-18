@@ -57,3 +57,22 @@ test('unmount or logout aborts stalled renewal and never forwards a late credent
   finish('old-account-token'); await new Promise(resolve => setImmediate(resolve));
   assert.equal(reads, 1);
 });
+
+
+test('profile and access reads reject empty/malformed success without inventing authorization', async () => {
+  const { accountProfileResponse, accountAccessResponse, AccountResponseError } = await import('../../localeats/src/lib/account-response');
+  for (const value of [null, undefined, '', '<html>sign in</html>', [], {}, { role: 'admin' }, { profileStatus: 'active', driver: 'true' }]) {
+    for (const [parse, endpoint] of [[accountProfileResponse, 'PROFILE'], [accountAccessResponse, 'ACCESS']] as const) {
+      assert.throws(() => parse(value), error => error instanceof AccountResponseError && error.code.startsWith(`ACCOUNT_${endpoint}_RESPONSE_INVALID_`));
+    }
+  }
+  const profile = {id:'approved-driver',role:'driver',displayName:'Driver',createdAt:'2026-11-18T00:00:00Z'};
+  assert.equal(accountProfileResponse(profile), profile);
+  const flags = {ownerConfigured:true,ownerMatched:false,ownerDriverConfigured:true,ownerDriverMatched:false,profileStatus:'active',role:'customer',administrator:false,superAdministrator:false,driver:false};
+  assert.equal(accountAccessResponse(flags).driver, false);
+  for (const role of ['customer','restaurant','driver','admin']) assert.equal(accountProfileResponse({...profile,role}).role,role);
+  const error = new AccountResponseError('ACCESS', null);
+  assert.equal(retryAccountRead(0,error),false,'Malformed success is not repeatedly retried');
+  assert.match(error.message,/ACCOUNT_ACCESS_RESPONSE_INVALID_EMPTY/);
+  assert.doesNotMatch(error.message,/approved-driver|token|cookie/);
+});
