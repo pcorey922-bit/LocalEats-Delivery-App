@@ -1,3 +1,58 @@
+### VERIFIED replacement APK and recovered checkpoint — November 18, 2026 UTC
+
+This section supersedes older pending/outage/artifact instructions below.
+- Final main functional source: **cfaf340ecbc7b57eb845271d7a54d454001df8f4**.
+  All three exact-SHA workflows SUCCESS: Validate push 44263848163,
+  Validate PR 44263856079, native matrix 44263856139 (four actual builds).
+- Final supplemental APK source: **61b23965c2009097e3aca2b2bfdbb355a1239989**.
+  Validate 44263733677, four native builds 44264142874 and protected driver
+  signing 44264149130 all SUCCESS. No signing initialization or permission changes.
+- Download: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44264149130/artifacts/14409687170
+  Artifact RoCoEats-Driver-Android-Staging-Test-APK, expires December 18.
+  APK source/package checked independently against APP_IDENTITY.json; version
+  code 144 (prior installed 135), package com.rocoeats.driver.staging, same
+  public certificate SHA256 f22e58f4da4e5d64f9ac5d4f0fc8abfe2595e395511552f7fb385205c7d18296.
+  APK SHA256 e553014414fb5245d4b3b1652e8daecbe2fefa9c0578276e1782b918b1154024.
+  Downloaded ZIP matches GitHub digest; packaged JS includes FINAL cancellation
+  fence NATIVE_START_CANCELED_RELOAD, outside-provider watchdog and recovery UI.
+  Signing job verified v2 signature, package/permissions, absence of packaged
+  server credentials, and removal of temporary private signing material.
+- Runtime recovered. Both local worktrees were compared to remote, duplicate
+  patches saved as native-fence-recovery-main/native-fence-recovery-apk stashes,
+  then fast-forwarded cleanly. Preserve those backups; do not blindly reapply.
+  Agent dispatched the FINAL signing job; owner does not need to run a workflow.
+- Final backport account/handoff/browser checks passed again after recovery.
+  Main: 202 local app/API passes, one PG-only skip; backport: 198 passes, one
+  PG-only skip. CI uses PostgreSQL. Production audits, typechecks/builds,
+  startup entrypoint tests and four-platform compilation passed. Native/Clerk
+  browser behavior is simulated; this is not physical handset acceptance.
+- Read-only hosted checks: 23/23 PASS on existing deployed 6cc3c784 source;
+  ordering/public/private/live/municipal gates remain closed, Stripe TEST.
+  No deployment, hosted writes, provider lookups or financial action performed.
+
+Next necessary owner action (Samsung only): open the artifact above while signed
+into GitHub, download ZIP, extract in My Files, install the enclosed APK as an
+UPDATE without uninstalling/clearing app storage. It is the same signing identity.
+Open RoCoEats Driver. A saved active session should restore; otherwise complete
+one browser approval and return. Keep app foreground for up to 30 seconds.
+Record usable controls OR exact visible NATIVE_* recovery code, then force-close
+and reopen once to verify restoration. Never share tokens/cookies/credentials.
+Do not change availability, order, payment or geographic settings for this test.
+No Render deploy or migration 0029 is necessary for this APK; supplemental branch
+intentionally excludes newer notification APIs. Do not deploy it over main.
+
+Actual Samsung promise that stalled remains unknown. Reproduced defects include
+Browser.close blocking navigation BEFORE account timeout, unbounded SDK ticket/
+activation, replay across remount/callback, and late auth-start opening a browser
+after timeout. Fixes preserve one-use proof, Clerk finalization/tasks and server
+roles; no authorization bypass. Outer watchdog uses cumulative FOREGROUND time,
+survives provider withholding children, preserves first safe phase diagnostic,
+and quarantines late completions. Unhandled optional plugin failures are caught.
+Physical dashboard/session acceptance is the next blocker; do not claim it fixed
+on-device before owner evidence. Next independent work should follow that evidence,
+then driver foreground/background GPS, push delivery and iOS physical acceptance.
+Do not repeat Geocodio calls, activate territory or perform provider transactions.
+
 ### Final cancellation fence preserved after command-service outage — November 18
 
 Earlier repair candidate 4c247335583fd24022650dc5bac64d63ab987845 passed Validate,

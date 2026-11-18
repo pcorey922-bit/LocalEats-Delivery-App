@@ -1,3 +1,22 @@
+## Current acceptance gate — verified final APK, November 18
+
+Main functional source cfaf340ecbc7b57eb845271d7a54d454001df8f4: all three
+workflows SUCCESS (including four native builds). FINAL APK source
+61b23965c2009097e3aca2b2bfdbb355a1239989: Validate, four native builds and
+protected signer SUCCESS. Artifact/version 144, exact source/cert/hash/final
+cancellation fence verified; see checkpoint for download and Samsung steps.
+4c24733 and 18bb APKs are superseded. Command service recovered and final signing
+was dispatched by agent; no owner workflow dispatch needed. Recovery stashes kept.
+
+Priority: physical updated driver sign-in, bounded failure and session restore.
+No additional native rewrite justified until controls or NATIVE_* code supplied.
+Then actual GPS/background tracking and push delivery; iOS device/signing acceptance
+still outstanding. Main/app tests, builds, audits and CI passed; simulated auth is
+not physical acceptance. No backend deploy or migration 0029 required for this APK.
+All hosted ordering/live/municipal gates remain disabled, Stripe TEST. Existing
+order/ledger untouched; no provider calls or financial operations. Historical
+pending checkpoint entries below are superseded by this section.
+
 ## Final fence / command-service continuity — November 18
 
 4c24733 is superseded: late auth-start completion could open a browser after the
