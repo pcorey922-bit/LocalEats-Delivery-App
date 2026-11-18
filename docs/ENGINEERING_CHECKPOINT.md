@@ -30,9 +30,18 @@ Native/Clerk and interrupted responses are simulated; local API/DB are disposabl
 No hosted mutation, backend deployment, migration 0029, provider lookup or financial
 action. Ordering/live/municipal protections remain unchanged.
 
-Next: inspect exact pushed CI; backport client/test correction to existing repair
-branch without newer notification APIs/migration 0029; use existing protected signer.
-Verify source/certificate/version before phone retest. Samsung acceptance requires
+Current main functional source: 1c3b0d16286d8b847dbc22fd7a6ecab77507b697.
+Main CI: Validate push 44268650570, PR 44268656412, four native builds 44268656320.
+Exact compatible APK source: 6d2d5a2e6c92abc3cfb194c547904bbf995685aa.
+Its Validate 44268653080, four native builds 44268683728 and protected signer
+44268689778 were dispatched and running when this checkpoint was written.
+Inspect their actual final conclusions; pending is not success. No signing
+initialization or credential/permission changes. All seven repair files match
+main exactly. Compatible local build/types and native-entry regressions pass.
+Download after SUCCESS: GitHub -> Actions -> run 44268689778 -> artifact
+RoCoEats-Driver-Android-Staging-Test-APK. This is a client repair; NO Render
+redeploy or migration 0029. Verify source/certificate/new version before phone
+retest; do not use the older v144 artifact. Samsung acceptance requires
 usable approved-driver controls and restart restoration OR exact visible safe
 ACCOUNT_* / NATIVE_* code. Do not repeat account creation, change allowlists or
 claim provider/device acceptance from automated tests. Continue GPS/push acceptance

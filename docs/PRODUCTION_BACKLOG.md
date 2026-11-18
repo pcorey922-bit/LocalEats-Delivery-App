@@ -7,8 +7,11 @@ runtime profile/access validation, bounded access read/retry and dedicated drive
 Dashboard routing. 203 local tests pass / one PG-only skip; builds/types, actual
 native-entry, account and driver browser regressions pass. These do not identify
 the handset transport response; sanitized error codes enable the next safe test.
-Next: exact-SHA CI and protected signed supplemental APK, then physical controls/
-restart or visible code. No backend deploy/migration 0029 needed. Keep all gates
+Source pointers: main 1c3b0d16286d8b847dbc22fd7a6ecab77507b697; compatible
+APK 6d2d5a2e6c92abc3cfb194c547904bbf995685aa. Protected signer 44268689778
+and native matrix 44268683728 dispatched; inspect exact-SHA final conclusions
+before artifact handoff (pending when written). Next: physical controls/restart
+or safe visible code. No backend deploy/migration 0029 needed. Keep all gates
 closed, no provider calls/financial actions. Historical APK acceptance tasks below
 are superseded by this owner evidence; do not reinstall 18bb/4c/v144 as a repair.
 
