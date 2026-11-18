@@ -1,3 +1,19 @@
+## Final fence / command-service continuity — November 18
+
+4c24733 is superseded: late auth-start completion could open a browser after the
+startup deadline. Final first-error/cancellation/start-single-flight fence and
+regression pass locally on main; build/typechecks pass. Command service then
+lost transport while starting backport validation. Verified work is preserved via
+GitHub commits; inspect exact new CI. Existing signing must be dispatched AGAIN
+for final supplemental branch HEAD (target staging, audience driver); old reruns
+keep old SHA. No signing-policy workaround, backend deploy, migration 0029 or
+financial action. Resume dirty worktrees with compare/stash/fast-forward, preserving
+recovery copies. Phone physical outcome remains the next real acceptance gate.
+
+Final supplemental source: 61b23965c2009097e3aca2b2bfdbb355a1239989. Verify its
+new CI, then dispatch a fresh protected staging/driver run; never use the older
+4c artifact or an immutable old rerun. Main source has identical tested fence code.
+
 # Persistent production backlog
 
 Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,

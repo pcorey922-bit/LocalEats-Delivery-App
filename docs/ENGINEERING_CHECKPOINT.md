@@ -1,3 +1,42 @@
+### Final cancellation fence preserved after command-service outage — November 18
+
+Earlier repair candidate 4c247335583fd24022650dc5bac64d63ab987845 passed Validate,
+four native compile jobs and protected signing, but is SUPERSEDED before physical
+handoff. A focused check then reproduced one late browser open after the startup
+watchdog had shown recovery. The final fence preserves the first diagnostic,
+cancels expired handoffs, prevents duplicate starts and rejects late auth-start
+results before saving/opening another approval. The new regression passed locally
+on main (zero late opens), along with all account/handoff/browser checks and the
+production build/typechecks. Do NOT install the older 4c APK for this retest.
+
+The cloud command service disconnected during exact-backport final validation:
+"exec-server transport disconnected". Environment status reported running; that
+does not prove shell availability. Tested changes are preserved through the
+connected GitHub API with parent/expected-head checks; no force push. Exact new
+CI must pass before release. No backend/settings/migration 0029 or financial
+operation occurred. The signed APK for THIS final source still needs a NEW run
+of existing native-validation.yml, target=staging, audience=driver on
+fix/driver-staging-session-recovery. Rerunning an old job retains its old SHA and
+is NOT a substitute. Do not change signing workflow permissions or credentials.
+
+Agent resume when shell returns: main local HEAD may still be cf1cca9 with four
+dirty fenced files; repair local HEAD may be 4c24733 with those four files plus
+checkpoint/backlog edits. Fetch remote, compare the four source/test files with
+remote (the verified patches should match), preserve dirty files in a recovery
+stash before fast-forwarding each branch, then verify the resulting tree. Do NOT
+force reset, overwrite work, pop duplicate patches blindly, or force push. Keep
+the recovery stash until remote/local equivalence is verified. Owner needs no
+terminal/laptop: if dispatch remains unavailable, use GitHub Actions on Samsung,
+Run workflow -> branch fix/driver-staging-session-recovery -> target staging ->
+audience driver. Verify the NEW run/source/signature/artifact before installation.
+Physical handoff, session restore and bounded-code acceptance remain unverified.
+Historical checkpoints below are superseded by this final fence.
+
+Final supplemental APK source: **61b23965c2009097e3aca2b2bfdbb355a1239989**. Its
+exact-SHA CI must pass; no signed APK for this SHA is yet verified. A new protected
+staging/driver dispatch is required. Primary code below contains the same four
+locally tested fence changes, preserving all other main work.
+
 # RoCoEats resumable engineering checkpoint
 
 ## READ FIRST — website and native continuation, November 17, 2026 UTC

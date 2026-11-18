@@ -43,7 +43,12 @@ export function NativeStartupBoundary({
     if (state.ready) { remaining.current = 30000; return; }
     if (!foreground) return;
     const started = performance.now();
-    const timer = setTimeout(() => setFailure(latest.current.phase), remaining.current);
+    const timer = setTimeout(() => {
+      const phase = latest.current.phase;
+      nativeStartup.block(`NATIVE_STARTUP_TIMEOUT_${phase}`);
+      clearNativeRequest();
+      setFailure(phase);
+    }, remaining.current);
     return () => {
       clearTimeout(timer);
       remaining.current = Math.max(0, remaining.current - (performance.now() - started));
