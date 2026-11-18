@@ -8,6 +8,27 @@ authentication, homepage, delivery or Stripe investigations. The owner explicitl
 on November 17. This supersedes historical native deferral notes. Shared website/
 backend completion comes first; reuse existing native code and signing infrastructure.
 
+### November 18 CI security correction — separate from handset defect
+
+Native repair source 29551e94c17948cf08b247e0dcc3f7c5f2463a47 was pushed; its
+Validate runs 44258685115/44258691610 failed BEFORE tests on a newly reported
+HIGH picomatch advisory GHSA-fc5q-39xc-vjpf (<=4.0.7; no patched published release).
+Do not call those workflows successful or attribute this dependency issue to the
+phone. The existing proxy used no glob matching; removed http-proxy-middleware's
+unused matcher layer and use its EXACT pre-existing httpxy 0.5.5 engine directly.
+Fixed Clerk HTTPS target, key forwarding/isolation, mounted path/body forwarding,
+gzip/cookies/content lengths and HEAD/204/304 semantics are preserved by local
+real-HTTP compatibility tests. Network failure produces an empty 502, no secrets.
+Private TEST credentials still bypass the proxy; actual Render is unchanged.
+
+Production audit now reports NO known vulnerabilities, with no audit exceptions,
+policy weakening or advisory suppression. 202 app/API passes, one local PG-only
+skip, typechecks/production builds pass. This source dependency/middleware repair
+must be included in the isolated APK branch to pass unchanged CI. It changes NO
+business API, database or migration and requires NO backend deploy for this APK
+(auth uses the already deployed TEST endpoints, proxy remains inactive there).
+Future deployment of newer main, including migration 0029, remains separate.
+
 ### November 18 — 18bb repair FAILED physical acceptance; native handoff repair
 
 Authoritative main HEAD at resume: a6f22ef578297ce37cad575dc1b2070a4842849a.

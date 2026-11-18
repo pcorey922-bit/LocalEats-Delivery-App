@@ -4,6 +4,16 @@ Work only on feature/rocoeats-launch-readiness / PR #1. Preserve navy branding,
 original demo, versioned migrations, free hosting and Stripe TEST-only gates.
 Never enable public ordering, add billing or publish native apps without approval.
 
+## CI dependency gate, November 18
+
+29551e9 Validate failed on new unpatched HIGH picomatch advisory, before tests.
+Remove unused glob middleware layer; retain exact existing httpxy 0.5.5 engine.
+Real local HTTP tests preserve Clerk path/body/key isolation/gzip/cookies/status
+semantics and TEST bypass. Production audit is clear without suppression; 202
+local app/API passes plus one PG-only skip, builds/typechecks pass. Include this
+narrow security source correction in the APK backport; NO Render deploy needed
+for the client repair. No schema/financial/settings change. Recheck exact-SHA CI.
+
 ## Current blocker — native handoff before account loading, November 18
 
 18bbca7 FAILED physical acceptance: browser approval/another approval, then endless

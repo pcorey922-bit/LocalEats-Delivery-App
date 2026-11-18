@@ -59,7 +59,7 @@ try {
   const backendFile = path.join(backend, 'server.mjs');
   await build({
     entryPoints: [path.join(root, 'artifacts/api-server/tests/website-browser-server.ts')], outfile: backendFile, bundle: true, platform: 'node', format: 'esm',
-    external: ['@electric-sql/pglite', 'stripe', 'express', 'pg', 'cors', 'pino', 'pino-http', 'http-proxy-middleware', '@clerk/shared/*', 'firebase-admin/*'],
+    external: ['@electric-sql/pglite', 'stripe', 'express', 'pg', 'cors', 'pino', 'pino-http', '@clerk/shared/*', 'firebase-admin/*'],
     plugins: [{ name: 'isolated-services', setup(b) {
       b.onResolve({ filter: /^@workspace\/db$/ }, () => ({ path: path.join(root, 'artifacts/api-server/tests/database.ts') }));
       b.onResolve({ filter: /^@clerk\/express$/ }, () => ({ path: path.join(root, 'artifacts/api-server/tests/clerk.ts') }));
