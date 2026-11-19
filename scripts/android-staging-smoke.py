@@ -14,7 +14,7 @@ results=[]
 runtime_permissions={}
 completed=False
 def adb(*args,timeout=30):
- return subprocess.check_output(['adb','-e',*args],timeout=timeout,stderr=subprocess.STDOUT)
+ return subprocess.check_output([os.environ['ROCOEATS_QA_ADB'],'-e',*args],timeout=timeout,stderr=subprocess.STDOUT)
 def shell(*args,timeout=30):return adb('shell',*args,timeout=timeout).decode(errors='replace')
 def snapshot(name):
  shell('uiautomator','dump','/sdcard/rocoeats-qa.xml')

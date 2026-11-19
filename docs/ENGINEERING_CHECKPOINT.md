@@ -1,3 +1,16 @@
+## November 19 — driver emulator execution correction
+
+Smoke source 57090a8 passed both Validate workflows and three native jobs; driver
+compile hit Maven HTTP 429 before compiling, retried only that job. Manual driver
+smoke 44478459873 verified exact artifact/source/hash/certificate/manifest but never
+installed the app: boot loop could not execute adb. Saved emulator evidence shows
+Android DID boot in 35 seconds, while boot-completed.txt says "timeout: failed to
+execute process: No such file or directory". Fix uses installed SDK's absolute adb
+path, exported for Python, and starts daemon before emulator. No relaxed deadline,
+permission/signature checks or signing changes. Six policy tests, Python compile,
+shell syntax/YAML checks passed. Re-run existing driver smoke against v154 signing
+run 44468084935 after push; no app/device acceptance is inferred from boot.
+
 ## November 19 — owner-reported Samsung version 154 acceptance
 
 Owner physically tested signed Driver APK v154, source

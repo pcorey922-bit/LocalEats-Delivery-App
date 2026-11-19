@@ -4,6 +4,9 @@ set -euo pipefail
 : "${ANDROID_HOME:?}"
 : "${RUNNER_TEMP:?}"
 mkdir -p android-smoke-evidence
+export ROCOEATS_QA_ADB="$ANDROID_HOME/platform-tools/adb"
+[[ -x "$ROCOEATS_QA_ADB" ]] || { echo 'Installed Android SDK adb is missing.' >&2; exit 1; }
+"$ROCOEATS_QA_ADB" start-server
 if [[ ! -e /dev/kvm || ! -r /dev/kvm || ! -w /dev/kvm ]]; then
  echo 'Hardware virtualization unavailable to this runner; cannot certify emulator launch.' >&2
  exit 1
@@ -16,18 +19,18 @@ printf 'no\n' | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -
 emulator_pid=$!
 cleanup() {
  cp "$RUNNER_TEMP/rocoeats-emulator.log" android-smoke-evidence/emulator-boot.log || true
- timeout 10s adb -e shell getprop sys.boot_completed > android-smoke-evidence/boot-completed.txt 2>&1 || true
- timeout 10s adb -e emu kill >/dev/null 2>&1 || true
+ timeout 10s "$ROCOEATS_QA_ADB" -e shell getprop sys.boot_completed > android-smoke-evidence/boot-completed.txt 2>&1 || true
+ timeout 10s "$ROCOEATS_QA_ADB" -e emu kill >/dev/null 2>&1 || true
  kill "$emulator_pid" 2>/dev/null || true
 }
 trap cleanup EXIT
 boot_deadline=$((SECONDS+480))
 while (( SECONDS < boot_deadline )); do
- if [[ "$(timeout 10s adb -e shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == '1' ]]; then
-  adb -e shell input keyevent KEYCODE_WAKEUP
-  adb -e shell wm dismiss-keyguard
-  adb -e shell settings put system screen_off_timeout 600000
-  adb -e shell input keyevent 82
+ if [[ "$(timeout 10s "$ROCOEATS_QA_ADB" -e shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == '1' ]]; then
+  "$ROCOEATS_QA_ADB" -e shell input keyevent KEYCODE_WAKEUP
+  "$ROCOEATS_QA_ADB" -e shell wm dismiss-keyguard
+  "$ROCOEATS_QA_ADB" -e shell settings put system screen_off_timeout 600000
+  "$ROCOEATS_QA_ADB" -e shell input keyevent 82
   python3 scripts/android-staging-smoke.py
   exit $?
  fi
