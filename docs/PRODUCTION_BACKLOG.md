@@ -1,3 +1,13 @@
+## November 19 — background GPS startup gate corrected
+
+Fresh server on-duty eligibility now precedes native watcher creation; offline/
+unapproved/malformed/unavailable states fail closed. Stop/cancel and revocation
+remain explicit. Eight controller tests + consent browser + build/types PASS;
+physical background GPS still NOT verified. Emulator smoke implementation is pushed;
+first run's SDK-ADB path failure has a concrete fix and one new run in progress.
+Continue with confirmed push-registration deadline/account-scope races; no provider
+credentials or sends required for the regression. All hosted safety gates untouched.
+
 ## November 19 — Samsung driver access accepted, next native gates
 
 Owner reports physical v154/d0cf7b8 dashboard, owner/admin recognition, availability

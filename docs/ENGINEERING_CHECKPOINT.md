@@ -1,3 +1,25 @@
+## November 19 — fresh background GPS authorization preflight
+
+Confirmed regression before change: watcher startup succeeded even when the
+server would report offline/unapproved state; cached UI intent was its only gate
+until a later GPS fix. Now, after explicit consent/device notification permission,
+read fresh existing /api/driver/availability and require boolean approved/available/
+online plus a valid assignment shape before creating any background watcher.
+Offline, revoked, malformed/unavailable responses fail closed; stopping during this
+read never starts GPS. Every subsequent position retains heartbeat, current-state,
+server authorization and timestamp/stale/mock-fix checks. Location acknowledgements
+must be actual booleans; malformed successes cannot report upload or forward GPS.
+No new endpoint, role, permission, tracking-on-restart or secret. Existing Android
+location-only foreground service/notification and iOS declarations are preserved.
+
+Eight controller tests PASS (including failing-before preflight, cancel/revocation,
+outage/fresh-fix recovery and malformed acknowledgement), background-consent/push
+browser regressions PASS, production builds/typechecks PASS. These are simulated
+native/API tests; physical background/locked-screen GPS remains unverified. No
+hosted availability/locations/records changed. Full CI to verify after this push.
+Next independent priority: reproduce/correct late push-enrollment completion after
+its deadline or account change using existing registration component/fixtures.
+
 ## November 19 — driver emulator execution correction
 
 Smoke source 57090a8 passed both Validate workflows and three native jobs; driver
