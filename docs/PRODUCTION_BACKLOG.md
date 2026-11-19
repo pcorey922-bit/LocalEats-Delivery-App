@@ -1,3 +1,27 @@
+# Current launch gates — November 19 verified functional checkpoint
+
+Functional d2e79f73ad942c2ddd189714a8f755c909f8ad49: all THREE CI SUCCESS,
+including four native builds. Completed: audience-safe signed APK smoke tooling
+(actual install verified; UI blocked by OS Launcher ANR), fresh GPS eligibility,
+cancellable push enrollment/unknown-ack opt-out, protected Firebase client build
+handoff, visible timely native alerts and creation-based queue expiry. 213 local
+app/API PASS / one PG skip; CI PostgreSQL and browser/build/native checks PASS.
+
+Owner-reported Samsung v154 dashboard/roles/controls/foreground-GPS/session restore
+accepted. Compatible customer v165 and GPS-only driver v168 artifacts are source/
+cert/hash verified and ready; physical customer and background GPS checks pending.
+Do not re-investigate accepted auth, repeatedly retry emulator infrastructure, or
+rebuild existing core workflows. Artifact SHAs/links and exact steps in checkpoint.
+
+Remaining priorities: real device receipt/background/lifecycle acceptance; approved
+push backend migration-0029 deployment and provider inputs; iOS signing/device;
+authorized Stripe settlement/refund/dispute/payout proof; geographic ground truth /
+owner acceptance (one USGS centroid corroboration added without new geocoding);
+always-on hosting/restore and approved contact/legal content. No further confirmed
+independent missing business workflow established. Next engineering responds to
+new device evidence or owner-approved release inputs. No deployments, records,
+permissions, financial operations or activation were performed in this session.
+
 ## November 19 — expired push queues cannot burst historical alerts
 
 Existing five-minute TTL now applies from creation across worker, FCM and APNs;

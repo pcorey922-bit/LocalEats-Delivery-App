@@ -1,3 +1,97 @@
+# CURRENT VERIFIED CONTINUATION — November 19, 2026
+
+This section supersedes historical pending/failed acceptance instructions below.
+Primary functional source: **d2e79f73ad942c2ddd189714a8f755c909f8ad49**.
+ALL THREE exact-SHA workflows SUCCESS: Validate push 44485823122, PR 44485832924,
+native matrix 44485832915 (actual customer/driver Android+iOS compilation).
+Prior functional 89ec27c / 16036c6 / d16be56 / 3c5769d also all-three SUCCESS.
+No new Render deployment, hosted environment/role/data change, provider message,
+geocoder request, ordering activation, financial operation or PR merge occurred.
+Public/private ordering, live charges and municipal enforcement remain unchanged/OFF;
+Stripe TEST. Existing successful $19.19 order/financial records preserved.
+
+## Completed this session
+
+- Recorded owner-reported physical Samsung v154/d0cf7b8 acceptance: installed update,
+  driver dashboard and owner/admin recognition, availability controls/online status,
+  empty offers, historical delivery, navigation buttons, foreground GPS success
+  indicator and close/reopen without reauthentication; empty-profile error absent.
+  Do NOT reopen this resolved investigation without regression evidence.
+- 57090a8: existing signed Android smoke now supports both audiences with strict
+  source/artifact/package/hash/certificate checks and signed-out navigation/restart.
+  2ced65f fixed absolute SDK ADB startup; 17a0d34 fixed early missing UI captures.
+  Actual driver install and no pre-granted permission checks passed; subsequent UI
+  execution blocked by OS "Pixel Launcher isn't responding" (44481651431). Rest of
+  emulator flow is NOT passed. Preserve evidence; do not endlessly retry infrastructure.
+- 89ec27c: fresh server eligibility before background watcher creation; cancel/
+  revocation/error paths fail closed; malformed acknowledgements cannot fake upload.
+- 16036c6: push registration deadline/account-change cancellation, abort/listener/
+  late-result fencing, and retryable pending-token opt-out without false confirmation.
+- d16be56: optional protected per-audience Firebase CLIENT JSON validation/private
+  runner handoff/cleanup/compiled-resource check; no server credentials in an APK.
+- 3c5769d: consent-created HIGH/private Android channel, configured iOS/Android
+  foreground presentation, HIGH user-visible FCM messages, generated-config checks.
+- d2e79f7: creation-based existing 5-minute push lifetime across worker/FCM/APNs;
+  no old-queue burst after provider activation; expired admin retry denied; in-app
+  history intact. No new SQL beyond already pending 0029 notification app identity.
+- Saved one independent official USGS City Hall centroid reference (2021 load),
+  12.649 m from saved CSV point, clears approved server margin. No activation/accuracy
+  acceptance claimed. See delivery-area/usgs-city-hall-reference-2026-11-19.json;
+  historical office-unit response still insufficient to establish exact rejection.
+
+## Validation and exact ready artifacts
+
+213 local app/API tests PASS, one PostgreSQL-only local skip; CI PostgreSQL checks
+PASS. Production builds/typechecks, native-entry/account/browser regressions,
+background consent/revocation, push race/opt-out/channel tests, 4 Firebase-config
+Node tests, 8 Python policy/resource tests and generated native config checks PASS.
+Reproduced regressions before corrections: startup from stale eligibility, late push
+ack overwriting timeout, missing FCM priority, and historical queue send. Provider/
+Clerk/native browser behavior remains simulated; unsigned compilation is not store
+or physical-device acceptance. Real-provider financial acceptance is unchanged.
+
+Customer compatible APK **v165**, source d0cf7b88164e25b5962fea4d06f7e918e45e195c:
+https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44482969353/artifacts/14510280728
+Signer SUCCESS; source/package/cert/v2-report/hash/no-driver-service independently
+verified. Customer package com.rocoeats.app.staging installs separately from Driver.
+APK SHA256 317cc7fa2009fb157cd1f28effd31fe520c2a00f12a0ef7428247a3f36c00fd4.
+Owner nonfinancial login/menus/cart/saved-address/reopen test requested; pending.
+Use intended existing customer browser identity, not owner approval by accident.
+
+Driver GPS compatible APK **v168**, source 575ee0364ae6247a92f6fec7daa58de573439af4:
+https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44484420131/artifacts/14510805880
+Validate+signer SUCCESS; source/package/cert/hash and packaged GPS preflight verified.
+APK SHA256 99ae03f6912bbd4ddf1e558bd63c7879f00a3849df4a3bbab9ae150d2b053ae5.
+Update existing Driver without uninstalling. Requires separately owner-authorized
+background/locked-screen/offline GPS exercise; do NOT toggle availability remotely.
+These compatibility artifacts deliberately exclude new main push capabilities and
+migration 0029, and require NO Render deployment. Do not merge recovery over main.
+
+## Remaining owner-only gates / next exact engineering action
+
+1. Customer physical check above, then controlled GPS v168 test with explicit consent,
+   fresh eligibility, visible ongoing indicator, several minutes background/locked,
+   and explicit offline/permission-revocation stopping. No orders/payments needed.
+2. Approve a specific verified main backend deployment incl. migration 0029 after
+   existing backup/restore review; existing Render service/configuration only, all
+   ordering/live/municipal gates closed. 0029 adds notification_devices.app_id with
+   customer default/allowlist; no order/financial table changes. NOT authorized or run.
+3. Protected Firebase client/server inputs, APNs sandbox/Apple team/signing/device
+   and authorized real receipt tests. Phone-only steps already in ANDROID_STAGING_TEST.md.
+   No account, billing, secret or real send configured by engineering. Once backend
+   capability is deployed/verified, build MAIN APKs via existing preflight/signer.
+4. Explicit Stripe availability + separate authorization before any settlement,
+   refund/dispute/transfer/payout exercise; geographic current ground truth/owner
+   review + activation approval; always-on hosting/hosted recovery and approved
+   contact/Privacy/Terms before commercial launch. Do not invent those decisions.
+
+Resume by fetching latest primary/recovery refs and checking doc-only HEAD CI;
+functional source above is verified. Act on new device/provider evidence or approved
+release inputs, then fix confirmed failures. No additional missing core business
+workflow was established; do not restart broad audits, re-test completed simulations
+or invent features to avoid external acceptance. Emulator continuation is blocked by
+its OS launcher ANR; actual Samsung acceptance is recorded separately, not inferred.
+
 ## November 19 — creation-based push expiry and verified GPS candidate
 
 Confirmed before correction: existing worker sent a ten-minute-old queued alert

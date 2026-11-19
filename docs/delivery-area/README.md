@@ -418,3 +418,18 @@ Process-local cache/quota controls reset on restart and are not account-wide bil
 limits. Before activation, confirm the provider's free-only limit behavior and plan
 account-wide usage protection for multiple processes/restarts; do not assume these
 in-memory guards alone guarantee no overage.
+
+## Independent public reference, November 19 (no activation)
+
+[USGS City Hall reference](usgs-city-hall-reference-2026-11-19.json) preserves a
+National Map Structures City/Town Halls point for 110 North Chamberlain Avenue,
+Rockwood TN 37854. Official domain identifies it as a **centroid**; record load
+is March 30, 2021, not proof of a current survey or service publication date.
+The evidence records its separation from the saved Geocodio CSV point and uses
+the unchanged approved geometry to check the reference's 30 m clearance. No
+Geocodio/API geocoding lookup, private address, boundary update or activation.
+
+Treat this as independent corroboration, not completed rooftop/entrance ground
+truth. It covers one public building only; the historical office-unit live response
+remains insufficient to establish its exact rejection. All accuracy/activation
+flags stay false and owner review remains required. No eligibility rule is relaxed.
