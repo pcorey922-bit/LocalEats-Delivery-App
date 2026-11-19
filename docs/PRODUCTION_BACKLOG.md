@@ -1,3 +1,12 @@
+# Approved deployment handoff — November 19
+
+Owner APPROVED d2e79f73ad942c2ddd189714a8f755c909f8ad49 including 0029 for
+existing Render staging after backup/recovery review, settings unchanged, no
+provider sends/financial tests. No direct Render deployment tool available; owner
+phone action pending, NOT deployed. Do not ask approval again for this SHA or
+substitute a later commit. Exact no-send/backup/Manual Deploy steps in checkpoint.
+After Live run read-only 23 checks; customer/GPS/provider/iOS acceptance still open.
+
 # Current launch gates — November 19 verified functional checkpoint
 
 Functional d2e79f73ad942c2ddd189714a8f755c909f8ad49: all THREE CI SUCCESS,

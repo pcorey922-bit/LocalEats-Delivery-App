@@ -1,3 +1,31 @@
+# OWNER DEPLOYMENT APPROVAL RECORDED — November 19
+
+Owner explicitly approved functional commit **d2e79f73ad942c2ddd189714a8f755c909f8ad49**
+INCLUDING notification migration 0029 to the EXISTING Render staging service,
+after the existing backup/recovery review, with configuration/gates unchanged and
+NO provider sends or financial tests. Do not ask for the same approval again.
+This does NOT authorize later commits, provider credential changes, activation,
+financial operations or merging. Functional SHA all-three CI SUCCESS as below.
+
+No connected Render deployment capability is available; owner must use authenticated
+phone dashboard. Deployment has NOT been performed/claimed. Owner instructions:
+1. Existing /operations -> Service health and recovery: Android push and iOS sandbox
+   push should say configuration required. If configured, pause/report; do NOT clear
+   or change secrets (explicit no-send requirement). Do not press retry/verify buttons.
+2. Confirm existing database backup/restore point. Do not create paid resources or
+   destroy/change database. If this cannot be confirmed, stop deployment handoff.
+3. Render -> existing LocalEats-Delivery-App -> Manual Deploy -> Deploy a specific
+   commit -> full approved d2e79f73... SHA. No Environment edit/save/deploy-latest,
+   new service, billing, root paid blueprint or PR merge. Keep gates OFF, TEST only.
+4. On Live, owner reports exact source/status; engineer runs existing READ-ONLY
+   23 staging checks, health/SHA/native notification capability/CSP/gates. Do not
+   call signed Stripe/provider verification that writes audit, reconciliation or
+   any payment/refund/transfer/financial retry. Preserve $19.19 order/ledger.
+
+This approval supersedes older approval-pending text below for d2e79f73 ONLY.
+Customer v165 check remains pending; GPS v168 background acceptance remains
+separately owner-controlled/unverified. Primary/recovery worktrees are clean.
+
 # CURRENT VERIFIED CONTINUATION — November 19, 2026
 
 This section supersedes historical pending/failed acceptance instructions below.

@@ -1,3 +1,16 @@
+## Current approved staging release — November 19
+
+Owner approved **d2e79f73ad942c2ddd189714a8f755c909f8ad49**, including migration
+0029, after existing backup/recovery review. All three functional-source CI workflows
+passed. This approval does NOT open an ordering window, configure providers or
+permit financial operations. Before owner Manual Deploy, Operations -> Service
+health and recovery should show both Android/iOS push **configuration required**;
+if either is configured, report first without editing secrets. Verify existing
+backup/restore point, then follow existing specific-commit Render procedure below
+with approved SHA and unchanged settings. No deployment has been performed by agent.
+On Live, report source/status for read-only verification; no audit-writing Stripe
+connection verification, sends, retries, reconciliation or payments are authorized.
+
 # Real private TEST delivery acceptance
 
 Use https://localeats-delivery-app.onrender.com/ with real Clerk sessions and the
