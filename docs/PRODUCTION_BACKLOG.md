@@ -1,3 +1,25 @@
+## November 19 — next independent implementation and launch priorities
+
+Current fix 4c44ab6 and checkpoint 06a378c each have all three CI workflows PASS.
+Compatible APK d0cf7b8 Validate + protected signer PASS (run 44468084935;
+artifact 14502534790); independent artifact inspection and Samsung acceptance
+remain outstanding. Do not rebuild or re-investigate the response-reader fix.
+
+Next independent code task: extend the existing customer-only Android signed-APK
+emulator smoke target to the driver audience, preserving signature/source/manifest
+validation and zero accounts/hosted writes. This is confirmed MISSING automation;
+it is not new business functionality or a substitute for authenticated phone GPS/
+push acceptance. Exact files and five acceptance criteria are at the top of
+ENGINEERING_CHECKPOINT.md. No implementation begun during this planning checkpoint.
+
+Top five unfinished launch requirements: (1) usable/accepted native customer and
+driver Android/iOS apps, (2) real provider/device notification acceptance and newer
+push deployment approval, (3) authorized provider financial acceptance, (4) Rockwood
+accuracy evidence/approval, (5) always-on operations/hosted recovery and approved
+legal/contact content. Core customer/restaurant/admin/driver/finance workflows are
+implemented and automated-tested; one real TEST delivery does not certify every
+financial/native scenario. Separate missing code/content from missing acceptance.
+
 ### Weekly-reset release checkpoint — November 19
 
 Response-reader fix 4c44ab66188475dce41975cc79ea03a1f4436776 and compatible

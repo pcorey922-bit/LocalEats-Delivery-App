@@ -1,3 +1,68 @@
+## NEXT SESSION — accelerated completion plan, November 19, 2026
+
+Supersedes historical pending/build-next instructions below. Planning-only update;
+no tests rerun, hosted changes, deployments, provider calls or financial operations.
+One-time CI inspection: fix 4c44ab66188475dce41975cc79ea03a1f4436776 and checkpoint
+06a378c081feeacf208e28cd05645beafe106222 each have all THREE workflows SUCCESS.
+Compatible APK d0cf7b88164e25b5962fea4d06f7e918e45e195c has Validate 44468084570
+and protected signer 44468084935 SUCCESS. No rebuild/backport is needed.
+Signed artifact: run 44468084935 / artifact 14502534790,
+RoCoEats-Driver-Android-Staging-Test-APK, source d0cf7b8, expires December 19.
+GitHub ZIP digest: 5c49281d7b287e43c9b8fee301895dcb5900fe5b55c1e8b971867301ddd5d7c8.
+Binary has NOT yet been independently unpacked/verified for this artifact; do that
+before owner handoff. Verify APP_IDENTITY source, package, version >152, same cert,
+APK hash and packaged reader fix. Physical driver acceptance remains UNVERIFIED.
+
+### Five highest-priority unfinished launch requirements
+
+| Priority | Requirement | Existing state | What remains |
+| --- | --- | --- | --- |
+| 1 | Usable customer/driver native apps | Shared auth, menus, checkout, tracking, driver operations, navigation and consent-based background GPS implemented; four native builds and simulated/browser tests verified. Android driver installation/browser approval physically verified. | Driver controls/session restore after reader fix; real background GPS/battery recovery; customer native device acceptance; signed iOS distribution and physical customer/driver evidence. Driver signed-APK emulator target is MISSING. |
+| 2 | Reliable customer/restaurant/driver notifications | In-app notifications, durable outbox/retry, account-scoped device enrollment/opt-out and distinct APNs audiences implemented and automated-tested. | Deployment/verification of newer push capability and migration 0029 requires separate approval; actual Firebase/APNs receipt and background delivery unverified. Do not deploy or claim receipt from mocks. |
+| 3 | Complete provider financial acceptance | TEST checkout, signed idempotent webhooks, ledger, earnings, refund/dispute/Connect/payout/reconciliation controls implemented and automated-tested; one real $19.19 TEST delivery completed. | Provider fee/net settlement evidence plus separately authorized refund/dispute/transfer/payout acceptance. Historical balance/order must not be changed to manufacture proof. |
+| 4 | Approved Rockwood geographic acceptance | Boundary/exclusions, ZIP 37854, 30 m margin, strict Geocodio adapter/caching/fail-closed checks implemented and tested; limited real-provider evidence preserved. | Independent ground truth, unresolved historical office-unit evidence, owner accuracy acceptance and separate activation approval. No repeat exhausted provider suite; no expansion. |
+| 5 | Operable public launch and recovery | Customer discovery/menus/guest checkout/tracking/cancellation/support; restaurant onboarding/menu/inventory/capacity/fulfillment; admin dispatch/refunds/reporting/recovery are implemented and regression-tested. Backup/restore and deployment tooling tested locally/CI. | Always-on hosting decision and authorized hosted restore/operational drill; approved contact/Privacy/Terms content is MISSING; hosted cross-role acceptance for newer code and commercial activation approval remain unverified. Render Free is not always-on dispatch. |
+
+These are completion/acceptance gaps, not proof that the underlying business APIs
+are missing. Do not restart a broad audit or rebuild working checkout, restaurant,
+dispatch or finance flows. Existing review found no additional missing core API.
+
+### Single highest-value independent implementation: signed driver APK emulator smoke
+
+Confirmed gap: scripts/android-staging-smoke.py hardcodes customer package,
+activity, APK filename and customer-only guest paths. The android-smoke job in
+.github/workflows/native-validation.yml explicitly exits for audience=driver.
+Reuse the existing isolated emulator and protected signed artifacts; no new service.
+
+Files/components: scripts/android-staging-smoke.py,
+.github/workflows/native-validation.yml (android-smoke job only),
+scripts/staging_apk_policy.py + scripts/test_staging_apk_policy.py,
+config/native-audiences.json, scripts/start-android-qa-emulator.sh only if required;
+update docs/ANDROID_STAGING_TEST.md with the actual resulting evidence/limits.
+First implement pure audience/artifact selection with offline tests, then the
+existing smoke flow. Keep signing jobs, keys and workflow permissions unchanged.
+
+Acceptance criteria:
+1. Explicit customer/driver input maps only to reviewed package/activity/filename/
+   artifact/scheme. Wrong audience, package, source, hash or certificate fails closed.
+2. Preserve existing customer smoke checks; driver uses its own signed APK and
+   renders secure signed-out entry, navigation and bounded recovery instead of
+   expecting customer guest/order controls. No role elevation via driver branding.
+3. Driver cold-start return link, malformed/authority-bearing links and force-stop/
+   relaunch recover safely; no automatic permission grants or GPS/push enrollment.
+4. CI installs/exercises the actual signed driver APK on the disposable emulator,
+   records screenshots/results/crash checks and exact source/package. Do not claim
+   authenticated-session, physical Samsung/iOS, push receipt or GPS acceptance.
+5. No accounts, bearer tokens, auth approvals, guest capabilities, hosted writes,
+   orders, payments or provider sends. Do not relax private staging or APK security.
+
+After reset: verify the ready artifact for owner handoff, then implement this
+narrow missing smoke target while the owner separately tests the meaningful reader
+fix. Do not ask for tests of older APKs. If emulator infrastructure is concretely
+blocked, preserve tested pure selection/manifest changes and record the exact error;
+do not spend another session troubleshooting emulators without a concrete fix.
+All ordering/live/municipal gates stay OFF; Stripe TEST; no deploy/merge/launch.
+
 ### Saved release pointers before weekly reset — November 19
 
 Functional fix committed/pushed: 4c44ab66188475dce41975cc79ea03a1f4436776.
