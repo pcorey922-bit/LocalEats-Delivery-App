@@ -1,3 +1,15 @@
+# Native acceptance inputs prepared — November 19
+
+Current-source signed Driver v172 (44490907162/14513076061) and Customer v173
+(44490912804/14513605155) builds SUCCESS, exact source
+3e8afdf9fb45949d788b02234595962131d8e033 and bytes/package/version/certificate
+independently verified. Backend d2e79f7 is deployed and read-only verified; no
+further deployment needed. Both APKs have Firebase client resources unconfigured;
+real push still blocked by protected provider inputs and authorized physical tests.
+Artifact links/hashes, acceptance limitations and phone retrieval in checkpoint.
+No changes to hosted data/settings or provider/financial operations. Continue with
+new device evidence; no speculative features or duplicate auth investigations.
+
 # Staging release verified — November 19, 08:48 UTC
 
 Approved d2e79f73ad942c2ddd189714a8f755c909f8ad49 is now hosted, exact SHA

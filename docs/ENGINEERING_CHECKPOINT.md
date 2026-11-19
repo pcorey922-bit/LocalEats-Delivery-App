@@ -1,3 +1,51 @@
+# CURRENT SIGNED NATIVE ARTIFACTS — November 19 post-deployment
+
+Read-only hosted verification below remains current at approved d2e79f7; no further
+backend deployment occurred. Independent builds from already CI-verified primary
+**3e8afdf9fb45949d788b02234595962131d8e033** both SUCCESS:
+
+- Driver **v172**, run **44490907162**, artifact **14513076061**,
+  `RoCoEats-Driver-Android-Staging-Test-APK`:
+  https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44490907162/artifacts/14513076061
+  APK SHA256 dbc5a86ead3ec58636ba2fc091ce98cb985dcffe6d510bb845b3970ed151d657.
+  ZIP SHA256 424a4956bc846632deaf16c48e9cd5892a72c7ff449271b66a88b2a1669e52fa.
+- Customer **v173**, run **44490912804**, artifact **14513605155**,
+  `RoCoEats-Android-Staging-Test-APK`:
+  https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44490912804/artifacts/14513605155
+  APK SHA256 d14e68daa187ecb754cd71b13a104c5ca2c0fc8dfbef0fbc8ec9714593c40429.
+  ZIP SHA256 5c23498a346fc5a0a7a351b9f57d054fd7e6a2f7a057a70672c839b2af89cc6d.
+
+Both downloaded through the GitHub connector after CLI artifact transport was
+blocked; independently verified GitHub ZIP digest, APK checksum, exact source,
+respective staging package/manifest/version, v2 signing report and existing public
+certificate f22e58f4da4e5d64f9ac5d4f0fc8abfe2595e395511552f7fb385205c7d18296.
+No signing credentials read or changed. Protected runner verified compiled native
+push presentation, backend contract/CORS, permissions and credential absence;
+temporary signing/client material cleanup SUCCESS. Firebase CLIENT resources are
+explicitly **unconfigured** in BOTH artifacts. No real notification receipt claim.
+
+These main-source artifacts now include the GPS, push enrollment/opt-out and
+presentation fixes with the deployed notification API, superseding compatibility
+v165/v168 for future approved acceptance. No further backend deployment needed.
+They are not physically accepted merely because v154 was accepted. Preserve v154
+observed dashboard/session/foreground GPS result; new customer/background GPS,
+real push, live offer/native lifecycle and all physical iOS checks remain open.
+
+Phone artifact retrieval: signed-in GitHub link -> download ZIP -> Samsung My Files
+-> extract -> matching APK -> update existing respective app without uninstalling.
+Keep device security protections. Do not enable ordering, submit checkout, alter
+availability, consent to background GPS or configure providers as part of the
+read-only deployment verification. Separate supervised device exercise/consent
+remains required. No new independent missing core workflow identified; next
+engineering action is act on device evidence or protected provider inputs, not
+repeat auth/provider/emulator investigations. Existing Operations provider-status
+read-only owner question remains pending; no audit-writing or retry buttons.
+
+Deployment-evidence checkpoint pushed as
+**ec1e92940aa77321baa3ad250893e13486dfbb9c**; its three CI workflows must be
+reported from actual results, never inferred from source-build success. This
+artifact record is documentation only; no repeated local full suite is necessary.
+
 # POST-DEPLOYMENT READ-ONLY VERIFICATION — November 19, 08:48 UTC
 
 Owner reports existing Render service Live at approved functional source
