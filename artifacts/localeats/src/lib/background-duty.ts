@@ -12,6 +12,14 @@ type Dependencies = {
   now?: () => number;
 };
 
+type DutyAccess = { approved: true; available: true; online: true; activeOrderId: string | null };
+function eligible(value: unknown): value is DutyAccess {
+  if (!value || typeof value !== 'object') return false;
+  const state = value as Record<string, unknown>;
+  return state.approved === true && state.available === true && state.online === true &&
+    (state.activeOrderId === null || typeof state.activeOrderId === 'string' && state.activeOrderId.length > 0);
+}
+
 /** Uses existing Clerk/session/approval/location authorization; no new credential
  * or bypass endpoint. Native HTTP is enabled only in the dedicated driver build. */
 export function backgroundDutySession(deps: Dependencies) {
@@ -51,14 +59,15 @@ export function backgroundDutySession(deps: Dependencies) {
       const options = { method: 'POST' as const, signal: abort.signal };
       await deps.api('/api/driver/heartbeat', options);
       if (stopped) return;
-      const availability = await deps.api<{ activeOrderId: string | null; approved: boolean; online: boolean }>('/api/driver/availability', { signal: abort.signal });
+      const availability = await deps.api<unknown>('/api/driver/availability', { signal: abort.signal });
       if (stopped) return;
-      if (!availability.approved || !availability.online) { fail('On-duty access ended. Background sharing stopped; reconnect explicitly when eligible.'); return; }
+      if (!eligible(availability)) { fail('On-duty access ended. Background sharing stopped; reconnect explicitly when eligible.'); return; }
       const body = JSON.stringify({ latitude: fix.latitude, longitude: fix.longitude, accuracyMeters: fix.accuracy, observedAt: new Date(fix.time).toISOString() });
       const result = await deps.api<{ accepted: boolean }>('/api/driver/location', { ...options, body });
       if (stopped) return;
-      if (result.accepted && availability.activeOrderId) {
-        await deps.api(`/api/driver/orders/${availability.activeOrderId}/location`, { ...options, body });
+      if (!result || typeof result.accepted !== 'boolean') throw Error('Invalid location acknowledgement');
+      if (result.accepted === true && availability.activeOrderId) {
+        await deps.api(`/api/driver/orders/${encodeURIComponent(availability.activeOrderId)}/location`, { ...options, body });
       }
       if (!stopped) deps.status(result.accepted ? 'Background location uploaded to authorized dispatch.' : 'Waiting for a newer GPS fix.');
     } catch (error) {
@@ -73,6 +82,10 @@ export function backgroundDutySession(deps: Dependencies) {
       starting ??= (async () => {
         if (!await deps.permission()) throw Error('Background location requires device permission and, on Android, a visible notification.');
         if (stopped) return;
+        deps.status('Verifying current on-duty access before starting background location…');
+        const access = await deps.api<unknown>('/api/driver/availability', { signal: abort.signal });
+        if (stopped) return;
+        if (!eligible(access)) throw Error('Current driver approval and online availability are required. Reconnect explicitly.');
         id = await deps.watcher.addWatcher({ backgroundTitle: 'RoCoEats Driver · On duty', backgroundMessage: 'Sharing your driver location. Go offline in RoCoEats to stop.', requestPermissions: true, stale: false, distanceFilter: 0 }, (fix, error) => { void position(fix, error); });
         if (stopped) await remove();
       })();

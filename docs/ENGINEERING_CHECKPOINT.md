@@ -1,3 +1,20 @@
+## November 19 — deployed-compatible background GPS candidate
+
+Owner physically accepted Driver v154/d0cf7b8 on Samsung: dashboard/permissions/
+availability/offers/historical delivery/navigation controls/foreground-GPS indicator
+and close/reopen session restoration; empty-profile error absent. Preserve this.
+This branch now backports ONLY tested fresh background GPS eligibility startup
+and strict location acknowledgement from main 89ec27c. Eight controller tests,
+background consent/stop/revocation browser checks and production/typechecks PASS.
+No new main notification APIs, migration 0029, Firebase configuration or provider
+sends are included; existing deployed backend endpoints suffice. No backend deploy.
+
+Next after exact-SHA Validate and protected signer pass: verify artifact source,
+package/version/certificate/hash, then owner-authorized nonfinancial background /
+locked-screen GPS check. No automatic availability change or location collection;
+explicit driver consent and reconnect remain required. Do not repeat auth work.
+Primary authoritative ongoing checkpoint remains feature/rocoeats-launch-readiness.
+
 ### Final cancellation fence preserved after command-service outage — November 18
 
 Earlier repair candidate 4c247335583fd24022650dc5bac64d63ab987845 passed Validate,
