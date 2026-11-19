@@ -1,5 +1,5 @@
 import { useNativeStartup } from '../components/native-startup-boundary';
-import { accountAccessResponse } from '../lib/account-response';
+import { accountAccessResponse, accountResponseRead } from '../lib/account-response';
 import { accountReadOptions, accountReadMessage, sessionRead } from '../lib/account-read';
 import { useAuth } from "@clerk/react";
 import { useState } from "react";
@@ -17,7 +17,7 @@ export function AccountAccess() {
   const { isSignedIn, userId, getToken } = useAuth();
   const [copyStatus,setCopyStatus] = useState("");
   const result = useQuery({ queryKey: ["session-access", userId], enabled: !!isSignedIn,
-    queryFn: ({ signal }) => sessionRead(async (headers, requestSignal) => accountAccessResponse(await customFetch("/api/session/access", { headers, signal: requestSignal })), getToken, { signal }), ...accountReadOptions, staleTime: 0 });
+    queryFn: ({ signal }) => sessionRead(async (headers, requestSignal) => accountResponseRead(onResponse => customFetch("/api/session/access", { headers, signal: requestSignal, onResponse }), accountAccessResponse), getToken, { signal }), ...accountReadOptions, staleTime: 0 });
   const access = result.data;
   useNativeStartup('PROFILE', result.isError || !!access);
   return <main className="roco-main"><Link href={import.meta.env.VITE_APP_AUDIENCE === 'driver' ? '/driver' : `/dashboard${entry.query}`}>{import.meta.env.VITE_APP_AUDIENCE === 'driver' ? '← Driver workspace' : '← Dashboard'}</Link><h1>Account access</h1>

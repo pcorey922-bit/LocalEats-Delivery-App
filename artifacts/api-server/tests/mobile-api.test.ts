@@ -122,3 +122,46 @@ test("native signup resumes only fixed role and checkout routes after browser si
   assert.equal(nativeAccountReturn("https://untrusted.example/admin"), "/account");
   assert.equal(nativeAccountReturn("admin"), "/account");
 });
+
+test('native response readers preserve authenticated JSON without an exposed stream or reliable length hint', async () => {
+  const profile = {id:'native-driver',role:'driver',displayName:'Driver',createdAt:'2026-11-18T00:00:00Z'};
+  setBaseUrl('https://api.example.test');
+  setAuthTokenGetter(() => 'local-test-bearer');
+  for (const stream of [null, undefined]) {
+    for (const declaredLength of [undefined, '0']) {
+      let evidence: unknown;
+      globalThis.fetch = async (input, init) => {
+        assert.equal(String(input),'https://api.example.test/api/profiles/me');
+        assert.equal(new Headers(init?.headers).get('authorization'),'Bearer local-test-bearer');
+        assert.equal('onResponse' in (init ?? {}),false);
+        const response = Response.json(profile);
+        if (declaredLength) response.headers.set('content-length',declaredLength);
+        Object.defineProperty(response,'body',{value:stream});
+        return response;
+      };
+      assert.deepEqual(await customFetch('/api/profiles/me',{onResponse:value=>{evidence=value}}),profile);
+      assert.deepEqual(evidence, {status:200,media:'JSON',stream:stream===null?'NONE':'UNAVAILABLE',redirected:false,declaredLength:declaredLength === undefined ? null : Number(declaredLength),textLength:JSON.stringify(profile).length});
+      assert.doesNotMatch(JSON.stringify(evidence),/native-driver|bearer|api\.example|authorization|displayName/);
+    }
+  }
+});
+test('native streamless error bodies retain 401 status and do not become empty success', async () => {
+  globalThis.fetch = async () => {
+    const response = Response.json({error:'Sign-in is required'},{status:401});
+    Object.defineProperty(response,'body',{value:null});
+    return response;
+  };
+  await assert.rejects(customFetch('/api/profiles/me'),error=>error instanceof ApiError && error.status===401 && error.message.includes('Sign-in is required'));
+});
+test('HEAD and no-content semantics remain empty without invoking a response reader', async () => {
+  for (const [method,status] of [['HEAD',200],['GET',204],['GET',205]] as const) {
+    globalThis.fetch = async () => {
+      const response = new Response(null,{status});
+      response.text=async()=>{throw Error('Forbidden body read')};
+      return response;
+    };
+    assert.equal(await customFetch('/api/profiles/me',{method}),null);
+  }
+  globalThis.fetch=async()=>new Response('',{status:200,headers:{'content-type':'application/json'}});
+  assert.equal(await customFetch('/api/profiles/me'),null,'A truly empty payload is still empty, never fabricated');
+});

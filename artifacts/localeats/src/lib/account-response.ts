@@ -1,3 +1,4 @@
+import type { FetchResponseEvidence } from '../../../../lib/api-client-react/src/custom-fetch';
 import type { Profile } from "@workspace/api-client-react";
 
 export type AccountAccessResponse = {
@@ -18,18 +19,18 @@ const object = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
 export class AccountResponseError extends Error {
   readonly code: string;
-  constructor(endpoint: "PROFILE" | "ACCESS", value: unknown) {
+  constructor(endpoint: "PROFILE" | "ACCESS", value: unknown, evidence?: Readonly<FetchResponseEvidence>) {
     const kind =
       value == null ? "EMPTY" : typeof value === "string" ? "TEXT" : "SHAPE";
     const code = `ACCOUNT_${endpoint}_RESPONSE_INVALID_${kind}`;
     super(
-      `The server response did not contain valid account ${endpoint === "PROFILE" ? "profile" : "permissions"}. Retry, or sign out and sign in again. No permissions were changed. Code: ${code}.`,
+      `The server response did not contain valid account ${endpoint === "PROFILE" ? "profile" : "permissions"}. Retry, or sign out and sign in again. No permissions were changed. Code: ${code}.${evidence ? ` Transport: HTTP_${evidence.status}_${evidence.media}_STREAM_${evidence.stream}_TEXT_${evidence.textLength ?? 'UNKNOWN'}_LENGTH_${evidence.declaredLength ?? 'UNKNOWN'}${evidence.redirected ? '_REDIRECTED' : ''}.` : ''}`,
     );
     this.name = "AccountResponseError";
     this.code = code;
   }
 }
-export function accountProfileResponse(value: unknown): Profile {
+export function accountProfileResponse(value: unknown, evidence?: Readonly<FetchResponseEvidence>): Profile {
   if (
     !object(value) ||
     typeof value.id !== "string" ||
@@ -39,10 +40,10 @@ export function accountProfileResponse(value: unknown): Profile {
     !(typeof value.createdAt === "string" || value.createdAt instanceof Date) ||
     !Number.isFinite(new Date(value.createdAt).getTime())
   )
-    throw new AccountResponseError("PROFILE", value);
+    throw new AccountResponseError("PROFILE", value, evidence);
   return value as unknown as Profile;
 }
-export function accountAccessResponse(value: unknown): AccountAccessResponse {
+export function accountAccessResponse(value: unknown, evidence?: Readonly<FetchResponseEvidence>): AccountAccessResponse {
   const flags = [
     "ownerConfigured",
     "ownerMatched",
@@ -63,6 +64,16 @@ export function accountAccessResponse(value: unknown): AccountAccessResponse {
       (flag) => value[flag] !== undefined && typeof value[flag] !== "boolean",
     )
   )
-    throw new AccountResponseError("ACCESS", value);
+    throw new AccountResponseError("ACCESS", value, evidence);
   return value as AccountAccessResponse;
+}
+
+// Keep sanitized evidence within this read; never persist response payloads.
+export async function accountResponseRead<T>(
+  read: (observe: (evidence: Readonly<FetchResponseEvidence>) => void) => Promise<unknown>,
+  validate: (value: unknown, evidence?: Readonly<FetchResponseEvidence>) => T,
+): Promise<T> {
+  let evidence: Readonly<FetchResponseEvidence> | undefined;
+  const value = await read(next => { evidence = next; });
+  return validate(value, evidence);
 }

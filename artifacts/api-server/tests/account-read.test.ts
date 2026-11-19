@@ -76,3 +76,11 @@ test('profile and access reads reject empty/malformed success without inventing 
   assert.match(error.message,/ACCOUNT_ACCESS_RESPONSE_INVALID_EMPTY/);
   assert.doesNotMatch(error.message,/approved-driver|token|cookie/);
 });
+
+test('empty account errors expose only sanitized transport facts, without profile contents or credentials', async () => {
+  const {accountResponseRead,accountProfileResponse,AccountResponseError}=await import('../../localeats/src/lib/account-response');
+  await assert.rejects(accountResponseRead(async observe=>{
+    observe({status:200,media:'JSON',stream:'NONE',redirected:false,declaredLength:0,textLength:0});
+    return null;
+  },accountProfileResponse),error=>error instanceof AccountResponseError && /HTTP_200_JSON_STREAM_NONE_TEXT_0_LENGTH_0/.test(error.message));
+});
