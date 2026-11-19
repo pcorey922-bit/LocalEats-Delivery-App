@@ -1,3 +1,4 @@
+import { notificationPushDeadline, pushLifetime, PushExpiredError } from './push-expiry';
 import { databaseNow } from "./database-clock";
 import { createPrivateKey, sign, randomUUID } from "node:crypto";
 import { connect } from "node:http2";
@@ -34,7 +35,8 @@ export function pushConfiguration() {
     testMode: true,
   };
 }
-async function sendApns(token: string, notificationId: string, appId: string) {
+async function sendApns(token: string, notificationId: string, appId: string, expiresAt?: Date) {
+  const lifetime = pushLifetime(expiresAt);
   const topic = nativePushTopic(appId);
   const now = Math.floor(Date.now() / 1000);
   const header = Buffer.from(
@@ -67,6 +69,7 @@ async function sendApns(token: string, notificationId: string, appId: string) {
       authorization: `bearer ${data}.${signature}`,
       "apns-topic": topic,
       "apns-push-type": "alert",
+      "apns-expiration": String(lifetime.expiresAtSeconds),
       "apns-collapse-id": notificationId,
     });
     let status = 0;
@@ -97,9 +100,10 @@ async function sendPush(
   token: string,
   notificationId: string,
   appId = 'com.rocoeats.app',
+  expiresAt?: Date,
 ) {
-  if (platform === "ios") return sendApns(token, notificationId, appId);
-  await sendFcm(token, notificationId);
+  if (platform === "ios") return sendApns(token, notificationId, appId, expiresAt);
+  await sendFcm(token, notificationId, expiresAt);
 }
 // A provider acknowledgement is not proof that a device displayed a message.
 // Push is at-least-once; the durable in-app inbox remains the source of truth.
@@ -147,6 +151,7 @@ type PushSender = (
   token: string,
   notificationId: string,
   appId?: string,
+  expiresAt?: Date,
 ) => Promise<void>;
 function invalidToken(error: unknown) {
   const code = (error as { code?: string })?.code;
@@ -308,9 +313,11 @@ export async function processPushDelivery(
     if (!current) {
       state = "unregistered";
       errorCode = "DEVICE_UNREGISTERED";
-    } else
+    } else {
+      const expiresAt = notificationPushDeadline(claimed.notification.createdAt);
+      pushLifetime(expiresAt, (await databaseNow()).getTime());
       await Promise.race([
-        send(current.platform, current.token, claimed.notification.id, current.appId),
+        send(current.platform, current.token, claimed.notification.id, current.appId, expiresAt),
         new Promise<never>((_, reject) => {
           timer = setTimeout(
             () => reject(new Error("Push acknowledgement timed out")),
@@ -318,14 +325,16 @@ export async function processPushDelivery(
           );
         }),
       ]);
+    }
   } catch (error) {
+    const expired = error instanceof PushExpiredError;
     const permanent = invalidToken(error);
-    state = permanent
+    state = expired ? 'failed' : permanent
       ? "invalid_token"
       : claimed.delivery.attempts >= 4
         ? "failed"
         : "pending";
-    errorCode = permanent
+    errorCode = expired ? 'NOTIFICATION_EXPIRED' : permanent
       ? "INVALID_DEVICE_TOKEN"
       : "PROVIDER_ACKNOWLEDGEMENT_UNCONFIRMED";
   } finally {

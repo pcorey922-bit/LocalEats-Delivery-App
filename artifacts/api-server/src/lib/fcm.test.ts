@@ -127,3 +127,20 @@ test("FCM fails closed on invalid credentials and OAuth failures", async () => {
   );
   assert.equal(calls, 2);
 });
+
+test('FCM uses remaining original lifetime and sends nothing if OAuth consumes the deadline',async()=>{
+  let ttl='', messages=0;
+  const send=createFcmSender(credentials,async(input,init)=>{
+    if(String(input).includes('oauth2'))return Response.json({access_token:'fixture',expires_in:3600});
+    messages++;ttl=JSON.parse(String(init?.body)).message.android.ttl;
+    return Response.json({name:'projects/rocoeats-test/messages/expiry-fixture'});
+  });
+  await send('token_fixture','notice',new Date(Date.now()+180000));
+  assert.ok(parseInt(ttl)>0&&parseInt(ttl)<=180);assert.equal(messages,1);
+  const realNow=Date.now;let clock=1800000000000;
+  try {
+    Date.now=()=>clock;
+    const slow=createFcmSender(credentials,async()=>{clock+=4000;return Response.json({access_token:'fixture',expires_in:3600});});
+    await assert.rejects(slow('token_fixture','old',new Date(clock+3000)),error=>(error as {code:string}).code==='notification/expired');
+  } finally {Date.now=realNow;}
+});

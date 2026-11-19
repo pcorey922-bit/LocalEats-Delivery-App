@@ -1,3 +1,5 @@
+import { databaseNow } from '../lib/database-clock';
+import { notificationPushDeadline, pushLifetime } from '../lib/push-expiry';
 import { geographicReadiness } from "../lib/municipal-delivery";
 import { and, count, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import { Router, type IRouter, type RequestHandler } from "express";
@@ -196,11 +198,13 @@ router.post(
         .limit(1);
       if (!reference)
         throw new CommerceError(404, "Delivery attempt not found");
-      await tx
+      const [notice] = await tx
         .select()
         .from(notificationsTable)
         .where(eq(notificationsTable.id, reference.notificationId))
         .for("update");
+      try { pushLifetime(notificationPushDeadline(notice.createdAt),(await databaseNow(tx)).getTime()); }
+      catch { throw new CommerceError(409,'This alert push has expired. Its in-app notification remains available; no message was sent.'); }
       const [job] = await tx
         .select()
         .from(pushJobs)

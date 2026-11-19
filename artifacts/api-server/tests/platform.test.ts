@@ -3410,6 +3410,22 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       }
     },
   );
+  await t.test('stale queued push never sends after provider activation and preserves the in-app history', async () => {
+    await db.update(pushDeliveriesTable).set({nextAttemptAt:new Date(Date.now()+86400000)}).where(eq(pushDeliveriesTable.state,'pending'));
+    await db.update(notificationsTable).set({pushNextAttemptAt:new Date(Date.now()+86400000)}).where(eq(notificationsTable.pushState,'pending'));
+    const owner=randomUUID();
+    await db.insert(profilesTable).values({id:owner,clerkUserId:owner,role:'customer',displayName:'Stale push fixture'});
+    const [notice]=await db.insert(notificationsTable).values({profileId:owner,eventKey:randomUUID(),title:'Historical notice',body:'Preserve this inbox entry',createdAt:new Date(Date.now()-600000)}).returning();
+    await db.insert(notificationDevicesTable).values({profileId:owner,platform:'android',token:'stale_push_fixture_token_only'});
+    await fanOutPushNotifications();let sends=0;
+    assert.equal(await processPushDelivery(async()=>{sends++;},{android:true,ios:false,testMode:true}),true);
+    assert.equal(sends,0,'Configuring a provider must not release historical alerts as fresh messages');
+    const [delivery]=await db.select().from(pushDeliveriesTable).where(eq(pushDeliveriesTable.notificationId,notice.id));
+    assert.equal(delivery.state,'failed');assert.equal(delivery.errorCode,'NOTIFICATION_EXPIRED');assert.equal(delivery.acceptedAt,null);
+    assert.equal((await api(`/admin/push-deliveries/${delivery.id}/retry`,ids.admin,'POST',{reason:'Reviewed the stale alert before retry'})).status,409);
+    const [inbox]=await db.select().from(notificationsTable).where(eq(notificationsTable.id,notice.id));
+    assert.equal(inbox.body,notice.body);assert.equal(inbox.readAt,null);assert.equal(inbox.createdAt.getTime(),notice.createdAt.getTime());
+  });
   await t.test(
     "audited webhook and notification retries are immediately due on database time despite host clock skew",
     async () => {

@@ -1,3 +1,4 @@
+import { pushLifetime } from './push-expiry';
 import pushPolicy from '../../../../config/native-push-policy.json';
 import { createHash, createPrivateKey, sign } from "node:crypto";
 const tokenUrl = "https://oauth2.googleapis.com/token";
@@ -77,8 +78,9 @@ export function createFcmSender(raw: string, transport: typeof fetch = fetch) {
       pending = null;
     }
   }
-  return async (token: string, notificationId: string) => {
+  return async (token: string, notificationId: string, expiresAt?: Date) => {
     const bearer = await accessToken();
+    const lifetime = pushLifetime(expiresAt);
     const response = await transport(
       `https://fcm.googleapis.com/v1/projects/${project}/messages:send`,
       {
@@ -100,7 +102,7 @@ export function createFcmSender(raw: string, transport: typeof fetch = fetch) {
               // priority may wait for a Doze maintenance window and miss offers.
               priority: 'HIGH',
               collapse_key: notificationId,
-              ttl: "300s",
+              ttl: `${lifetime.ttlSeconds}s`,
               notification: { tag: notificationId, channel_id: pushPolicy.androidChannel.id },
             },
           },
@@ -136,7 +138,7 @@ export function createFcmSender(raw: string, transport: typeof fetch = fetch) {
 }
 let sender: ReturnType<typeof createFcmSender> | undefined,
   configurationHash = "";
-export async function sendFcm(token: string, notificationId: string) {
+export async function sendFcm(token: string, notificationId: string, expiresAt?: Date) {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!raw) throw new Error("Firebase configuration required");
   const hash = createHash("sha256").update(raw).digest("hex");
@@ -144,5 +146,5 @@ export async function sendFcm(token: string, notificationId: string) {
     sender = createFcmSender(raw);
     configurationHash = hash;
   }
-  return sender(token, notificationId);
+  return sender(token, notificationId, expiresAt);
 }

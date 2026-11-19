@@ -1,3 +1,14 @@
+## November 19 — expired push queues cannot burst historical alerts
+
+Existing five-minute TTL now applies from creation across worker, FCM and APNs;
+expired messages never send/retry, but in-app history stays. Regression reproduced
+before fix. 213 local app/API PASS / one PG skip; builds/types/API bundle PASS.
+No provider calls or hosted changes. Current exact CI next. Native policy 3c5769d
+all three workflows PASS. GPS-only compatible v168/575ee03 signed+Validate PASS,
+artifact source/hash/cert/preflight independently verified (links in checkpoint).
+Customer v165 ready, physical check pending. Remaining gates need owner device /
+provider / approved hosting access; no further missing core workflow established.
+
 ## November 19 — native alert visibility configured, customer APK ready
 
 Actual policy gaps corrected: FCM user-visible messages request HIGH priority and

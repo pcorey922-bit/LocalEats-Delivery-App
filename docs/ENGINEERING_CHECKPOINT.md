@@ -1,3 +1,41 @@
+## November 19 — creation-based push expiry and verified GPS candidate
+
+Confirmed before correction: existing worker sent a ten-minute-old queued alert
+when a simulated provider became available (real disposable local DB test, sender
+mock only). Enforce the EXISTING five-minute push lifetime from notification
+creation, using database time before provider I/O. Expired attempts become failed /
+NOTIFICATION_EXPIRED with no send or fabricated acknowledgement; inbox/history
+retained. FCM gets remaining TTL (rechecks after OAuth), APNs gets original absolute
+expiration. Admin retry returns 409 for expired alerts instead of refreshing them.
+No new migration, financial/order mutation, provider send or hosted configuration.
+
+Full local app/API checkpoint PASS: 213 tests, one PostgreSQL-only local skip.
+Includes failing-before historical-queue regression, inbox preservation/denied
+retry, clock/claim recovery regressions and sender deadline tests. Production
+build/typechecks and final API bundle PASS. Existing TEST/provider simulation
+limits remain; real device/FCM/APNs receipt NOT verified. Exact CI pending after push.
+
+Main native-push policy 3c5769d9e509e565a32480f6ac5f7230d65dfc13 has all THREE
+workflows SUCCESS (four native builds included). GPS compatibility source
+575ee0364ae6247a92f6fec7daa58de573439af4 has Validate 44484419039 and protected
+signer 44484420131 SUCCESS. Signed Driver GPS candidate v168 independently checked:
+artifact 14510805880, package com.rocoeats.driver.staging, same certificate, v2,
+GitHub ZIP digest/APK checksum and packaged fresh-eligibility preflight.
+APK SHA256 99ae03f6912bbd4ddf1e558bd63c7879f00a3849df4a3bbab9ae150d2b053ae5.
+Download https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44484420131/artifacts/14510805880
+This is GPS-only on the deployed-compatible branch; it preserves v154 auth and
+EXCLUDES newer main push APIs/Firebase/presentation changes. No Render deploy or
+migration 0029 needed for this candidate. Physical background GPS NOT accepted;
+owner-authorized explicit consent/online/locked-screen/offline test still required.
+Do not automatically change driver availability or request real coordinates.
+Customer v165 compatible artifact remains ready; physical check requested, pending.
+
+Next: inspect exact pushed CI; preserve clean primary/recovery branches. Remaining
+high-value acceptance requires owner devices, provider inputs, approved Render push
+capability/migration 0029, Apple provisioning, approved financial exercises,
+geographic ground truth/approval and production hosting/recovery. Do not invent
+new core rewrites or endlessly retry blocked Pixel Launcher emulator ANR.
+
 ## November 19 — timely visible native push policy and customer artifact
 
 Verified gaps: raw FCM Android payload omitted priority (normal may be deferred in
