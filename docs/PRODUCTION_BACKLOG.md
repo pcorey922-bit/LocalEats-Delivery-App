@@ -1,3 +1,20 @@
+# Staging release verified — November 19, 08:48 UTC
+
+Approved d2e79f73ad942c2ddd189714a8f755c909f8ad49 is now hosted, exact SHA
+independently matched; 23/23 read-only checks passed, healthy database and workers,
+new notification capability, CSP/HSTS and closed ordering/live/municipal gates.
+Owner recovery branch rocoeats-pre-migration-0029 retained (Never auto-delete).
+0029 schema availability supported by migration-before-start and healthy worker
+query of app_id; journal/constraint not directly inspected. Authenticated order,
+role, current provider and financial queue state need owner read-only access.
+No payout-disable flag advertised; no real financial action authorized/performed.
+
+Continue existing signed customer/driver builds for current verified source, then
+verify artifacts. Physical customer/background GPS, real notifications, iOS signing,
+provider financial and geographic acceptance remain open. Do not rebuild core
+workflows or reactivate exhausted diagnostics. This supersedes pending-deployment
+handoff below; no additional deployment/configuration/transactions authorized.
+
 # Approved deployment handoff — November 19
 
 Owner APPROVED d2e79f73ad942c2ddd189714a8f755c909f8ad49 including 0029 for

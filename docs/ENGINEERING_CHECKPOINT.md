@@ -1,3 +1,41 @@
+# POST-DEPLOYMENT READ-ONLY VERIFICATION — November 19, 08:48 UTC
+
+Owner reports existing Render service Live at approved functional source
+**d2e79f73ad942c2ddd189714a8f755c909f8ad49**. Before deployment, owner created
+Neon recovery branch `rocoeats-pre-migration-0029`, auto-delete Never, and confirmed
+Android/iOS sandbox providers both configuration required. No agent deployment,
+configuration change, provider send or financial operation was performed.
+
+Independent existing staging verifier: **23/23 HTTP requests passed**, exact full
+SHA match; database/auth/pricing/Stripe TEST/webhook configuration and all five
+worker heartbeats ready. Public/private/effective ordering OFF; live charges OFF;
+municipal enforcement OFF, provisional postal mode. CSP and one-year HSTS present;
+Clerk source allowed, native origins allowed, untrusted origin/unsigned/forged admin
+requests denied. Customer/restaurant/driver/admin route shells return 200. Public
+`/api/healthz` requires private staging access (401, expected); `/livez` and
+`/readyz` return 200. No authenticated role/session acceptance inferred from shells.
+
+Hosted native readiness now advertises notificationDeviceStatusVersion=1 and both
+customer/driver return schemes. Migration 0029 is consistent with successful
+migration-before-start free-staging launcher and healthy push worker: its query
+selects notification_devices including new app_id even with no eligible messages.
+The migration journal/allowlist constraint were NOT directly queried with hosted DB
+credentials. No missing-column failure observed. Existing order/ledger content,
+current provider configuration, queued financial operations and authenticated roles
+are inaccessible to these public reads. No public payout-disable switch exists:
+TEST-only provider safety is verified, not a claim that authorized TEST settlement
+could not be requested. Do not attempt one. Owner read-only Operations confirmation
+of both providers still configuration required has been requested; pending.
+
+Next independent action started: existing protected signed staging workflows for
+both audiences at primary source **3e8afdf9fb45949d788b02234595962131d8e033**,
+whose code/config equals deployed d2e79f7 (only docs/reference evidence differ).
+These artifacts include current GPS/push fixes and require no further deployment.
+Do not claim successful build/install/provider/physical acceptance until verified.
+No new core feature gap established; preserve existing physical Samsung v154
+acceptance and pending customer/background GPS/iOS/real push/financial/geographic
+acceptance. Do not repeat completed provider calls or emulator Launcher ANR audit.
+
 # OWNER DEPLOYMENT APPROVAL RECORDED — November 19
 
 Owner explicitly approved functional commit **d2e79f73ad942c2ddd189714a8f755c909f8ad49**
