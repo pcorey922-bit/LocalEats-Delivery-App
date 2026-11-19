@@ -1,3 +1,27 @@
+### Saved release pointers before weekly reset — November 19
+
+Functional fix committed/pushed: 4c44ab66188475dce41975cc79ea03a1f4436776.
+Compatible APK source committed/pushed: d0cf7b88164e25b5962fea4d06f7e918e45e195c.
+Both sources PASS 20 focused transport/account tests, production/typechecks and
+native main-entry streamless-response/controls/access/navigation/reload regressions.
+Main CI runs 44467913137 (push Validate), 44467919196 (PR Validate),
+44467919195 (four native jobs) were pending when saved. APK Validate 44468084570
+and protected driver signer 44468084935 were initiated and pending, NOT passed.
+Signing run: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44468084935
+
+NEXT SESSION: no investigation/reimplementation or backport is needed. Fetch the
+latest branch and inspect these exact-SHA workflow conclusions. Fix genuine
+failures only. After APK Validate/signing success, verify APP_IDENTITY source d0cf7b8,
+package com.rocoeats.driver.staging, new version >152, same public certificate and
+APK checksum, and packaged reader correction before offering phone installation.
+Do not offer an older artifact or claim physical acceptance. One meaningful phone
+test then checks existing sign-in, permissions, availability controls (do NOT toggle
+availability), menu and force-close/reopen. If still empty, collect only the new
+sanitized transport facts, never credentials or payloads. No Render deployment or
+migration 0029 needed. Public/private ordering, live charges, municipal enforcement
+stay OFF and Stripe TEST. No hosted changes/financial/provider operations performed.
+This section supersedes the historical backport/signing-next instructions below.
+
 ### November 19 — confirmed response-reader defect fixed; physical verification pending
 
 Physical v152 returns ACCOUNT_PROFILE_RESPONSE_INVALID_EMPTY. Before editing the

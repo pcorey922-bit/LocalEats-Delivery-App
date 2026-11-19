@@ -1,3 +1,12 @@
+### Weekly-reset release checkpoint — November 19
+
+Response-reader fix 4c44ab66188475dce41975cc79ea03a1f4436776 and compatible
+APK d0cf7b88164e25b5962fea4d06f7e918e45e195c are tested and pushed. Backport
+is COMPLETE. Exact-SHA CI pending; protected signer 44468084935 initiated, APK
+Validate 44468084570 pending. Resume by checking these runs, verifying artifact,
+then one physical controls/navigation/restart test. Do not repeat development.
+No backend deploy or migration 0029. Full evidence/resume steps in checkpoint.
+
 ### November 19 — finish streamless response transport repair first
 
 Confirmed custom-fetch discarded valid authenticated JSON when Response.body was
