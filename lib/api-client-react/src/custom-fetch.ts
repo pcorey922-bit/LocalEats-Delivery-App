@@ -1,5 +1,15 @@
+// Safe transport facts only: never URLs, headers, identities, tokens or bodies.
+export type FetchResponseEvidence = {
+  status: number;
+  media: 'JSON' | 'TEXT' | 'OTHER' | 'MISSING';
+  stream: 'NONE' | 'UNAVAILABLE' | 'PRESENT';
+  redirected: boolean;
+  declaredLength: number | null;
+  textLength: number | null;
+};
 export type CustomFetchOptions = RequestInit & {
   responseType?: "json" | "text" | "blob" | "auto";
+  onResponse?: (evidence: Readonly<FetchResponseEvidence>) => void;
 };
 
 export type ErrorType<T = unknown> = ApiError<T>;
@@ -113,18 +123,11 @@ function isTextMediaType(mediaType: string | null): boolean {
   );
 }
 
-// Use strict equality: in browsers, `response.body` is `null` when the
-// response genuinely has no content.  In React Native, `response.body` is
-// always `undefined` because the ReadableStream API is not implemented —
-// even when the response carries a full payload readable via `.text()` or
-// `.json()`.  Loose equality (`== null`) matches both `null` and `undefined`,
-// which causes every React Native response to be treated as empty.
+// Only HTTP semantics establish that a body is forbidden. Native/polyfilled
+// responses may expose body=null (or stale Content-Length: 0) while text() still
+// contains valid JSON. Read the actual payload rather than discarding it.
 function hasNoBody(response: Response, method: string): boolean {
-  if (method === "HEAD") return true;
-  if (NO_BODY_STATUS.has(response.status)) return true;
-  if (response.headers.get("content-length") === "0") return true;
-  if (response.body === null) return true;
-  return false;
+  return method === "HEAD" || NO_BODY_STATUS.has(response.status);
 }
 
 function stripBom(text: string): string {
@@ -238,8 +241,10 @@ export class ResponseParseError extends Error {
 async function parseJsonBody(
   response: Response,
   requestInfo: { method: string; url: string },
+  evidence?: FetchResponseEvidence,
 ): Promise<unknown> {
   const raw = await response.text();
+  if (evidence) evidence.textLength = raw.length;
   const normalized = stripBom(raw);
 
   if (normalized.trim() === "") {
@@ -253,7 +258,7 @@ async function parseJsonBody(
   }
 }
 
-async function parseErrorBody(response: Response, method: string): Promise<unknown> {
+async function parseErrorBody(response: Response, method: string, evidence?: FetchResponseEvidence): Promise<unknown> {
   if (hasNoBody(response, method)) {
     return null;
   }
@@ -266,6 +271,7 @@ async function parseErrorBody(response: Response, method: string): Promise<unkno
   }
 
   const raw = await response.text();
+  if (evidence) evidence.textLength = raw.length;
   const normalized = stripBom(raw);
   const trimmed = normalized.trim();
 
@@ -296,6 +302,7 @@ async function parseSuccessBody(
   response: Response,
   responseType: "json" | "text" | "blob" | "auto",
   requestInfo: { method: string; url: string },
+  evidence?: FetchResponseEvidence,
 ): Promise<unknown> {
   if (hasNoBody(response, requestInfo.method)) {
     return null;
@@ -306,10 +313,11 @@ async function parseSuccessBody(
 
   switch (effectiveType) {
     case "json":
-      return parseJsonBody(response, requestInfo);
+      return parseJsonBody(response, requestInfo, evidence);
 
     case "text": {
       const text = await response.text();
+      if (evidence) evidence.textLength = text.length;
       return text === "" ? null : text;
     }
 
@@ -320,7 +328,8 @@ async function parseSuccessBody(
             "Use responseType \"json\" or \"text\" instead.",
         );
       }
-      return response.blob();
+      const blob = await response.blob();
+      return blob.size === 0 ? null : blob;
   }
 }
 
@@ -360,7 +369,7 @@ async function fetchApi<T>(input: RequestInfo | URL, options: CustomFetchOptions
     try{const target=new URL(originalUrl),base=new URL(_baseUrl);return target.origin===base.origin&&target.pathname.startsWith("/api/");}catch{return false;}
   })();
   input = applyBaseUrl(input);
-  const { responseType = "auto", headers: headersInit, ...init } = options;
+  const { responseType = "auto", onResponse, headers: headersInit, ...init } = options;
 
   const method = resolveMethod(input, init.method);
 
@@ -400,10 +409,23 @@ async function fetchApi<T>(input: RequestInfo | URL, options: CustomFetchOptions
   init.signal?.throwIfAborted();
   const response = await fetch(input, { ...init, method, headers });
 
-  if (!response.ok) {
-    const errorData = await parseErrorBody(response, method);
-    throw new ApiError(response, errorData, requestInfo);
+  const media = getMediaType(response.headers);
+  const length = response.headers.get('content-length');
+  const evidence: FetchResponseEvidence = {
+    status: response.status,
+    media: isJsonMediaType(media) ? 'JSON' : isTextMediaType(media) ? 'TEXT' : media ? 'OTHER' : 'MISSING',
+    stream: response.body === null ? 'NONE' : response.body === undefined ? 'UNAVAILABLE' : 'PRESENT',
+    redirected: response.redirected === true,
+    declaredLength: length !== null && /^\d+$/.test(length) && Number.isSafeInteger(Number(length)) ? Number(length) : null,
+    textLength: null,
+  };
+  try {
+    if (!response.ok) {
+      const errorData = await parseErrorBody(response, method, evidence);
+      throw new ApiError(response, errorData, requestInfo);
+    }
+    return (await parseSuccessBody(response, responseType, requestInfo, evidence)) as T;
+  } finally {
+    onResponse?.(Object.freeze({ ...evidence }));
   }
-
-  return (await parseSuccessBody(response, responseType, requestInfo)) as T;
 }

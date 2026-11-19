@@ -1,3 +1,40 @@
+### November 19 — confirmed response-reader defect fixed; physical verification pending
+
+Physical v152 returns ACCOUNT_PROFILE_RESPONSE_INVALID_EMPTY. Before editing the
+transport, the actual native-entry browser regression reproduced that EXACT code
+with valid authorized driver JSON from the local API: only the Response.body
+property was null; text() still held the payload. The shared custom-fetch helper
+incorrectly discarded it using the stream/Content-Length hints. Evidence:
+/tmp/roco-native-body-code-repro.log. This establishes the client defect; Samsung's
+actual stream/header properties and raw authenticated response remain unobserved.
+
+Fix: determine forbidden bodies only from HEAD/204/205/304 semantics; otherwise
+read through text()/blob(). Null/unavailable streams and stale Content-Length: 0
+no longer discard readable data. Preserve real empty payloads, strict profile/
+access validation, one-401 session renewal, bearer scoping and all server roles.
+Optional account-read diagnostics expose only status, media category, stream
+presence, declared length, decoded character count and redirect boolean. No URLs,
+identities, headers, tokens, cookies, body contents or persistent logs.
+
+Validation PASS: 20 focused transport/account tests (12 mobile + 8 account),
+production build/typechecks, actual native main-entry regressions with streamless
+real local authorized API JSON, driver controls, access/menu navigation and reload.
+Native/Clerk/response-stream properties are simulated; API/DB disposable local.
+Logs: /tmp/roco-stream-mobile-direct.log, /tmp/roco-stream-account-direct.log,
+/tmp/roco-stream-native-browser.log, /tmp/roco-stream-build.log.
+
+Resume: inspect exact main HEAD CI; apply this commit's seven-file source/test
+patch to fix/driver-staging-session-recovery (currently 744ecb09) without newer
+notification APIs/migration 0029. Run its focused checks, push, dispatch existing
+native-validation.yml target=staging audience=driver, verify exact-SHA Validate
+and signing. No backend deploy is needed for this client transport correction.
+Do not ask for another phone test until a verified replacement APK is available.
+Then install as update (same signing identity, preserve data), verify Account
+Access fields and Driver availability controls, force-close/reopen once. Do not
+toggle availability/order/payment settings. Physical acceptance is NOT yet passed.
+No hosted settings/data, role grants, provider lookups, financial action or deploy.
+Keep public/private ordering, live charges and municipal enforcement OFF, TEST only.
+
 ### CI fixture correction — November 18
 
 Initial blank-workspace repair Validate failed at the background-GPS browser test:

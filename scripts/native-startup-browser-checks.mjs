@@ -12,9 +12,22 @@ export async function verifyNativeStartupBootstrap({ actor, origin }) {
   await blocked.getByRole('button', { name: 'Reload app', exact: true }).waitFor();
   assert.equal(await blocked.getByRole('button', { name: 'Go online', exact: true }).count(), 0);
   const restored = await actor('driver');
-  await restored.context().addInitScript(() => { window.qaNativeBootstrap = true; });
+  await restored.context().addInitScript(() => {
+    window.qaNativeBootstrap = true;
+    // A native/polyfilled response can have no exposed stream while text()
+    // still contains the valid, authenticated API payload. Do not synthesize roles.
+    const transport = window.fetch;
+    window.fetch = async (...args) => {
+      const response = await transport(...args);
+      if (/\/api\/(profiles\/me|session\/access)(?:\?|$)/.test(String(args[0])))
+        Object.defineProperty(response, 'body', {value:null});
+      return response;
+    };
+  });
   await restored.goto(origin + '/driver');
-  await restored.getByRole('button', { name: 'Go online', exact: true }).waitFor();
+  try { await restored.getByRole('button', { name: 'Go online', exact: true }).waitFor({timeout:3000}); }
+  catch (error) { console.log('Streamless authenticated response diagnostic:', await restored.getByRole('alert').allTextContents()); throw error; }
+
   await restored.getByRole('heading', { name: 'Local deliveries.', exact: true }).waitFor();
   assert.equal(await restored.getByText(/NATIVE_STARTUP_TIMEOUT/).count(), 0);
   await restored.reload();

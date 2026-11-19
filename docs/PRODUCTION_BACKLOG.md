@@ -1,3 +1,16 @@
+### November 19 — finish streamless response transport repair first
+
+Confirmed custom-fetch discarded valid authenticated JSON when Response.body was
+null; native-entry test reproduces v152's exact empty-profile code before fix.
+Supported body readers now preserve payloads; strict role/profile checks remain.
+20 focused tests + production/types + native-entry real-local-API regressions PASS.
+Next: exact main CI, compatible APK backport to existing repair branch, protected
+signing and one physical controls/navigation/restart test. No backend deployment
+or migration 0029. Handset wire properties still unobserved; no physical acceptance
+claim. Safe diagnostic facts are present if a truly empty response persists.
+Do not repeat investigations, change permissions or start unrelated tasks before
+this checkpoint is pushed and the usable signed repair is ready. See checkpoint.
+
 ### CI correction before APK handoff
 
 Background GPS browser fixture must include the existing API's required createdAt.
