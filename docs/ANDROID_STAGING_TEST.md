@@ -1,3 +1,46 @@
+## Real push readiness — owner-controlled setup, no credentials in chat
+
+Software preparation does NOT mean actual push works. The signed staging workflow
+can now consume optional customer/driver Firebase CLIENT JSON separately, validate
+its exact staging package/project, write a private runner file, and verify compiled
+Google app/project resources. Missing input explicitly produces an unconfigured
+build. Client files are ignored by git and removed from the runner. Never put a
+Firebase service-account private key in either Android client secret or APK.
+
+When the owner separately approves provider setup (all steps work in phone dashboards):
+1. First approve a verified shared-backend deployment including migration 0029,
+   after its existing backup/restore checks; keep all ordering/live/municipal gates
+   OFF. Existing 6cc staging lacks the newer notification-device/app-identity
+   capability. Do not bypass the main packaging preflight or deploy automatically.
+2. In an existing/free Firebase Spark project, register staging Android packages
+   `com.rocoeats.app.staging` and `com.rocoeats.driver.staging`. Use the SAME project
+   as backend FCM credentials. No billing/card/paid upgrade or new project is created
+   by engineering. Download the matching google-services.json for each app.
+3. GitHub repository -> Settings -> Secrets and variables -> Actions -> New repository
+   secret. Put each downloaded CLIENT JSON privately in its matching field:
+   `ROCOEATS_FIREBASE_CUSTOMER_ANDROID_CONFIG_JSON` or
+   `ROCOEATS_FIREBASE_DRIVER_ANDROID_CONFIG_JSON`. No base64, laptop, terminal,
+   public upload, source commit or chat is needed. Do not change signing secrets.
+4. Backend sending separately needs `FIREBASE_SERVICE_ACCOUNT_JSON` in protected
+   Render Environment, with authorized FCM sending access to the same project.
+   This is a SERVER secret; never upload it to GitHub source/client configuration.
+   Setting it and redeployment require separate owner authorization; not done here.
+5. After readiness verifies backend capability and closed gates, use the existing
+   signer for each audience. Check BUILD_READINESS client flag and exact source;
+   compiled resources/configuration still do not prove device receipt.
+6. Only in a separately authorized device exercise: explicit notification consent,
+   enroll current account, confirm its server registration, then verify one existing
+   authorized notification in foreground/background/terminated states. No test
+   payment/order creation is implied. In-app inbox remains authoritative; never
+   infer delivery from a provider acknowledgement. Restaurant/admin profiles use
+   their authorized shared app/in-app inbox; no browser system-push support is claimed.
+
+APNs stays sandbox/development only. Existing Apple team access, matching customer/
+driver App IDs/provisioning with push entitlement, protected server
+`APNS_PRIVATE_KEY`, `APNS_KEY_ID`, `APNS_TEAM_ID`, and a real iOS device are required.
+No Apple account/billing/signing change or membership purchase is authorized here.
+Physical iOS/background receipt remains blocked until those owner-controlled inputs.
+
 ## Driver emulator smoke (no authenticated account)
 
 Use the existing **Native validation and signed staging** workflow: target

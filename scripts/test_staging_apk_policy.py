@@ -4,7 +4,7 @@ import json
 import hashlib
 import tempfile
 from pathlib import Path
-from staging_apk_policy import staging_identity, verify_staging_manifest, smoke_identity, verify_smoke_source, verify_smoke_input, parse_ui_hierarchy
+from staging_apk_policy import staging_identity, verify_staging_manifest, smoke_identity, verify_smoke_source, verify_smoke_input, parse_ui_hierarchy, verify_firebase_resources
 
 class StagingApkPolicyTests(unittest.TestCase):
     def test_customer_default_stays_stable_and_wrong_audience_is_rejected(self):
@@ -27,6 +27,14 @@ class SignedSmokeSelectionTests(unittest.TestCase):
             self.assertIsNone(parse_ui_hierarchy(raw))
         root=parse_ui_hierarchy('<?xml version="1.0"?><hierarchy><node text="Sign in securely"/></hierarchy>')
         self.assertEqual(root.find('node').get('text'),'Sign in securely')
+
+    def test_configured_firebase_requires_matching_compiled_app_and_project(self):
+        config={'client':[{'client_info':{'android_client_info':{'package_name':'com.rocoeats.driver.staging'},'mobilesdk_app_id':'public-fixture-app'}}],'project_info':{'project_id':'public-fixture-project'}}
+        resources='google_app_id public-fixture-app project_id public-fixture-project'
+        verify_firebase_resources(resources,config,'com.rocoeats.driver.staging')
+        for missing in ['google_app_id','public-fixture-app','project_id','public-fixture-project']:
+            with self.assertRaises(AssertionError):verify_firebase_resources(resources.replace(missing,''),config,'com.rocoeats.driver.staging')
+        with self.assertRaises(AssertionError):verify_firebase_resources(resources,config,'com.rocoeats.app.staging')
 
     def source(self, audience):
         sha = 'a' * 40

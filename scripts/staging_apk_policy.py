@@ -82,3 +82,10 @@ def parse_ui_hierarchy(raw):
         return root if root.tag == 'hierarchy' else None
     except ET.ParseError:
         return None
+
+
+def verify_firebase_resources(resources, config, package):
+    selected = config['client'][0]
+    assert selected['client_info']['android_client_info']['package_name'] == package, 'Firebase client package mismatch'
+    assert 'google_app_id' in resources and selected['client_info']['mobilesdk_app_id'] in resources, 'Compiled Firebase app resource missing'
+    assert 'project_id' in resources and config['project_info']['project_id'] in resources, 'Compiled Firebase project resource missing'

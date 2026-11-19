@@ -1,3 +1,25 @@
+## November 19 — optional secure Android Firebase build handoff
+
+Confirmed missing build input: Gradle applies Google Services only if
+android/app/google-services.json exists, but protected staging signing had no
+client-config input. Now optional audience-isolated repository secrets
+ROCOEATS_FIREBASE_CUSTOMER_ANDROID_CONFIG_JSON / ROCOEATS_FIREBASE_DRIVER_ANDROID_CONFIG_JSON
+are read only in the existing staging job. No secret was created/configured.
+Helper rejects invalid/duplicate/wrong-package/project config and ANY server private
+credentials; emits only minimal required public client fields to a new mode-0600
+runner file, refuses overwrites, no values in output. File ignored by git and
+always cleaned. Existing signing key/permissions untouched. APK verifier checks
+compiled matching Google app/project resources if configured, and BUILD_READINESS
+reports configured/unconfigured separately from actual receipt.
+
+Four Node configuration tests + eight Python policy/resource tests + Python compile
+and workflow YAML checks PASS. No real config supplied, configured binary/FCM/APNs
+receipt NOT verified. No paid services/provider calls or hosted changes. Owner phone
+steps are in ANDROID_STAGING_TEST.md. Main backend push capability/migration 0029
+requires separate approved deployment; never bypass its packaging preflight.
+Next independent action: build the compatible customer staging APK from d0cf7b8
+against existing backend (no push acceptance claimed), then check final source CI.
+
 ## November 19 — push enrollment cancellation and acknowledgement recovery
 
 Reproduced BEFORE change: delayed mocked enrollment POST completes after its

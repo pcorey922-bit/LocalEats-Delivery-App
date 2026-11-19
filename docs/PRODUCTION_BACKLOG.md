@@ -1,3 +1,12 @@
+## November 19 — Firebase client build integration prepared
+
+Optional protected per-audience client JSON now has validation, private runner
+handoff, cleanup and compiled-resource checks. Four Node/eight Python tests pass;
+no provider config/accounts or hosted settings changed. Real configured APK and
+FCM/APNs delivery still require owner inputs and separately approved backend
+push/migration-0029 deployment. Exact phone steps in ANDROID_STAGING_TEST.md.
+Continue compatible customer APK readiness while those external gates remain closed.
+
 ## November 19 — push enrollment race fixed, provider setup still blocked
 
 Confirmed timeout/late acknowledgement defect is fixed with account-scoped cancel,

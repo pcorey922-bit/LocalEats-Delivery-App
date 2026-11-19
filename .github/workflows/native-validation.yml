@@ -176,6 +176,11 @@ jobs:
       - run: node scripts/prepare-native-audience.mjs --github-env
       - name: Require deployed safe native backend before packaging
         run: node scripts/verify-native-staging.mjs
+      - name: Prepare optional protected Firebase Android client configuration
+        env:
+          ROCOEATS_FIREBASE_CUSTOMER_ANDROID_CONFIG_JSON: ${{ secrets.ROCOEATS_FIREBASE_CUSTOMER_ANDROID_CONFIG_JSON }}
+          ROCOEATS_FIREBASE_DRIVER_ANDROID_CONFIG_JSON: ${{ secrets.ROCOEATS_FIREBASE_DRIVER_ANDROID_CONFIG_JSON }}
+        run: node scripts/prepare-firebase-android.mjs
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @workspace/localeats mobile:sync
       - name: Restore signing key only into private runner temporary storage
@@ -221,6 +226,10 @@ jobs:
       - name: Remove temporary signing material
         if: always()
         run: rm -f "$RUNNER_TEMP/rocoeats-staging.p12"
+
+      - name: Remove temporary Firebase client configuration
+        if: always()
+        run: rm -f artifacts/localeats/android/app/google-services.json
 
   android-smoke:
     if: github.event_name == 'workflow_dispatch' && inputs.target == 'android-smoke'
