@@ -72,3 +72,13 @@ def verify_smoke_input(directory, audience, source):
     assert match, 'Expected exact APK checksum entry, without extra paths'
     assert hashlib.sha256((directory / app['apk']).read_bytes()).hexdigest() == match[1], 'APK digest mismatch'
     return {**app, 'source': source}
+
+
+def parse_ui_hierarchy(raw):
+    """An early/busy uiautomator dump may not exist yet; never parse shell errors as XML."""
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.fromstring(raw)
+        return root if root.tag == 'hierarchy' else None
+    except ET.ParseError:
+        return None

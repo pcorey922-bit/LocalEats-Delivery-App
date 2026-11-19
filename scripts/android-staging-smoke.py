@@ -3,7 +3,7 @@ No accounts, auth tickets, guest capabilities, orders or payments are supplied.
 ADB is used only on this disposable CI emulator, never the owner's phone.
 """
 import json,os,pathlib,re,subprocess,time,xml.etree.ElementTree as ET
-from staging_apk_policy import verify_smoke_input
+from staging_apk_policy import verify_smoke_input, parse_ui_hierarchy
 audience=os.environ.get('ROCOEATS_SMOKE_AUDIENCE', 'customer')
 app=verify_smoke_input('smoke-input',audience,os.environ['ROCOEATS_SMOKE_SOURCE'])
 package=app['package']
@@ -17,20 +17,30 @@ def adb(*args,timeout=30):
  return subprocess.check_output([os.environ['ROCOEATS_QA_ADB'],'-e',*args],timeout=timeout,stderr=subprocess.STDOUT)
 def shell(*args,timeout=30):return adb('shell',*args,timeout=timeout).decode(errors='replace')
 def snapshot(name):
- shell('uiautomator','dump','/sdcard/rocoeats-qa.xml')
+ shell('rm','-f','/sdcard/rocoeats-qa.xml')
+ capture=shell('uiautomator','dump','--compressed','/sdcard/rocoeats-qa.xml')
  xml=adb('exec-out','cat','/sdcard/rocoeats-qa.xml').decode(errors='replace')
- (output/(name+'.xml')).write_text(xml)
+ root=parse_ui_hierarchy(xml)
  (output/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'))
- return ET.fromstring(xml)
+ if root is None:
+  (output/(name+'.capture.txt')).write_text(capture+'\n'+xml)
+ else:
+  (output/(name+'.xml')).write_text(xml)
+ return root
 def labels(root):return ' '.join(n.get('text','')+' '+n.get('content-desc','') for n in root.iter('node'))
 def wait_text(name,expected,attempts=18):
+ text=''
+ captured=False
  for _ in range(attempts):
-  root=snapshot(name);text=labels(root)
+  root=snapshot(name)
+  if root is None:
+   time.sleep(2);continue
+  captured=True;text=labels(root)
   if 'Something went wrong' in text:raise AssertionError('Application error boundary appeared; inspect anonymous screenshot')
   if expected.casefold() in text.casefold():return root
   time.sleep(2)
  print('Anonymous emulator UI: '+re.sub(r'https?://\S+','[URL]',text)[:1000],flush=True)
- raise AssertionError('Expected UI did not appear: '+expected)
+ raise AssertionError(('Expected UI did not appear: '+expected) if captured else 'UI hierarchy capture unavailable; inspect capture.txt and screenshot; no app acceptance claimed')
 def tap(root,text):
  candidates=[n for n in root.iter('node') if text in [n.get('text',''),n.get('content-desc','')]]
  assert candidates,'UI control missing: '+text

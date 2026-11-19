@@ -4,7 +4,7 @@ import json
 import hashlib
 import tempfile
 from pathlib import Path
-from staging_apk_policy import staging_identity, verify_staging_manifest, smoke_identity, verify_smoke_source, verify_smoke_input
+from staging_apk_policy import staging_identity, verify_staging_manifest, smoke_identity, verify_smoke_source, verify_smoke_input, parse_ui_hierarchy
 
 class StagingApkPolicyTests(unittest.TestCase):
     def test_customer_default_stays_stable_and_wrong_audience_is_rejected(self):
@@ -22,6 +22,12 @@ class StagingApkPolicyTests(unittest.TestCase):
                 with self.assertRaises(AssertionError): verify_staging_manifest(source + unsafe, audience)
 
 class SignedSmokeSelectionTests(unittest.TestCase):
+    def test_busy_or_missing_ui_capture_retries_without_claiming_app_failure(self):
+        for raw in ['cat: /sdcard/rocoeats-qa.xml: No such file or directory\n', '', 'ERROR: could not get idle state', '<hierarchy', '<html/>']:
+            self.assertIsNone(parse_ui_hierarchy(raw))
+        root=parse_ui_hierarchy('<?xml version="1.0"?><hierarchy><node text="Sign in securely"/></hierarchy>')
+        self.assertEqual(root.find('node').get('text'),'Sign in securely')
+
     def source(self, audience):
         sha = 'a' * 40
         run = {'id': 42, 'conclusion':'success', 'status':'completed', 'event':'workflow_dispatch',
