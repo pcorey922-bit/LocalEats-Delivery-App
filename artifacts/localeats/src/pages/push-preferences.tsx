@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useState } from "react";
 import { useAuth } from "@clerk/react";
 import { Capacitor } from "@capacitor/core";
@@ -21,13 +22,14 @@ function savedDevice() {
 }
 function hasLegacyRegistration() {
   try {
-    return !!localStorage.getItem("rocoeats-push-token");
+    return !!(localStorage.getItem("rocoeats-push-token") || localStorage.getItem("rocoeats-push-pending-token"));
   } catch {
     return false;
   }
 }
 export function PushPreferences() {
   const { userId } = useAuth();
+  const enrollment = useRef<AbortController | null>(null);
   const native = Capacitor.isNativePlatform(),
     platform = Capacitor.getPlatform();
   const [deviceId, setDeviceId] = useState(savedDevice);
@@ -63,13 +65,21 @@ export function PushPreferences() {
     refetchOnMount: "always",
   });
   const enroll = useMutation({
-    mutationFn: registerPush,
+    mutationFn: () => {
+      if (!userId || !enrollment.current || enrollment.current.signal.aborted) throw new Error('Sign in before enrolling this device.');
+      return registerPush({signal:enrollment.current.signal});
+    },
     onSuccess: async () => {
       const id = savedDevice();
       setDeviceId(id);
       if (id === deviceId) await status.refetch();
     },
   });
+  useEffect(() => {
+    const controller = new AbortController(); enrollment.current=controller;
+    enroll.reset();
+    return () => { controller.abort(); if (enrollment.current===controller) enrollment.current=null; };
+  },[userId,enroll.reset]);
   const disable = useMutation({
     mutationFn: unregisterPush,
     onSuccess: () => {

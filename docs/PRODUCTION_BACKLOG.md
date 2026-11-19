@@ -1,3 +1,15 @@
+## November 19 — push enrollment race fixed, provider setup still blocked
+
+Confirmed timeout/late acknowledgement defect is fixed with account-scoped cancel,
+request abort, listener cleanup and durable local unconfirmed opt-out handles.
+Browser timeout/account-change/permission/configuration/opt-out regressions, native
+bootstrap/account suites, build/types PASS; 210 app/API PASS / one local PG skip.
+No real notifications. GPS 89ec27c all three CI PASS. Driver smoke installed actual
+signed APK after source/cert checks; remaining UI checks blocked by Pixel Launcher
+ANR (44481651431), not claimed as pass. Do not repeat infrastructure investigation.
+Next actionable product gap: protected Android Firebase client-config build input;
+then owner-controlled Firebase/APNs provisioning and physical receipt acceptance.
+
 ## November 19 — background GPS startup gate corrected
 
 Fresh server on-duty eligibility now precedes native watcher creation; offline/

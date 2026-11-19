@@ -9,6 +9,8 @@ import { PushPreferences } from '../src/pages/push-preferences';
 const qa = window as unknown as {
   bgPermission: boolean; bgStarts: number; bgRemovals: string[]; bgUploads: number;
   bgDenied: boolean; emitFix?: (fix: unknown) => void; offline: () => void;
+  pushPostAborted?: boolean; pushPosts?: number;
+  pushPostDelay?: boolean; finishPushEnrollment?: () => void;
   pushConfigured: boolean; pushRegistered: boolean; pushDeleteFails: boolean; pushRevocation?: unknown;
 };
 qa.bgPermission = true; qa.bgStarts = 0; qa.bgRemovals = []; qa.bgUploads = 0; qa.bgDenied = false;
@@ -24,6 +26,9 @@ window.fetch = async (input, options) => {
       if (qa.pushDeleteFails) return Response.json({ error: 'Simulated removal outage' }, { status: 503 });
       qa.pushRegistered = false; localStorage.setItem('qa-server-push', 'false'); return new Response(null, { status: 204 });
     }
+    qa.pushPosts=(qa.pushPosts??0)+1;
+    options?.signal?.addEventListener('abort',()=>{qa.pushPostAborted=true;},{once:true});
+    if (qa.pushPostDelay) await new Promise<void>(resolve=>{qa.finishPushEnrollment=resolve;});
     qa.pushRegistered = true; localStorage.setItem('qa-server-push', 'true'); return Response.json({ registered: true, deviceId: '11111111-1111-4111-8111-111111111119' }, { status: 201 });
   }
   if (url.startsWith('/api/notification-devices/')) return qa.pushRegistered ? Response.json({ registered: true, platform: 'android', appId: 'com.rocoeats.driver.staging' }) : Response.json({ error: 'Not registered' }, { status: 404 });

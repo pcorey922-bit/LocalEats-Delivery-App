@@ -1,3 +1,38 @@
+## November 19 — push enrollment cancellation and acknowledgement recovery
+
+Reproduced BEFORE change: delayed mocked enrollment POST completes after its
+15-second deadline and still saves a device ID, despite the UI reporting timeout.
+Fix scopes the shared enrollment to the initiating screen/account AbortSignal;
+abort on account change/unmount/opt-out, stop pending authenticated requests,
+fence late SDK callbacks/results and remove late-created listener handles. First
+registration event wins; old cleanup cannot erase a newer operation. No timeout
+extension, provider send or server authorization bypass.
+
+A pending token is retained separately before POST because a lost acknowledgement
+may still have committed. It is never displayed/logged. Explicit disable revokes
+both confirmed and pending handles, still attempts native unregister during API
+failure, and clears handles only after confirmed success. No false claim that a
+timed-out enrollment is absent. Completed registration still requires server status;
+provider acknowledgement is not actual device receipt.
+
+PASS: reproduced race and late-listener/account-change/opt-out component tests,
+existing background consent/revocation/legacy opt-out tests, native-entry and full
+account/native-handoff browser regressions, production/typechecks. Local app/API
+checkpoint: 210 PASS / one PostgreSQL-only skip. Native/provider APIs in browser
+fixtures are mocked; real Firebase/APNs delivery is NOT verified.
+
+Driver emulator: 17a0d34 fixed invalid early UI captures; source/signature/manifest,
+actual APK install and no pre-granted permission checks passed. Run 44481651431
+then blocked on OS dialog "Pixel Launcher isn't responding"; no startup/deep-link
+acceptance claimed. Stop repeated emulator work and continue independent product
+readiness. Physical Samsung v154 acceptance above remains separate and valid.
+GPS source 89ec27ca34510dd1102f69464186fb02b4853b88 has ALL THREE CI SUCCESS.
+
+Next: prepare optional protected Firebase Android client configuration handoff;
+current build applies Google Services only when an untracked google-services.json
+exists, while signing workflow has no input for it. Do not create provider accounts,
+change hosted secrets or claim compiled Firebase support before checking APK output.
+
 ## November 19 — fresh background GPS authorization preflight
 
 Confirmed regression before change: watcher startup succeeded even when the

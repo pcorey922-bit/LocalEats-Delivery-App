@@ -10,14 +10,14 @@ const root = fileURLToPath(new URL('../', import.meta.url)), require = createReq
 const { build } = require('esbuild'), { chromium } = require(process.env.PLAYWRIGHT_CORE_PATH || 'playwright-core');
 const target = await mkdtemp(path.join(tmpdir(), 'rocoeats-background-ui-'));
 const modules = {
-  '@clerk/react': `export const useAuth=()=>({isLoaded:true,isSignedIn:true,userId:'driver-fixture',getToken:async()=>null});`,
+  '@clerk/react': `import {useSyncExternalStore} from 'react';const subscribe=cb=>{window.addEventListener('qa-push-account',cb);return()=>window.removeEventListener('qa-push-account',cb)};export const useAuth=()=>{const userId=useSyncExternalStore(subscribe,()=>window.pushUserId||'driver-fixture');return{isLoaded:true,isSignedIn:true,userId,getToken:async()=>null}};`,
   '@capacitor/core': `export const Capacitor={isNativePlatform:()=>true,getPlatform:()=>'android'};export const registerPlugin=()=>({addWatcher:async(options,callback)=>{window.emitFix=fix=>callback(fix);return 'watch-'+(++window.bgStarts)},removeWatcher:async({id})=>{window.bgRemovals.push(id)}});`,
   '@capacitor/browser': `export const Browser={close:async()=>{},open:async()=>{}};`,
   '@capacitor/app': `export const App={getInfo:async()=>({id:'com.rocoeats.driver.staging'}),addListener:async()=>({remove:async()=>{}})};`,
   '@capacitor/geolocation': `export const Geolocation={watchPosition:async()=> 'foreground-fixture',clearWatch:async()=>{}};`,
-  '@capacitor/push-notifications': `const listeners={};export const PushNotifications={checkPermissions:async()=>({receive:window.bgPermission?'granted':'denied'}),requestPermissions:async()=>({receive:window.bgPermission?'granted':'denied'}),addListener:async(name,callback)=>{listeners[name]=callback;return{remove:async()=>{delete listeners[name]}}},register:async()=>listeners.registration({value:'mock_push_token_not_real_123456'}),unregister:async()=>{window.pushUnregisterCalls=(window.pushUnregisterCalls||0)+1}};`,
+  '@capacitor/push-notifications': `const listeners={};export const PushNotifications={checkPermissions:async()=>({receive:window.bgPermission?'granted':'denied'}),requestPermissions:async()=>({receive:window.bgPermission?'granted':'denied'}),addListener:async(name,callback)=>{if(name==='registration'&&window.pushListenerDelay)await new Promise(resolve=>{window.finishPushListener=resolve});listeners[name]=callback;window.pushListenersFinished=(window.pushListenersFinished||0)+1;return{remove:async()=>{if(listeners[name]===callback)delete listeners[name]}}},register:async()=>{window.pushRegisterCalls=(window.pushRegisterCalls||0)+1;listeners.registration({value:'mock_push_token_not_real_123456'})},unregister:async()=>{window.pushUnregisterCalls=(window.pushUnregisterCalls||0)+1}};`,
 };
-await build({ entryPoints: [path.join(root, 'artifacts/localeats/tests/background-browser.tsx')], outfile: path.join(target, 'app.js'), bundle: true, format: 'esm', platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"development"', 'import.meta.env.VITE_APP_AUDIENCE': '"driver"', 'import.meta.env.VITE_API_ORIGIN': 'undefined' }, plugins: [{ name: 'native-fixture', setup(b) { b.onResolve({ filter: /^(@capacitor\/(core|app|browser|geolocation|push-notifications)|@clerk\/react)$/ }, args => ({ path: args.path, namespace: 'qa-native' })); b.onLoad({ filter: /.*/, namespace: 'qa-native' }, args => ({ contents: modules[args.path], loader: 'js' })); } }] });
+await build({ entryPoints: [path.join(root, 'artifacts/localeats/tests/background-browser.tsx')], outfile: path.join(target, 'app.js'), bundle: true, format: 'esm', platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"development"', 'import.meta.env.VITE_APP_AUDIENCE': '"driver"', 'import.meta.env.VITE_API_ORIGIN': 'undefined' }, plugins: [{ name: 'native-fixture', setup(b) { b.onResolve({ filter: /^(@capacitor\/(core|app|browser|geolocation|push-notifications)|@clerk\/react)$/ }, args => ({ path: args.path, namespace: 'qa-native' })); b.onLoad({ filter: /.*/, namespace: 'qa-native' }, args => ({ contents: modules[args.path], loader: 'js', resolveDir: path.join(root,'artifacts/localeats') })); } }] });
 const assets = path.join(root, 'artifacts/localeats/dist/public/assets');
 await writeFile(path.join(target, 'app.css'), await readFile(path.join(assets, (await readdir(assets)).find(f => f.endsWith('.css')))));
 const server = http.createServer(async (req, res) => { res.setHeader('Content-Type', req.url === '/app.js' ? 'text/javascript' : req.url === '/app.css' ? 'text/css' : 'text/html'); res.end(req.url === '/app.js' || req.url === '/app.css' ? await readFile(path.join(target, req.url.slice(1))) : '<html><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/app.css"><div class="roco-page"><div id="root" class="roco-main"></div></div><script type="module" src="/app.js"></script></html>'); });
@@ -51,6 +51,42 @@ try {
   await page.waitForFunction(() => window.bgRemovals.includes('watch-2'));
   assert.equal(await page.getByRole('complementary', { name: 'On-duty location status', exact: true }).count(), 0);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  // A timed-out enrollment must never save a late success in this/new session.
+  await page.goto(`http://127.0.0.1:${server.address().port}/?push=true`);
+  await page.clock.install();
+  await page.evaluate(()=>{window.pushPostDelay=true;});
+  await page.getByRole('button',{name:'Enable mobile push notifications',exact:true}).click();
+  await page.waitForFunction(()=>typeof window.finishPushEnrollment==='function');
+  await page.clock.fastForward(16000);
+  await page.getByRole('alert').filter({hasText:'registration timed out'}).waitFor();
+  await page.evaluate(()=>window.finishPushEnrollment());
+  await page.waitForTimeout(50);
+  assert.equal(await page.evaluate(()=>localStorage.getItem('rocoeats-push-device-id')),null,'A late registration acknowledgement cannot overwrite timeout/account state');
+  assert.equal(await page.evaluate(()=>window.pushPostAborted),true,'Deadline cancels the authenticated enrollment request');
+  await page.getByRole('button',{name:'Disable push for this device',exact:true}).click();
+  await page.getByRole('status').filter({hasText:'Push registration removed'}).waitFor();
+  assert.equal(await page.evaluate(()=>localStorage.getItem('rocoeats-push-pending-token')),null);
+  // A late native listener must be removed instead of registering after timeout.
+  await page.goto(`http://127.0.0.1:${server.address().port}/?push=true`);
+  await page.evaluate(()=>{window.pushListenerDelay=true;});
+  await page.getByRole('button',{name:'Enable mobile push notifications',exact:true}).click();
+  await page.waitForFunction(()=>typeof window.finishPushListener==='function');
+  await page.clock.fastForward(16000);
+  await page.getByRole('alert').filter({hasText:'registration timed out'}).waitFor();
+  await page.evaluate(()=>window.finishPushListener());
+  await page.waitForFunction(()=>window.pushListenersFinished===1);
+  assert.equal(await page.evaluate(()=>window.pushRegisterCalls||0),0,'Expired listeners cannot start native registration');
+  // Changing the active account cancels old enrollment before it can save state.
+  await page.goto(`http://127.0.0.1:${server.address().port}/?push=true`);
+  await page.evaluate(()=>{window.pushPostDelay=true;});
+  await page.getByRole('button',{name:'Enable mobile push notifications',exact:true}).click();
+  await page.waitForFunction(()=>typeof window.finishPushEnrollment==='function');
+  await page.evaluate(()=>{window.pushUserId='other-account-fixture';window.dispatchEvent(new Event('qa-push-account'));});
+  await page.waitForFunction(()=>window.pushPostAborted===true);
+  await page.evaluate(()=>window.finishPushEnrollment());
+  await page.waitForTimeout(50);
+  assert.equal(await page.evaluate(()=>localStorage.getItem('rocoeats-push-device-id')),null,'Old-account acknowledgement cannot attach to a new session');
+  console.log('PASS: enrollment deadlines and account changes abort pending requests, fence late responses/listeners, retain explicit unconfirmed opt-out and never fabricate registration success. Native/provider APIs mocked.');
   assert.deepEqual(errors, []);
   await page.screenshot({ path: path.join(target, 'background-consent.png'), fullPage: true });
   console.log('PASS: driver background consent defaults OFF, orphan watcher cleanup, upload, explicit stop/reset, no late upload and revoked-access shutdown. Simulated native bridge/API only; no real GPS, permission or provider operation.');
