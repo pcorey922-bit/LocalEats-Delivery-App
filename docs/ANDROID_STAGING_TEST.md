@@ -1,3 +1,19 @@
+## Driver emulator smoke (no authenticated account)
+
+Use the existing **Native validation and signed staging** workflow: target
+`android-smoke`, audience `driver`, APK run `44468084935` (v154/d0cf7b8, owner-tested).
+The workflow revision must include audience-aware smoke support. It validates the
+successful same-repository packaging run, exact artifact source/audience, checksum,
+owner public certificate and compiled staging manifest before installing bytes.
+Driver uses its own package/return scheme and safe signed-out entry/navigation/
+restart checks. Customer selection retains its guest/navigation checks. Neither
+flow starts browser approval, creates an account, submits an order or makes payment.
+
+Evidence is `RoCoEats-driver-Android-Emulator-QA` (or customer), with exact source,
+package, permission defaults, screenshots and crash checks. This is actual signed
+APK/emulator evidence, NOT physical Samsung, authenticated session, background GPS
+or push-delivery acceptance. No signature/key initialization is required.
+
 # Owner-controlled Android staging test
 
 ## Verified driver APK available — November 17

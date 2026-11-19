@@ -1,3 +1,31 @@
+## November 19 — owner-reported Samsung version 154 acceptance
+
+Owner physically tested signed Driver APK v154, source
+ d0cf7b88164e25b5962fea4d06f7e918e45e195c, on Samsung Galaxy S22 Ultra.
+Observed: update installed without uninstalling; dashboard rendered; owner/admin
+privileges recognized; availability controls appeared and reported online; offers
+loaded the normal empty state; previously completed test delivery appeared;
+restaurant/customer Google Maps buttons were visible; app reported successful
+foreground GPS upload; close/reopen restored dashboard without another sign-in;
+ACCOUNT_PROFILE_RESPONSE_INVALID_EMPTY did not recur during this test.
+This supersedes older failed/unverified auth/dashboard acceptance below. Do not
+repeat the resolved investigation without new regression evidence. These are owner
+observations, not independently inspected hosted permissions or GPS records.
+
+NOT verified: background/locked-screen GPS, actual push delivery, receipt of a live
+assignment, navigation app execution, full native delivery lifecycle, physical iOS.
+Existing completed $19.19 TEST order and financial records remain unchanged.
+
+Driver signed-APK smoke implementation completed: shared audience/source/input
+policy, strict same-repo successful packaging run, exact identity/hash and existing
+public certificate, compiled manifest validation; customer paths preserved, driver
+safe signed-out entry/deep links/navigation/restart and explicit evidence limits.
+No signing job/key/permission changes. Six offline policy tests, Python compilation,
+shell syntax, workflow YAML and actual version-154 source metadata selection PASS.
+Actual emulator run/CI pending: dispatch existing native-validation.yml target
+android-smoke, audience driver, apk_run 44468084935. This does not start auth or
+business operations. All ordering/live/municipal gates OFF.
+
 ## NEXT SESSION — accelerated completion plan, November 19, 2026
 
 Supersedes historical pending/build-next instructions below. Planning-only update;

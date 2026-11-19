@@ -230,11 +230,6 @@ jobs:
       contents: read
       actions: read
     steps:
-      - name: Keep the existing emulator fixture limited to its supported customer APK
-        if: inputs.audience == 'driver'
-        run: |
-          echo 'The existing emulator fixture targets customer APKs. Use documented owner-supervised driver device acceptance.' >&2
-          exit 1
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
@@ -244,12 +239,15 @@ jobs:
         env:
           APK_RUN: ${{ inputs.apk_run }}
           GH_TOKEN: ${{ github.token }}
+          APK_AUDIENCE: ${{ inputs.audience }}
         run: |
           [[ "$APK_RUN" =~ ^[0-9]+$ ]]
-          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$APK_RUN" --jq .conclusion)" = success
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$APK_RUN" > "$RUNNER_TEMP/rocoeats-smoke-source.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$APK_RUN/artifacts?per_page=100" > "$RUNNER_TEMP/rocoeats-smoke-artifacts.json"
+          python3 scripts/prepare-android-smoke.py source "$APK_AUDIENCE" "$RUNNER_TEMP/rocoeats-smoke-source.json" "$RUNNER_TEMP/rocoeats-smoke-artifacts.json"
       - uses: actions/download-artifact@v4
         with:
-          name: RoCoEats-Android-Staging-Test-APK
+          name: ${{ env.ROCOEATS_SMOKE_ARTIFACT }}
           path: smoke-input
           run-id: ${{ inputs.apk_run }}
           github-token: ${{ github.token }}
@@ -260,8 +258,10 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platform-tools' 'emulator' 'build-tools;36.0.0' 'system-images;android-35;google_apis;x86_64'
       - name: Verify the original APK digest and owner signature
         run: |
-          (cd smoke-input && sha256sum -c SHA256SUMS.txt)
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs smoke-input/RoCoEats-Android-Staging-Test.apk > "$RUNNER_TEMP/rocoeats-apk-cert.txt"
+          python3 scripts/prepare-android-smoke.py input "$ROCOEATS_SMOKE_AUDIENCE" smoke-input
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "smoke-input/$ROCOEATS_SMOKE_APK" > "$RUNNER_TEMP/rocoeats-apk-cert.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump xmltree "smoke-input/$ROCOEATS_SMOKE_APK" --file AndroidManifest.xml > "$RUNNER_TEMP/rocoeats-smoke-manifest.txt"
+          python3 scripts/staging_apk_policy.py "$ROCOEATS_SMOKE_AUDIENCE" "$RUNNER_TEMP/rocoeats-smoke-manifest.txt"
           grep -q 'certificate SHA-256 digest: f22e58f4da4e5d64f9ac5d4f0fc8abfe2595e395511552f7fb385205c7d18296' "$RUNNER_TEMP/rocoeats-apk-cert.txt"
       - name: Allow this isolated runner access to its virtualization device
         run: sudo setfacl -m "u:$(id -un):rw" /dev/kvm
@@ -270,7 +270,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: RoCoEats-Android-Emulator-QA
+          name: RoCoEats-${{ inputs.audience }}-Android-Emulator-QA
           path: android-smoke-evidence/
           if-no-files-found: warn
           retention-days: 14

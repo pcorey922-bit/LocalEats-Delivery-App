@@ -3,8 +3,12 @@ No accounts, auth tickets, guest capabilities, orders or payments are supplied.
 ADB is used only on this disposable CI emulator, never the owner's phone.
 """
 import json,os,pathlib,re,subprocess,time,xml.etree.ElementTree as ET
-package='com.rocoeats.app.staging'
-activity=package+'/com.rocoeats.app.MainActivity'
+from staging_apk_policy import verify_smoke_input
+audience=os.environ.get('ROCOEATS_SMOKE_AUDIENCE', 'customer')
+app=verify_smoke_input('smoke-input',audience,os.environ['ROCOEATS_SMOKE_SOURCE'])
+package=app['package']
+activity=app['activity']
+scheme=app['scheme']
 output=pathlib.Path('android-smoke-evidence');output.mkdir(exist_ok=True)
 results=[]
 runtime_permissions={}
@@ -47,7 +51,7 @@ def crash_check():
   assert 'Process: '+package+',' not in block,'Native app crash recorded'
 
 try:
- adb('logcat','-c');adb('install','--no-streaming',str(pathlib.Path('smoke-input/RoCoEats-Android-Staging-Test.apk').resolve()),timeout=90)
+ adb('logcat','-c');adb('install','--no-streaming',str((pathlib.Path('smoke-input')/app['apk']).resolve()),timeout=90)
  mark('signed staging package installed on Android emulator')
  package_info=shell('dumpsys','package',package)
  for permission in ['ACCESS_FINE_LOCATION','ACCESS_COARSE_LOCATION','POST_NOTIFICATIONS']:
@@ -55,23 +59,40 @@ try:
   runtime_permissions[permission]=matches[-1] if matches else 'not present in runtime permission state'
   assert 'true' not in matches,'Runtime permission granted before user consent: '+permission
  mark('location and notification runtime permissions are not pre-granted')
- launch();root=wait_text('01-launch','RoCoEats');root=wait_text('01-home','Find food')
- mark('real packaged application launched and rendered')
- tap(root,'Guest order');root=wait_text('02-guest','Use a private guest link')
- mark('private guest recovery UI reachable without account')
- # Cold-start links must recover into native browser sign-in, not an embedded Google WebView.
- shell('am','force-stop',package);launch('rocoeats://auth')
- root=wait_text('03-cold-auth','Sign in or create account in browser')
- mark('cold-start auth callback reaches system-browser sign-in control')
- launch('rocoeats://orders?role=admin')
- root=wait_text('04-untrusted-link','Sign in securely')
- mark('authority-bearing deep link cannot navigate into an account')
- tap(root,'Continue as Guest');root=wait_text('05-guest-checkout','Receipt email')
- mark('guest checkout contact form does not require registration')
- shell('am','force-stop',package);launch();wait_text('06-relaunch','Find food')
- mark('application relaunch succeeds')
+ if audience=='driver':
+  launch();root=wait_text('01-driver-launch','Sign in or create account in browser')
+  mark('real signed driver app reaches secure signed-out entry')
+  for name,uri in [('02-driver-cold-auth',scheme+'://auth'),('03-driver-order-link',scheme+'://orders'),('04-driver-untrusted-link',scheme+'://orders?role=admin'),('05-driver-malformed-link',scheme+'://auth/untrusted')]:
+   shell('am','force-stop',package);launch(uri)
+   root=wait_text(name,'Sign in or create account in browser')
+   text=labels(root)
+   for forbidden in ['Go online','Go offline','Administrator controls','Enable background location for this session']:
+    assert forbidden not in text,'Signed-out navigation exposed authenticated controls'
+   mark(name+' remains signed out without approval or role elevation')
+  tap(root,'Use a private guest link');root=wait_text('06-driver-navigation','Use a private guest link')
+  shell('input','keyevent','KEYCODE_BACK')
+  wait_text('07-driver-back','Sign in or create account in browser')
+  mark('driver signed-out navigation and back recover without starting authentication')
+  shell('am','force-stop',package);launch();wait_text('08-driver-relaunch','Sign in or create account in browser')
+  mark('driver relaunch restores safe signed-out state; no account supplied')
+ else:
+  launch();root=wait_text('01-launch','RoCoEats');root=wait_text('01-home','Find food')
+  mark('real packaged application launched and rendered')
+  tap(root,'Guest order');root=wait_text('02-guest','Use a private guest link')
+  mark('private guest recovery UI reachable without account')
+  # Cold-start links must recover into native browser sign-in, not an embedded Google WebView.
+  shell('am','force-stop',package);launch(scheme+'://auth')
+  root=wait_text('03-cold-auth','Sign in or create account in browser')
+  mark('cold-start auth callback reaches system-browser sign-in control')
+  launch(scheme+'://orders?role=admin')
+  root=wait_text('04-untrusted-link','Sign in securely')
+  mark('authority-bearing deep link cannot navigate into an account')
+  tap(root,'Continue as Guest');root=wait_text('05-guest-checkout','Receipt email')
+  mark('guest checkout contact form does not require registration')
+  shell('am','force-stop',package);launch();wait_text('06-relaunch','Find food')
+  mark('application relaunch succeeds')
  crash_check();mark('no native application crash found');completed=True
 finally:
- report={'completed':completed,'runtimePermissions':runtime_permissions,'package':package,'emulator':True,'physicalSamsung':False,'playProtectVerified':False,'authenticatedSignInVerified':False,'paymentTested':False,'checks':results}
+ report={'completed':completed,'runtimePermissions':runtime_permissions,'package':package,'source':app['source'],'audience':audience,'businessWritesPerformed':False,'emulator':True,'physicalSamsung':False,'playProtectVerified':False,'authenticatedSignInVerified':False,'paymentTested':False,'checks':results}
  (output/'results.json').write_text(json.dumps(report,indent=2))
 print(json.dumps({'passed':len(results),'emulator':True,'physicalDeviceVerified':False}))

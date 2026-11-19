@@ -1,3 +1,17 @@
+## November 19 — Samsung driver access accepted, next native gates
+
+Owner reports physical v154/d0cf7b8 dashboard, owner/admin recognition, availability
+controls/online status, offers empty state, historical delivery, navigation buttons,
+foreground GPS success indicator and close/reopen session restoration. Empty-profile
+error did not recur. Driver auth/access blocker is resolved for this observed test;
+do not repeat it. Background GPS, real push, live assignment receipt and native
+end-to-end delivery remain UNVERIFIED. iOS physical/signing acceptance remains open.
+
+Active independent task: extend existing signed Android smoke workflow to driver,
+without auth accounts, hosted writes or weakening signing. Then inspect confirmed
+background GPS and push gaps using existing implementation/tests. No deployments,
+financial operations, paid services or activation authorized by this work.
+
 ## November 19 — next independent implementation and launch priorities
 
 Current fix 4c44ab6 and checkpoint 06a378c each have all three CI workflows PASS.
