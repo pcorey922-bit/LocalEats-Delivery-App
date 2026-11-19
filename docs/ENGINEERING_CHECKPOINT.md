@@ -1,3 +1,40 @@
+## November 19 — timely visible native push policy and customer artifact
+
+Verified gaps: raw FCM Android payload omitted priority (normal may be deferred in
+Doze), and native config omitted foreground presentation (installed iOS plugin
+returns no presentation without it). New shared policy pairs user-visible FCM
+messages with HIGH priority, existing short TTL/dedup and a fixed delivery-update
+channel. After explicit notification permission, Android enrollment creates HIGH-
+importance PRIVATE-lockscreen channel before token registration. Customer/driver
+native configs request badge/sound/banner/list; iOS makes no Android channel call.
+User/system notification preferences remain authoritative; no delivery guarantee.
+
+FCM regression failed before change, three sender tests PASS after; consent/channel/
+registration-race browser suite PASS; production builds/typechecks PASS; generated
+Android AND iOS configs copied/verified for customer and driver. New config check
+runs after mobile:sync in existing native jobs. Actual FCM/APNs receipt remains
+unverified; no provider message, credential change or backend deployment occurred.
+Sources 16036c67bed0afbe52253047cfa1a14fd2a54561 (cancel) and
+ d16be5675aa29228008549f64b377ea03015a9a5 (Firebase handoff) each ALL THREE CI SUCCESS.
+
+Compatible CUSTOMER APK v165 built on existing signer, source d0cf7b88164e25b5962fea4d06f7e918e45e195c,
+run 44482969353 SUCCESS; artifact 14510280728 (RoCoEats-Android-Staging-Test-APK),
+expires December 19. Independent ZIP/GitHub digest, APP_IDENTITY, customer package
+com.rocoeats.app.staging, same public signing certificate, v2 signature report,
+APK digest and absence of driver service verified. APK SHA256:
+317cc7fa2009fb157cd1f28effd31fe520c2a00f12a0ef7428247a3f36c00fd4.
+Download https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44482969353/artifacts/14510280728
+It intentionally uses deployed-compatible recovery source, not newer main push/
+GPS features. Does not replace Driver; no Render deployment/migration 0029 needed.
+Customer physical installation/account/menu/guest/session acceptance NOT verified.
+No automatic payment/order/availability test. If browser shows the wrong existing
+account, do not approve; sign into intended customer browser account first.
+
+Next: inspect current exact CI; ready owner-only gates are customer device check,
+controlled background GPS, optional provider inputs/approved push backend migration,
+Apple provisioning/device and financial/territory/hosting acceptance. Do not reopen
+resolved Samsung auth or endlessly retry Pixel Launcher ANR. Keep all gates closed.
+
 ## November 19 — optional secure Android Firebase build handoff
 
 Confirmed missing build input: Gradle applies Google Services only if

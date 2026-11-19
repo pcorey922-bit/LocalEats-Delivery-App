@@ -1,3 +1,4 @@
+import pushPolicy from '../../../../config/native-push-policy.json';
 import { readNativeRequest } from './native-auth-request';
 import { mobileReturnRoute, mobileCallbackRoute } from "./mobile-return";
 import { readGuestToken } from "./guest-session";
@@ -42,6 +43,10 @@ export function registerPush(options: { signal?: AbortSignal } = {}): Promise<vo
     const permission = await PushNotifications.requestPermissions();
     signal.throwIfAborted();
     if (permission.receive !== 'granted') throw new Error('Notification permission was not granted');
+    if (platform === 'android') {
+      await PushNotifications.createChannel({...pushPolicy.androidChannel,importance:4,visibility:0,vibration:true});
+      signal.throwIfAborted();
+    }
     const appId = (await App.getInfo()).id;
     signal.throwIfAborted();
     timer = setTimeout(() => controller.abort(new Error('Device registration timed out. Registration is unconfirmed; retry or disable push for this device.')),15000);

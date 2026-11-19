@@ -1,3 +1,4 @@
+import pushPolicy from '../../../../config/native-push-policy.json';
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { generateKeyPairSync, verify } from "node:crypto";
@@ -54,10 +55,13 @@ test("FCM signs scoped OAuth assertions and shares cached access across concurre
     );
     const body = JSON.parse(String(init!.body));
     assert.equal(body.message.android.ttl, "300s");
+    assert.equal(body.message.android.priority, "HIGH", "User-visible delivery alerts must not default to Doze-delayed normal priority");
     assert.equal(
       body.message.android.collapse_key,
       body.message.data.notificationId,
     );
+    assert.equal(body.message.android.notification.channel_id,pushPolicy.androidChannel.id);
+    assert.ok(body.message.notification.title && body.message.notification.body,'High priority is paired with a user-visible alert, never silent polling');
     assert.ok(!JSON.stringify(body).includes("private_key"));
     sends++;
     return Response.json({ name: `projects/rocoeats-test/messages/${sends}` });

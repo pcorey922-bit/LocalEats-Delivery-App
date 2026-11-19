@@ -1,3 +1,16 @@
+## November 19 — native alert visibility configured, customer APK ready
+
+Actual policy gaps corrected: FCM user-visible messages request HIGH priority and
+shared channel; consent creates Android HIGH/PRIVATE channel; customer/driver iOS/
+Android foreground presentation configured. Sender/channel/browser/build/types and
+both generated native configurations PASS. No real provider receipt. Cancel and
+Firebase integration commits each have all three CI PASS. Current policy CI next.
+Customer compatible signed APK v165/d0cf7b8 ready (run 44482969353, artifact
+14510280728), independently source/cert/hash/package verified, physical customer
+acceptance pending. It excludes new main push/GPS and needs no backend deploy.
+Remaining gates need owner/provider/device/approved hosted access; no additional
+missing core workflow established. Exact owner steps/artifact links in checkpoint.
+
 ## November 19 — Firebase client build integration prepared
 
 Optional protected per-audience client JSON now has validation, private runner

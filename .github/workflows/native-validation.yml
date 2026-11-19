@@ -50,6 +50,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: node scripts/prepare-native-audience.mjs --github-env
       - run: pnpm --filter @workspace/localeats mobile:sync
+      - run: node scripts/verify-native-push-config.mjs
       - name: Install checksum-pinned official Gradle
         run: node scripts/install-native-gradle.mjs
       - name: Resolve Gradle dependencies with bounded transport retries
@@ -107,6 +108,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: node scripts/prepare-native-audience.mjs --github-env
       - run: pnpm --filter @workspace/localeats mobile:sync
+      - run: node scripts/verify-native-push-config.mjs
       - name: Resolve iOS packages with bounded transport retries
         run: bash ../../../scripts/retry-native-dependencies.sh xcodebuild -resolvePackageDependencies -project App/App.xcodeproj -scheme App -clonedSourcePackagesDirPath "$RUNNER_TEMP/rocoeats-ios-packages"
         working-directory: artifacts/localeats/ios
@@ -183,6 +185,7 @@ jobs:
         run: node scripts/prepare-firebase-android.mjs
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @workspace/localeats mobile:sync
+      - run: node scripts/verify-native-push-config.mjs
       - name: Restore signing key only into private runner temporary storage
         env:
           KEYSTORE: ${{ secrets.ROCOEATS_STAGING_KEYSTORE_BASE64 }}

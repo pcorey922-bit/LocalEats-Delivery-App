@@ -1,3 +1,4 @@
+import pushPolicy from '../../../../config/native-push-policy.json';
 import { createHash, createPrivateKey, sign } from "node:crypto";
 const tokenUrl = "https://oauth2.googleapis.com/token";
 const scope = "https://www.googleapis.com/auth/firebase.messaging";
@@ -95,9 +96,12 @@ export function createFcmSender(raw: string, transport: typeof fetch = fetch) {
             },
             data: { notificationId },
             android: {
+              // These messages always include a visible notification. Normal
+              // priority may wait for a Doze maintenance window and miss offers.
+              priority: 'HIGH',
               collapse_key: notificationId,
               ttl: "300s",
-              notification: { tag: notificationId },
+              notification: { tag: notificationId, channel_id: pushPolicy.androidChannel.id },
             },
           },
         }),
