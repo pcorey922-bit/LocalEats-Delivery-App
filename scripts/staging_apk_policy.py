@@ -89,3 +89,12 @@ def verify_firebase_resources(resources, config, package):
     assert selected['client_info']['android_client_info']['package_name'] == package, 'Firebase client package mismatch'
     assert 'google_app_id' in resources and selected['client_info']['mobilesdk_app_id'] in resources, 'Compiled Firebase app resource missing'
     assert 'project_id' in resources and config['project_info']['project_id'] in resources, 'Compiled Firebase project resource missing'
+
+
+def verify_driver_signed_out_entry(root):
+    """Dedicated driver entry must stay signed out and contain no customer paths."""
+    text = ' '.join(n.get('text', '') + ' ' + n.get('content-desc', '') for n in root.iter('node')).casefold()
+    for expected in ['RoCoEats Driver', 'Driver access', 'Sign in or create account in browser']:
+        assert expected.casefold() in text, 'Expected driver sign-in navigation missing'
+    for forbidden in ['Continue as Guest', 'Use a private guest link', 'Order as Guest', 'Go online', 'Go offline', 'Administrator controls', 'Enable background location for this session']:
+        assert forbidden.casefold() not in text, 'Signed-out driver entry exposed a foreign or authenticated control'

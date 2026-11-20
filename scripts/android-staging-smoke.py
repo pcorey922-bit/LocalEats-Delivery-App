@@ -3,7 +3,7 @@ No accounts, auth tickets, guest capabilities, orders or payments are supplied.
 ADB is used only on this disposable CI emulator, never the owner's phone.
 """
 import json,os,pathlib,re,subprocess,time,xml.etree.ElementTree as ET
-from staging_apk_policy import verify_smoke_input, parse_ui_hierarchy
+from staging_apk_policy import verify_smoke_input, parse_ui_hierarchy, verify_driver_signed_out_entry
 audience=os.environ.get('ROCOEATS_SMOKE_AUDIENCE', 'customer')
 app=verify_smoke_input('smoke-input',audience,os.environ['ROCOEATS_SMOKE_SOURCE'])
 package=app['package']
@@ -71,18 +71,17 @@ try:
  mark('location and notification runtime permissions are not pre-granted')
  if audience=='driver':
   launch();root=wait_text('01-driver-launch','Sign in or create account in browser')
-  mark('real signed driver app reaches secure signed-out entry')
+  verify_driver_signed_out_entry(root)
+  mark('real signed driver app reaches driver-only secure signed-out entry')
   for name,uri in [('02-driver-cold-auth',scheme+'://auth'),('03-driver-order-link',scheme+'://orders'),('04-driver-untrusted-link',scheme+'://orders?role=admin'),('05-driver-malformed-link',scheme+'://auth/untrusted')]:
    shell('am','force-stop',package);launch(uri)
    root=wait_text(name,'Sign in or create account in browser')
-   text=labels(root)
-   for forbidden in ['Go online','Go offline','Administrator controls','Enable background location for this session']:
-    assert forbidden not in text,'Signed-out navigation exposed authenticated controls'
+   verify_driver_signed_out_entry(root)
    mark(name+' remains signed out without approval or role elevation')
-  tap(root,'Use a private guest link');root=wait_text('06-driver-navigation','Use a private guest link')
-  shell('input','keyevent','KEYCODE_BACK')
-  wait_text('07-driver-back','Sign in or create account in browser')
-  mark('driver signed-out navigation and back recover without starting authentication')
+  tap(root,'RoCoEats Driver · Driver access')
+  root=wait_text('06-driver-navigation','Sign in or create account in browser')
+  verify_driver_signed_out_entry(root)
+  mark('driver entry navigation returns to secure sign-in without starting authentication')
   shell('am','force-stop',package);launch();wait_text('08-driver-relaunch','Sign in or create account in browser')
   mark('driver relaunch restores safe signed-out state; no account supplied')
  else:

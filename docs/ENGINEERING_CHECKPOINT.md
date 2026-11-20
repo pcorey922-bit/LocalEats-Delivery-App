@@ -1,3 +1,26 @@
+# November 20 — Driver187 verified; emulator expectation corrected
+
+Signed Driver version187, source3170b047861e1eb0035fd80ceb1c2d100bb22b07,
+workflow44701171498 SUCCESS. Artifact14612324985 exact ZIP digest, packaged source,
+APK checksum/package/manifest safeguards and protected v2 signing certificate checked.
+Retrieve from https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44701171498
+artifact RoCoEats-Driver-Android-Staging-Test-APK. No backend deployment required.
+Physical update/navigation acceptance still pending; v154 auth acceptance remains.
+
+Actual Android emulator44703441877 installed/launched Driver187, denied unauthenticated
+controls for cold/untrusted links, then failed because the old test tried the removed
+CUSTOMER guest link. This is a stale test expectation, not a driver app failure.
+Corrected smoke now requires dedicated driver identity, rejects guest/authenticated
+controls, and tests Driver access navigation back to safe sign-in. Nine APK-policy
+regressions and Python compilation PASS. Run the existing smoke against the SAME
+already verified Driver187 artifact; do not rebuild it or loosen app authorization.
+
+Customer startup correction d4b62acc29df60f0509d292f0e06709b0bbeb896 is pushed;
+three ordinary CI and optional iOS smoke44703368279 still pending at this writing.
+No hosted/provider/financial operations. Next: exact-SHA CI, actual iOS OCR/screens,
+corrected Driver emulator run, then protected corrected Customer APK and physical
+public startup/restart acceptance. Keep live76a24ed safeguards unchanged.
+
 # November 20 — customer native restart defect reproduced and corrected
 
 Actual simulator screenshots from run 44700216739/source3170b04 exposed a customer

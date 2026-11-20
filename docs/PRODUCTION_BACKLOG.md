@@ -1,3 +1,13 @@
+# November 20 — Driver187 artifact ready, Android smoke contract aligned
+
+Protected signed Driver187/source3170b04 hash/package/v2/certificate verified;
+run44701171498 artifact RoCoEats-Driver-Android-Staging-Test-APK. Emulator installed
+and passed secure links but its old guest-navigation expectation failed. Corrected
+smoke requires dedicated driver entry, rejects customer paths and authenticated
+controls, tests safe driver navigation. Nine policy tests PASS; actual corrected
+run next against same artifact. d4b62ac customer startup fix CI/iOS smoke pending.
+No backend deployment required for native changes; hosted safeguards untouched.
+
 # November 20 — customer native public-startup defect, not a physical acceptance pass
 
 Actual iOS restart screenshot exposed false NATIVE_STARTUP_TIMEOUT_RESTORING on a
