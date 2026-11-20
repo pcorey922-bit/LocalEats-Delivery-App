@@ -113,8 +113,8 @@ app.use("/api", (req, res, next) => {
   }
   next();
 });
-app.use("/api", privateStaging);
 app.use("/api", limitMutations);
+app.use("/api", privateStaging);
 app.use("/api", router);
 
 const errors: ErrorRequestHandler = (error, _req, res, _next) => {

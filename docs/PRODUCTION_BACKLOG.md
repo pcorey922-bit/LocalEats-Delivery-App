@@ -1,3 +1,12 @@
+# November 20 — proxy-aware abuse protection
+
+Render-chain rate identity, IPv6 /64 normalization, shared guest/native guards and
+atomic anonymous mutation limits implemented/tested. Express host/protocol remain
+untrusted. Readiness adds sanitized source signal for future approved hosted check;
+actual deployed chain unverified. Payout gate 36b14d3 pushed; no hosted changes.
+Next: assess driver GPS/arrival integrity without treating self-reported positions
+as proof, then bounded raw webhook PII retention with evidence/idempotency intact.
+
 # November 20 — recovered payout safety, proxy rate limits next
 
 Default-OFF TEST transfer admission/worker/provider gate implemented and tested;

@@ -1,3 +1,4 @@
+import { clientRateKey } from "./client-address";
 import { createHash } from "node:crypto";
 import { getAuth } from "@clerk/express";
 import type { Request, RequestHandler } from "express";
@@ -41,7 +42,7 @@ export async function guestRateLimit(
     );
 }
 export async function readGuest(req: Request) {
-  await guestRateLimit(`read-ip:${req.ip || req.socket.remoteAddress}`, 600);
+  await guestRateLimit(`read-ip:${clientRateKey(req)}`, 600);
   const token = req.header("X-RoCoEats-Guest-Token");
   if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token))
     throw new CommerceError(

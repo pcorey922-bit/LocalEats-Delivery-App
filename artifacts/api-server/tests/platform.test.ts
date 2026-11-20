@@ -143,6 +143,7 @@ before(async () => {
   process.env.NODE_ENV = "test";
   process.env.API_MUTATION_LIMIT_PER_MINUTE = "10000";
   process.env.ROCOEATS_TEST_PAYOUTS_ENABLED = "true";
+  process.env.API_ANONYMOUS_MUTATION_LIMIT_PER_MINUTE = "10000";
   delete process.env.STRIPE_SECRET_KEY;
   for (const file of (await readdir("../../lib/db/drizzle"))
     .filter((f) => f.endsWith(".sql"))
@@ -232,6 +233,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     delete process.env.STRIPE_WEBHOOK_SECRET;
     process.env.API_MUTATION_LIMIT_PER_MINUTE = "10000";
     process.env.ROCOEATS_TEST_PAYOUTS_ENABLED = "true";
+    process.env.API_ANONYMOUS_MUTATION_LIMIT_PER_MINUTE = "10000";
   });
   await t.test("closed payout gate rejects administrator requests without changing financial records", async () => {
     delete process.env.ROCOEATS_TEST_PAYOUTS_ENABLED;
@@ -258,6 +260,22 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       await assert.rejects(executeStripeOperation(before), /payouts are disabled/i);
     }
     await db.delete(financialOperationsTable).where(eq(financialOperationsTable.id,id));
+  });
+  await t.test("proxied native auth isolates real clients, ignores forged prefixes and caps anonymous mutations atomically", async () => {
+    const names=['RENDER','RENDER_EXTERNAL_URL','PUBLIC_APP_URL','ROCOEATS_PRIVATE_STAGING','PAYMENT_PROVIDER','API_ANONYMOUS_MUTATION_LIMIT_PER_MINUTE'];
+    const prior=Object.fromEntries(names.map(n=>[n,process.env[n]]));
+    Object.assign(process.env,{RENDER:'true',RENDER_EXTERNAL_URL:'https://localeats-delivery-app.onrender.com',PUBLIC_APP_URL:'https://localeats-delivery-app.onrender.com',ROCOEATS_PRIVATE_STAGING:'true',PAYMENT_PROVIDER:'stripe_test'});
+    const start=async(client:string,prefix='192.0.2.66')=>fetch(origin+'/api/mobile/auth/start',{method:'POST',headers:{'content-type':'application/json','x-forwarded-for':`${prefix}, ${client}, 172.64.1.2, 10.0.0.1`},body:JSON.stringify({challenge:'X'.repeat(43)})});
+    try {
+      for(let i=0;i<20;i++) assert.equal((await start('198.51.100.71',`192.0.2.${i+1}`)).status,201);
+      assert.equal((await start('198.51.100.71','192.0.2.200')).status,429);
+      assert.equal((await start('198.51.100.72')).status,201);
+      process.env.API_ANONYMOUS_MUTATION_LIMIT_PER_MINUTE='2';
+      const results=await Promise.all(Array.from({length:3},()=>start('198.51.100.73')));
+      assert.deepEqual(results.map(r=>r.status).sort(),[201,201,429]);
+      const blocked=await start('198.51.100.73','192.0.2.201');assert.equal(blocked.status,429);assert.ok(Number(blocked.headers.get('retry-after'))>0);
+      assert.equal((await start('198.51.100.74')).status,201);
+    }finally{for(const [name,value] of Object.entries(prior)) if(value===undefined)delete process.env[name];else process.env[name]=value;}
   });
   await t.test("public geocoding is owner-only, explicit, closed-gate and durable single-use across concurrent calls", async () => {
     const names = ["LOCALEATS_ADMIN_CLERK_USER_IDS", "ROCOEATS_PRIVATE_STAGING", "ROCOEATS_STAGING_TESTER_CLERK_USER_IDS", "ROCOEATS_ORDERING_ENABLED", "ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED", "PAYMENT_PROVIDER", "STRIPE_SECRET_KEY", "ROCOEATS_DELIVERY_AREA_MODE", "GEOCODIO_API_KEY", "ROCOEATS_GEOCODIO_PUBLIC_TEST_ENABLED"];

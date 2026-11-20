@@ -6,6 +6,7 @@ await mkdir("tmp", { recursive: true });
 const outputDirectory = await mkdtemp("tmp/tests-");
 try {
   for (const [name, entry] of [
+    ["client-address", "tests/client-address.test.ts"],
     ["dashboard-sections", "src/lib/dashboard-sections.test.ts"],
     ["order-lifecycle", "src/lib/order-lifecycle.test.ts"],
     ["guest-access-link", "tests/guest-access-link.test.ts"],

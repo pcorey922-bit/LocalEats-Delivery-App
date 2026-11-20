@@ -1,3 +1,36 @@
+# November 20 — Render rate-limit identity corrected
+
+Proxy finding reproduced with real local Express HTTP: default req.ip identical
+for different forwarded clients; guest create and native auth used that value.
+Anonymous mutation middleware also skipped unauthenticated callers. Fixed via one
+rate-only client identity helper: Render-assigned HTTPS service context, trusted
+private transport and pinned official Cloudflare ranges, bounded right-to-left
+chain, first untrusted public client. No trust-proxy=true/fixed hop assumption;
+forwarded Host/protocol/CF-Connecting-IP do not authorize identity or auth. Direct
+connections/unknown/malformed chains fall back to socket. IPv6 /64 buckets prevent
+privacy-address churn; stored database keys remain hashed.
+
+All guest/native IP guards share the helper; anonymous mutations now use atomic
+per-client buckets BEFORE private-staging admission, separate from per-user signed
+limits. Signed raw Stripe webhook remains before these middleware and unchanged.
+/readyz reports policy/source only, never IP/header contents; actual deployed
+forwarding topology remains UNVERIFIED until approved deployment and read-only
+inspection. If CDN anchor absent, fallback is safe but clients may share a bucket.
+Render's private network is an owner-controlled trust boundary; outside Render,
+forwarded identities are not trusted. Public ingress port is not directly exposed
+per Render docs. Sources checked 2026-11-20:
+https://render.com/articles/how-render-handles-ddos-attacks
+https://render.com/docs/web-services#port-binding
+https://www.cloudflare.com/ips-v4 and https://www.cloudflare.com/ips-v6
+https://expressjs.com/en/guide/behind-proxies/
+
+Local 220 app/API PASS, 1 PG-only skip; five focused client-address tests PASS
+including actual socket/protocol/host behavior; production build/types PASS.
+Existing 36b14d352d2a9a9ea38eaff7bf072ffa4e5d7d1a contains recovered payout fix.
+No deployment/settings/provider/financial operation performed. Next: driver GPS/
+arrival integrity targeted review and processed raw webhook PII retention, while
+preserving idempotency/evidence and requiring separate hosted cleanup approval.
+
 # November 20 — interrupted payout safety recovered
 
 Primary baseline 79c5e46bf3fcad7812fadb1ab0ab5f11a5d9ed62 equals remote;

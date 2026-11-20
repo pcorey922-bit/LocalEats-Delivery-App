@@ -1,3 +1,4 @@
+import { clientIpSource } from "../lib/client-address";
 import { testPayoutsEnabled } from "../lib/commerce-policy";
 import { databaseNow } from '../lib/database-clock';
 import { notificationPushDeadline, pushLifetime } from '../lib/push-expiry';
@@ -56,6 +57,8 @@ export const readiness: RequestHandler = async (_req, res) => {
       !process.env.ROCOEATS_DRAINING;
     res.status(ready ? 200 : 503).json({
       ready,
+      clientIpPolicy: "render-cdn-chain-v1",
+      clientIpSource: clientIpSource(_req),
       database: true,
       deliveryAreaReady: geographicDelivery.configurationReady,
       geographicDelivery,

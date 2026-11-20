@@ -1,3 +1,4 @@
+import { clientRateKey } from "../lib/client-address";
 import { randomBytes, randomUUID } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
@@ -53,7 +54,7 @@ async function mintGuest(
 router.post("/guest/sessions", async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   await guestRateLimit(
-    `create:${req.ip || req.socket.remoteAddress}`,
+    `create:${clientRateKey(req)}`,
     30,
     3600,
   );

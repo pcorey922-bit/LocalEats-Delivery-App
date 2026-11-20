@@ -1,3 +1,4 @@
+import { clientRateKey } from "./client-address";
 import { createHash } from "node:crypto";
 import type { RequestHandler } from "express";
 import { getAuth } from "@clerk/express";
@@ -9,16 +10,13 @@ export const limitMutations: RequestHandler = async (req, res, next) => {
     return;
   }
   const userId = getAuth(req).userId;
-  if (!userId) {
-    next();
-    return;
-  }
-  const configured = Number(process.env.API_MUTATION_LIMIT_PER_MINUTE ?? 120);
+  const identity = userId ? `user:${userId}` : `anonymous:${clientRateKey(req)}`;
+  const configured = Number((userId ? process.env.API_MUTATION_LIMIT_PER_MINUTE : process.env.API_ANONYMOUS_MUTATION_LIMIT_PER_MINUTE) ?? 120);
   if (!Number.isInteger(configured) || configured < 1 || configured > 10000)
     throw new Error("Invalid mutation rate limit configuration");
   const minute = Math.floor(Date.now() / 60000);
   const bucketKey = createHash("sha256")
-    .update(`${userId}:${minute}`)
+    .update(`${identity}:${minute}`)
     .digest("hex");
   const [bucket] = await db
     .insert(limits)

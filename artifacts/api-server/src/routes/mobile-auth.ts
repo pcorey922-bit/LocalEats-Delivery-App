@@ -1,3 +1,4 @@
+import { clientRateKey } from "../lib/client-address";
 import { orderingEnabled, privateTestOrderingEnabled } from "../lib/commerce-policy";
 import { Router } from "express";
 import { z } from "zod";
@@ -56,7 +57,7 @@ router.use("/mobile/auth", (req, res, next) => {
 });
 router.post("/mobile/auth/start", async (req, res) => {
   await guestRateLimit(
-    `mobile-start:${req.ip || req.socket.remoteAddress}`,
+    `mobile-start:${clientRateKey(req)}`,
     20,
     3600,
   );
@@ -126,7 +127,7 @@ router.post("/mobile/auth/approve", requireAuth, async (req, res) => {
 });
 router.post("/mobile/auth/redeem", async (req, res) => {
   await guestRateLimit(
-    `mobile-redeem:${req.ip || req.socket.remoteAddress}`,
+    `mobile-redeem:${clientRateKey(req)}`,
     300,
   );
   const { id, verifier } = z
