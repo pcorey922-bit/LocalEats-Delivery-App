@@ -90,6 +90,12 @@ jobs:
             PLAYWRIGHT_CORE_PATH="$RUNNER_TEMP/rocoeats-browser/node_modules/playwright-core" \
             CHROMIUM_PATH="$(command -v google-chrome)" \
             node scripts/verify-website-workflow.mjs
+      - name: Verify customer native public-route startup and guarded account recovery
+        run: |
+          ROCOEATS_NATIVE_BOOT_BROWSER=true ROCOEATS_NATIVE_BOOT_AUDIENCE=customer \
+            PLAYWRIGHT_CORE_PATH="$RUNNER_TEMP/rocoeats-browser/node_modules/playwright-core" \
+            CHROMIUM_PATH="$(command -v google-chrome)" \
+            node scripts/verify-website-workflow.mjs
       - name: Verify driver background consent and stop controls
         run: |
           PLAYWRIGHT_CORE_PATH="$RUNNER_TEMP/rocoeats-browser/node_modules/playwright-core" \

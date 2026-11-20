@@ -1,3 +1,16 @@
+# November 20 — customer native public-startup defect, not a physical acceptance pass
+
+Actual iOS restart screenshot exposed false NATIVE_STARTUP_TIMEOUT_RESTORING on a
+usable public customer page. Scoped READY reporting after loaded SDK/no handoff
+corrects the missing public-route completion signal; customer/driver browser guards,
+UI types/build and six smoke policy tests PASS. Optional simulator smoke now rejects
+error/blank/wrong-audience screenshots using offline Vision; macOS execution next.
+Process-only run44700216739 is PARTIAL/FAILED overall and its customer process pass
+is NOT UI acceptance. Driver signed build187/source3170b04 succeeded; verify artifact.
+Customer173 needs corrected replacement before physical acceptance. No deployment
+or hosted/provider/financial operation. Next: exact-SHA CI, existing iOS smoke and
+protected Customer build, then owner-only physical acceptance with distinct results.
+
 # November 20 — actual iOS evidence and native entry correction
 
 Driver simulator process/install/restart PASS, screenshots reviewed (manual run

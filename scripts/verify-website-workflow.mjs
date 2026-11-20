@@ -3,7 +3,7 @@ import { verifyMenuEditor } from './menu-editor-browser-checks.mjs';
 import { verifyMenuCategories } from './menu-category-browser-checks.mjs';
 import { verifyGuestService } from './guest-service-browser-checks.mjs';
 import { verifyPublicInformation } from './public-information-browser-checks.mjs';
-import { verifyNativeStartupBootstrap } from './native-startup-browser-checks.mjs';
+import { verifyNativeStartupBootstrap, verifyNativeCustomerStartup } from './native-startup-browser-checks.mjs';
 import { verifyDriverApp } from './driver-app-browser-checks.mjs';
 // Real website + API + migrated, disposable PGlite database. Only Clerk and
 // payment provider are simulated. This is NOT a Stripe TEST transaction.
@@ -24,6 +24,8 @@ await mkdir(apiTmp, { recursive: true });
 const backend = await mkdtemp(path.join(apiTmp, 'browser-'));
 let browser, server;
 const pages = [], browserErrors = [];
+const nativeAudience = process.env.ROCOEATS_NATIVE_BOOT_AUDIENCE || ((process.env.ROCOEATS_DRIVER_APP_BROWSER === 'true' || process.env.ROCOEATS_NATIVE_BOOT_BROWSER === 'true') ? 'driver' : 'customer');
+assert.ok(['customer','driver'].includes(nativeAudience));
 try {
   // Never inherit hosted credentials, database connections, or ordering windows.
   for (const key of ['TEST_DATABASE_URL', 'DATABASE_URL', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'CLERK_SECRET_KEY', 'ROCOEATS_PRIVATE_STAGING', 'LOCALEATS_ADMIN_CLERK_USER_IDS', 'ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS']) delete process.env[key];
@@ -36,7 +38,7 @@ try {
   await build({
     stdin: { contents: process.env.ROCOEATS_NATIVE_BOOT_BROWSER === 'true' ? `import './src/main.tsx';` : `import React from 'react'; import {createRoot} from 'react-dom/client'; import App from './src/App'; createRoot(document.getElementById('root')).render(<App/>);`, resolveDir: path.join(root, 'artifacts/localeats'), loader: 'tsx' },
     outfile: path.join(web, 'app.js'), bundle: true, platform: 'browser', format: 'esm', jsx: 'automatic', logLevel: 'silent', loader: { '.css': 'empty' },
-    define: { 'import.meta.env.VITE_DEMO_MODE': '"false"', 'import.meta.env.DEV': 'false', 'import.meta.env.VITE_APP_AUDIENCE': JSON.stringify((process.env.ROCOEATS_DRIVER_APP_BROWSER === 'true' || process.env.ROCOEATS_NATIVE_BOOT_BROWSER === 'true') ? 'driver' : 'customer'), 'process.env.NODE_ENV': '"development"', 'import.meta.env.BASE_URL': '"/"', 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': '"fixture"', 'import.meta.env.VITE_CLERK_PROXY_URL': 'undefined', 'import.meta.env.VITE_API_ORIGIN': 'undefined', 'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': 'undefined', 'import.meta.env.VITE_GOOGLE_MAPS_MAP_ID': 'undefined' },
+    define: { 'import.meta.env.VITE_DEMO_MODE': '"false"', 'import.meta.env.DEV': 'false', 'import.meta.env.VITE_APP_AUDIENCE': JSON.stringify(nativeAudience), 'process.env.NODE_ENV': '"development"', 'import.meta.env.BASE_URL': '"/"', 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': '"fixture"', 'import.meta.env.VITE_CLERK_PROXY_URL': 'undefined', 'import.meta.env.VITE_API_ORIGIN': 'undefined', 'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': 'undefined', 'import.meta.env.VITE_GOOGLE_MAPS_MAP_ID': 'undefined' },
     plugins: [{ name: 'test-only-clerk', setup(b) {
       b.onResolve({ filter: /^@\// }, args => b.resolve(path.join(root, 'artifacts/localeats/src', args.path.slice(2)), { kind: args.kind, resolveDir: root, namespace: 'file' }));
       b.onResolve({ filter: /^@capacitor\/core$/ }, () => ({ path: 'core', namespace: 'native-fixture-core' }));
@@ -90,7 +92,8 @@ try {
     return response.json();
   }
   if (process.env.ROCOEATS_NATIVE_BOOT_BROWSER === 'true') {
-    await verifyNativeStartupBootstrap({ actor, origin });
+    if(nativeAudience==='customer') await verifyNativeCustomerStartup({actor,origin});
+    else await verifyNativeStartupBootstrap({ actor, origin });
   } else if (process.env.ROCOEATS_DRIVER_APP_BROWSER === 'true') {
     await verifyDriverApp({ actor, api, origin });
   } else if (process.env.ROCOEATS_PUBLIC_INFO_ONLY === 'true') {

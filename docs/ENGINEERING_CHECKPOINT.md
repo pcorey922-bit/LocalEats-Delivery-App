@@ -1,3 +1,39 @@
+# November 20 — customer native restart defect reproduced and corrected
+
+Actual simulator screenshots from run 44700216739/source3170b04 exposed a customer
+restart NATIVE_STARTUP_TIMEOUT_RESTORING despite a usable public homepage. Process
+survival alone was insufficient evidence. Driver job failed at cold_launch; this
+run is PARTIAL/FAILED overall, not full iOS acceptance.
+
+Root cause: public customer routes had no profile request to signal READY after
+Clerk restoration. Router now completes startup only for loaded public customer
+routes with no pending native handoff. Private/driver guards, SDK/handoff deadlines,
+strict profile checks and authorization remain unchanged. Controlled-clock browser
+regression FAILED before correction, now PASS for customer public navigation/reload,
+stalled SDK, pending handoff and private-account timeout. Existing driver native
+bootstrap/account/session/retry regression PASS. UI typecheck/production build PASS;
+six simulator-policy tests and workflow YAML validation PASS.
+
+Optional iOS smoke now requires local Vision screenshot recognition of the expected
+signed-out audience entry after both launches; startup errors/blank/wrong-audience
+screens fail even if the app process survives. Recognized text is never logged or
+sent externally. Actual macOS compile/self-test and both-audience execution are next;
+Linux/offline fixtures do NOT establish iOS UI or physical acceptance.
+
+3170b047861e1eb0035fd80ceb1c2d100bb22b07 has all THREE ordinary CI SUCCESS.
+Signed Driver run44701171498/version187 SUCCESS; artifact/source/signature review
+in progress. This driver entry correction needs a native update, no backend deploy.
+Customer v173 must not be offered as a restart-accepted candidate: build replacement
+only after this startup correction passes exact-SHA CI. No hosted settings, database,
+permissions, provider, financial or deployment operation performed. Live76a24ed
+safeguards and owner-observed retention/ledger evidence remain as recorded below.
+
+Next: push correction, verify all-three CI, execute existing ios-smoke once on that
+source and inspect sanitized reports/screenshots; build corrected Customer staging
+APK using existing protected signer. Distinguish simulator process/UI from physical
+auth/background GPS/push/delivery acceptance. Never repeat the resolved v154 auth
+investigation, Geocodio calls or hosted financial actions.
+
 # November 20 — actual iOS smoke exposed dedicated-entry navigation gap
 
 589aaf4f8f8016f1e8b3f7c9237d2700c149c811 all THREE ordinary CI workflows SUCCESS.

@@ -109,6 +109,14 @@ def run_smoke(app, audience, source, output, run=execute, pause=time.sleep):
             if data[:8] != b'\x89PNG\r\n\x1a\n' or len(data) < 24 or min(struct.unpack('>II', data[16:24])) == 0:
                 raise SmokeFailure(phase + '_screenshot')
             report['checks'].append(phase + '_launch_process_survived_35_seconds_and_screenshot')
+            checker = [os.environ['ROCOEATS_IOS_IMAGE_CHECKER']] if os.environ.get('ROCOEATS_IOS_IMAGE_CHECKER') else ['swift', str(ROOT / 'scripts/verify-ios-smoke-image.swift')]
+            evidence = json.loads(run(phase + '_screen_content', checker + [str(screenshot), audience], timeout=60))
+            if not isinstance(evidence, dict):
+                raise SmokeFailure(phase + '_screen_content')
+            report.setdefault('screens', {})[phase] = {key: evidence.get(key) is True for key in ['uiVerified','startupErrorDetected','expectedEntryDetected','unexpectedCustomerPaths','ocrUnavailable']}
+            if evidence.get('uiVerified') is not True:
+                raise SmokeFailure(phase + '_screen_content')
+            report['checks'].append(phase + '_signed_out_screen_content')
             run(phase + '_terminate', ['xcrun', 'simctl', 'terminate', device, expected['id']])
     except SmokeFailure as error:
         failure = error
@@ -125,7 +133,7 @@ def run_smoke(app, audience, source, output, run=execute, pause=time.sleep):
         report['completed'] = failure is None
         if failure:
             report['failureStage'] = failure.stage
-        report['limits'] = 'Process survival and screenshots only. UI rendering needs screenshot review; no authentication, GPS, push, delivery lifecycle, signing or physical acceptance inferred.'
+        report['limits'] = 'Process survival and offline signed-out screenshot recognition only; no authentication, GPS, push, delivery lifecycle, signing or physical acceptance inferred.'
         (output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     if failure:
         raise failure

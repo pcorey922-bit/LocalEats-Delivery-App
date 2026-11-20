@@ -86,3 +86,22 @@ export async function verifyNativeStartupBootstrap({ actor, origin }) {
   console.log('PASS: actual native routes reject empty account responses, timeout/403 reads visibly, recover on explicit retry, route legacy Dashboard to Driver and restore controls after restart. Native/Clerk simulated.');
   console.log('PASS: actual native main bootstrap exits withheld-provider loading within 30 seconds; restored/restarted approved session reaches driver controls without auto-starting GPS. SDK/native simulated; no provider/device claim.');
 }
+
+
+export async function verifyNativeCustomerStartup({actor,origin}) {
+ for(const role of ['guest','customer']) {
+  const page=await actor(role);await page.context().addInitScript(()=>{window.qaNativeBootstrap=true;});await page.clock.install();
+  for(const path of ['/','/about','/restaurants']) {
+   await page.goto(origin+path);await page.waitForFunction(()=>!!document.querySelector('main'));
+   await page.clock.fastForward(31000);
+   assert.equal(await page.getByRole('alert').filter({hasText:'NATIVE_STARTUP_TIMEOUT'}).count(),0,'A usable public customer route must not fall back to a startup error');
+  }
+  await page.goto(origin);await page.reload();await page.getByText('Browse Restaurants & Menus',{exact:true}).waitFor();await page.clock.fastForward(31000);
+  assert.equal(await page.getByRole('heading',{name:'App startup did not finish',exact:true}).count(),0);
+  await page.close();
+ }
+ const loading=await actor('guest');await loading.context().addInitScript(()=>{window.qaNativeBootstrap=true;sessionStorage.setItem('qa-pending','1');window.qaAuthReady=false;});await loading.clock.install();await loading.goto(origin);await loading.getByRole('status').filter({hasText:'NATIVE_RESTORING'}).waitFor();await loading.clock.fastForward(31000);await loading.getByRole('alert').filter({hasText:'NATIVE_STARTUP_TIMEOUT_RESTORING'}).waitFor();
+ const pending=await actor('guest');await pending.context().addInitScript(()=>{window.qaNativeBootstrap=true;localStorage.setItem('rocoeats-native-auth:v1',JSON.stringify({id:'11111111-1111-4111-8111-111111111119',verifier:'V'.repeat(43),expiresAt:new Date(Date.now()+300000).toISOString(),phase:'waiting'}));});await pending.clock.install();await pending.goto(origin);await pending.getByRole('status').filter({hasText:'NATIVE_RESTORING'}).waitFor();assert.ok(await pending.evaluate(()=>localStorage.getItem('rocoeats-native-auth:v1')));await pending.clock.fastForward(31000);await pending.getByRole('alert').filter({hasText:'NATIVE_STARTUP_TIMEOUT_RESTORING'}).waitFor();
+ const privateAccount=await actor('customer');await privateAccount.context().addInitScript(()=>{window.qaNativeBootstrap=true;});await privateAccount.clock.install();await privateAccount.route('**/api/session/access',()=>{});await privateAccount.goto(origin+'/account/access');await privateAccount.getByRole('status').filter({hasText:'Checking account permissions'}).waitFor();await privateAccount.clock.fastForward(21000);await privateAccount.getByRole('alert').filter({hasText:'ACCOUNT_API_TIMEOUT'}).waitFor();
+ console.log('PASS: signed-out/signed-in customer public routes and restart survive startup budget; unresolved Clerk restoration remains bounded. Native/Clerk simulated; no order/payment submitted.');
+}

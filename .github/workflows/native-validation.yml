@@ -126,8 +126,15 @@ jobs:
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$plist")" = "$ROCOEATS_NATIVE_APP_NAME"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:0:CFBundleURLSchemes:0' "$plist")" = "$ROCOEATS_NATIVE_SCHEME"
           python3 scripts/verify-native-privacy.py ios "$ROCOEATS_NATIVE_AUDIENCE" "$plist"
+      - name: Compile offline screenshot verifier
+        if: inputs.target == 'ios-smoke'
+        run: |
+          xcrun swiftc scripts/verify-ios-smoke-image.swift -o "$RUNNER_TEMP/rocoeats-ios-image-check"
+          "$RUNNER_TEMP/rocoeats-ios-image-check" --self-test
       - name: Optional signed-out iOS simulator installation, launch and restart
         if: inputs.target == 'ios-smoke'
+        env:
+          ROCOEATS_IOS_IMAGE_CHECKER: ${{ runner.temp }}/rocoeats-ios-image-check
         run: python3 scripts/ios-simulator-smoke.py artifacts/localeats/ios/build/Build/Products/Debug-iphonesimulator/App.app "$ROCOEATS_NATIVE_AUDIENCE" "ios-smoke/$ROCOEATS_NATIVE_AUDIENCE"
       - uses: actions/upload-artifact@v4
         if: always() && inputs.target == 'ios-smoke'

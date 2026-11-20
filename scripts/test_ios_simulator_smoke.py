@@ -37,6 +37,8 @@ class SmokeTests(unittest.TestCase):
                 return 'com.rocoeats.driver: 12345\n'
             if stage.endswith('_process_alive'):
                 return '/Devices/' + DEVICE + '/Containers/Bundle/Application/fixture/App.app/App'
+            if stage.endswith('_screen_content'):
+                return json.dumps({'uiVerified': True, 'expectedEntryDetected': True})
             if stage.endswith('_screenshot'):
                 Path(args[-1]).write_bytes(b'\x89PNG\r\n\x1a\n' + bytes(8) + struct.pack('>II', 390, 844))
             return ''
@@ -97,6 +99,22 @@ class SmokeTests(unittest.TestCase):
                     with self.assertRaises(smoke.SmokeFailure):
                         smoke.run_smoke(self.fixture(root), 'driver', 'a' * 40, root / 'report', run, lambda _: None)
                     self.assertFalse(any(stage == 'install' for stage, _ in calls))
+
+    def test_live_process_does_not_accept_a_startup_error_screen(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, calls = Path(directory), []
+            original = self.runner(calls)
+            def run(stage, args, timeout=45):
+                if stage == 'restart_screen_content':
+                    return json.dumps({'uiVerified': False, 'startupErrorDetected': True})
+                return original(stage, args, timeout)
+            with self.assertRaises(smoke.SmokeFailure):
+                smoke.run_smoke(self.fixture(root, 'customer'), 'customer', 'a' * 40, root / 'report', run, lambda _: None)
+            report = json.loads((root / 'report/report.json').read_text())
+            self.assertFalse(report['completed'])
+            self.assertEqual(report['failureStage'], 'restart_screen_content')
+            self.assertTrue(report['screens']['restart']['startupErrorDetected'])
+            self.assertEqual(calls[-1][1], ['xcrun', 'simctl', 'delete', DEVICE])
 
     def test_runtime_selection_rejects_unavailable_or_incompatible_without_downloading(self):
         self.assertEqual(smoke.select_device(INVENTORY)[1], 'com.apple.CoreSimulator.SimDeviceType.iPhone-16')

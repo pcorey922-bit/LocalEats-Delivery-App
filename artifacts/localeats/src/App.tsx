@@ -314,6 +314,15 @@ function AccountAccessPage() {
 }
 
 function Router() {
+  const [path] = useLocation();
+  const { isLoaded } = useAuth();
+  // Public customer pages have no profile request to report completion. Resolve
+  // their SDK-restoration phase explicitly; private/driver and pending handoff
+  // phases keep their existing account-specific guards and deadline.
+  const publicCustomerPage = import.meta.env.VITE_APP_AUDIENCE !== 'driver' && (
+    ['/', '/about', '/how-it-works', '/support', '/faq', '/privacy', '/terms', '/restaurants', '/guest/order'].includes(path) || /^\/restaurants\/[^/]+$/.test(path)
+  );
+  useNativeStartup(isLoaded ? 'READY' : 'RESTORING', !!isLoaded, publicCustomerPage && !readNativeRequest());
   return <RoutedErrorBoundary><Switch>
     <Route path="/" component={import.meta.env.VITE_APP_AUDIENCE === 'driver' ? () => <Redirect to="/driver"/> : HomePage} />
     {['/about', '/how-it-works', '/support', '/faq', '/privacy', '/terms'].map(path => <Route key={path} path={path} component={InformationPage}/>)}
