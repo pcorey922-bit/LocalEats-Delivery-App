@@ -76,6 +76,7 @@ jobs:
         run: |
           python3 scripts/test_native_privacy.py
           python3 scripts/test_staging_apk_policy.py
+          python3 scripts/test_ios_simulator_smoke.py
       - name: Verify dedicated driver app shared UI and authorization
         timeout-minutes: 5
         run: |

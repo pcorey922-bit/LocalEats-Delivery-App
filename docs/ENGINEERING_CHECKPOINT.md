@@ -1,3 +1,19 @@
+# November 20 — optional iOS simulator process smoke prepared
+
+Existing iOS matrix now supports manual target ios-smoke for BOTH audiences.
+Uses public staging configuration/read-only native preflight; no signing credentials
+or provider setup. Validates compiled ID/name/scheme/source hash and public bundle
+settings, creates an available compatible temporary iPhone simulator, installs,
+cold launches, waits 35 seconds, captures screenshot, terminates/restarts and
+repeats. Only its own created simulator is deleted; no erase-all/permission/account/
+order/payment/UI-input actions. Sanitized source/binary-hash/report/screenshots are
+uploaded separately. Ordinary compile/signed Android jobs remain unchanged.
+Four offline tests (both audiences, identity/config rejection, failure cleanup,
+runtime availability) plus existing 2 privacy/8 APK policy tests and YAML syntax
+PASS. ACTUAL macOS simulator run still required; no iOS process/UI/physical/auth/
+background GPS/push acceptance claimed yet. Next: push and dispatch existing
+native-validation.yml target=ios-smoke, inspect actual stages and screenshots.
+
 # November 20, 07:39 UTC — staging 76a24ed independently verified
 
 Deployed full SHA 76a24ed542e85c42e8a85d42d59dfd3e20e46ead independently

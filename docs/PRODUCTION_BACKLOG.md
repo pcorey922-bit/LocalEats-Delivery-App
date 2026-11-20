@@ -1,3 +1,11 @@
+# November 20 — iOS execution gap being closed
+
+Optional ios-smoke target reuses existing matrix with public staging preflight,
+ephemeral simulator install/cold launch/restart and sanitized screenshot evidence.
+Offline policy/failure-cleanup tests PASS; actual macOS execution pending. Process
+survival is not UI/auth/physical acceptance. No signing, permissions, provider,
+financial, hosting or staging-data change. Continue with actual run evidence.
+
 # November 20 — hosted proxy and safeguards verified
 
 Hosted 76a24ed passes all 23 checks; actual render_cdn_chain observed, all ordering/

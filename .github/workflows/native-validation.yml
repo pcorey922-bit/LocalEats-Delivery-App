@@ -4,16 +4,16 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: Compile only, create staging APK, or initialize owner signing
+        description: Compile, create staging APK, run smoke checks, or initialize signing
         type: choice
-        options: [compile, staging, initialize-staging-signing, android-smoke]
+        options: [compile, staging, initialize-staging-signing, android-smoke, ios-smoke]
         default: compile
       apk_run:
         description: Successful signed staging APK run to test (android-smoke only)
         type: string
         default: "42583769896"
       audience:
-        description: Signed staging app (compile validates both; emulator smoke is customer-only)
+        description: Android staging/smoke audience (compile and iOS smoke validate both)
         type: choice
         options: [customer, driver]
         default: customer
@@ -88,7 +88,7 @@ jobs:
           name: ${{ matrix.audience == 'driver' && 'RoCoEats-Driver' || 'RoCoEats' }}-Android-debug-unconfigured
           path: artifacts/localeats/android/app/build/outputs/apk/debug/app-debug.apk
   ios:
-    if: github.event_name != 'workflow_dispatch' || inputs.target == 'compile'
+    if: github.event_name != 'workflow_dispatch' || inputs.target == 'compile' || inputs.target == 'ios-smoke'
     runs-on: macos-latest
     timeout-minutes: 30
     strategy:
@@ -105,6 +105,11 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: xcodebuild -version
+      - name: Prepare public private-staging configuration for optional simulator smoke
+        if: inputs.target == 'ios-smoke'
+        run: |
+          node scripts/prepare-native-staging.mjs --github-env
+          node scripts/verify-native-staging.mjs
       - run: pnpm install --frozen-lockfile
       - run: node scripts/prepare-native-audience.mjs --github-env
       - run: pnpm --filter @workspace/localeats mobile:sync
@@ -121,6 +126,16 @@ jobs:
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$plist")" = "$ROCOEATS_NATIVE_APP_NAME"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:0:CFBundleURLSchemes:0' "$plist")" = "$ROCOEATS_NATIVE_SCHEME"
           python3 scripts/verify-native-privacy.py ios "$ROCOEATS_NATIVE_AUDIENCE" "$plist"
+      - name: Optional signed-out iOS simulator installation, launch and restart
+        if: inputs.target == 'ios-smoke'
+        run: python3 scripts/ios-simulator-smoke.py artifacts/localeats/ios/build/Build/Products/Debug-iphonesimulator/App.app "$ROCOEATS_NATIVE_AUDIENCE" "ios-smoke/$ROCOEATS_NATIVE_AUDIENCE"
+      - uses: actions/upload-artifact@v4
+        if: always() && inputs.target == 'ios-smoke'
+        with:
+          name: RoCoEats-${{ matrix.audience }}-iOS-Simulator-Smoke
+          path: ios-smoke/${{ matrix.audience }}/
+          if-no-files-found: warn
+          retention-days: 30
       - run: ditto -c -k --keepParent artifacts/localeats/ios/build/Build/Products/Debug-iphonesimulator/App.app "$RUNNER_TEMP/RoCoEats-iOS-simulator.zip"
       - name: Validate unsigned iOS device release compilation
         run: xcodebuild -project App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -clonedSourcePackagesDirPath "$RUNNER_TEMP/rocoeats-ios-packages" -disableAutomaticPackageResolution -derivedDataPath release-build ROCOEATS_INFO_PLIST="$ROCOEATS_NATIVE_INFO_PLIST" ROCOEATS_APP_ID="$ROCOEATS_NATIVE_APP_ID" ROCOEATS_APP_NAME="$ROCOEATS_NATIVE_APP_NAME" ROCOEATS_URL_SCHEME="$ROCOEATS_NATIVE_SCHEME" CODE_SIGNING_ALLOWED=NO build
@@ -128,11 +143,11 @@ jobs:
       - run: ditto -c -k --keepParent artifacts/localeats/ios/release-build/Build/Products/Release-iphoneos/App.app "$RUNNER_TEMP/RoCoEats-iOS-release-unsigned.zip"
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.audience == 'driver' && 'RoCoEats-Driver' || 'RoCoEats' }}-iOS-release-unsigned-unconfigured
+          name: ${{ matrix.audience == 'driver' && 'RoCoEats-Driver' || 'RoCoEats' }}-iOS-release-unsigned-${{ inputs.target == 'ios-smoke' && 'staging' || 'unconfigured' }}
           path: ${{ runner.temp }}/RoCoEats-iOS-release-unsigned.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.audience == 'driver' && 'RoCoEats-Driver' || 'RoCoEats' }}-iOS-simulator-unconfigured
+          name: ${{ matrix.audience == 'driver' && 'RoCoEats-Driver' || 'RoCoEats' }}-iOS-simulator-${{ inputs.target == 'ios-smoke' && 'staging' || 'unconfigured' }}
           path: ${{ runner.temp }}/RoCoEats-iOS-simulator.zip
 
   initialize-staging-signing:
