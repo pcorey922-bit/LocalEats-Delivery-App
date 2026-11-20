@@ -187,3 +187,19 @@ test("Clerk proxy remains bypassed for private TEST credentials in production", 
     else process.env.CLERK_SECRET_KEY = previous.key;
   }
 });
+
+
+test('production Clerk proxy origin and client identity cannot be selected by forwarded headers',async()=>{
+ const prior={origin:process.env.PUBLIC_APP_URL,mode:process.env.NODE_ENV};
+ process.env.PUBLIC_APP_URL='https://app.example.test';process.env.NODE_ENV='production';
+ let observed:Record<string,unknown>={};
+ const upstream=http.createServer((req,res)=>{observed={proxy:req.headers['clerk-proxy-url'],ip:req.headers['x-forwarded-for']};res.end('ok');});
+ const upstreamPort=await listen(upstream),engine=createProxyServer({target:`http://127.0.0.1:${upstreamPort}`,selfHandleResponse:true});
+ const app=express();app.use(CLERK_PROXY_PATH,forwardClerkRequests('fixture-not-real',engine));const server=http.createServer(app),port=await listen(server);
+ try{
+  const response=await fetch(`http://127.0.0.1:${port}${CLERK_PROXY_PATH}/v1/client`,{headers:{host:'evil.example','x-forwarded-host':'evil.example','x-forwarded-proto':'http','x-forwarded-for':'192.0.2.66'}});
+  assert.equal(response.status,200);assert.equal(observed.proxy,'https://app.example.test'+CLERK_PROXY_PATH);assert.equal(observed.ip,'127.0.0.1');
+  delete process.env.PUBLIC_APP_URL;
+  assert.equal((await fetch(`http://127.0.0.1:${port}${CLERK_PROXY_PATH}/v1/client`)).status,503);
+ }finally{await close(server);await close(upstream);engine.close();for(const [name,value] of [['PUBLIC_APP_URL',prior.origin],['NODE_ENV',prior.mode]])if(value===undefined)delete process.env[name!];else process.env[name!]=value;}
+});

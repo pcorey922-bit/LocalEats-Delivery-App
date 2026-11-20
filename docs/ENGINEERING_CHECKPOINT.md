@@ -1,3 +1,16 @@
+# November 20 — Clerk proxy origin spoof corrected
+
+Local fake-upstream reproduction showed forged X-Forwarded-Host/Proto changed
+Clerk-Proxy-Url to http://evil.example/api/__clerk. Fixed production origin to
+protected PUBLIC_APP_URL; malformed/missing production origin refuses proxying
+before upstream contact. Caller Host/forwarded host/protocol cannot choose auth
+origin; upstream XFF uses validated rate-only client identity. Direct-host fallback
+is nonproduction only. Four focused compatibility/spoofing/bypass tests and API
+typecheck PASS. Mounted paths, cookies, gzip, bodyless responses, secret isolation
+and TEST-key production bypass preserved. No real Clerk/provider call or hosted
+change. Existing CSP already blocks inline script/object/framing and scopes Clerk/
+Stripe; no separately demonstrated CSP bypass established. Do not weaken it.
+
 # November 20 — Render rate-limit identity corrected
 
 Proxy finding reproduced with real local Express HTTP: default req.ip identical

@@ -1,3 +1,4 @@
+import { clientAddress } from "../lib/client-address";
 /**
  * Clerk Frontend API Proxy Middleware
  *
@@ -26,30 +27,22 @@ import { createProxyServer, type ProxyServer } from "httpxy";
 const CLERK_FAPI = "https://frontend-api.clerk.dev";
 export const CLERK_PROXY_PATH = "/api/__clerk";
 
-/**
- * Returns the first effective public hostname for the given request,
- * preferring x-forwarded-host over the Host header so callers behind a
- * proxy see the original client-facing host.
- *
- * x-forwarded-host can take three shapes:
- *   - undefined (no proxy involved)
- *   - a single string (one proxy hop)
- *   - a comma-delimited string when an upstream appended rather than
- *     replaced the header (Node folds duplicate headers this way), or a
- *     string[] in some Express typings
- * In the multi-value case, the leftmost value is the original client-
- * facing host. Take that one in all forms. Exported so that app.ts
- * (clerkMiddleware callback) and this proxy middleware agree on which
- * hostname is canonical — otherwise multi-domain/custom-domain flows
- * break.
- */
-export function getClerkProxyHost(req: {
-  headers: IncomingHttpHeaders;
-}): string | undefined {
-  const forwarded = req.headers["x-forwarded-host"];
-  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-  const firstHop = raw?.split(",")[0]?.trim();
-  return firstHop || req.headers.host?.trim() || undefined;
+// Authentication origin comes from protected deployment configuration, not
+// forwarded headers. TEST/dev without configuration may use the direct Host.
+function configuredClerkOrigin(): string | undefined {
+  try {
+    const url=new URL(process.env.PUBLIC_APP_URL || '');
+    if(url.username || url.password || url.pathname!=='/' || url.search || url.hash) return;
+    if(url.protocol!=='https:' && !(process.env.NODE_ENV!=='production' && url.protocol==='http:' && ['localhost','127.0.0.1','[::1]'].includes(url.hostname))) return;
+    return url.origin;
+  }catch{return;}
+}
+export function getClerkProxyHost(req: {headers:IncomingHttpHeaders}):string|undefined {
+  const origin=configuredClerkOrigin();if(origin)return new URL(origin).host;
+  if(process.env.NODE_ENV==='production' || process.env.PUBLIC_APP_URL) return;
+  const raw=req.headers.host;
+  if(typeof raw!=='string' || /[\s,/@?#]/.test(raw)) return;
+  try {const url=new URL('https://'+raw);return url.host.toLowerCase()===raw.toLowerCase()?url.host:undefined;}catch{return;}
 }
 
 export function clerkProxyMiddleware(): RequestHandler {
@@ -79,21 +72,11 @@ export function forwardClerkRequests(
   }),
 ): RequestHandler {
   proxy.on("proxyReq", (proxyReq, req) => {
-    const protocol = req.headers["x-forwarded-proto"] || "https";
-    const host = getClerkProxyHost(req) || "";
-    const proxyUrl = `${protocol}://${host}${CLERK_PROXY_PATH}`;
-
-    proxyReq.setHeader("Clerk-Proxy-Url", proxyUrl);
+    const origin=configuredClerkOrigin();
+    const host=getClerkProxyHost(req);
+    proxyReq.setHeader("Clerk-Proxy-Url", `${origin || 'https://'+host}${CLERK_PROXY_PATH}`);
     proxyReq.setHeader("Clerk-Secret-Key", secretKey);
-
-    const xff = req.headers["x-forwarded-for"];
-    const clientIp =
-      (Array.isArray(xff) ? xff[0] : xff)?.split(",")[0]?.trim() ||
-      req.socket?.remoteAddress ||
-      "";
-    if (clientIp) {
-      proxyReq.setHeader("X-Forwarded-For", clientIp);
-    }
+    proxyReq.setHeader("X-Forwarded-For", clientAddress(req));
   });
   // Clerk's dynamic Frontend API responses (/v1/environment, /v1/client,
   // JWKS, ...) arrive without a Content-Length, so relaying them would use
@@ -145,6 +128,9 @@ export function forwardClerkRequests(
     });
   });
   return async (req, res) => {
+    if (!getClerkProxyHost(req)) {
+      res.writeHead(503, {"content-length":"0"}).end();return;
+    }
     req.url = req.url.replace(/^\/api\/__clerk(?=\/|$)/, "");
     try {
       await proxy.web(req, res);
