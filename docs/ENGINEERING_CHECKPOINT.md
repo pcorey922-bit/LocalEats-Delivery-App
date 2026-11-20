@@ -1,3 +1,54 @@
+# November 20 — final acceptance checkpoint and safe release gates
+
+Current functional source **d2cae2c0f4d8337335c060c2cc67c3e7689525cd** is pushed
+on feature/rocoeats-launch-readiness. Validate push 44693512261 and Validate PR
+44693518910 SUCCESS; native matrix 44693518942 pending at writing (both iOS builds
+already SUCCESS). A CLI watcher hit GitHub HTTP 503; the underlying workflow was
+independently confirmed SUCCESS, not rerun. Earlier payout 36b14d3, proxy 8ef5f54,
+Clerk 83a5e86 and retention/arrival 9cd84ea each have all THREE CI SUCCESS.
+Final tooling/checkpoint commit requires its own exact-SHA CI; inspect actual
+conclusions before release, never infer from an empty/pending result.
+
+Staging verifier now REQUIRES render_cdn_chain when a new deployment advertises
+clientIpPolicy=render-cdn-chain-v1. Socket fallback/malformed/unknown source fails
+verification; legacy absent policy is explicitly unverified. Twelve local verifier/
+container tests PASS. No extra hosted requests/provider probes performed. This
+closes the verification gap without assuming an observed Render hop count.
+
+Completed source work: separately default-off TEST payout gate with in-flight ACK
+preservation; shared trusted-chain guest/native IP identity and anonymous mutation
+limits; protected Clerk proxy origin; default-off, matched-receipt checkout PII
+compaction preserving holds/idempotency; honest driver-arrival attestation/body
+validation; exact full provider reversal evidence. Final local 227 app/API PASS,
+one PG-only skip; full builds/types, four-role website and native bootstrap/driver
+browser checks PASS. Provider/payment/Clerk/native SDK tests remain simulations.
+No migrations introduced. Protected signing infrastructure/recovery branch/branding
+and historical order/financial records preserved. No Render deployment/settings,
+real provider send, financial operation, municipal activation or PR merge.
+
+Owner-only next gates:
+1. Review/approve a specific final verified SHA for existing Render staging; keep
+   configuration unchanged. No new variable is needed: test payouts and retention
+   default OFF if absent. Do NOT activate retention with routine deployment.
+2. After owner reports Live, engineer runs existing 23 read-only checks against full
+   SHA; require new clientIdentity.source=render_cdn_chain and testPayoutsEnabled=false,
+   closed ordering/live/municipal gates, health/CSP/native contracts. If source is
+   socket, STOP release acceptance and investigate actual forwarding topology via
+   owner-controlled access, without weakening trust or exhausting hosted buckets.
+3. Existing signed Driver v172/Customer v173 remain compatible; no new APK required
+   for these backend fixes. Physical customer/session and consented background GPS,
+   real push receipt (providers still unconfigured), iOS signing/device and full
+   native delivery lifecycle remain unverified. No repeat auth investigation.
+4. Real Stripe settlement/refund/dispute/payout evidence, full legal retention/
+   privacy/contact policy, geographic ground truth/activation and reliable hosting/
+   recovery require their existing owner/provider approvals. No financial retry.
+
+Next independent action: verify newest exact-SHA CI and repair any real regression.
+If green, respond to new physical/provider/hosted forwarding evidence. No further
+confirmed independent core defect remains after this targeted work; do not invent
+features, repeat broad audits, or spend time retrying the known emulator Launcher
+ANR/exhausted Geocodio test. All work must remain committed and branch clean.
+
 # November 20 — financial reversal evidence correction
 
 New confirmed defect: execution/read-only reconciliation accepted reversal IDs

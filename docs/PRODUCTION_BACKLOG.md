@@ -1,3 +1,20 @@
+# November 20 — focused defects completed, acceptance gates remain
+
+Functional d2cae2c0f4d8337335c060c2cc67c3e7689525cd pushed: payout/ACK safety,
+proxy-aware guest/native and anonymous limits, Clerk origin integrity, opt-in PII
+retention, honest arrival evidence, exact reversal recovery evidence. 227 local
+app/API PASS, one PG skip; production/types and website/native browser checks PASS.
+Payout/proxy/Clerk/retention commits all-three CI SUCCESS; reversal two Validate
+SUCCESS, native pending at writing. Final verifier additionally refuses to pass
+new hosted policy with socket fallback (12 tool tests PASS). Read exact-SHA CI.
+
+No migration/deployment/configuration/provider/financial operation. Retention and
+payout flags default OFF. Next owner-controlled gate is approved staging deployment
+then actual trusted-chain/readiness evidence; physical customer/background GPS,
+FCM/APNs inputs/real receipt, iOS signing/device, provider finance, geography/legal/
+hosting acceptance remain. No additional confirmed missing core workflow identified;
+continue on new evidence rather than speculative code or repeated auth audits.
+
 # November 20 — full reversal evidence enforced
 
 Mocked partial-reversal acceptance defect corrected in execution and reconciliation:

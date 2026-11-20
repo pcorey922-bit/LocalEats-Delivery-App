@@ -69,6 +69,10 @@ export async function verifyStaging(
   await check("dependency_health", async () => {
     readiness = await (await request("/readyz", [200, 503])).json();
     assert.equal(readiness.liveChargesEnabled, false);
+    if (Object.hasOwn(readiness, "clientIpPolicy")) {
+      assert.equal(readiness.clientIpPolicy, "render-cdn-chain-v1");
+      assert.equal(readiness.clientIpSource, "render_cdn_chain");
+    }
     if (Object.hasOwn(readiness, "testPayoutsEnabled")) assert.equal(readiness.testPayoutsEnabled, false);
     assert.equal(readiness.database, true);
     if (Object.hasOwn(readiness, "deliveryAreaReady"))
@@ -220,6 +224,10 @@ export async function verifyStaging(
         "testPayoutsEnabled",
       ].map((key) => [key, bool(readiness?.[key])]),
     ),
+    clientIdentity: readiness?.clientIpPolicy ? {
+      policy: readiness.clientIpPolicy === 'render-cdn-chain-v1' ? readiness.clientIpPolicy : null,
+      source: ['render_cdn_chain','socket'].includes(readiness.clientIpSource) ? readiness.clientIpSource : null,
+    } : null,
     geographicDelivery:
       readiness?.geographicDelivery &&
       typeof readiness.geographicDelivery === "object"

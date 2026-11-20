@@ -235,3 +235,14 @@ test('read-only verifier rejects open or malformed TEST payout gates and reports
   const legacy=await verifyStaging({origin,expectedRevision:expected},fixture().fetcher);
   assert.equal(legacy.readiness.testPayoutsEnabled,null);
 });
+
+
+test('new proxy policy requires actual CDN identity evidence; legacy deployment is explicitly unverified',async()=>{
+ for(const clientIpSource of ['socket','unknown',undefined]){
+  const report=await verifyStaging({origin,expectedRevision:expected},fixture({config:{clientIpPolicy:'render-cdn-chain-v1',clientIpSource}}).fetcher);
+  assert.equal(report.verificationPassed,false);assert.ok(report.failures.includes('dependency_health'));
+ }
+ const good=await verifyStaging({origin,expectedRevision:expected},fixture({config:{clientIpPolicy:'render-cdn-chain-v1',clientIpSource:'render_cdn_chain'}}).fetcher);
+ assert.equal(good.verificationPassed,true);assert.equal(good.clientIdentity.source,'render_cdn_chain');
+ const legacy=await verifyStaging({origin,expectedRevision:expected},fixture().fetcher);assert.equal(legacy.clientIdentity,null);
+});
