@@ -246,3 +246,16 @@ test('new proxy policy requires actual CDN identity evidence; legacy deployment 
  assert.equal(good.verificationPassed,true);assert.equal(good.clientIdentity.source,'render_cdn_chain');
  const legacy=await verifyStaging({origin,expectedRevision:expected},fixture().fetcher);assert.equal(legacy.clientIdentity,null);
 });
+
+
+test('retention gate is explicit, strict and sanitized; absent legacy evidence is never reported as disabled',async()=>{
+ for(const webhookRetentionEnabled of [true,'false','DO_NOT_ECHO']){
+  const report=await verifyStaging({origin,expectedRevision:expected},fixture({config:{webhookRetentionEnabled}}).fetcher);
+  assert.equal(report.verificationPassed,false);assert.ok(report.failures.includes('dependency_health'));assert.equal(JSON.stringify(report).includes('DO_NOT_ECHO'),false);
+ }
+ const closed=await verifyStaging({origin,expectedRevision:expected},fixture({config:{testPayoutsEnabled:false,webhookRetentionEnabled:false}}).fetcher);
+ assert.equal(closed.verificationPassed,true);assert.equal(closed.readiness.webhookRetentionEnabled,false);assert.deepEqual(closed.unverifiedSafeguards,[]);
+ const legacy=await verifyStaging({origin,expectedRevision:expected},fixture().fetcher);
+ assert.equal(legacy.readiness.webhookRetentionEnabled,null);assert.ok(legacy.unverifiedSafeguards.includes('webhook_retention_gate'));
+ assert.ok(legacy.unverifiedSafeguards.includes('test_payout_gate'));
+});

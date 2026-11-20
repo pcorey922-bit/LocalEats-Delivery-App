@@ -23,9 +23,12 @@ export function retainedCheckoutReceipt(payload:Record<string,unknown>,id:string
  for(const key of ['status','payment_status'])if(typeof obj[key]==='string' && ['complete','paid','unpaid','no_payment_required'].includes(obj[key] as string))retained[key]=obj[key];
  return {id,type:eventType,livemode:false,...(Number.isSafeInteger(payload.created)?{created:payload.created}:{}),data:{object:retained},rocoeatsRetention:{policy:'processed-checkout-30d-v1',compactedAt:compactedAt.toISOString(),payloadSha256:createHash('sha256').update(JSON.stringify(canonical(payload))).digest('hex')}};
 }
+export function webhookRetentionEnabled(env=process.env):boolean {
+ return env.ROCOEATS_WEBHOOK_RETENTION_ENABLED==='true';
+}
 // Explicit owner-approved opt-in only. No records are deleted, and no provider I/O.
 export async function compactProcessedCheckoutWebhooks(env=process.env) {
- if(env.ROCOEATS_WEBHOOK_RETENTION_ENABLED!=='true')return 0;
+ if(!webhookRetentionEnabled(env))return 0;
  const cutoff=new Date((await databaseNow()).getTime()-retentionMs);
  const eligible=(executor:Pick<typeof db,'select'>,id?:string)=>executor.select({event:inbox,orderId:ordersTable.id})
   .from(inbox)

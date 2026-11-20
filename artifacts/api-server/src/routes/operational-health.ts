@@ -1,3 +1,4 @@
+import { webhookRetentionEnabled } from "../lib/webhook-retention";
 import { clientIpSource } from "../lib/client-address";
 import { testPayoutsEnabled } from "../lib/commerce-policy";
 import { databaseNow } from '../lib/database-clock';
@@ -68,7 +69,8 @@ export const readiness: RequestHandler = async (_req, res) => {
       webhookReady,
       workerReady,
       liveChargesEnabled: false,
-    testPayoutsEnabled: testPayoutsEnabled(),
+      testPayoutsEnabled: testPayoutsEnabled(),
+      webhookRetentionEnabled: webhookRetentionEnabled(),
     });
   } catch {
     res
@@ -292,7 +294,7 @@ router.get("/admin/operational-health", requireAuth, async (req, res) => {
     workers,
     pushDeliveries,
     pushConfiguration: pushConfiguration(),
-    webhookRetentionEnabled: process.env.ROCOEATS_WEBHOOK_RETENTION_ENABLED === "true",
+    webhookRetentionEnabled: webhookRetentionEnabled(),
     observedAt: new Date(),
     liveChargesEnabled: false,
     testPayoutsEnabled: testPayoutsEnabled(),

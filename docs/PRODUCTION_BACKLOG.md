@@ -1,3 +1,16 @@
+# November 20 — hosted proxy and safeguards verified
+
+Hosted 76a24ed passes all 23 checks; actual render_cdn_chain observed, all ordering/
+live/TEST payout/municipal gates OFF, health/native/security contracts good.
+Owner confirms retention disabled, both push providers unconfigured, balanced
+ledger/zero missing payment baselines and no held webhook matches (owner evidence,
+not independent provider reconciliation). Public retention status gap corrected in
+source with shared effective helper and explicit unknown legacy reporting; targeted
+tests/build/types PASS. No urgent redeploy required, no hosted change performed.
+Next independent task: optional iOS simulator cold-launch/restart process smoke
+using existing matrix. Physical UI/auth/GPS/push/iOS signing/provider/financial/legal
+acceptance remain distinct and unverified. No native authentication re-investigation.
+
 # November 20 — focused defects completed, acceptance gates remain
 
 Functional d2cae2c0f4d8337335c060c2cc67c3e7689525cd pushed: payout/ACK safety,

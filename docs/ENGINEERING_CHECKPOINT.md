@@ -1,3 +1,42 @@
+# November 20, 07:39 UTC — staging 76a24ed independently verified
+
+Deployed full SHA 76a24ed542e85c42e8a85d42d59dfd3e20e46ead independently
+matched; all 23 read-only checks PASS. All-three exact-SHA CI SUCCESS (44694326325,
+44694326104, 44694318276). ACTUAL Render client identity source is render_cdn_chain,
+including read-only forged forwarding-prefix probe. Guest/native limits use the
+same helper; limits were NOT exhausted and no auth/order mutation was issued.
+Public/private/effective ordering, live charges, TEST payouts and municipal
+ enforcement OFF; Stripe TEST, DB/auth/pricing/webhook config/workers healthy.
+Fixed CSP/HSTS/native customer+driver contracts also PASS under forged host/proto.
+No new migration; hosted migration journal not directly queried. Clerk production
+forwarding remains TEST-key bypassed; origin protection is deployed-source/local-
+fake-upstream verified, not real production Clerk acceptance. Unsigned roles denied;
+actual signed-in workspace operations not repeated from an unauthenticated session.
+
+OWNER-OBSERVED authenticated Operations evidence: processed checkout retention
+DISABLED, TEST payouts DISABLED, Android+iOS push configuration required, balanced
+trial balance/zero missing payment baselines, no reconciliation-required webhook
+matches. Owner pressed no Verify/Retry/financial buttons. This is owner testimony,
+not an engineer-authenticated financial inspection or provider reconciliation.
+
+One verification gap corrected in source: public readiness lacked cleanup status.
+Public/admin status and worker now share the same pure effective-flag helper.
+Verifier rejects advertised enabled/malformed retention and explicitly reports
+legacy missing evidence as unverified, never false. Read-only status cannot run
+cleanup; regression snapshots inbox/audit state unchanged even with enabled flag
+in isolated fixture. 13 tooling tests, 103 relational API PASS/one PG-only skip,
+all typechecks and API production bundle PASS. No cleanup/configuration/deployment
+occurred. This small additive diagnostic update does NOT require an urgent repair
+deployment; publish only in a separately approved release. Current hosted retention
+closure is established by owner observation above.
+
+Next independently actionable native gap: existing iOS matrix compiles but never
+launches simulator apps. Extend same job with optional manual process-smoke target,
+validate identity/source, temporary simulator cold launch/restart/screenshots;
+no sign-in, permissions, background GPS, provider sends, orders or payments. Do not
+claim UI/auth/physical acceptance from process survival. Preserve signing/jobs and
+keep actual app/device/provider acceptance separately pending.
+
 # November 20 — final acceptance checkpoint and safe release gates
 
 Current functional source **d2cae2c0f4d8337335c060c2cc67c3e7689525cd** is pushed

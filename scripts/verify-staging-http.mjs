@@ -74,6 +74,7 @@ export async function verifyStaging(
       assert.equal(readiness.clientIpSource, "render_cdn_chain");
     }
     if (Object.hasOwn(readiness, "testPayoutsEnabled")) assert.equal(readiness.testPayoutsEnabled, false);
+    if (Object.hasOwn(readiness, "webhookRetentionEnabled")) assert.equal(readiness.webhookRetentionEnabled, false);
     assert.equal(readiness.database, true);
     if (Object.hasOwn(readiness, "deliveryAreaReady"))
       assert.equal(readiness.deliveryAreaReady, true);
@@ -222,8 +223,13 @@ export async function verifyStaging(
         "workerReady",
         "liveChargesEnabled",
         "testPayoutsEnabled",
+        "webhookRetentionEnabled",
       ].map((key) => [key, bool(readiness?.[key])]),
     ),
+    unverifiedSafeguards: [
+      ['testPayoutsEnabled','test_payout_gate'],
+      ['webhookRetentionEnabled','webhook_retention_gate'],
+    ].filter(([key])=>typeof readiness?.[key]!=='boolean').map(([,name])=>name),
     clientIdentity: readiness?.clientIpPolicy ? {
       policy: readiness.clientIpPolicy === 'render-cdn-chain-v1' ? readiness.clientIpPolicy : null,
       source: ['render_cdn_chain','socket'].includes(readiness.clientIpSource) ? readiness.clientIpSource : null,

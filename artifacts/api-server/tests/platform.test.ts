@@ -278,6 +278,19 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       assert.equal((await start('198.51.100.74')).status,201);
     }finally{for(const [name,value] of Object.entries(prior)) if(value===undefined)delete process.env[name];else process.env[name]=value;}
   });
+  await t.test("read-only retention status matches its effective gate without running cleanup or exposing configuration",async()=>{
+    const prior=process.env.ROCOEATS_WEBHOOK_RETENTION_ENABLED;
+    const inboxBefore=await db.select().from(webhookInboxTable),auditBefore=await db.select().from(auditLogsTable);
+    try{
+      for(const value of [undefined,'false','true','PRIVATE_BAD_FLAG']){
+        if(value===undefined)delete process.env.ROCOEATS_WEBHOOK_RETENTION_ENABLED;else process.env.ROCOEATS_WEBHOOK_RETENTION_ENABLED=value;
+        const response=await fetch(origin+'/readyz');const data=await response.json();
+        assert.equal(data.database,true);assert.equal(data.webhookRetentionEnabled,value==='true');assert.equal(JSON.stringify(data).includes('PRIVATE_BAD_FLAG'),false);
+        const health=await api('/admin/operational-health',ids.admin);assert.equal(health.status,200);assert.equal(health.data.webhookRetentionEnabled,data.webhookRetentionEnabled);
+      }
+      assert.deepEqual(await db.select().from(webhookInboxTable),inboxBefore);assert.deepEqual(await db.select().from(auditLogsTable),auditBefore);
+    }finally{if(prior===undefined)delete process.env.ROCOEATS_WEBHOOK_RETENTION_ENABLED;else process.env.ROCOEATS_WEBHOOK_RETENTION_ENABLED=prior;}
+  });
   await t.test("opt-in webhook retention removes only excess PII from settled processed checkout receipts and preserves idempotency",async()=>{
     const order=await create();await pay(order.id);
     const eventId='evt_retention_'+randomUUID(),sessionId='cs_test_'+randomUUID().replaceAll('-',''),old=new Date(Date.now()-31*86400000);
