@@ -1,3 +1,4 @@
+import { verifiedReversalReceipt, ReversalEvidenceError } from "./reversal-evidence";
 import { requireLaunchServiceArea } from './municipal-delivery';
 import { requireTelephoneAcceptance } from "./telephone-confirmation";
 import { databaseNow } from "./database-clock";
@@ -607,6 +608,11 @@ async function claimOperation(): Promise<FinancialOperation | null> {
   }
   return null;
 }
+async function expectedReversal(job: FinancialOperation) {
+  const [payout]=await db.select().from(payoutsTable).where(and(eq(payoutsTable.id,job.resourceId),eq(payoutsTable.orderId,job.orderId))).limit(1);
+  if(!payout || !Number.isSafeInteger(payout.amountCents) || payout.amountCents<=0 || !payout.providerTransferId || payout.providerTransferId!==job.payload.transferId) throw new ReversalEvidenceError();
+  return {amountCents:payout.amountCents,transferId:payout.providerTransferId,orderId:job.orderId,operationId:job.id};
+}
 export async function executeStripeOperation(
   job: FinancialOperation,
 ): Promise<OperationResult> {
@@ -715,12 +721,13 @@ export async function executeStripeOperation(
     return { id: result.id, status: result.status ?? "pending" };
   }
   if (job.kind === "reversal") {
+    const expected = await expectedReversal(job);
     const result = await stripe.transfers.createReversal(
       String(p.transferId),
       { metadata: { orderId: job.orderId, operationId: job.id } },
       { idempotencyKey: job.id },
     );
-    return { id: result.id, status: "succeeded" };
+    return verifiedReversalReceipt(result, expected);
   }
   const [payment] = await db
     .select()
@@ -1002,14 +1009,19 @@ async function readFinancialReceipt(
     if (matches.length === 1)
       result = { id: matches[0].id, status: matches[0].status ?? "pending" };
   } else if (job.kind === "reversal") {
+    const expected = await expectedReversal(job);
     const matches = [];
     for await (const reversal of stripe.transfers.listReversals(
       String(job.payload.transferId),
       { limit: 100 },
     ))
-      if (reversal.metadata?.operationId === job.id) matches.push(reversal);
+      if (reversal.metadata?.operationId === job.id) {
+        verifiedReversalReceipt(reversal, expected);
+        matches.push(reversal);
+        if(matches.length>1) break;
+      }
     if (matches.length === 1)
-      result = { id: matches[0].id, status: "succeeded" };
+      result = verifiedReversalReceipt(matches[0], expected);
   } else if (job.kind === "checkout") {
     // Bounded search: absence is not proof that the provider did nothing.
     let seen = 0;

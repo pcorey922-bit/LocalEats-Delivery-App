@@ -17,6 +17,7 @@ try {
     ["background-duty", "tests/background-duty.test.ts"],
     ["clerk-proxy", "tests/clerk-proxy.test.ts"],
     ["native-startup", "tests/native-startup.test.ts"],
+    ["reversal-evidence", "src/lib/reversal-evidence.test.ts"],
     ["push-expiry", "src/lib/push-expiry.test.ts"],
     ["native-push-app", "tests/native-push-app.test.ts"],
     ["navigation", "tests/navigation.test.ts"],

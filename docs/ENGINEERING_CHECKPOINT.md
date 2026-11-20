@@ -1,3 +1,48 @@
+# November 20 — financial reversal evidence correction
+
+New confirmed defect: execution/read-only reconciliation accepted reversal IDs
+without validating full amount, USD currency, transfer identity or committed
+order/operation metadata. Mocked SDK reproduction returned a partial reversal as
+success before fix (Missing expected rejection). Both paths now require exact
+receipt evidence against immutable committed payout amount/order/transfer. Expanded
+live transfer evidence, foreign/missing metadata, wrong IDs/currency and partial
+amounts fail closed into review, never fabricated full recovery. Existing request
+parameters/idempotency keys and historical operation payloads are unchanged.
+No provider transaction or hosted reconciliation was attempted.
+
+Final local validation: 227 app/API PASS / one PostgreSQL-only skip; types and
+production builds PASS. Four-role mobile website workflow (including paused hours,
+menus/modifiers, guest support/cancel, simulated payment, preparation, dispatch,
+pickup/handoff, balanced ledger and disabled payout controls) PASS. Native bootstrap
+and driver navigation/session-recovery browser regressions PASS; authentication,
+provider/native SDK behaviors simulated. No physical acceptance inferred.
+
+Verified earlier source CI: 36b14d352d2a9a9ea38eaff7bf072ffa4e5d7d1a payout and
+8ef5f5465ab0ff3504793418c9c7620e4a1352dc proxy each all THREE SUCCESS. Clerk
+83a5e869673be49f9a943fcc732a1e107276923e also all THREE SUCCESS. Retention/
+arrival 9cd84ea65207ffdf29d1bbd24750759003452dd7 CI pending last observation;
+check exact conclusions. Current reversal commit requires its own exact-SHA CI.
+All work on feature/rocoeats-launch-readiness, PR #1 remains unmerged.
+
+Owner gates: any Render deploy remains separately approved; no new migration is
+required for these fixes. Keep all current settings/gates unchanged. New payout
+flag defaults OFF if absent; retention defaults OFF and requires separate explicit
+policy/backup/activation approval. After approved deployment, inspect /readyz
+clientIpPolicy/clientIpSource (no IPs exposed), testPayoutsEnabled=false and closed
+ordering/live/municipal gates. Actual Render XFF chain is UNVERIFIED until that
+read-only source check; fallback is safe but may retain shared buckets. Do not claim
+an actual hosted proxy configuration change or confirmed per-client isolation yet.
+Driver v172/customer v173 physical checks, locked/background GPS, push credentials/
+real receipt, iOS signing/device, authorized Stripe settlement/refund/dispute/payout
+provider evidence, geographic acceptance and legal/hosting approval remain open.
+Neon recovery branch and completed $19.19 order/financial history untouched.
+
+Next independent action: inspect exact-SHA CI for newest commits; repair genuine
+failures. If green, use targeted new evidence/acceptance inputs rather than broad
+re-audits or speculative refactors. No further demonstrated independent core
+workflow defect remains in this focused investigation. Do not repeat exhausted
+Geocodio, resolved driver authentication, or emulator Launcher ANR investigations.
+
 # November 20 — webhook privacy retention and driver evidence
 
 Implemented opt-in ROCOEATS_WEBHOOK_RETENTION_ENABLED (default OFF, no hosted

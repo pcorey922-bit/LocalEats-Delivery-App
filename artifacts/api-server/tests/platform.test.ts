@@ -12,7 +12,7 @@ import { before, after, test } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
 import { randomUUID,createHash } from "node:crypto";
 import Stripe from "stripe";
-import { eq, sql, inArray } from "drizzle-orm";
+import { eq, sql, inArray, and } from "drizzle-orm";
 import app from "../src/app";
 import {
   engine,
@@ -61,7 +61,7 @@ import { fanOutPushNotifications, processPushDelivery } from "../src/lib/push";
 import { processWebhookInbox } from "../src/lib/webhook-worker";
 import { processPayoutProvisioning } from "../src/lib/payout-onboarding";
 import { executeStripeOperation, processFinancialOperation, reconcileFinancialOperation } from "../src/lib/financial-operations";
-import { postJournal, journalRefund } from "../src/lib/ledger";
+import { postJournal, journalRefund, journalTransfer } from "../src/lib/ledger";
 import { enqueueFinancialOperation } from "../src/lib/finance-queue";
 import { requireLockedDriverAccess } from "../src/lib/driver-access";
 const ids = {
@@ -313,6 +313,36 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       const untouched=await db.select().from(webhookInboxTable).where(sql`${webhookInboxTable.id} <> ${eventId}`);
       assert.ok(untouched.filter(e=>JSON.stringify(e.payload).includes('PRIVATE_EMAIL_FIXTURE')).length>=protectedEvents.length);
     }finally{delete process.env.ROCOEATS_WEBHOOK_RETENTION_ENABLED;await db.delete(webhookInboxTable).where(inArray(webhookInboxTable.id,protectedIds));}
+  });
+  await t.test("partial or mismatched provider reversals cannot fabricate full recovery receipts",async()=>{
+    await api('/driver/availability',ids.driver,'PUT',{available:true});
+    const order=await create();await ready(order.id);await api(`/driver/orders/${order.id}/claim`,ids.driver,'POST');await api(`/driver/orders/${order.id}/pickup`,ids.driver,'POST');
+    const code=await api(`/orders/${order.id}/delivery-code`,ids.customer,'POST');assert.equal((await api(`/driver/orders/${order.id}/deliver`,ids.driver,'POST',{code:code.data.code})).status,200);
+    const [payout]=await db.select().from(payoutsTable).where(and(eq(payoutsTable.orderId,order.id),eq(payoutsTable.kind,'restaurant')));
+    const transferId='tr_reversal_evidence_fixture';
+    await db.transaction(async tx=>{await journalTransfer(tx,payout);await tx.update(payoutsTable).set({providerTransferId:transferId,status:'paid'}).where(eq(payoutsTable.id,payout.id));});
+    const operationId=`reversal:${payout.id}`;
+    await db.transaction(tx=>enqueueFinancialOperation(tx,{id:operationId,orderId:order.id,kind:'reversal',resourceId:payout.id,payload:{transferId}}));
+    const [job]=await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.id,operationId));
+    const resource=(Stripe as any).resources.Transfers.prototype,originalCreate=resource.createReversal,originalList=resource.listReversals;
+    const [admin]=await db.select().from(profilesTable).where(eq(profilesTable.id,ids.admin));
+    const valid={id:'trr_evidence_fixture',transfer:transferId,amount:payout.amountCents,currency:'usd',metadata:{orderId:order.id,operationId}};
+    process.env.PAYMENT_PROVIDER='stripe_test';process.env.STRIPE_SECRET_KEY='sk_test_fixture';
+    let response:unknown={...valid,amount:payout.amountCents-1};let calls=0;
+    resource.createReversal=async()=>{calls++;return response;};
+    resource.listReversals=()=>({async *[Symbol.asyncIterator](){yield response;}});
+    try{
+      await assert.rejects(executeStripeOperation(job),/reversal.*match|reversal.*evidence/i);
+      await db.update(financialOperationsTable).set({state:'reconciliation'}).where(eq(financialOperationsTable.id,job.id));
+      const beforePayout=await db.select().from(payoutsTable).where(eq(payoutsTable.id,payout.id));
+      for(const patch of [{amount:payout.amountCents-1},{currency:'eur'},{transfer:'tr_wrong_fixture'},{metadata:{orderId:randomUUID(),operationId}}]) {
+        response={...valid,...patch};await assert.rejects(reconcileFinancialOperation(job.id,admin),/reversal.*match|reversal.*evidence/i);
+        assert.deepEqual(await db.select().from(payoutsTable).where(eq(payoutsTable.id,payout.id)),beforePayout);
+      }
+      response=valid;assert.deepEqual(await executeStripeOperation(job),{id:valid.id,status:'succeeded'});
+      const result=await reconcileFinancialOperation(job.id,admin);assert.ok(result);
+      const [saved]=await db.select().from(payoutsTable).where(eq(payoutsTable.id,payout.id));assert.equal(saved.status,'reversed');assert.equal(saved.providerReversalId,valid.id);assert.equal(calls,2);
+    }finally{resource.createReversal=originalCreate;resource.listReversals=originalList;await db.update(financialOperationsTable).set({state:'cancelled'}).where(eq(financialOperationsTable.id,job.id));}
   });
   await t.test("public geocoding is owner-only, explicit, closed-gate and durable single-use across concurrent calls", async () => {
     const names = ["LOCALEATS_ADMIN_CLERK_USER_IDS", "ROCOEATS_PRIVATE_STAGING", "ROCOEATS_STAGING_TESTER_CLERK_USER_IDS", "ROCOEATS_ORDERING_ENABLED", "ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED", "PAYMENT_PROVIDER", "STRIPE_SECRET_KEY", "ROCOEATS_DELIVERY_AREA_MODE", "GEOCODIO_API_KEY", "ROCOEATS_GEOCODIO_PUBLIC_TEST_ENABLED"];

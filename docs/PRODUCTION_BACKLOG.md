@@ -1,3 +1,16 @@
+# November 20 — full reversal evidence enforced
+
+Mocked partial-reversal acceptance defect corrected in execution and reconciliation:
+exact committed amount/USD/transfer/order/operation receipt required before recovery
+journals. Partial/foreign/live/missing evidence remains held; saved request bodies,
+idempotency and historical records unchanged. 227 local app/API PASS / one PG skip;
+full build/types and four-role/native browser regressions PASS. Exact pushed CI next.
+No provider transactions, deployment, activation or hosted changes. Remaining launch
+gates are physical/provider/legal/hosting/approved-release acceptance; actual Render
+client chain still needs read-only source verification after an approved deployment.
+All new cleanup/payout controls remain default OFF. Detailed exact continuation and
+owner actions in ENGINEERING_CHECKPOINT.md; no native rebuild currently required.
+
 # November 20 — processed checkout retention prepared, not activated
 
 Default-off, audited 30-day compaction for matched processed paid checkout receipts
