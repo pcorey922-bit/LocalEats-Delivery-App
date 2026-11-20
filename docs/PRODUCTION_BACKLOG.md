@@ -1,3 +1,18 @@
+# November 20 — actual iOS entry/restart and signed Android readiness
+
+BOTH iOS signed-out simulator cold/restart checks now PASS with offline screenshot
+recognition and visual review (44703368279/source d4b62ac); full ordinary CI PASS.
+Driver187 Android emulator ten checks PASS (44704067532), artifacts verified. Signed
+Customer193/source7559c7c build44704171924 verified protected signature/source/hash;
+physical acceptance pending. Corrected stale Customer smoke homepage expectations
+and added >35-second cold/restart stability checks; ten policy tests PASS. Actual
+Customer193 emulator and final exact-SHA CI next. No new APK build/backend deploy
+needed for test-only changes. Minor iOS customer logo/status-bar overlap recorded
+for later safe-area review, no homepage redesign. Owner acceptance/provider/signing/
+background GPS/push/finance/geographic/legal/hosting gates remain separate, no claim
+of launch readiness. All deployed safeguards preserved; owner-only phone steps and
+artifact links in ENGINEERING_CHECKPOINT.md. No hosted/provider/financial operation.
+
 # November 20 — Driver187 artifact ready, Android smoke contract aligned
 
 Protected signed Driver187/source3170b04 hash/package/v2/certificate verified;

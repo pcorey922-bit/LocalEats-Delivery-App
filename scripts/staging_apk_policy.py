@@ -98,3 +98,11 @@ def verify_driver_signed_out_entry(root):
         assert expected.casefold() in text, 'Expected driver sign-in navigation missing'
     for forbidden in ['Continue as Guest', 'Use a private guest link', 'Order as Guest', 'Go online', 'Go offline', 'Administrator controls', 'Enable background location for this session']:
         assert forbidden.casefold() not in text, 'Signed-out driver entry exposed a foreign or authenticated control'
+
+
+def verify_customer_home(root):
+    """Actual approved homepage, never the legacy shell navigation or recovery UI."""
+    text = ' '.join(n.get('text', '') + ' ' + n.get('content-desc', '') for n in root.iter('node')).casefold()
+    for expected in ['Good food', 'Sign In', 'Browse Restaurants & Menus']:
+        assert expected.casefold() in text, 'Expected customer homepage control missing'
+    assert 'native_startup_timeout' not in text and 'app startup did not finish' not in text, 'Customer startup recovery replaced homepage'

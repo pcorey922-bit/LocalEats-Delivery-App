@@ -4,7 +4,7 @@ import json
 import hashlib
 import tempfile
 from pathlib import Path
-from staging_apk_policy import staging_identity, verify_staging_manifest, smoke_identity, verify_smoke_source, verify_smoke_input, parse_ui_hierarchy, verify_firebase_resources, verify_driver_signed_out_entry
+from staging_apk_policy import staging_identity, verify_staging_manifest, smoke_identity, verify_smoke_source, verify_smoke_input, parse_ui_hierarchy, verify_firebase_resources, verify_driver_signed_out_entry, verify_customer_home
 
 class StagingApkPolicyTests(unittest.TestCase):
     def test_customer_default_stays_stable_and_wrong_audience_is_rejected(self):
@@ -22,6 +22,14 @@ class StagingApkPolicyTests(unittest.TestCase):
                 with self.assertRaises(AssertionError): verify_staging_manifest(source + unsafe, audience)
 
 class SignedSmokeSelectionTests(unittest.TestCase):
+    def test_customer_home_rejects_legacy_shell_or_startup_error(self):
+        valid = '<hierarchy><node text="Good food."/><node text="Sign In"/><node text="Browse Restaurants &amp; Menus"/></hierarchy>'
+        verify_customer_home(parse_ui_hierarchy(valid))
+        with self.assertRaises(AssertionError):
+            verify_customer_home(parse_ui_hierarchy('<hierarchy><node text="Find food Guest order"/></hierarchy>'))
+        with self.assertRaises(AssertionError):
+            verify_customer_home(parse_ui_hierarchy(valid.replace('</hierarchy>', '<node text="NATIVE_STARTUP_TIMEOUT_RESTORING"/></hierarchy>')))
+
     def test_driver_entry_rejects_customer_paths_and_unauthenticated_controls(self):
         valid = '<hierarchy><node text="RoCoEats Driver · Driver access"/><node text="Sign in or create account in browser"/></hierarchy>'
         verify_driver_signed_out_entry(parse_ui_hierarchy(valid))

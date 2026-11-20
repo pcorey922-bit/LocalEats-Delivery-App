@@ -3,7 +3,7 @@ No accounts, auth tickets, guest capabilities, orders or payments are supplied.
 ADB is used only on this disposable CI emulator, never the owner's phone.
 """
 import json,os,pathlib,re,subprocess,time,xml.etree.ElementTree as ET
-from staging_apk_policy import verify_smoke_input, parse_ui_hierarchy, verify_driver_signed_out_entry
+from staging_apk_policy import verify_smoke_input, parse_ui_hierarchy, verify_driver_signed_out_entry, verify_customer_home
 audience=os.environ.get('ROCOEATS_SMOKE_AUDIENCE', 'customer')
 app=verify_smoke_input('smoke-input',audience,os.environ['ROCOEATS_SMOKE_SOURCE'])
 package=app['package']
@@ -36,7 +36,7 @@ def wait_text(name,expected,attempts=18):
   if root is None:
    time.sleep(2);continue
   captured=True;text=labels(root)
-  if 'Something went wrong' in text:raise AssertionError('Application error boundary appeared; inspect anonymous screenshot')
+  if 'Something went wrong' in text or 'NATIVE_STARTUP_TIMEOUT' in text:raise AssertionError('Application error boundary or startup recovery appeared; inspect anonymous screenshot')
   if expected.casefold() in text.casefold():return root
   time.sleep(2)
  print('Anonymous emulator UI: '+re.sub(r'https?://\S+','[URL]',text)[:1000],flush=True)
@@ -85,9 +85,11 @@ try:
   shell('am','force-stop',package);launch();wait_text('08-driver-relaunch','Sign in or create account in browser')
   mark('driver relaunch restores safe signed-out state; no account supplied')
  else:
-  launch();root=wait_text('01-launch','RoCoEats');root=wait_text('01-home','Find food')
-  mark('real packaged application launched and rendered')
-  tap(root,'Guest order');root=wait_text('02-guest','Use a private guest link')
+  launch();root=wait_text('01-home','Browse Restaurants & Menus')
+  time.sleep(35);root=wait_text('01-home-stable','Browse Restaurants & Menus');verify_customer_home(root)
+  mark('real customer homepage survives startup deadline without recovery screen')
+  tap(root,'Sign In');root=wait_text('02-sign-in','Sign in or create account in browser')
+  tap(root,'Use a private guest link');root=wait_text('02-guest','Use a private guest link')
   mark('private guest recovery UI reachable without account')
   # Cold-start links must recover into native browser sign-in, not an embedded Google WebView.
   shell('am','force-stop',package);launch(scheme+'://auth')
@@ -98,8 +100,9 @@ try:
   mark('authority-bearing deep link cannot navigate into an account')
   tap(root,'Continue as Guest');root=wait_text('05-guest-checkout','Receipt email')
   mark('guest checkout contact form does not require registration')
-  shell('am','force-stop',package);launch();wait_text('06-relaunch','Find food')
-  mark('application relaunch succeeds')
+  shell('am','force-stop',package);launch();wait_text('06-relaunch','Browse Restaurants & Menus')
+  time.sleep(35);root=wait_text('06-relaunch-stable','Browse Restaurants & Menus');verify_customer_home(root)
+  mark('customer relaunch survives startup deadline without recovery screen')
  crash_check();mark('no native application crash found');completed=True
 finally:
  report={'completed':completed,'runtimePermissions':runtime_permissions,'package':package,'source':app['source'],'audience':audience,'businessWritesPerformed':False,'emulator':True,'physicalSamsung':False,'playProtectVerified':False,'authenticatedSignInVerified':False,'paymentTested':False,'checks':results}

@@ -1,3 +1,61 @@
+# November 20 — native acceptance checkpoint: actual simulator evidence preserved
+
+Functional customer startup d4b62acc29df60f0509d292f0e06709b0bbeb896 all THREE ordinary
+CI SUCCESS (44703367524/44703373477/44703373450). Actual macOS iOS smoke44703368279
+SUCCESS for BOTH audiences on iOS26.5: exact compiled identity/public staging bundle,
+install, cold launch/restart, 35-second process checks AND offline Vision acceptance.
+Artifacts customer14613704136/driver14613589734 source+ZIP digests verified; both
+cold/restart PNG pairs visually reviewed. Customer homepage remains visible after
+restart; driver sign-in has Driver access and no customer guest links. Report limits
+remain explicit: no auth/UI input/permissions/GPS/push/physical/financial acceptance.
+Minor customer iOS status-bar/logo overlap is visible; record for later safe-area
+review, not an authorization or startup failure. Approved homepage unchanged.
+
+Actual Android Driver187 emulator44704067532 SUCCESS: ten checks including install,
+signed-out driver navigation, cold/malformed/untrusted links, restart and no crash;
+no authenticated session or hosted business writes. Source3170b04, QA artifact
+14613239432 digest/report checked. Previous44703441877 failure was stale guest-link
+expectation, resolved in7559c7ceee9cd21580324fd420708bfc08f3afcc (nine policy tests).
+7559c7c both Validate workflows SUCCESS; native CI44704075248 pending at writing.
+
+Signed CUSTOMER193 run44704171924 SUCCESS, source7559c7ceee9cd21580324fd420708bfc08f3afcc.
+Artifact14613868537 RoCoEats-Android-Staging-Test-APK, exact ZIP/APK hashes/package/
+source/manifest and unchanged protected v2 certificate verified. This replaces173
+for physical startup acceptance. Driver187 remains valid; no rebuild needed.
+
+Customer emulator's old Find food/Guest order homepage expectations were also stale
+against the actual approved five-button page. Corrected to existing Sign In -> native
+sign-in -> guest recovery navigation; public homepage and restart must each survive
+35 seconds without startup recovery. Ten policy tests/Python compilation PASS.
+Next: run existing android-smoke once against CUSTOMER run44704171924, inspect real
+report/screenshots; verify final exact-SHA CI. No native/app/backend code changes in
+this test-only checkpoint, so193/187 artifacts remain valid across this commit.
+
+OWNER PHONE ACTION after final checks: open the linked workflow -> Artifacts ->
+RoCoEats-Android-Staging-Test-APK (customer193) or
+RoCoEats-Driver-Android-Staging-Test-APK (driver187), extract ZIP and install APK as
+UPDATE without uninstalling existing data. Customer: leave homepage visible >35s,
+browse, sign in to existing customer, close/reopen and verify session/account/cart
+reads. Driver: verify existing session/dashboard/menu and restart; no availability
+changes, order/payment/financial/GPS/push tests requested. No Render deploy required.
+Customer link: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44704171924
+Driver link: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44701171498
+
+Current deployed76a24ed: all23 checks PASS, actual render_cdn_chain observed, ordering/
+live/TEST payout/municipal gates closed, Stripe TEST, health/DB/native/CSP/HSTS good.
+Retention closure/ledger/push status is OWNER-OBSERVED evidence as recorded below.
+No hosted change/deployment/provider/financial operation or migration performed.
+No urgent backend deployment required; optional additive retention readiness status
+can ship only in a separately approved release. Recovery branch/stashes preserved.
+
+Remaining OWNER/PROVIDER gates: physical customer193/driver187 acceptance (v154
+successful auth evidence preserved), background/locked GPS, real push/configuration,
+authenticated iOS/signing/device, authorized Stripe provider settlement/reconciliation,
+municipal accuracy/activation, legal/business/hosting backup acceptance. Do NOT
+repeat provider calls or resolved native response-reader investigation. Once current
+smoke is complete, no other confirmed missing core workflow is established; next
+software-only task should follow concrete new acceptance evidence, not speculation.
+
 # November 20 — Driver187 verified; emulator expectation corrected
 
 Signed Driver version187, source3170b047861e1eb0035fd80ceb1c2d100bb22b07,
