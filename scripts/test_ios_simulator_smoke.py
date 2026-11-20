@@ -79,6 +79,25 @@ class SmokeTests(unittest.TestCase):
                 self.assertFalse(report['completed']); self.assertEqual(report['failureStage'], stage)
                 self.assertEqual(calls[-1][1], ['xcrun', 'simctl', 'delete', DEVICE])
 
+    def test_inconclusive_bootstatus_requires_owned_booted_device_and_real_install_checks(self):
+        for state in ('Booted', 'Shutdown'):
+            with tempfile.TemporaryDirectory() as directory:
+                root, calls = Path(directory), []
+                original = self.runner(calls, 'boot_ready')
+                def run(stage, args, timeout=45):
+                    if stage == 'verify_booted_device':
+                        return json.dumps({'devices': {'runtime': [{'udid': DEVICE, 'state': state, 'isAvailable': True}]}})
+                    return original(stage, args, timeout)
+                if state == 'Booted':
+                    report = smoke.run_smoke(self.fixture(root), 'driver', 'a' * 40, root / 'report', run, lambda _: None)
+                    self.assertTrue(report['completed'])
+                    self.assertEqual(report['bootCompletionSignal'], 'booted_state_then_install_and_launch')
+                    self.assertTrue(any(stage == 'install' for stage, _ in calls))
+                else:
+                    with self.assertRaises(smoke.SmokeFailure):
+                        smoke.run_smoke(self.fixture(root), 'driver', 'a' * 40, root / 'report', run, lambda _: None)
+                    self.assertFalse(any(stage == 'install' for stage, _ in calls))
+
     def test_runtime_selection_rejects_unavailable_or_incompatible_without_downloading(self):
         self.assertEqual(smoke.select_device(INVENTORY)[1], 'com.apple.CoreSimulator.SimDeviceType.iPhone-16')
         with self.assertRaises(smoke.SmokeFailure):

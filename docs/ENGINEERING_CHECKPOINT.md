@@ -1,3 +1,34 @@
+# November 20 — actual iOS smoke exposed dedicated-entry navigation gap
+
+589aaf4f8f8016f1e8b3f7c9237d2700c149c811 all THREE ordinary CI workflows SUCCESS.
+Manual iOS smoke 44698220337 is PARTIAL/FAILED overall: driver on iOS-26-5 installed,
+cold-launched and restarted with 35-second process survival/screenshots; customer
+failed auxiliary boot_ready wait BEFORE app installation. Both fresh simulator
+resources cleaned up. Driver evidence artifact 14612261757, customer failure report
+14611408280; source/digest/identity checked and driver screenshots visually reviewed.
+Cold image partly obscured by OS welcome notification; restart image shows sign-in.
+No authenticated/physical/GPS/push/delivery acceptance inferred.
+
+Actual driver screenshot showed generic Home + customer guest-checkout links on
+native sign-in. Minimal audience-only correction: Driver access link and no guest
+links for driver builds; customer Home/guest paths remain. Browser regression failed
+before fix, now dedicated-driver role/recovery and customer checkout/guest-entry
+checks PASS, UI types/production build PASS. Authentication/roles/session state are
+unchanged. Native binary update will be needed to display this UI correction;
+no Render deployment is required for it.
+
+CoreSimulator correction does NOT extend timeout: on inconclusive bootstatus, only
+this owned simulator with observed Booted/isAvailable state may proceed to actual
+bounded installation/launch/process/screenshot checks. Unknown/Shutdown states fail.
+Five offline tests PASS, including fallback guard and failure cleanup. One new
+actual smoke run is warranted for this concrete change; do not blindly repeat the
+old failed run or claim customer launch until actual evidence succeeds.
+
+Next: push this tested fix, run exact-SHA CI + existing ios-smoke target, review both
+artifacts. Preserve current live 76a24ed verified safeguards, owner-observed retention/
+ledger/push evidence and no hosted changes. Retention-status ea82e2f all-three CI
+SUCCESS; additive public diagnostic remains undeployed and nonurgent.
+
 # November 20 — optional iOS simulator process smoke prepared
 
 Existing iOS matrix now supports manual target ios-smoke for BOTH audiences.

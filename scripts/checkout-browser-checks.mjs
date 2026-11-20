@@ -2,6 +2,12 @@ import assert from 'node:assert/strict';
 
 // Actual website + API + disposable relational DB; no order or payment submitted.
 export async function verifyCheckout({ actor, origin, ids }) {
+  const nativeSignedOut = await actor('guest');
+  await nativeSignedOut.context().addInitScript(() => { window.qaNativeBootstrap = true; });
+  await nativeSignedOut.goto(origin + '/sign-in');
+  await nativeSignedOut.getByRole('link',{name:'RoCoEats · Home',exact:true}).waitFor();
+  for(const name of ['Continue as Guest','Use a private guest link']) await nativeSignedOut.getByRole('link',{name,exact:true}).waitFor();
+  await nativeSignedOut.close();
   // Touch-enabled Chromium, real queries and API. Clerk identity remains simulated.
   for (const failure of [503, 'network', 401]) {
     const recovery = await actor('customer');

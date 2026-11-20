@@ -1,3 +1,14 @@
+# November 20 — actual iOS evidence and native entry correction
+
+Driver simulator process/install/restart PASS, screenshots reviewed (manual run
+44698220337/source589aaf4); customer blocked before install at boot_ready, NOT an
+application failure. Actual driver UI exposed customer guest links on dedicated
+native sign-in: corrected with driver-only entry, customer paths preserved. Local
+customer/driver browser checks, build/types and five smoke tests PASS. Guarded OS
+Booted-state fallback now still requires real install/launch; actual rerun next.
+No hosted deployment/settings/cleanup/provider/financial operation. Physical iOS/
+auth/GPS/push/native lifecycle remain unverified; no acceptance from process alone.
+
 # November 20 — iOS execution gap being closed
 
 Optional ios-smoke target reuses existing matrix with public staging preflight,

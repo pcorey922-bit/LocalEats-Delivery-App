@@ -6,6 +6,12 @@ export async function verifyDriverApp({ actor, api, origin }) {
   const signedOut = await actor('guest');
   await signedOut.goto(origin);
   await signedOut.waitForURL(url => url.pathname === '/sign-in' && url.searchParams.get('join') === 'driver');
+  const nativeSignedOut = await actor('guest');
+  await nativeSignedOut.context().addInitScript(() => { window.qaNativeBootstrap = true; });
+  await nativeSignedOut.goto(origin + '/sign-in?join=driver');
+  await nativeSignedOut.getByRole('button', {name:'Sign in or create account in browser',exact:true}).waitFor();
+  await nativeSignedOut.getByRole('link', {name:'RoCoEats Driver · Driver access',exact:true}).waitFor();
+  for(const name of ['Continue as Guest','Use a private guest link']) assert.equal(await nativeSignedOut.getByRole('link',{name,exact:true}).count(),0);
   const driver = await actor('driver');
   await driver.goto(origin);
   await driver.waitForURL(origin + '/driver');

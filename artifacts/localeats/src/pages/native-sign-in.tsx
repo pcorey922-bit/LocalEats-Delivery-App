@@ -12,6 +12,7 @@ const encoded = (v: Uint8Array) =>
     .replace(/\+/g, "-")
     .replace(/\//g, "_");
 export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; checkout?: boolean } = {}) {
+  const driverApp = import.meta.env.VITE_APP_AUDIENCE === 'driver';
   const [pending, setPending] = useState<NativeRequest | null>(readNativeRequest),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -141,7 +142,7 @@ export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; chec
   return (
     <main className="roco-main">
       <section className="roco-card">
-        <Link href="/">RoCoEats · Home</Link>
+        <Link href={driverApp ? "/driver" : "/"}>{driverApp ? "RoCoEats Driver · Driver access" : "RoCoEats · Home"}</Link>
         <h1>Sign in securely</h1>
         <p>
           Google and account creation open in your system browser. Your password
@@ -179,10 +180,10 @@ export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; chec
           </>
         )}
         {error && <p role="alert">{error}</p>}
-        <p>
+        {!driverApp && <p>
           <Link href="/cart">Continue as Guest</Link> ·{" "}
           <Link href="/guest/order">Use a private guest link</Link>
-        </p>
+        </p>}
       </section>
     </main>
   );

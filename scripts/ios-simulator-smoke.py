@@ -76,7 +76,22 @@ def run_smoke(app, audience, source, output, run=execute, pause=time.sleep):
             raise SmokeFailure('created_device_identity') from None
         report['runtime'] = runtime
         run('boot', ['xcrun', 'simctl', 'boot', device])
-        run('boot_ready', ['xcrun', 'simctl', 'bootstatus', device, '-b'], timeout=180)
+        try:
+            run('boot_ready', ['xcrun', 'simctl', 'bootstatus', device, '-b'], timeout=180)
+            report['bootCompletionSignal'] = 'bootstatus'
+        except SmokeFailure:
+            # An inconclusive bootstatus wait is not proof of readiness.
+            # Require this OWN device to report Booted, then the real bounded
+            # install/launch checks. Never extend the wait or infer UI acceptance.
+            try:
+                inventory = json.loads(run('verify_booted_device', ['xcrun', 'simctl', 'list', 'devices', '--json']))
+                booted = any(d.get('udid', '').upper() == device and d.get('state') == 'Booted' and d.get('isAvailable') is True for items in inventory['devices'].values() for d in items)
+            except (SmokeFailure, ValueError, KeyError, TypeError):
+                booted = False
+            if not booted:
+                raise SmokeFailure('boot_ready')
+            report['bootCompletionSignal'] = 'booted_state_then_install_and_launch'
+
         run('install', ['xcrun', 'simctl', 'install', device, str(app.resolve())], timeout=60)
         report['checks'].append('installed')
         for phase in ('cold', 'restart'):
