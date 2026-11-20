@@ -292,6 +292,7 @@ router.get("/admin/operational-health", requireAuth, async (req, res) => {
     workers,
     pushDeliveries,
     pushConfiguration: pushConfiguration(),
+    webhookRetentionEnabled: process.env.ROCOEATS_WEBHOOK_RETENTION_ENABLED === "true",
     observedAt: new Date(),
     liveChargesEnabled: false,
     testPayoutsEnabled: testPayoutsEnabled(),

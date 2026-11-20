@@ -426,6 +426,8 @@ router.post("/driver/orders/:orderId/arrive", requireAuth, async (req, res) => {
   if (!profile || !requireRole(profile, ["driver", "admin"], res)) return;
   if (!profile.driverApproved)
     throw new CommerceError(403, "Driver approval is required");
+  // Arrival is an explicit attestation, never a client-supplied GPS verification.
+  z.object({}).strict().parse(req.body ?? {});
   const orderId = String(req.params.orderId);
   if (
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
@@ -458,7 +460,7 @@ router.post("/driver/orders/:orderId/arrive", requireAuth, async (req, res) => {
         409,
         "Only the assigned driver can confirm arrival before pickup",
       );
-    if (delivery.arrivedAt) return { orderId, arrivedAt: delivery.arrivedAt };
+    if (delivery.arrivedAt) return { orderId, arrivedAt: delivery.arrivedAt, verification: "driver_reported" };
     const arrivedAt = await databaseNow(tx);
     await tx
       .update(deliveriesTable)
@@ -474,8 +476,9 @@ router.post("/driver/orders/:orderId/arrive", requireAuth, async (req, res) => {
     await audit(tx, profile.id, "delivery.arrived", orderId, {
       assignedAt: delivery.assignedAt,
       method: "driver_attestation",
+      gpsVerified: false,
     });
-    return { orderId, arrivedAt };
+    return { orderId, arrivedAt, verification: "driver_reported" };
   });
   res.json(result);
 });

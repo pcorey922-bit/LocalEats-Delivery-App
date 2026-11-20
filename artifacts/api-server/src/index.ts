@@ -1,3 +1,4 @@
+import { compactProcessedCheckoutWebhooks } from "./lib/webhook-retention";
 import { pruneDriverLocations } from "./lib/duty-location";
 import { processReservationExpiry } from "./lib/reservation-expiry";
 import { processOrderTiming } from "./lib/order-timing";
@@ -91,6 +92,7 @@ const loops = [
     await drainPushBatch(stopping, progress);
   }),
   worker("maintenance", 60000, async () => {
+    await compactProcessedCheckoutWebhooks();
     await pruneDriverLocations();
     await db.delete(mobileAuthFlowsTable).where(lt(mobileAuthFlowsTable.expiresAt,new Date(Date.now()-86400000)));
     await db.delete(driverOfferDeclinesTable).where(lt(driverOfferDeclinesTable.expiresAt,sql`now()-interval '1 day'`));

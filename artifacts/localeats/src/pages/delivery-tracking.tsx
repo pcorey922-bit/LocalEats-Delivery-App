@@ -241,7 +241,7 @@ export function OrderTracking({ orderId }: { orderId: string }) {
           )}
           {tracking.data.arrivedAt && (
             <p>
-              Restaurant arrival confirmed:{" "}
+              Driver reported restaurant arrival:{" "}
               {new Date(tracking.data.arrivedAt).toLocaleTimeString()}
             </p>
           )}

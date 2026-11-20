@@ -1,3 +1,15 @@
+# November 20 — processed checkout retention prepared, not activated
+
+Default-off, audited 30-day compaction for matched processed paid checkout receipts
+is implemented/tested. Hold/recovery/refund/dispute/unknown evidence and all IDs/
+normalized financial records retained; separate owner policy/backup/activation
+approval required. No hosted cleanup or configuration change. Arrival reporting now
+honestly distinguishes driver attestation from GPS proof; unsupported verification
+payloads rejected without adding rigid geofencing. Native bootstrap/driver browser
+checks pass using simulations, not physical acceptance. Next: verify full provider
+reversal evidence before journaling recovery. Existing device/provider/legal gates
+remain open; no new deployment or financial operation authorized.
+
 # November 20 — proxy-aware abuse protection
 
 Render-chain rate identity, IPv6 /64 normalization, shared guest/native guards and

@@ -14,6 +14,7 @@ type Health = {
   }>;
   pushConfiguration: { android: boolean; ios: boolean };
   testPayoutsEnabled?: boolean;
+  webhookRetentionEnabled?: boolean;
   observedAt: string;
 };
 type Recovery = {
@@ -104,6 +105,7 @@ export function OperationalConsole() {
         <>
           <p>
             Observed {new Date(health.data.observedAt).toLocaleString()}.
+            Processed checkout payload retention: {health.data.webhookRetentionEnabled === true ? "enabled" : "disabled"}.
             Test payouts: {health.data.testPayoutsEnabled === true ? "enabled (TEST only)" : "disabled"}.
             Android push:{" "}
             {health.data.pushConfiguration.android

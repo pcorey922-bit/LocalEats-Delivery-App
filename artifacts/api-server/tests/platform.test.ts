@@ -1,3 +1,4 @@
+import { compactProcessedCheckoutWebhooks } from "../src/lib/webhook-retention";
 import { boundarySha256 } from '../src/data/rockwood/boundary';
 import { ProviderEvidenceError } from '../src/lib/provider-balance-evidence';
 import { reconcileDispute, reconcilePayment } from "../src/lib/financial-holds";
@@ -11,7 +12,7 @@ import { before, after, test } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
 import { randomUUID,createHash } from "node:crypto";
 import Stripe from "stripe";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, inArray } from "drizzle-orm";
 import app from "../src/app";
 import {
   engine,
@@ -276,6 +277,42 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       const blocked=await start('198.51.100.73','192.0.2.201');assert.equal(blocked.status,429);assert.ok(Number(blocked.headers.get('retry-after'))>0);
       assert.equal((await start('198.51.100.74')).status,201);
     }finally{for(const [name,value] of Object.entries(prior)) if(value===undefined)delete process.env[name];else process.env[name]=value;}
+  });
+  await t.test("opt-in webhook retention removes only excess PII from settled processed checkout receipts and preserves idempotency",async()=>{
+    const order=await create();await pay(order.id);
+    const eventId='evt_retention_'+randomUUID(),sessionId='cs_test_'+randomUUID().replaceAll('-',''),old=new Date(Date.now()-31*86400000);
+    await db.update(paymentsTable).set({provider:'stripe_test',checkoutSessionId:sessionId,providerPaymentId:'pi_test_retention'}).where(eq(paymentsTable.orderId,order.id));
+    const payload={id:eventId,type:'checkout.session.completed',livemode:false,created:1,data:{object:{id:sessionId,payment_intent:'pi_test_retention',metadata:{orderId:order.id,privateNote:'DO_NOT_RETAIN'},currency:'usd',amount_total:order.totalCents,payment_status:'paid',customer_email:'PRIVATE_EMAIL_FIXTURE',customer_details:{address:{line1:'PRIVATE_STREET_FIXTURE'}}}}};
+    await db.insert(webhookInboxTable).values({id:eventId,eventType:payload.type,payload,state:'processed',processedAt:old,receivedAt:old});
+    const protectedEvents=[['received',payload.type],['processing',payload.type],['dead_letter',payload.type],['reconciliation',payload.type],['processed','refund.updated']] as const;
+    const protectedIds:string[]=[];
+    for(const [state,eventType] of protectedEvents){const id=randomUUID();protectedIds.push(id);await db.insert(webhookInboxTable).values({id,eventType,payload,state,processedAt:old,receivedAt:old});}
+    delete process.env.ROCOEATS_WEBHOOK_RETENTION_ENABLED;
+    assert.equal(await compactProcessedCheckoutWebhooks(),0);
+    const holdId=randomUUID();await db.insert(financialHoldsTable).values({id:holdId,orderId:order.id,providerDisputeId:'dp_retention',amountCents:1,currency:'usd',providerStatus:'needs_response',lastEventCreated:1});
+    try {
+      process.env.ROCOEATS_WEBHOOK_RETENTION_ENABLED='true';
+      assert.equal(await compactProcessedCheckoutWebhooks(),0);
+      await db.update(financialHoldsTable).set({active:false}).where(eq(financialHoldsTable.id,holdId));
+      const pendingId='retention:'+randomUUID();await db.transaction(tx=>enqueueFinancialOperation(tx,{id:pendingId,orderId:order.id,kind:'transfer',resourceId:randomUUID(),payload:{}}));
+      assert.equal(await compactProcessedCheckoutWebhooks(),0);
+      await db.update(financialOperationsTable).set({state:'cancelled'}).where(eq(financialOperationsTable.id,pendingId));
+      await db.update(webhookInboxTable).set({processedAt:new Date()}).where(eq(webhookInboxTable.id,eventId));assert.equal(await compactProcessedCheckoutWebhooks(),0);
+      await db.update(webhookInboxTable).set({processedAt:old}).where(eq(webhookInboxTable.id,eventId));
+      await db.update(webhookInboxTable).set({payload:{...payload,data:{object:{...payload.data.object,amount_total:order.totalCents+1}}}}).where(eq(webhookInboxTable.id,eventId));assert.equal(await compactProcessedCheckoutWebhooks(),0);
+      await db.update(webhookInboxTable).set({payload}).where(eq(webhookInboxTable.id,eventId));
+      const financialBefore=await db.select().from(paymentsTable).where(eq(paymentsTable.orderId,order.id));
+      const counts=await Promise.all([compactProcessedCheckoutWebhooks(),compactProcessedCheckoutWebhooks()]);assert.equal(counts.reduce((a,b)=>a+b,0),1);
+      const [saved]=await db.select().from(webhookInboxTable).where(eq(webhookInboxTable.id,eventId));
+      assert.equal(saved.state,'processed');assert.equal(saved.processedAt?.getTime(),old.getTime());assert.equal(saved.payload.id,eventId);
+      assert.equal(JSON.stringify(saved.payload).includes('PRIVATE_'),false);assert.equal(JSON.stringify(saved.payload).includes('DO_NOT_RETAIN'),false);
+      assert.match((saved.payload.rocoeatsRetention as any).payloadSha256,/^[a-f0-9]{64}$/);
+      const duplicate=await db.insert(webhookInboxTable).values({id:eventId,eventType:payload.type,payload}).onConflictDoNothing().returning();assert.equal(duplicate.length,0);
+      assert.equal(await compactProcessedCheckoutWebhooks(),0);
+      assert.deepEqual(await db.select().from(paymentsTable).where(eq(paymentsTable.orderId,order.id)),financialBefore);
+      const untouched=await db.select().from(webhookInboxTable).where(sql`${webhookInboxTable.id} <> ${eventId}`);
+      assert.ok(untouched.filter(e=>JSON.stringify(e.payload).includes('PRIVATE_EMAIL_FIXTURE')).length>=protectedEvents.length);
+    }finally{delete process.env.ROCOEATS_WEBHOOK_RETENTION_ENABLED;await db.delete(webhookInboxTable).where(inArray(webhookInboxTable.id,protectedIds));}
   });
   await t.test("public geocoding is owner-only, explicit, closed-gate and durable single-use across concurrent calls", async () => {
     const names = ["LOCALEATS_ADMIN_CLERK_USER_IDS", "ROCOEATS_PRIVATE_STAGING", "ROCOEATS_STAGING_TESTER_CLERK_USER_IDS", "ROCOEATS_ORDERING_ENABLED", "ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED", "PAYMENT_PROVIDER", "STRIPE_SECRET_KEY", "ROCOEATS_DELIVERY_AREA_MODE", "GEOCODIO_API_KEY", "ROCOEATS_GEOCODIO_PUBLIC_TEST_ENABLED"];
@@ -1440,9 +1477,13 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     assert.equal((await api(arrivalPath,ids.customer,'POST')).status,403);
     assert.equal((await api(arrivalPath,ids.driver2,'POST')).status,409);
     assert.equal((await api('/driver/orders/not-a-uuid/arrive',ids.driver,'POST')).status,400);
+    assert.equal((await api(arrivalPath,ids.driver,'POST',{latitude:35.8,longitude:-84.6,gpsVerified:true})).status,400);
+    const [notArrived]=await db.select().from(deliveriesTable).where(eq(deliveriesTable.orderId,order.id));assert.equal(notArrived.arrivedAt,null);
     const arrivals=await Promise.all([api(arrivalPath,ids.driver,'POST'),api(arrivalPath,ids.driver,'POST')]);
     assert.deepEqual(arrivals.map(r=>r.status),[200,200]);
     assert.equal(arrivals[0].data.arrivedAt,arrivals[1].data.arrivedAt);
+    assert.equal(arrivals[0].data.verification,"driver_reported");
+    assert.equal((await api(`/orders/${order.id}/tracking`,ids.customer)).data.arrivalVerification,"driver_reported");
     const arrivalNotices=await db.select().from(notificationsTable).where(eq(notificationsTable.orderId,order.id));
     assert.equal(arrivalNotices.filter(n=>n.eventKey.includes(':arrival:')).length,3);
     assert.ok(arrivalNotices.some(n=>n.profileId===ids.restaurant && n.eventKey.includes(':arrival:')));

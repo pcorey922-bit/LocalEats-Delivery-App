@@ -1,3 +1,40 @@
+# November 20 — webhook privacy retention and driver evidence
+
+Implemented opt-in ROCOEATS_WEBHOOK_RETENTION_ENABLED (default OFF, no hosted
+setting changed). Only processed successful checkout events older than 30 days,
+with matching normalized Stripe TEST session/payment-intent/gross/currency/paid
+receipt, no lease, active financial hold or unfinished/failed financial operation,
+may compact excess raw PII. Keep event ID/type/state/timestamps, normalized financial
+references/amounts, canonical JSON payload digest and append-only audit receipt.
+No records deleted; no replay/idempotency reset. Refund/dispute/unmatched/unknown/
+recovery/newer events remain raw. Order-then-event locks and rechecks fence races;
+concurrent runs compact once. Actual hosted cleanup requires separate approval of
+policy and recovery backup, then explicit protected flag activation. Do not enable
+it with a routine deployment. This is scoped checkout minimization, NOT a complete
+legal retention policy or deletion of all provider PII.
+
+Driver arrival remains authorized driver attestation; no trusted restaurant
+coordinates exist for secure proximity proof. Reject client-supplied arrival GPS/
+verification fields; return/audit driver_reported with gpsVerified=false and replace
+misleading customer 'arrival confirmed' label. Existing GPS bounds/DB-time freshness,
+assignment ownership, pickup custody and cryptographic handoff remain enforced.
+Coordinates do not grant role/order transition authority. No rigid geofence, mock-
+proof guarantee, municipal activation or physical GPS acceptance is claimed.
+
+Local app/API 224 PASS / 1 PG-only skip, production builds and typechecks
+PASS. Native bootstrap/session-recovery and dedicated driver browser regressions
+PASS with simulated Clerk/native; actual local API. Retention race/hold/queue/raw-
+PII/mismatched amount/deduplication and arrival regressions PASS. Initial retention
+fixture left recoverable local queue rows affecting later tests; isolated fixture
+cleanup corrected it. No hosted/provider operations occurred. CI for current SHA
+must be read, not inferred. Payout and proxy commits have all three workflows PASS;
+Clerk commit exact CI pending last observation.
+
+Next independent financial task: provider reversal receipts currently accept an
+ID without checking full amount/currency/transfer against committed earnings;
+inspect and reproduce offline before correcting. Native/provider/physical acceptance
+remains as documented; do not reopen resolved driver auth or exhausted Geocodio.
+
 # November 20 — Clerk proxy origin spoof corrected
 
 Local fake-upstream reproduction showed forged X-Forwarded-Host/Proto changed

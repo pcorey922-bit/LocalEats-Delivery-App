@@ -322,6 +322,7 @@ router.get("/orders/:orderId/tracking", requireCustomerAuth, async (req, res) =>
     assignedDriver: assignedDriver ?? null,
     deliveryStatus: delivery?.status ?? "unassigned",
     arrivedAt: delivery?.arrivedAt ?? null,
+    arrivalVerification: delivery?.arrivedAt ? "driver_reported" : null,
     pickedUpAt: delivery?.pickedUpAt ?? null,
     deliveredAt: delivery?.deliveredAt ?? null,
     location:
