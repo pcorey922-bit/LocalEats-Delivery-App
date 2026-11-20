@@ -201,6 +201,9 @@ try {
     assert.equal(denied.status, 403);
   }
   await admin.goto(origin + '/operations');
+  await admin.getByText('Test payouts are disabled. Earnings remain recorded; no transfers can be started.', {exact:true}).waitFor();
+  await admin.getByRole('button', {name:'Transfer test earnings',exact:true}).first().waitFor();
+  for(const button of await admin.getByRole('button', {name:'Transfer test earnings',exact:true}).all()) assert.equal(await button.isDisabled(),true);
   await admin.getByLabel('Filter by order ID', { exact: true }).fill(order.id);
   await admin.getByRole('button', { name: 'Apply filter', exact: true }).click();
   await admin.getByText(/Trial balance is balanced/).waitFor();

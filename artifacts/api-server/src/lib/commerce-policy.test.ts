@@ -7,6 +7,7 @@ import {
   orderingEnabled,
   paymentMode,
   privateTestOrderingEnabled,
+  testPayoutsEnabled,
 } from "./commerce-policy";
 test("fees, tax, and tip use integer cents and immutable allocation inputs", () => {
   const price = calculatePrice(1999, 300, {
@@ -72,4 +73,14 @@ test("private test ordering fails closed unless public ordering is explicitly of
     assert.equal(orderingEnabled({ ...env, ...patch }), false);
   }
   assert.equal(orderingEnabled({ ROCOEATS_ORDERING_ENABLED: "true" }), true);
+});
+
+
+test("payout admission defaults off and is independent of order intake; only explicit private TEST or local simulation is allowed", () => {
+  const env={ROCOEATS_TEST_PAYOUTS_ENABLED:'true',ROCOEATS_PRIVATE_STAGING:'true',PAYMENT_PROVIDER:'stripe_test',STRIPE_SECRET_KEY:'sk_test_fixture',NODE_ENV:'production'};
+  assert.equal(testPayoutsEnabled(env),true);
+  for(const patch of [{ROCOEATS_TEST_PAYOUTS_ENABLED:undefined},{ROCOEATS_TEST_PAYOUTS_ENABLED:'false'},{ROCOEATS_TEST_PAYOUTS_ENABLED:'TRUE'},{ROCOEATS_PRIVATE_STAGING:undefined},{PAYMENT_PROVIDER:'sandbox'},{STRIPE_SECRET_KEY:'sk_live_fixture'},{STRIPE_SECRET_KEY:undefined}]) assert.equal(testPayoutsEnabled({...env,...patch}),false);
+  for(const ordering of ['true','false',undefined]) assert.equal(testPayoutsEnabled({...env,ROCOEATS_TEST_PAYOUTS_ENABLED:undefined,ROCOEATS_ORDERING_ENABLED:ordering}),false);
+  assert.equal(testPayoutsEnabled({NODE_ENV:'test',PAYMENT_PROVIDER:'sandbox',ROCOEATS_TEST_PAYOUTS_ENABLED:'true'}),true);
+  assert.equal(testPayoutsEnabled({NODE_ENV:'test',PAYMENT_PROVIDER:'sandbox'}),false);
 });

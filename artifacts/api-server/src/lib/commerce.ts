@@ -29,6 +29,7 @@ import {
 } from "@workspace/db";
 import {
   allocateEarnings,
+  requireTestPayoutsEnabled,
   CommerceError,
   paymentMode,
   pricingSchema,
@@ -244,6 +245,7 @@ export async function createEarnings(tx: Transaction, orderId: string) {
   }
 }
 export async function settlePayout(payoutId: string, actor: Profile) {
+  requireTestPayoutsEnabled();
   if (paymentMode() === "stripe_test")
     return (await import("./financial-operations")).requestProviderTransfer(
       payoutId,

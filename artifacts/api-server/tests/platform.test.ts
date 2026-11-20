@@ -142,6 +142,7 @@ before(async () => {
   process.env.PAYMENT_PROVIDER = "sandbox";
   process.env.NODE_ENV = "test";
   process.env.API_MUTATION_LIMIT_PER_MINUTE = "10000";
+  process.env.ROCOEATS_TEST_PAYOUTS_ENABLED = "true";
   delete process.env.STRIPE_SECRET_KEY;
   for (const file of (await readdir("../../lib/db/drizzle"))
     .filter((f) => f.endsWith(".sql"))
@@ -230,6 +231,33 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     delete process.env.STRIPE_SECRET_KEY;
     delete process.env.STRIPE_WEBHOOK_SECRET;
     process.env.API_MUTATION_LIMIT_PER_MINUTE = "10000";
+    process.env.ROCOEATS_TEST_PAYOUTS_ENABLED = "true";
+  });
+  await t.test("closed payout gate rejects administrator requests without changing financial records", async () => {
+    delete process.env.ROCOEATS_TEST_PAYOUTS_ENABLED;
+    const before = await db.select().from(financialOperationsTable);
+    const response = await api(`/admin/payouts/${randomUUID()}/transfer`, ids.admin, 'POST');
+    assert.equal(response.status, 503);
+    assert.match(response.data.error, /payouts are disabled/i);
+    assert.deepEqual(await db.select().from(financialOperationsTable), before);
+    assert.equal((await api(`/admin/payouts/${randomUUID()}/transfer`, ids.customer, 'POST')).status,403);
+  });
+  await t.test("closed payout gate preserves queued and unknown transfer outcomes without calling provider", async () => {
+    const order = await create(); await pay(order.id);
+    const id = `transfer:disabled:${order.id}`;
+    await db.transaction(tx => enqueueFinancialOperation(tx, {id, orderId:order.id, kind:'transfer', resourceId:randomUUID(), payload:{amount:100,currency:'usd',accountId:'acct_fixture'}}));
+    delete process.env.ROCOEATS_TEST_PAYOUTS_ENABLED;
+    for (const [firstAttemptAt,state] of [[null,'queued'],[new Date(),'queued'],[new Date(),'processing'],[new Date(),'pending']] as const) {
+      await db.update(financialOperationsTable).set({firstAttemptAt,state,leaseExpiresAt:state === 'processing' ? new Date(0) : null}).where(eq(financialOperationsTable.id,id));
+      const [before] = await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.id,id));
+      let calls=0;
+      await processFinancialOperation(async () => {calls++; throw Error('No provider send permitted');});
+      assert.equal(calls,0);
+      const [after] = await db.select().from(financialOperationsTable).where(eq(financialOperationsTable.id,id));
+      assert.deepEqual(after,before);
+      await assert.rejects(executeStripeOperation(before), /payouts are disabled/i);
+    }
+    await db.delete(financialOperationsTable).where(eq(financialOperationsTable.id,id));
   });
   await t.test("public geocoding is owner-only, explicit, closed-gate and durable single-use across concurrent calls", async () => {
     const names = ["LOCALEATS_ADMIN_CLERK_USER_IDS", "ROCOEATS_PRIVATE_STAGING", "ROCOEATS_STAGING_TESTER_CLERK_USER_IDS", "ROCOEATS_ORDERING_ENABLED", "ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED", "PAYMENT_PROVIDER", "STRIPE_SECRET_KEY", "ROCOEATS_DELIVERY_AREA_MODE", "GEOCODIO_API_KEY", "ROCOEATS_GEOCODIO_PUBLIC_TEST_ENABLED"];
@@ -2281,6 +2309,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
           return { id: "tr_inflight_fixture", status: "succeeded" };
         });
         await started;
+        process.env.ROCOEATS_TEST_PAYOUTS_ENABLED = "false";
         const cancel = await api(
           `/orders/${order.id}/cancel`,
           ids.admin,

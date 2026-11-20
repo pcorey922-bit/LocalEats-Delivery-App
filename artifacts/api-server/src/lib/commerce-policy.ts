@@ -132,6 +132,20 @@ export function paymentMode(
   }
   return "disabled";
 }
+// Separate from order intake: pausing ordering must never authorize transfers.
+// This branch supports TEST connected-balance transfers only, never bank payouts.
+export function testPayoutsEnabled(env = process.env): boolean {
+  if (env.ROCOEATS_TEST_PAYOUTS_ENABLED !== 'true') return false;
+  if (env.NODE_ENV !== 'test' && env.ROCOEATS_PRIVATE_STAGING !== 'true') return false;
+  try {
+    const mode = paymentMode(env);
+    return mode === 'stripe_test' || (env.NODE_ENV === 'test' && mode === 'sandbox');
+  } catch { return false; }
+}
+export function requireTestPayoutsEnabled() {
+  if (!testPayoutsEnabled()) throw new CommerceError(503, 'Test payouts are disabled. Existing earnings and financial records remain available.');
+}
+
 export function checkoutOrigin() {
   const url = new URL(process.env.PUBLIC_APP_URL || "http://localhost:5173");
   if (

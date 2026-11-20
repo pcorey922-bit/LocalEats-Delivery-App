@@ -12,6 +12,11 @@ export function containerEnvironment(env) {
     if (env.ROCOEATS_PRIVATE_STAGING !== "true")
       throw new Error("Render staging requires ROCOEATS_PRIVATE_STAGING=true");
   }
+  const payouts = result.ROCOEATS_TEST_PAYOUTS_ENABLED;
+  if (payouts !== undefined && !['true','false'].includes(payouts))
+    throw new Error('Use true or false for ROCOEATS_TEST_PAYOUTS_ENABLED');
+  if (payouts === 'true' && (result.ROCOEATS_PRIVATE_STAGING !== 'true' || result.PAYMENT_PROVIDER !== 'stripe_test' || !/^sk_test_[A-Za-z0-9]+$/.test(result.STRIPE_SECRET_KEY || '')))
+    throw new Error('Test payouts require private staging and Stripe TEST credentials');
   const privateOrders = result.ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED;
   if (privateOrders !== undefined && !["true", "false"].includes(privateOrders))
     throw new Error("Use true or false for ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED");

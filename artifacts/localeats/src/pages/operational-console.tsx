@@ -13,6 +13,7 @@ type Health = {
     lastSuccessAt: string;
   }>;
   pushConfiguration: { android: boolean; ios: boolean };
+  testPayoutsEnabled?: boolean;
   observedAt: string;
 };
 type Recovery = {
@@ -103,6 +104,7 @@ export function OperationalConsole() {
         <>
           <p>
             Observed {new Date(health.data.observedAt).toLocaleString()}.
+            Test payouts: {health.data.testPayoutsEnabled === true ? "enabled (TEST only)" : "disabled"}.
             Android push:{" "}
             {health.data.pushConfiguration.android
               ? "configured"

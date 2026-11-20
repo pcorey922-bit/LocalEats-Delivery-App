@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import { db, guestSessionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { CommerceError, checkoutOrigin, paymentMode } from "./commerce-policy";
+import { CommerceError, checkoutOrigin, paymentMode, requireTestPayoutsEnabled } from "./commerce-policy";
 
 export function stripeTest() {
   if (paymentMode() !== "stripe_test")
@@ -93,6 +93,7 @@ export async function transferTestEarnings(
   payoutId: string,
   orderId: string,
 ) {
+  requireTestPayoutsEnabled();
   if (requirePaymentProvider() === "sandbox")
     return `sandbox_transfer_${payoutId}`;
   const transfer = await stripeTest().transfers.create(

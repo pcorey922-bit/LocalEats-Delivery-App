@@ -27,6 +27,7 @@ import {
   or,
   sql,
   notExists,
+  ne,
   exists,
 } from "drizzle-orm";
 import {
@@ -53,7 +54,7 @@ import {
   recordPayment,
   type Transaction,
 } from "./commerce";
-import { CommerceError } from "./commerce-policy";
+import { CommerceError, testPayoutsEnabled, requireTestPayoutsEnabled } from "./commerce-policy";
 import {
   enqueueFinancialOperation,
   queueSettlementRecovery,
@@ -167,6 +168,7 @@ export async function requestProviderTransfer(
 ) {
   if (actor.role !== "admin")
     throw new CommerceError(403, "Administrator access is required");
+  requireTestPayoutsEnabled();
   const [initial] = await db
     .select()
     .from(payoutsTable)
@@ -176,6 +178,7 @@ export async function requestProviderTransfer(
     throw new CommerceError(404, "Order settlement not found");
   return db.transaction(async (tx) => {
     await requireLockedAdministrator(tx, actor.id);
+    requireTestPayoutsEnabled();
     const [order] = await tx
       .select()
       .from(ordersTable)
@@ -403,6 +406,7 @@ async function claimOperation(): Promise<FinancialOperation | null> {
     .where(
       and(
         inArray(operations.state, ["queued", "processing", "pending"]),
+        testPayoutsEnabled() ? undefined : ne(operations.kind, "transfer"),
         lte(operations.nextAttemptAt, sql`clock_timestamp()`),
         notExists(
           db
@@ -485,8 +489,12 @@ async function claimOperation(): Promise<FinancialOperation | null> {
           ),
         )
         .limit(1);
+      // An earlier unknown transfer must continue blocking dependent writes.
+      // Disabling payouts neither retries it nor declares it safe to skip.
+      if (!testPayoutsEnabled() && jobs.some(j => j.kind === 'transfer' && j.firstAttemptAt && ['queued','processing','pending'].includes(j.state))) return null;
       const allowed = (j: FinancialOperation) =>
-        !hold || !["transfer", "refund", "partial_refund"].includes(j.kind);
+        (j.kind !== 'transfer' || testPayoutsEnabled()) &&
+        (!hold || !["transfer", "refund", "partial_refund"].includes(j.kind));
       if (jobs.some((j) => j.state === "processing" && !allowed(j)))
         return null;
       if (jobs.some((j) => j.state === "reconciliation")) return null;
@@ -604,6 +612,7 @@ export async function executeStripeOperation(
 ): Promise<OperationResult> {
   if (job.provider !== "stripe_test")
     throw new CommerceError(409, "Operation provider must be Stripe TEST");
+  if (job.kind === "transfer") requireTestPayoutsEnabled();
   const stripe = stripeTest();
   const p = job.payload;
   if (job.kind === "checkout") {

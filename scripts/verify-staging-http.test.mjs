@@ -223,3 +223,15 @@ test("geographic misconfiguration fails readiness and reports only known setting
   assert.equal(old.verificationPassed, true);
   assert.equal(old.geographicDelivery, null);
 });
+
+
+test('read-only verifier rejects open or malformed TEST payout gates and reports legacy status as unverified', async () => {
+  for (const testPayoutsEnabled of [true,'false']) {
+    const report=await verifyStaging({origin,expectedRevision:expected},fixture({config:{testPayoutsEnabled}}).fetcher);
+    assert.ok(report.failures.includes('dependency_health'));
+  }
+  const closed=await verifyStaging({origin,expectedRevision:expected},fixture({config:{testPayoutsEnabled:false}}).fetcher);
+  assert.equal(closed.verificationPassed,true);assert.equal(closed.readiness.testPayoutsEnabled,false);
+  const legacy=await verifyStaging({origin,expectedRevision:expected},fixture().fetcher);
+  assert.equal(legacy.readiness.testPayoutsEnabled,null);
+});

@@ -46,6 +46,7 @@ export type CommerceConfig = {
   testMode: true;
   liveChargesEnabled: false;
   orderingEnabled: boolean;
+  testPayoutsEnabled?: boolean;
   pricing: Pricing | null;
   taxNotice: string;
   launchArea?: { city: string; region: string; postalCode: string };
@@ -583,6 +584,7 @@ export function OperationsCommerce() {
         </article>
       ))}
       <h2>Settlement queue</h2>
+      {config.data?.testPayoutsEnabled !== true && <p role="status">Test payouts are disabled. Earnings remain recorded; no transfers can be started.</p>}
       {payouts.data?.map((p) => (
         <article className="roco-card" key={p.id}>
           <p>
@@ -596,7 +598,7 @@ export function OperationsCommerce() {
           {p.status === "pending" && (
             <button
               className="roco-button"
-              disabled={change.isPending}
+              disabled={change.isPending || config.data?.testPayoutsEnabled !== true}
               onClick={() =>
                 change.mutate({ path: `/api/admin/payouts/${p.id}/transfer` })
               }

@@ -1,3 +1,12 @@
+# November 20 — recovered payout safety, proxy rate limits next
+
+Default-OFF TEST transfer admission/worker/provider gate implemented and tested;
+in-flight acknowledgments, unknown outcomes and immutable history preserved.
+No hosted configuration/transactions/deployment. Native/device/provider acceptance
+remains open; owner confirms both push providers still unconfigured. Next confirmed
+work: proxy-aware guest/native IP limits and anonymous mutation coverage, then
+reported driver arrival/GPS and raw webhook retention. Do not reopen resolved auth.
+
 # Native acceptance inputs prepared — November 19
 
 Current-source signed Driver v172 (44490907162/14513076061) and Customer v173

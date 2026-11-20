@@ -69,6 +69,7 @@ export async function verifyStaging(
   await check("dependency_health", async () => {
     readiness = await (await request("/readyz", [200, 503])).json();
     assert.equal(readiness.liveChargesEnabled, false);
+    if (Object.hasOwn(readiness, "testPayoutsEnabled")) assert.equal(readiness.testPayoutsEnabled, false);
     assert.equal(readiness.database, true);
     if (Object.hasOwn(readiness, "deliveryAreaReady"))
       assert.equal(readiness.deliveryAreaReady, true);
@@ -216,6 +217,7 @@ export async function verifyStaging(
         "webhookReady",
         "workerReady",
         "liveChargesEnabled",
+        "testPayoutsEnabled",
       ].map((key) => [key, bool(readiness?.[key])]),
     ),
     geographicDelivery:

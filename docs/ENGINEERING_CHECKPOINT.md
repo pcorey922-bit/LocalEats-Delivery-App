@@ -1,3 +1,34 @@
+# November 20 — interrupted payout safety recovered
+
+Primary baseline 79c5e46bf3fcad7812fadb1ab0ab5f11a5d9ed62 equals remote;
+all three exact-SHA workflows SUCCESS (44491713653, 44491713606, 44491703164).
+Owner independently confirmed BOTH hosted push providers remain configuration
+required after deployed d2e79f7; no settings changed. Previous unsigned/physical
+acceptance distinctions and recovery branch remain unchanged.
+
+Recovered default-OFF TEST payout gate across request admission, worker claiming,
+provider writes and operator controls. ROCOEATS_TEST_PAYOUTS_ENABLED is absent/false
+by default; no hosted variable set. Only explicit private Stripe TEST configuration
+(or isolated local simulator) may opt in after separate authorization. Queued/
+expired/pending unknown transfer records stay untouched while closed; dependent
+writes cannot bypass unknown transfers. In-flight receipt recording and explicit
+refund/reversal recovery are preserved. No migrations or historical adjustments.
+Public readiness now reports the gate and read-only verifier rejects an open or
+malformed advertised gate, leaving old deployment's absent field unverified.
+
+Before-fix regressions demonstrated admission was not separately gated and worker
+mutated queued records while payouts supposed closed. Local full app/API: 216 PASS,
+1 PG-only skip; extended relational cases 99 PASS/1 skip; 11 tool tests, full types
+and production builds PASS. Four-role mobile browser validation PASS, including disabled settlement buttons; no
+real-provider evidence claimed. Initial sandbox disallowed loopback test listeners;
+reran with authorized local test-server access. Existing test fixture needed to
+await asynchronously rendered settlement buttons before checking disabled state.
+
+Current next priority: reported Render client-IP/anonymous rate-limit defect.
+No trust-proxy=true or fixed hop count will be introduced. Official Render confirms
+Cloudflare/load-balancer path, but XFF prefix cannot be assumed sanitized; inspect
+trusted-chain handling and cover malicious prefixes/direct clients offline.
+
 # CURRENT SIGNED NATIVE ARTIFACTS — November 19 post-deployment
 
 Read-only hosted verification below remains current at approved d2e79f7; no further

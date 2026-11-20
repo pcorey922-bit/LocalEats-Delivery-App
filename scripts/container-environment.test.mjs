@@ -52,3 +52,10 @@ test("private test ordering requires a closed public gate and Stripe webhook", (
     { ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED: "yes" },
   ]) assert.throws(() => containerEnvironment({ ...env, ...patch }));
 });
+
+test('test payouts remain an independent opt-in and malformed or unsafe activation is refused', () => {
+  assert.equal(containerEnvironment(valid()).ROCOEATS_TEST_PAYOUTS_ENABLED, undefined);
+  assert.doesNotThrow(()=>containerEnvironment({...valid(),ROCOEATS_TEST_PAYOUTS_ENABLED:'false'}));
+  assert.doesNotThrow(()=>containerEnvironment({...valid(),ROCOEATS_TEST_PAYOUTS_ENABLED:'true',ROCOEATS_ORDERING_ENABLED:'false'}));
+  for(const patch of [{ROCOEATS_TEST_PAYOUTS_ENABLED:'yes'},{ROCOEATS_TEST_PAYOUTS_ENABLED:'true',ROCOEATS_PRIVATE_STAGING:'false'},{ROCOEATS_TEST_PAYOUTS_ENABLED:'true',PAYMENT_PROVIDER:'sandbox'},{ROCOEATS_TEST_PAYOUTS_ENABLED:'true',STRIPE_SECRET_KEY:'sk_live_fixture'}]) assert.throws(()=>containerEnvironment({...valid(),...patch}));
+});

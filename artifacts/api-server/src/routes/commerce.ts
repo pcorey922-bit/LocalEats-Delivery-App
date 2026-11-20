@@ -1,3 +1,4 @@
+import { testPayoutsEnabled } from "../lib/commerce-policy";
 import { requireLaunchServiceArea } from '../lib/municipal-delivery';
 import { requireLaunchPostalCodes, launchArea } from '../lib/delivery-area';
 import { requireTelephoneAcceptance } from "../lib/telephone-confirmation";
@@ -85,6 +86,7 @@ router.get("/commerce/config", async (_req, res) => {
     mode: paymentMode(),
     testMode: true,
     liveChargesEnabled: false,
+    testPayoutsEnabled: testPayoutsEnabled(),
     orderingEnabled: orderingEnabled(),
     publicOrderingEnabled: process.env.ROCOEATS_ORDERING_ENABLED === "true",
     privateTestOrderingEnabled: privateTestOrderingEnabled(),

@@ -1,3 +1,4 @@
+import { testPayoutsEnabled } from "../lib/commerce-policy";
 import { databaseNow } from '../lib/database-clock';
 import { notificationPushDeadline, pushLifetime } from '../lib/push-expiry';
 import { geographicReadiness } from "../lib/municipal-delivery";
@@ -64,6 +65,7 @@ export const readiness: RequestHandler = async (_req, res) => {
       webhookReady,
       workerReady,
       liveChargesEnabled: false,
+    testPayoutsEnabled: testPayoutsEnabled(),
     });
   } catch {
     res
@@ -289,6 +291,7 @@ router.get("/admin/operational-health", requireAuth, async (req, res) => {
     pushConfiguration: pushConfiguration(),
     observedAt: new Date(),
     liveChargesEnabled: false,
+    testPayoutsEnabled: testPayoutsEnabled(),
   });
 });
 export default router;
