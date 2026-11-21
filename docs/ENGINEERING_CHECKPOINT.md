@@ -1,3 +1,31 @@
+# November 21 — OWNER PHYSICAL ACCEPTANCE: Customer Android208
+
+Samsung Galaxy S22 Ultra, signed Customer208/source9c91fdc3940b7e69be0724babfd2cdc044b45f0e:
+owner confirms sign-in opens restaurant browsing, Administrator/Driver menu functionality
+remains accessible, same account/permissions preserved, closing/reopening and session
+recovery work, no startup timeout/navigation failure observed. PHYSICALLY ACCEPTED
+for those tested workflows ONLY. Supersedes older208-PENDING notes below; do NOT
+repeat accepted sign-in/navigation/session tests without regression evidence.
+Not evidence of background GPS, push delivery, physical iOS, checkout/payment or
+complete native delivery lifecycle. Driver154 prior physical evidence preserved.
+
+VERIFIED SOFTWARE CONTINUATION: hung background GPS request held inFlight forever;
+reproduced beforefix, now existing bounded nativeStep + per-request cancellation
+releases slot after15s, retries only a fresh fix with fresh eligibility, and ignores
+late acknowledgements. Preflight timeout cannot start GPS later; explicit stop still
+cancels without false failure. Ten background-duty units PASS, including existing
+consent/eligibility/revocation/stale-fix/assignment/stop guards. No real GPS acceptance.
+Push enrollment timer previously started after configuration/permission/channel/app
+identity; reproduced stalled pre-token setup, moved existing15s budget to enrollment
+start. Four pre-token browser cases plus existing enrollment/account fences/opt-out/
+configuration and GPS consent/stop regression PASS. Native/provider APIs SIMULATED;
+UI types/production build/diff PASS. No accepted Customer sign-in retest performed.
+
+Next independent confirmed gap: bound notification status reads and opt-out requests,
+which can otherwise remain pending on a hung transport. Preserve revocation evidence
+and attempt native opt-out even if server is unavailable. Hosted settings/deployments/
+provider sends/financial operations remain unauthorized; safeguards unchanged.
+
 # November 21 — verified Customer208 multi-role landing release
 
 Functional9c91fdc3940b7e69be0724babfd2cdc044b45f0e ALL THREE CI SUCCESS:

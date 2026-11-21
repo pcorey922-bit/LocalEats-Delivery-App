@@ -1,3 +1,4 @@
+import { nativeStep } from './native-startup';
 export type DutyFix = { latitude: number; longitude: number; accuracy: number; time: number; simulated?: boolean };
 type Options = { method?: 'GET' | 'POST'; body?: string; signal: AbortSignal };
 type Dependencies = {
@@ -26,6 +27,17 @@ export function backgroundDutySession(deps: Dependencies) {
   let stopped = false, inFlight = false, lastAttempt = -Infinity;
   let starting: Promise<void> | undefined, id: string | undefined, removing: Promise<void> | undefined;
   const abort = new AbortController(), now = deps.now ?? Date.now;
+  async function request<T>(path: string, options: Options): Promise<T> {
+    const controller = new AbortController();
+    try {
+      // Bound the complete request even if native HTTP ignores cancellation.
+      // Its late result cannot continue the abandoned upload sequence.
+      return await nativeStep('NATIVE_LOCATION_REQUEST_TIMEOUT', () =>
+        deps.api<T>(path, { ...options, signal: controller.signal }), abort.signal);
+    } finally {
+      controller.abort();
+    }
+  }
   const remove = () => {
     if (!id) return Promise.resolve();
     removing ??= deps.watcher.removeWatcher({ id });
@@ -57,17 +69,17 @@ export function backgroundDutySession(deps: Dependencies) {
     lastAttempt = now();
     try {
       const options = { method: 'POST' as const, signal: abort.signal };
-      await deps.api('/api/driver/heartbeat', options);
+      await request('/api/driver/heartbeat', options);
       if (stopped) return;
-      const availability = await deps.api<unknown>('/api/driver/availability', { signal: abort.signal });
+      const availability = await request<unknown>('/api/driver/availability', { signal: abort.signal });
       if (stopped) return;
       if (!eligible(availability)) { fail('On-duty access ended. Background sharing stopped; reconnect explicitly when eligible.'); return; }
       const body = JSON.stringify({ latitude: fix.latitude, longitude: fix.longitude, accuracyMeters: fix.accuracy, observedAt: new Date(fix.time).toISOString() });
-      const result = await deps.api<{ accepted: boolean }>('/api/driver/location', { ...options, body });
+      const result = await request<{ accepted: boolean }>('/api/driver/location', { ...options, body });
       if (stopped) return;
       if (!result || typeof result.accepted !== 'boolean') throw Error('Invalid location acknowledgement');
       if (result.accepted === true && availability.activeOrderId) {
-        await deps.api(`/api/driver/orders/${encodeURIComponent(availability.activeOrderId)}/location`, { ...options, body });
+        await request(`/api/driver/orders/${encodeURIComponent(availability.activeOrderId)}/location`, { ...options, body });
       }
       if (!stopped) deps.status(result.accepted ? 'Background location uploaded to authorized dispatch.' : 'Waiting for a newer GPS fix.');
     } catch (error) {
@@ -83,12 +95,12 @@ export function backgroundDutySession(deps: Dependencies) {
         if (!await deps.permission()) throw Error('Background location requires device permission and, on Android, a visible notification.');
         if (stopped) return;
         deps.status('Verifying current on-duty access before starting background location…');
-        const access = await deps.api<unknown>('/api/driver/availability', { signal: abort.signal });
+        const access = await request<unknown>('/api/driver/availability', { signal: abort.signal });
         if (stopped) return;
         if (!eligible(access)) throw Error('Current driver approval and online availability are required. Reconnect explicitly.');
         id = await deps.watcher.addWatcher({ backgroundTitle: 'RoCoEats Driver · On duty', backgroundMessage: 'Sharing your driver location. Go offline in RoCoEats to stop.', requestPermissions: true, stale: false, distanceFilter: 0 }, (fix, error) => { void position(fix, error); });
         if (stopped) await remove();
-      })();
+      })().catch(error => { if (!stopped) throw error; });
       return starting;
     },
     stop,

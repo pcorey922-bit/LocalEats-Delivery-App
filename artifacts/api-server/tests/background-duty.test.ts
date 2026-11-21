@@ -102,3 +102,33 @@ test('malformed location acknowledgement never reports success or forwards to th
   assert.equal(calls.some(path=>path.includes('/orders/')),false);
   assert.match(f.statuses.at(-1)!,/interrupted/);await f.session.stop();
 });
+
+test('hung background upload releases its slot and a late acknowledgement cannot resume an abandoned upload', async t => {
+ t.mock.timers.enable({apis:['setTimeout']});
+ const late=deferred<unknown>();let stalled=true;let signal:AbortSignal|undefined;const calls:string[]=[];
+ const f=fixture({api:async<T>(path,options)=>{
+  calls.push(path);
+  if(path.endsWith('/heartbeat')&&stalled){stalled=false;signal=options.signal;return await late.promise as T;}
+  return (path.endsWith('/availability')?{approved:true,available:true,online:true,activeOrderId:'order-a'}:{accepted:true}) as T;
+ }});
+ await f.session.start();f.emit();await flush();
+ t.mock.timers.tick(15000);await flush();await flush();
+ assert.match(f.statuses.at(-1)!,/interrupted/);
+ assert.equal(signal?.aborted,true);
+ f.advance();f.emit();await flush();await flush();
+ assert.match(f.statuses.at(-1)!,/uploaded/);assert.equal(f.fatal.length,0);
+ const count=calls.length;late.resolve({online:true});await flush();await flush();
+ assert.equal(calls.length,count,'Late heartbeat must not cause more availability/location calls');
+ await f.session.stop();
+});
+
+test('timed-out background eligibility cannot start a watcher after a late response', async t => {
+ t.mock.timers.enable({apis:['setTimeout']});
+ const late=deferred<unknown>();let watchers=0;
+ const f=fixture({api:async<T>()=>await late.promise as T,watcher:{addWatcher:async()=>{watchers++;return 'late'},removeWatcher:async()=>{}}});
+ const starting=f.session.start();let rejected=false;void starting.catch(()=>{rejected=true;});await flush();
+ t.mock.timers.tick(15000);await flush();await flush();assert.equal(rejected,true);
+ await assert.rejects(starting,/NATIVE_LOCATION_REQUEST_TIMEOUT/);
+ late.resolve({approved:true,available:true,online:true,activeOrderId:null});await flush();
+ assert.equal(watchers,0);await f.session.stop();
+});

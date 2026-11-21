@@ -10,6 +10,7 @@ const qa = window as unknown as {
   bgPermission: boolean; bgStarts: number; bgRemovals: string[]; bgUploads: number;
   bgDenied: boolean; emitFix?: (fix: unknown) => void; offline: () => void;
   pushPostAborted?: boolean; pushPosts?: number;
+  pushConfigDelay?: boolean; finishPushConfig?: () => void;
   pushPostDelay?: boolean; finishPushEnrollment?: () => void;
   pushConfigured: boolean; pushRegistered: boolean; pushDeleteFails: boolean; pushRevocation?: unknown;
 };
@@ -19,7 +20,7 @@ qa.pushConfigured = true; qa.pushRegistered = localStorage.getItem('qa-server-pu
 dutyIntent.set('driver-fixture', true);
 window.fetch = async (input, options) => {
   const url = String(input);
-  if (url === '/api/notification-devices/config') return Response.json({ android: qa.pushConfigured, ios: false });
+  if (url === '/api/notification-devices/config') { if(qa.pushConfigDelay)await new Promise<void>(resolve=>{qa.finishPushConfig=resolve;}); return Response.json({ android: qa.pushConfigured, ios: false }); }
   if (url === '/api/notification-devices') {
     if (options?.method === 'DELETE') {
       qa.pushRevocation = JSON.parse(String(options.body));

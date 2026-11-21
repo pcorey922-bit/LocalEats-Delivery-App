@@ -13,9 +13,9 @@ const modules = {
   '@clerk/react': `import {useSyncExternalStore} from 'react';const subscribe=cb=>{window.addEventListener('qa-push-account',cb);return()=>window.removeEventListener('qa-push-account',cb)};export const useAuth=()=>{const userId=useSyncExternalStore(subscribe,()=>window.pushUserId||'driver-fixture');return{isLoaded:true,isSignedIn:true,userId,getToken:async()=>null}};`,
   '@capacitor/core': `export const Capacitor={isNativePlatform:()=>true,getPlatform:()=>'android'};export const registerPlugin=()=>({addWatcher:async(options,callback)=>{window.emitFix=fix=>callback(fix);return 'watch-'+(++window.bgStarts)},removeWatcher:async({id})=>{window.bgRemovals.push(id)}});`,
   '@capacitor/browser': `export const Browser={close:async()=>{},open:async()=>{}};`,
-  '@capacitor/app': `export const App={getInfo:async()=>({id:'com.rocoeats.driver.staging'}),addListener:async()=>({remove:async()=>{}})};`,
+  '@capacitor/app': `export const App={getInfo:async()=>{if(window.pushInfoDelay)await new Promise(resolve=>{window.finishPushInfo=resolve});return{id:'com.rocoeats.driver.staging'}},addListener:async()=>({remove:async()=>{}})};`,
   '@capacitor/geolocation': `export const Geolocation={watchPosition:async()=> 'foreground-fixture',clearWatch:async()=>{}};`,
-  '@capacitor/push-notifications': `const listeners={};export const PushNotifications={createChannel:async channel=>{if(!window.bgPermission)throw Error('Channel before consent');window.pushChannel=channel;},checkPermissions:async()=>({receive:window.bgPermission?'granted':'denied'}),requestPermissions:async()=>({receive:window.bgPermission?'granted':'denied'}),addListener:async(name,callback)=>{if(name==='registration'&&window.pushListenerDelay)await new Promise(resolve=>{window.finishPushListener=resolve});listeners[name]=callback;window.pushListenersFinished=(window.pushListenersFinished||0)+1;return{remove:async()=>{if(listeners[name]===callback)delete listeners[name]}}},register:async()=>{window.pushRegisterCalls=(window.pushRegisterCalls||0)+1;listeners.registration({value:'mock_push_token_not_real_123456'})},unregister:async()=>{window.pushUnregisterCalls=(window.pushUnregisterCalls||0)+1}};`,
+  '@capacitor/push-notifications': `const listeners={};export const PushNotifications={createChannel:async channel=>{if(window.pushChannelDelay)await new Promise(resolve=>{window.finishPushChannel=resolve});if(!window.bgPermission)throw Error('Channel before consent');window.pushChannel=channel;},checkPermissions:async()=>({receive:window.bgPermission?'granted':'denied'}),requestPermissions:async()=>{window.pushPermissionRequests=(window.pushPermissionRequests||0)+1;if(window.pushPermissionDelay)await new Promise(resolve=>{window.finishPushPermission=resolve});return{receive:window.bgPermission?'granted':'denied'}},addListener:async(name,callback)=>{if(name==='registration'&&window.pushListenerDelay)await new Promise(resolve=>{window.finishPushListener=resolve});listeners[name]=callback;window.pushListenersFinished=(window.pushListenersFinished||0)+1;return{remove:async()=>{if(listeners[name]===callback)delete listeners[name]}}},register:async()=>{window.pushRegisterCalls=(window.pushRegisterCalls||0)+1;listeners.registration({value:'mock_push_token_not_real_123456'})},unregister:async()=>{window.pushUnregisterCalls=(window.pushUnregisterCalls||0)+1}};`,
 };
 await build({ entryPoints: [path.join(root, 'artifacts/localeats/tests/background-browser.tsx')], outfile: path.join(target, 'app.js'), bundle: true, format: 'esm', platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"development"', 'import.meta.env.VITE_APP_AUDIENCE': '"driver"', 'import.meta.env.VITE_API_ORIGIN': 'undefined' }, plugins: [{ name: 'native-fixture', setup(b) { b.onResolve({ filter: /^(@capacitor\/(core|app|browser|geolocation|push-notifications)|@clerk\/react)$/ }, args => ({ path: args.path, namespace: 'qa-native' })); b.onLoad({ filter: /.*/, namespace: 'qa-native' }, args => ({ contents: modules[args.path], loader: 'js', resolveDir: path.join(root,'artifacts/localeats') })); } }] });
 const assets = path.join(root, 'artifacts/localeats/dist/public/assets');
@@ -51,6 +51,22 @@ try {
   await page.waitForFunction(() => window.bgRemovals.includes('watch-2'));
   assert.equal(await page.getByRole('complementary', { name: 'On-duty location status', exact: true }).count(), 0);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  // Every pre-token phase is bounded; a late result must not enroll a device.
+  for(const [flag,finish] of [['pushConfigDelay','finishPushConfig'],['pushPermissionDelay','finishPushPermission'],['pushChannelDelay','finishPushChannel'],['pushInfoDelay','finishPushInfo']]) {
+   await page.goto(`http://127.0.0.1:${server.address().port}/?push=true`);
+   await page.clock.install();
+   await page.getByRole('button',{name:'Enable mobile push notifications',exact:true}).waitFor();
+   await page.evaluate(flag=>{window[flag]=true;},flag);
+   await page.getByRole('button',{name:'Enable mobile push notifications',exact:true}).click();
+   await page.waitForFunction(finish=>typeof window[finish]==='function',finish);
+   await page.clock.fastForward(16000);
+   await page.getByRole('alert').filter({hasText:'registration timed out'}).waitFor({timeout:3000});
+   await page.evaluate(finish=>window[finish](),finish);await page.waitForTimeout(30);
+   assert.equal(await page.evaluate(()=>window.pushRegisterCalls||0),0);
+   assert.equal(await page.evaluate(()=>window.pushPosts||0),0);
+   assert.equal(await page.evaluate(()=>localStorage.getItem('rocoeats-push-device-id')),null);
+  }
+  console.log('PASS: stalled push configuration, permission, channel and app identity time out before enrollment; late native/API results cannot register or save a device. All simulated.');
   // A timed-out enrollment must never save a late success in this/new session.
   await page.goto(`http://127.0.0.1:${server.address().port}/?push=true`);
   await page.clock.install();

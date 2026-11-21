@@ -34,6 +34,9 @@ export function registerPush(options: { signal?: AbortSignal } = {}): Promise<vo
     if (signal.aborted) { void handle.remove().catch(()=>{}); signal.throwIfAborted(); }
     handles.push(handle);
   };
+  // Bound enrollment from configuration/permission onward, including native
+  // promises that never resolve before token listeners have been installed.
+  timer = setTimeout(() => controller.abort(new Error('Device registration timed out. Registration is unconfirmed; retry or disable push for this device.')),15000);
   const work = (async () => {
     signal.throwIfAborted();
     const config = await customFetch<{android:boolean;ios:boolean}>('/api/notification-devices/config',{signal});
@@ -49,7 +52,6 @@ export function registerPush(options: { signal?: AbortSignal } = {}): Promise<vo
     }
     const appId = (await App.getInfo()).id;
     signal.throwIfAborted();
-    timer = setTimeout(() => controller.abort(new Error('Device registration timed out. Registration is unconfirmed; retry or disable push for this device.')),15000);
     let resolveToken!: () => void, rejectToken!: (error:unknown) => void, claimed = false;
     const received = new Promise<void>((resolve,reject) => {resolveToken=resolve;rejectToken=reject;});
     // May abort while native listener creation itself is still pending.
