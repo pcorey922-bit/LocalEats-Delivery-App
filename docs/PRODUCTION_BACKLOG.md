@@ -1,3 +1,15 @@
+# November 21 — Customer208 audience routing ready for Samsung
+
+Functional9c91fdc all THREE CI SUCCESS. Signed Customer208/run44883913561 artifact
+RoCoEats-Android-Staging-Test-APK verified exact source/hash/manifest/protected cert.
+Native Customer same multi-role profile now lands discovery; Admin/Dispatch/Driver
+menu access preserved. Website admin-first and Driver priority unchanged; no account,
+role, authorization, checkout eligibility or backend changes. No duplicate account
+required for navigation. Multi-role/restart/handoff/permission browser tests,13 units,
+types/build/full CI PASS. Physical208 acceptance PENDING, exact phone link/steps in
+checkpoint. No Render deployment, Driver rebuild, settings or financial/provider action.
+Next actual208 phone evidence; do not invent new features or repeat resolved audits.
+
 # November 21 — dedicated Customer app multi-role landing fixed
 
 Owner Samsung205 recognizes identity and authorized menu but sign-in lands Admin.

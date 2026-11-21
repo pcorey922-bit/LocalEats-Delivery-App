@@ -1,3 +1,54 @@
+# November 21 — verified Customer208 multi-role landing release
+
+Functional9c91fdc3940b7e69be0724babfd2cdc044b45f0e ALL THREE CI SUCCESS:
+Validate push44883913574, PR44883917369, Native44883917377. Protected signed CUSTOMER208
+run44883913561 SUCCESS; artifact14698664941 RoCoEats-Android-Staging-Test-APK exact
+source/ZIP/APK hashes, package com.rocoeats.app.staging, version208, permission/
+manifest safeguards and unchanged protected v2 signing certificate independently
+verified. No physical208 acceptance claimed. Latest documentation commit does not
+require rebuilding this artifact; read its own exact-SHA CI rather than assuming.
+
+Root cause and fix: shared WEBSITE admin-first AccountSetup policy lacked native
+Customer presentation override; NativeSignIn completion also returned inconsistently
+to account/setup. Native Customer ordinary sign-in now selects restaurant discovery
+using SAME verified profile ID/role. Actual customer checkout intent still restores
+cart; explicit partner onboarding, WEBSITE role routing and Driver app priority
+preserved. Admin/Dispatch/Driver menu privileges remain; server authentication,
+authorization and checkout eligibility unchanged. NO new account/profile or role
+grant. This is navigation, not expansion of purchasing permissions.
+
+PASS before/after browser reproduction of /account/setup -> /admin; corrected four-role
+Customer landing, owner admin/dispatch/driver access, profile identity/role unchanged,
+zero profile creates, active saved-owner handoff with zero new approval calls,
+reload/session and explicit partner routes. Existing waiting-handoff/cancel/expiry/
+interrupted activation/timeout tests PASS; Driver native bootstrap and dedicated
+owner/approved/unapproved role regressions PASS.13 mobile API/routing/body-reader
+units, UI typecheck/production build/diff PASS; full standard CI PASS. Native/Clerk
+simulated with real disposable local APIs, not physical or real-provider acceptance.
+
+PHONE CHECK (same existing MULTI-ROLE account, no separate customer/driver account):
+https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44883913561
+Artifacts -> RoCoEats-Android-Staging-Test-APK -> extract ZIP -> install208 UPDATE,
+never uninstall existing app/data. From Home use Sign In (active session may skip
+browser) -> expect restaurant browsing rather than automatic Admin dashboard.
+Menu -> Administrator and Driver remain accessible; return Find food and close/
+reopen to check session remains. Role can still display Administrator: correct,
+identity/permissions unchanged. No need to log out solely to test, toggle availability,
+submit forms/orders, press finance controls or change hosted settings. Physical208
+result PENDING. Record only observed scope; preserve prior205 identity/menu evidence.
+
+NEXT: fetch latest branch/CI, incorporate208 phone result and fix only reproducible
+remaining defect. No Driver APK rebuild, Render deployment, migration, credential or
+host configuration needed. No backend code/hosted data/provider/financial operations
+performed. Existing public/private ordering, live/payout/cleanup/geographic controls
+remain closed, Stripe TEST. PR1 unmerged, recovery worktree/stashes/signing preserved.
+Remaining real-device GPS/push, authenticated/signed iOS, authorized provider finance,
+geographic/legal/hosting acceptance remains distinct; no more known Launcher ANR/
+installer or exhausted Geocodio retries without concrete fix. Contractor/income/
+Plaid/verification letters remain deferred. Do not reopen resolved154 auth or repeat
+completed audits merely to create work. Current actionable routing fix is complete;
+new independent application changes should follow concrete acceptance evidence.
+
 # November 21 — owner Customer205 multi-role evidence and audience landing correction
 
 OWNER-OBSERVED Samsung205: existing multi-role identity recognized; Find food,
