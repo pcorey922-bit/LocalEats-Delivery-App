@@ -1,3 +1,37 @@
+# November 21 — foreground driver transport recovery completed; Customer208 accepted
+
+Customer Android208 OWNER physical sign-in/navigation/identity/permissions/restart
+acceptance remains scoped and VALID below; no repeated Customer phone test requested.
+
+Confirmed related foreground defects: never-resolving location request held inFlight
+forever; heartbeat interval could accumulate requests; malformed timestamp threw
+before cleanup and poisoned upload slot; truthy non-boolean acknowledgement could
+be treated as success. Reproduced foreground hang and timestamp exception beforefix.
+
+Small correction reuses bounded nativeStep with per-request abort for foreground
+position/order uploads and heartbeats. Heartbeat has single-flight guard; cleanup
+cancels pending work. Validate native fix before occupying slot (same finite/range/
+accuracy/freshness bounds as background; NOT municipal enforcement), require strict
+boolean acknowledgement, encode active order path. No change to backend authorization,
+assignment, role, pricing or location privacy policy. No real GPS test performed.
+
+Focused mocked browser PASS: invalid/stale/out-of-range timestamps/fixes never send
+or poison slot; hung GPS aborts, fresh fix recovers; old late acknowledgement cannot
+forward a position to an order; malformed ack never reports new success; hung heartbeat
+errors then next interval recovers without overlap. Existing changed GPS consent/
+stop/authorization and Android+iOS notification status/enrollment/opt-out/account-
+fencing regressions PASS. UI types/production build/diff PASS. Background10 unit
+regressions already PASS in34c1175; native CI0a29655 SUCCESS, Validate pending at writing.
+No actual provider receipt/background/physical-iOS acceptance inferred.
+
+Next: push, verify exact-SHA CI and build protected DRIVER staging candidate containing
+these GPS/notification fixes. Verify source/version/hash/cert/manifest; do not rebuild
+accepted Customer208 just to repeat its completed auth tests. Native updates only,
+no Render deploy or hosted settings/migration needed. Background/locked-screen GPS
+acceptance needs owner's explicit device consent/on-duty actions; never start from
+tools. Push providers still owner-observed unconfigured; no real sends authorized.
+No ordering/financial/geographic activation, credentials or paid resources changed.
+
 # November 21 — notification status/opt-out recovery and iOS controller verified
 
 Customer208 physical sign-in/navigation/session acceptance below remains VALID;

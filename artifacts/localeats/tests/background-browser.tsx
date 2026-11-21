@@ -14,6 +14,8 @@ const qa = window as unknown as {
   pushConfigReadAborted?: boolean; pushConfigDelay?: boolean; finishPushConfig?: () => void;
   pushStatusDelay?: boolean; finishPushStatus?: () => void;
   pushDeleteDelay?: boolean; finishPushDelete?: () => void; pushDeleteAborted?: boolean;
+  dutyOrderId?:string; dutyPostDelay?:boolean; finishDutyPost?:()=>void; dutyPostAborted?:boolean; dutyMalformed?:boolean; dutyOrderUploads?:number;
+  dutyHeartbeatDelay?:boolean; finishDutyHeartbeat?:()=>void; dutyHeartbeatAborted?:boolean; dutyHeartbeats?:number;
   directRegisterPush: () => Promise<void>; pushRegistration?: {platform:string;appId:string};
   pushPostDelay?: boolean; finishPushEnrollment?: () => void;
   pushConfigured: boolean; pushRegistered: boolean; pushDeleteFails: boolean; pushRevocation?: unknown;
@@ -41,8 +43,18 @@ window.fetch = async (input, options) => {
   }
   if (url.startsWith('/api/notification-devices/')) { if(qa.pushStatusDelay)await new Promise<void>(resolve=>{qa.finishPushStatus=resolve;}); return qa.pushRegistered ? Response.json({ registered: true, platform: location.search.includes('ios=true')?'ios':'android', appId: location.search.includes('ios=true')?'com.rocoeats.driver':'com.rocoeats.driver.staging' }) : Response.json({ error: 'Not registered' }, { status: 404 }); }
   if (url === '/api/profiles/me') return Response.json({ id: 'driver-fixture', role: 'driver', displayName: 'Fixture Driver', createdAt: '2026-11-18T00:00:00.000Z' });
-  if (url === '/api/driver/availability') return Response.json({ approved: true, available: true, online: true, activeOrderId: null });
-  if (url === '/api/driver/location') { qa.bgUploads++; return qa.bgDenied ? Response.json({ error: 'Access revoked' }, { status: 403 }) : Response.json({ accepted: true }); }
+  if (url === '/api/driver/availability') return Response.json({ approved: true, available: true, online: true, activeOrderId: qa.dutyOrderId ?? null });
+  if (url === '/api/driver/location') {
+    qa.bgUploads++;
+    if(qa.dutyPostDelay) { options?.signal?.addEventListener('abort',()=>{qa.dutyPostAborted=true;},{once:true}); await new Promise<void>(resolve=>{qa.finishDutyPost=resolve;}); }
+    return qa.bgDenied ? Response.json({ error: 'Access revoked' }, { status: 403 }) : Response.json({ accepted: qa.dutyMalformed ? 'false' : true });
+  }
+  if (url.startsWith('/api/driver/orders/') && url.endsWith('/location')) { qa.dutyOrderUploads=(qa.dutyOrderUploads??0)+1; return Response.json({accepted:true}); }
+  if (url === '/api/driver/heartbeat') {
+    qa.dutyHeartbeats=(qa.dutyHeartbeats??0)+1;
+    if(qa.dutyHeartbeatDelay) { options?.signal?.addEventListener('abort',()=>{qa.dutyHeartbeatAborted=true;},{once:true}); await new Promise<void>(resolve=>{qa.finishDutyHeartbeat=resolve;}); }
+    return Response.json({online:true});
+  }
   return Response.json({ online: true });
 };
 createRoot(document.getElementById('root')!).render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{location.search.includes('push=true') ? <PushPreferences/> : <><BackgroundDutyRecovery/><DriverDutySession/></>}</QueryClientProvider>);

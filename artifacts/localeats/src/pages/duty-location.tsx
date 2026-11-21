@@ -1,3 +1,4 @@
+import { nativeStep } from '../lib/native-startup';
 import { useEffect, useRef, useState } from "react";
 import { Geolocation } from "@capacitor/geolocation";
 import { useAppForeground } from "../hooks/use-app-foreground";
@@ -21,6 +22,13 @@ export function DutyLocation({
       inFlight = false;
     const controller = new AbortController();
     attempt.current = 0;
+    async function upload<T>(path: string, body: string): Promise<T> {
+      const request = new AbortController();
+      try {
+        return await nativeStep('NATIVE_LOCATION_REQUEST_TIMEOUT', () =>
+          customFetch<T>(path, { method: 'POST', body, signal: request.signal }), controller.signal);
+      } finally { request.abort(); }
+    }
     void Geolocation.watchPosition(
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 },
       (position, error) => {
@@ -29,6 +37,13 @@ export function DutyLocation({
           setMessage(
             "GPS unavailable. Check location permissions and signal; dispatch will see a missing or stale-location warning.",
           );
+          return;
+        }
+        const coords = position.coords, age = Date.now() - position.timestamp;
+        if (!coords || ![coords.latitude, coords.longitude, coords.accuracy, position.timestamp].every(Number.isFinite) ||
+            Math.abs(coords.latitude) > 90 || Math.abs(coords.longitude) > 180 || coords.accuracy < 0 || coords.accuracy > 10000 ||
+            age > 120000 || age < -30000) {
+          setMessage('GPS fix rejected: a fresh, valid device position is required.');
           return;
         }
         if (inFlight || Date.now() - attempt.current < 15000) return;
@@ -40,13 +55,10 @@ export function DutyLocation({
           accuracyMeters: position.coords.accuracy,
           observedAt: new Date(position.timestamp).toISOString(),
         });
-        void customFetch<{ accepted: boolean }>("/api/driver/location", {
-          method: "POST",
-          body: payload,
-          signal: controller.signal,
-        })
+        void upload<{ accepted: boolean }>("/api/driver/location", payload)
           .then(async (result) => {
             if (disposed) return;
+            if (!result || typeof result.accepted !== 'boolean') throw new Error('Invalid location acknowledgement');
             if (!result.accepted) {
               setMessage(
                 "Waiting for a newer GPS fix; the last position was not replaced.",
@@ -54,9 +66,8 @@ export function DutyLocation({
               return;
             }
             if (activeOrderId) {
-              await customFetch(
-                `/api/driver/orders/${activeOrderId}/location`,
-                { method: "POST", body: payload, signal: controller.signal },
+              await upload(
+                `/api/driver/orders/${encodeURIComponent(activeOrderId)}/location`, payload,
               );
             }
             if (!disposed) {

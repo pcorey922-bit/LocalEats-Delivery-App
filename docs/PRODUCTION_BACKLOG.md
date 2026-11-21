@@ -1,3 +1,14 @@
+# November 21 — driver GPS recovery ready for candidate build
+
+Customer208 physical tested workflows ACCEPTED; no repeat. Foreground upload/heartbeat
+hang and invalid-timestamp crash reproduced and fixed with bounded requests, no
+heartbeat overlap, pre-slot valid-fix checks and strict ack. Fresh fix recovery/
+late-result fencing + existing changed GPS/Android+iOS push controller regressions,
+UI types/build PASS (mocked native/API; no real GPS/provider). Next Driver-only signed
+candidate + exact-source CI/certificate verification. No Customer auth rebuild/retest,
+backend deploy or activation. Actual locked/background GPS, real push and physical
+signed iOS remain owner/provider gates. Safety/data/permissions unchanged.
+
 # November 21 — native notification recovery completed offline
 
 Customer208 physically ACCEPTED for scoped sign-in/navigation/identity/session work;

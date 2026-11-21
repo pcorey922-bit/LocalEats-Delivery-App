@@ -1,3 +1,4 @@
+import { nativeStep } from '../lib/native-startup';
 import { useAccountProfile } from '../hooks/use-account-profile';
 import { dutyIntent } from "../lib/duty-intent";
 import { useDutyIntent } from "../hooks/use-duty-intent";
@@ -48,11 +49,15 @@ export function DriverDutySession() {
   useEffect(() => { if (!active) { setBackground(false); setConsent(false); } }, [active]);
   useEffect(() => {
     if (!active || !foreground) return;
-    let disposed = false;
+    let disposed = false, inFlight = false;
+    const controller = new AbortController();
     const heartbeat = () => {
-      void customFetch("/api/driver/heartbeat", {
-        method: "POST",
-      })
+      if (disposed || inFlight) return;
+      inFlight = true;
+      const request = new AbortController();
+      void nativeStep('NATIVE_DRIVER_HEARTBEAT_TIMEOUT', () => customFetch("/api/driver/heartbeat", {
+        method: "POST", signal: request.signal,
+      }), controller.signal)
         .then(() => {
           if (!disposed) setError("");
         })
@@ -61,12 +66,14 @@ export function DriverDutySession() {
             setError(
               "Dispatch connection interrupted. Offers will pause until the connection recovers.",
             );
-        });
+        })
+        .finally(() => { request.abort(); inFlight = false; });
     };
     heartbeat();
     const timer = setInterval(heartbeat, 30000);
     return () => {
       disposed = true;
+      controller.abort();
       clearInterval(timer);
     };
   }, [active, userId, foreground]);

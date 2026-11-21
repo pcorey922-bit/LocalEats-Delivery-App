@@ -14,7 +14,7 @@ const modules = {
   '@capacitor/core': `export const Capacitor={isNativePlatform:()=>true,getPlatform:()=>location.search.includes('ios=true')?'ios':'android'};export const registerPlugin=()=>({addWatcher:async(options,callback)=>{window.emitFix=fix=>callback(fix);return 'watch-'+(++window.bgStarts)},removeWatcher:async({id})=>{window.bgRemovals.push(id)}});`,
   '@capacitor/browser': `export const Browser={close:async()=>{},open:async()=>{}};`,
   '@capacitor/app': `export const App={getInfo:async()=>{if(window.pushInfoDelay)await new Promise(resolve=>{window.finishPushInfo=resolve});return{id:location.search.includes('ios=true')?'com.rocoeats.driver':'com.rocoeats.driver.staging'}},addListener:async()=>({remove:async()=>{}})};`,
-  '@capacitor/geolocation': `export const Geolocation={watchPosition:async()=> 'foreground-fixture',clearWatch:async()=>{}};`,
+  '@capacitor/geolocation': `export const Geolocation={watchPosition:async(options,callback)=>{window.emitForegroundFix=fix=>callback(fix);return 'foreground-fixture'},clearWatch:async()=>{}};`,
   '@capacitor/push-notifications': `const listeners={};export const PushNotifications={createChannel:async channel=>{if(window.pushChannelDelay)await new Promise(resolve=>{window.finishPushChannel=resolve});if(!window.bgPermission)throw Error('Channel before consent');window.pushChannel=channel;},checkPermissions:async()=>{if(window.pushPermissionReadDelay)await new Promise(resolve=>{window.finishPushPermissionRead=resolve});return{receive:window.bgPermission?'granted':'denied'}},requestPermissions:async()=>{window.pushPermissionRequests=(window.pushPermissionRequests||0)+1;if(window.pushPermissionDelay)await new Promise(resolve=>{window.finishPushPermission=resolve});return{receive:window.bgPermission?'granted':'denied'}},addListener:async(name,callback)=>{if(name==='registration'&&window.pushListenerDelay)await new Promise(resolve=>{window.finishPushListener=resolve});listeners[name]=callback;window.pushListenersFinished=(window.pushListenersFinished||0)+1;return{remove:async()=>{if(listeners[name]===callback)delete listeners[name]}}},register:async()=>{window.pushRegisterCalls=(window.pushRegisterCalls||0)+1;listeners.registration({value:location.search.includes('ios=true')?'a'.repeat(64):'mock_push_token_not_real_123456'})},unregister:async()=>{window.pushUnregisterCalls=(window.pushUnregisterCalls||0)+1;if(window.pushNativeRemoveDelay)await new Promise(resolve=>{window.finishPushNativeRemove=resolve})}};`,
 };
 await build({ entryPoints: [path.join(root, 'artifacts/localeats/tests/background-browser.tsx')], outfile: path.join(target, 'app.js'), bundle: true, format: 'esm', platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"development"', 'import.meta.env.VITE_APP_AUDIENCE': '"driver"', 'import.meta.env.VITE_API_ORIGIN': 'undefined' }, plugins: [{ name: 'native-fixture', setup(b) { b.onResolve({ filter: /^(@capacitor\/(core|app|browser|geolocation|push-notifications)|@clerk\/react)$/ }, args => ({ path: args.path, namespace: 'qa-native' })); b.onLoad({ filter: /.*/, namespace: 'qa-native' }, args => ({ contents: modules[args.path], loader: 'js', resolveDir: path.join(root,'artifacts/localeats') })); } }] });
@@ -25,6 +25,45 @@ let browser;
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 try {
   browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
+  const gps=await browser.newPage();
+  await gps.addInitScript(()=>{window.dutyOrderId='order-current';});await gps.clock.install();
+  await gps.goto(`http://127.0.0.1:${server.address().port}`);
+  await gps.waitForFunction(()=>typeof window.emitForegroundFix==='function');
+  await gps.evaluate(()=>window.emitForegroundFix({coords:{latitude:35.8,longitude:-84.7,accuracy:5},timestamp:NaN}));
+  await gps.getByText('GPS fix rejected: a fresh, valid device position is required.',{exact:true}).waitFor();
+  assert.equal(await gps.evaluate(()=>window.bgUploads),0,'Invalid timestamp cannot poison the upload slot or create a request');
+  await gps.evaluate(()=>{for(const fix of [
+   {coords:{latitude:91,longitude:-84.7,accuracy:5},timestamp:Date.now()},
+   {coords:{latitude:35.8,longitude:-84.7,accuracy:-1},timestamp:Date.now()},
+   {coords:{latitude:35.8,longitude:-84.7,accuracy:5},timestamp:Date.now()-121000},
+   {coords:{latitude:35.8,longitude:-84.7,accuracy:5},timestamp:9e15},
+  ])window.emitForegroundFix(fix);});
+  assert.equal(await gps.evaluate(()=>window.bgUploads),0);
+
+  await gps.evaluate(()=>{window.dutyPostDelay=true;window.emitForegroundFix({coords:{latitude:35.8,longitude:-84.7,accuracy:5},timestamp:Date.now()});});
+  await gps.waitForFunction(()=>typeof window.finishDutyPost==='function');await gps.clock.fastForward(16000);
+  await gps.getByText('Location upload failed. Retrying on the next GPS update.',{exact:true}).waitFor({timeout:3000});
+  assert.equal(await gps.evaluate(()=>window.dutyPostAborted),true);
+  await gps.evaluate(()=>{window.dutyPostDelay=false;window.emitForegroundFix({coords:{latitude:35.8,longitude:-84.7,accuracy:5},timestamp:Date.now()});});
+  await gps.getByText('Last successful upload',{exact:false}).waitFor();
+  assert.equal(await gps.evaluate(()=>window.dutyOrderUploads),1);
+  await gps.evaluate(()=>window.finishDutyPost());await gps.waitForTimeout(30);
+  assert.equal(await gps.evaluate(()=>window.dutyOrderUploads),1,'Late abandoned GPS result must not be forwarded to an order');
+  await gps.clock.fastForward(16000);
+  await gps.evaluate(()=>{window.dutyMalformed=true;window.emitForegroundFix({coords:{latitude:35.8,longitude:-84.7,accuracy:5},timestamp:Date.now()});});
+  await gps.getByText('Location upload failed. Retrying on the next GPS update.',{exact:true}).waitFor();
+  assert.equal(await gps.evaluate(()=>window.dutyOrderUploads),1,'Malformed acknowledgement cannot report success or forward a position');await gps.close();
+  const heartbeat=await browser.newPage();
+  await heartbeat.addInitScript(()=>{window.dutyHeartbeatDelay=true;});await heartbeat.clock.install();
+  await heartbeat.goto(`http://127.0.0.1:${server.address().port}`);
+  await heartbeat.waitForFunction(()=>typeof window.finishDutyHeartbeat==='function');await heartbeat.clock.fastForward(16000);
+  await heartbeat.getByText('Dispatch connection interrupted.',{exact:false}).waitFor({timeout:3000});
+  assert.equal(await heartbeat.evaluate(()=>window.dutyHeartbeatAborted),true);
+  await heartbeat.evaluate(()=>{window.dutyHeartbeatDelay=false;});await heartbeat.clock.fastForward(15000);
+  await heartbeat.waitForFunction(()=>window.dutyHeartbeats===2);
+  await heartbeat.getByText('Dispatch connection interrupted.',{exact:false}).waitFor({state:'hidden'});
+  await heartbeat.evaluate(()=>window.finishDutyHeartbeat());await heartbeat.close();
+  console.log('PASS: foreground GPS and heartbeats recover from hung transport, abort stale work, reject malformed acknowledgements and never forward a late old position. Native/API simulated.');
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } }), errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.addInitScript(() => localStorage.setItem('rocoeats-background-watch:v1', 'orphaned-prior-watch'));
