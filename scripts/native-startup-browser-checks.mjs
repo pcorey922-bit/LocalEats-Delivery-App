@@ -115,7 +115,70 @@ export async function verifyNativeCustomerStartup({actor,origin}) {
   await page.close();
  }
  const loading=await actor('guest');await loading.context().addInitScript(()=>{window.qaNativeBootstrap=true;sessionStorage.setItem('qa-pending','1');window.qaAuthReady=false;});await loading.clock.install();await loading.goto(origin);await loading.getByRole('status').filter({hasText:'NATIVE_RESTORING'}).waitFor();await loading.clock.fastForward(31000);await loading.getByRole('alert').filter({hasText:'NATIVE_STARTUP_TIMEOUT_RESTORING'}).waitFor();
- const pending=await actor('guest');await pending.context().addInitScript(()=>{window.qaNativeBootstrap=true;localStorage.setItem('rocoeats-native-auth:v1',JSON.stringify({id:'11111111-1111-4111-8111-111111111119',verifier:'V'.repeat(43),expiresAt:new Date(Date.now()+300000).toISOString(),phase:'waiting'}));});await pending.clock.install();await pending.goto(origin);await pending.getByRole('status').filter({hasText:'NATIVE_RESTORING'}).waitFor();assert.ok(await pending.evaluate(()=>localStorage.getItem('rocoeats-native-auth:v1')));await pending.clock.fastForward(31000);await pending.getByRole('alert').filter({hasText:'NATIVE_STARTUP_TIMEOUT_RESTORING'}).waitFor();
+ await verifySavedCustomerHandoff({actor,origin});
  const privateAccount=await actor('customer');await privateAccount.context().addInitScript(()=>{window.qaNativeBootstrap=true;});await privateAccount.clock.install();await privateAccount.route('**/api/session/access',()=>{});await privateAccount.goto(origin+'/account/access');await privateAccount.getByRole('status').filter({hasText:'Checking account permissions'}).waitFor();await privateAccount.clock.fastForward(21000);await privateAccount.getByRole('alert').filter({hasText:'ACCOUNT_API_TIMEOUT'}).waitFor();
  console.log('PASS: signed-out/signed-in customer public routes and restart survive startup budget; unresolved Clerk restoration remains bounded. Native/Clerk simulated; no order/payment submitted.');
+}
+
+
+async function verifySavedCustomerHandoff({actor,origin}) {
+ const saved={id:'11111111-1111-4111-8111-111111111119',verifier:'V'.repeat(43),role:'customer',checkout:true,phase:'waiting'};
+ async function pageWithRequest(role,patch={}) {
+  const page=await actor(role);
+  await page.context().addInitScript(request=>{
+   window.qaNativeBootstrap=true;
+   if(!localStorage.getItem('qa-request-seeded')) {
+    localStorage.setItem('qa-request-seeded','1');
+    localStorage.setItem('rocoeats-native-auth:v1',JSON.stringify({...request,expiresAt:new Date(Date.now()+(request.expired?-1:300000)).toISOString()}));
+   }
+  },{...saved,...patch});
+  return page;
+ }
+ for(const role of ['customer','restaurant','driver']) {
+  const page=await pageWithRequest('guest',{role});
+  await page.clock.install();let begins=0;const redeems=[];
+  await page.route('**/api/mobile/auth/begin',route=>{begins++;return route.fulfill({status:500,body:'{}'});});
+  await page.route('**/api/mobile/auth/redeem',route=>{redeems.push(route.request().postDataJSON());return route.fulfill({status:200,contentType:'application/json',body:'{"pending":true}'});});
+  for(let restart=0;restart<2;restart++) {
+   await page.goto(origin);
+   await page.waitForURL(url=>url.pathname==='/sign-in'&&url.searchParams.get('join')===role&&url.searchParams.get('checkout')===(role==='customer'?'1':null),{timeout:5000});
+   await page.getByRole('button',{name:'Cancel this sign-in',exact:true}).waitFor();
+   await page.waitForFunction(()=>JSON.parse(localStorage.getItem('rocoeats-native-auth:v1')||'null')?.phase==='waiting');
+   await page.getByRole('status').filter({hasText:'Secure startup · NATIVE_'}).waitFor({state:'hidden'});
+   await page.clock.fastForward(31000);
+   assert.equal(await page.getByRole('heading',{name:'App startup did not finish',exact:true}).count(),0);
+  }
+  assert.equal(begins,0,'Restoring a handoff must not create a new request or approval');
+  assert.ok(redeems.length>=2,'Each restarted document resumes the saved handoff');
+  for(const request of redeems) assert.deepEqual(request,{id:saved.id,verifier:saved.verifier});
+  await page.getByRole('button',{name:'Cancel this sign-in',exact:true}).click();
+  assert.equal(await page.evaluate(()=>localStorage.getItem('rocoeats-native-auth:v1')),null);
+  await page.close();
+ }
+ const stalled=await pageWithRequest('guest');
+ await stalled.clock.install();await stalled.route('**/api/mobile/auth/redeem',()=>{});
+ await stalled.goto(origin);
+ await stalled.getByRole('status').filter({hasText:'NATIVE_REDEEMING'}).waitFor();
+ await stalled.clock.fastForward(16000);
+ await stalled.getByRole('alert').filter({hasText:'NATIVE_REDEEM_TIMEOUT'}).first().waitFor();
+ await stalled.close();
+ const active=await pageWithRequest('customer');let activeAuthCalls=0;
+ await active.route('**/api/mobile/auth/*',route=>{activeAuthCalls++;return route.fulfill({status:500,body:'{}'});});
+ await active.goto(origin);
+ await active.waitForURL(url=>url.pathname==='/cart'&&url.searchParams.get('restore')==='1',{timeout:5000});
+ assert.equal(await active.evaluate(()=>localStorage.getItem('rocoeats-native-auth:v1')),null);
+ assert.equal(activeAuthCalls,0,'An already active session clears the stale handoff without redemption or another approval');
+ await active.close();
+ const interrupted=await pageWithRequest('guest',{phase:'activating'});let replayed=0;
+ await interrupted.route('**/api/mobile/auth/*',route=>{replayed++;return route.fulfill({status:500,body:'{}'});});
+ await interrupted.goto(origin);
+ await interrupted.getByRole('alert').filter({hasText:'NATIVE_HANDOFF_INTERRUPTED'}).first().waitFor();
+ assert.equal(replayed,0,'An interrupted one-use activation is never replayed');
+ await interrupted.close();
+ const expired=await pageWithRequest('guest',{expired:true});let expiredCalls=0;
+ await expired.route('**/api/mobile/auth/*',route=>{expiredCalls++;return route.fulfill({status:500,body:'{}'});});
+ await expired.goto(origin);await expired.getByText('Browse Restaurants & Menus',{exact:true}).waitFor();
+ assert.equal(expiredCalls,0);
+ await expired.close();
+ console.log('PASS: customer cold restart resumes the same saved waiting handoff and role/checkout intent, never begins another approval; active sessions, cancellation, expiry and interrupted one-use activation remain protected. Clerk/OS and native redemption simulated.');
 }

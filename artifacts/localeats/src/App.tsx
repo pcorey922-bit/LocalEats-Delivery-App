@@ -322,7 +322,15 @@ function Router() {
   const publicCustomerPage = import.meta.env.VITE_APP_AUDIENCE !== 'driver' && (
     ['/', '/about', '/how-it-works', '/support', '/faq', '/privacy', '/terms', '/restaurants', '/guest/order'].includes(path) || /^\/restaurants\/[^/]+$/.test(path)
   );
-  useNativeStartup(isLoaded ? 'READY' : 'RESTORING', !!isLoaded, publicCustomerPage && !readNativeRequest());
+  const pendingRequest = Capacitor.isNativePlatform() ? readNativeRequest() : null;
+  useNativeStartup(isLoaded ? 'READY' : 'RESTORING', !!isLoaded, publicCustomerPage && !pendingRequest);
+  if (path === '/' && publicCustomerPage && pendingRequest) {
+    // A killed app restarts at Home even if no OS callback is delivered. Resume
+    // the saved one-use handoff through the existing owner, never start another.
+    const intent = new URLSearchParams({ join: pendingRequest.role ?? 'customer' });
+    if (pendingRequest.checkout === true) intent.set('checkout', '1');
+    return <Redirect to={accountEntryLinks(intent.toString()).signIn} />;
+  }
   return <RoutedErrorBoundary><Switch>
     <Route path="/" component={import.meta.env.VITE_APP_AUDIENCE === 'driver' ? () => <Redirect to="/driver"/> : HomePage} />
     {['/about', '/how-it-works', '/support', '/faq', '/privacy', '/terms'].map(path => <Route key={path} path={path} component={InformationPage}/>)}

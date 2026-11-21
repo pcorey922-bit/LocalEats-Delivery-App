@@ -1,3 +1,15 @@
+# November 21 — actual Customer interrupted-sign-in recovery gap corrected
+
+Native Customer Home had a saved waiting handoff but no resume path, eventually
+clearing it on startup timeout. Reproduced beforefix; minimal native-only Home ->
+existing SignInPage restores same request/role/checkout, never creates another approval.
+Browser recovery across restarts/cancel/expiry/stall/active session/interrupted
+one-use activation PASS; Driver regressions, six targeted unit tests, UI types/build
+PASS. Provider/OS redemption simulated, no physical acceptance or callback root-cause
+claim. Next exact-SHA CI and protected replacement Customer APK; no Render deploy,
+Driver rebuild, migration, host/provider/financial operation. Prefer new candidate
+for pending first Samsung test; do not repeat completed basics unnecessarily.
+
 # November 21 — current acceptance and software status
 
 Fresh staging23 PASS on76a24ed, actual render_cdn_chain; all ordering/live/payout/

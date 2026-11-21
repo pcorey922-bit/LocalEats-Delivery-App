@@ -1,3 +1,39 @@
+# November 21 — confirmed saved Customer native handoff recovery fixed
+
+A focused source/test review found an independently reproducible missing path:
+Customer native restart lands on Home with a valid saved waiting request; previous
+Router suppressed READY but never remounted NativeSignIn, then timed out/cleared
+request. Existing test incorrectly expected timeout. New intended recovery regression
+FAILED before correction (no /sign-in navigation within5s), now PASS.
+
+Minimal native CUSTOMER Home guard redirects a valid saved request through existing
+SignInPage/NativeSignIn, preserving role/checkout via accountEntryLinks normalization.
+No new begin/approval request, new handoff implementation, transport switch, server
+or role/nonce/ticket authorization change. Web/driver routes untouched. Expired
+requests do not resume; interrupted redeem/activation still fails visibly without
+replaying one-use work. This is NOT a proven explanation of the earlier Android
+cold-callback failure, whose later evidence was blocked by OS Launcher ANR.
+
+Focused real-bootstrap browser PASS: customer/restaurant/driver intent and same saved
+ID/verifier across two document restarts, zero auth/begin calls, waiting survives31s,
+cancellation clears saved request, stalled redemption yields NATIVE_REDEEM_TIMEOUT,
+already active customer clears stale request without any auth API call and reaches
+checkout, expired requests ignored, interrupted activation yields NATIVE_HANDOFF_INTERRUPTED
+without API replay. Native/Clerk/redemption SIMULATED, local disposable backend only.
+Existing Driver bootstrap/profile/session/retry browser regressions PASS; four native
+startup plus two navigation unit tests PASS; UI typecheck/production build/diff PASS.
+
+Next: push, exact-SHA CI and protected CUSTOMER staging build. New Customer APK needed
+for this JS recovery fix; no Driver rebuild or Render deploy/migration/config change.
+The earlier async first-basic-phone check193 remains useful if already performed;
+if not yet started, prefer forthcoming replacement once verified. Do not ask owner
+to repeat unchanged basics or mark physical/real-Clerk redemption acceptance passed.
+Do NOT rerun known Launcher ANR merely to chase callbacks. iOS safe-area Customer
+screens and standard CI6c80db0 remain valid for unchanged native inset setting;
+latest unsigned native compilation still required. Owner/provider acceptance gates
+and all closed ordering/payment/retention/geographic controls unchanged. Contractor/
+income/Plaid/verification letters remain deferred; no hosted/provider/financial action.
+
 # November 21 — verified software checkpoint; remaining acceptance gates
 
 STAGING: fresh existing23 checks PASS on76a24ed542e85c42e8a85d42d59dfd3e20e46ead.
