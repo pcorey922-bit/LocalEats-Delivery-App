@@ -1,3 +1,22 @@
+# NEXT PRIORITY AFTER RESET — Driver213 physical background GPS NOT PASSED
+
+Owner Samsung S22 Ultra: precise location ON; Android offers only While using /
+Ask every time / Don't allow, NO Allow all the time. After online + about TWO minutes
+backgrounded, return showed "Reconnect on this device" and "Go offline everywhere".
+Root UNKNOWN. Investigate permission/foreground-service configuration AND device-
+session recovery/foreground lifecycle/heartbeat lease/GPS freshness. No assumption
+that missing All the time permission is a defect; explicit background consent,
+ongoing notification and actual background timestamp progression remain unverified.
+
+Preserve Customer208 scoped PHYSICAL ACCEPTANCE; no repeat absent regression. Driver
+GPS/push fixes and local integration remain automated-test verified, not physical BG
+acceptance.9ae8a13 all THREE CI SUCCESS, signed213 source73f85c7/run44887092509 preserved.
+Do NOT blindly change permissions, bypass authorization, repeat Launcher ANR/provider
+calls, rebuild APKs or deploy. Exact focused resume steps in top engineering checkpoint.
+This usage-reset turn records evidence only, no new runtime task started. Worktree
+clean after docs commit/push; automatic docs CI may be pending, never assume success.
+All hosting, signing, data/financial records and closed operational gates preserved.
+
 # November 21 — accepted Customer208; Driver213 and native recovery verified
 
 Customer208 owner's scoped physical sign-in/navigation/identity/permissions/session

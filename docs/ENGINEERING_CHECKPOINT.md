@@ -1,3 +1,63 @@
+# USAGE-RESET CHECKPOINT — November 21: Driver213 physical background acceptance NOT PASSED
+
+NEW OWNER-OBSERVED Samsung Galaxy S22 Ultra / signed DRIVER213:
+- Android location settings offer ONLY "Allow only while using the app", "Ask every
+  time", and "Don't allow". "Allow all the time" is NOT offered.
+- Precise location is enabled.
+- After going online and backgrounding approximately TWO minutes, returning showed
+  "Reconnect on this device" and "Go offline everywhere".
+- Background GPS acceptance has NOT passed. Exact root cause is UNKNOWN.
+These are observations, not evidence that a particular permission, foreground service,
+lease, watcher or device-session mechanism caused the failure. Absence of "Allow all
+the time" alone does not prove a defect in a foreground-service location design.
+Whether explicit background-sharing consent/enable was used, an ongoing Android
+notification was visible, GPS timestamps advanced while backgrounded, or the OS killed
+any process is NOT established by this report. Do not invent those facts or blame user.
+
+PRESERVED VERIFIED WORK:
+- Primary branch feature/rocoeats-launch-readiness, PR1 unmerged. Pre-checkpoint HEAD
+  9ae8a13dc8e222598e81588a43d26633301953e2 all THREE CI SUCCESS:
+  Validate PR44887800085, Native44887800086, push44887796256.
+- Driver213 functional source73f85c7f0e218f839b2e860951e38e837fe96e7f,
+  protected signed run44887092509/artifact14700009888. Source/hash/package/version/
+  existing signing certificate verified. No replacement/rebuild produced this turn.
+- GPS timeout/fix/ack recovery, notification deadline/opt-out/fencing fixes, real LOCAL
+  GPS/API/database/dispatch integration remain tested as recorded below; simulations
+  and builds do NOT establish physical background operation.
+- Customer Android208 remains PHYSICALLY ACCEPTED for tested sign-in/customer landing,
+  authorized Admin/Driver navigation, identity/permissions, close/reopen/session recovery
+  and no observed startup/navigation failure. Do NOT repeat without regression evidence.
+- Recovery worktree/stashes, native signing, database migrations, Neon recovery and
+  completed $19.19 TEST order/financial records preserved. No runtime edits this turn.
+
+EXACT NEXT ENGINEERING ACTION AFTER RESET:
+1. Fetch remote branch, inspect tree/history and this top checkpoint. Verify latest
+   exact-SHA CI; do not call pending/empty checks passed. Do not repeat completed audits.
+2. Investigate Android PERMISSION / FOREGROUND-SERVICE CONFIGURATION and DRIVER
+   DEVICE-SESSION RECOVERY together. Inspect compiled Driver213 manifest/native plugin
+   service setup, Android OS foreground-service rules and actual explicit-consent path.
+   Do NOT blindly add ACCESS_BACKGROUND_LOCATION or assume "Allow all the time" is needed.
+3. Trace DriverDutySession/useAppForeground/dutyIntent, BackgroundDutyRecovery/watcher
+   lifecycle and transport, server heartbeat/online lease/GPS freshness and reconnect
+   conditions. Explain how the two displayed controls are selected. Treat causes as
+   hypotheses until source, diagnostics or controlled reproduction establishes one.
+4. Reuse existing offline/native/browser tests; add only focused evidence/reproduction.
+   No rerun of known Launcher ANR or exhausted provider tests without concrete fix.
+   If device-only details remain necessary, ask only the missing targeted observation,
+   not a blanket repeat of accepted Customer or Driver sign-in acceptance.
+5. Make the smallest justified correction, preserve explicit tracking consent/privacy/
+   server authorization, run targeted checks, push and verify CI, then sign replacement
+   Driver APK ONLY if native/runtime change actually requires it. Physical background
+   GPS stays NOT PASSED until real owner evidence supports acceptance.
+
+STOP POINT: clean verified checkpoint only; no large investigation started before
+usage reset. Current commit changes docs only; no runtime tests rerun for documentation.
+Its automatic CI may still be PENDING at turn end; check exact result on resume.
+No Render deployment, hosted settings/data changes, new provider/financial operations,
+credentials/permissions changes or activation. Public/private ordering, live charges/
+payouts, retention cleanup and municipal enforcement stay OFF; Stripe TEST. Real
+notification-provider sends remain unauthorized. Contractor/income/Plaid/letters deferred.
+
 # November 21 — verified Driver213 recovery candidate + real local GPS/dispatch integration
 
 Customer Android208 physically ACCEPTED for owner's sign-in/customer-first landing,
