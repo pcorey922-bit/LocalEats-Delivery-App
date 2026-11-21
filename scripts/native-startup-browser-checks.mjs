@@ -88,7 +88,8 @@ export async function verifyNativeStartupBootstrap({ actor, origin }) {
 }
 
 
-export async function verifyNativeCustomerStartup({actor,origin}) {
+export async function verifyNativeCustomerStartup({actor,api,origin}) {
+ await verifyCustomerAppLanding({actor,api,origin});
  const callback=await actor('guest');
  await callback.context().addInitScript(()=>{window.qaNativeBootstrap=true;window.qaNativeLaunchUrl='rocoeats://auth';});
  await callback.goto(origin);
@@ -181,4 +182,40 @@ async function verifySavedCustomerHandoff({actor,origin}) {
  assert.equal(expiredCalls,0);
  await expired.close();
  console.log('PASS: customer cold restart resumes the same saved waiting handoff and role/checkout intent, never begins another approval; active sessions, cancellation, expiry and interrupted one-use activation remain protected. Clerk/OS and native redemption simulated.');
+}
+
+
+async function verifyCustomerAppLanding({actor,api,origin}) {
+ for(const role of ['admin','driver','restaurant','customer']) {
+  const page=await actor(role);await page.context().addInitScript(()=>{window.qaNativeBootstrap=true;});
+  const before=await api(role,'/profiles/me');let created=0;
+  page.on('request',request=>{if(request.method()==='POST'&&new URL(request.url()).pathname==='/api/profiles')created++;});
+  await page.goto(origin+'/sign-in');
+  await page.waitForURL(origin+'/restaurants',{timeout:5000});
+  await page.getByRole('button',{name:'Menu',exact:true}).click();
+  const nav=page.getByRole('navigation',{name:'Main navigation',exact:true});
+  if(role==='admin') {
+   await nav.getByRole('link',{name:'Administrator',exact:true}).waitFor();
+   await nav.getByRole('link',{name:'Dispatch & orders',exact:true}).waitFor();
+   await nav.getByRole('link',{name:'Driver',exact:true}).click();
+   await page.getByRole('button',{name:/^Go (online|offline)$/}).waitFor();
+   await page.goto(origin+'/admin');await api(role,'/admin/profiles');
+  } else if(role==='customer') {
+   assert.equal(await nav.getByRole('link',{name:'Administrator',exact:true}).count(),0);
+   assert.equal(await nav.getByRole('link',{name:'Driver',exact:true}).count(),0);
+  }
+  await page.goto(origin+'/sign-in');await page.waitForURL(origin+'/restaurants',{timeout:5000});
+  await page.reload();await page.waitForURL(origin+'/restaurants');
+  const after=await api(role,'/profiles/me');assert.equal(after.id,before.id);assert.equal(after.role,before.role);assert.equal(created,0);
+  await page.close();
+ }
+ const owner=await actor('admin');await owner.context().addInitScript(()=>{window.qaNativeBootstrap=true;localStorage.setItem('rocoeats-native-auth:v1',JSON.stringify({id:'11111111-1111-4111-8111-111111111119',verifier:'V'.repeat(43),expiresAt:new Date(Date.now()+300000).toISOString(),role:'customer',phase:'waiting'}));});
+ let approvals=0;await owner.route('**/api/mobile/auth/*',route=>{approvals++;return route.fulfill({status:500,body:'{}'});});
+ await owner.goto(origin);await owner.waitForURL(origin+'/restaurants',{timeout:5000});
+ assert.equal(approvals,0);assert.equal(await owner.evaluate(()=>localStorage.getItem('rocoeats-native-auth:v1')),null);await owner.close();
+ for(const [role,path] of [['restaurant','/restaurant'],['driver','/driver']]) {
+  const page=await actor(role);await page.context().addInitScript(()=>{window.qaNativeBootstrap=true;});
+  await page.goto(origin+'/sign-in?join='+role);await page.waitForURL(origin+path,{timeout:5000});await page.close();
+ }
+ console.log('PASS: native Customer sign-in prioritizes discovery for existing multi-role accounts, preserves profile/permissions, admin/dispatch/driver navigation and explicit partner onboarding; restored owner session needs no new approval. Local auth simulated, no hosted writes.');
 }

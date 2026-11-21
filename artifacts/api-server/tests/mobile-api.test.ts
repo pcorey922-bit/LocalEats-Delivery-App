@@ -165,3 +165,19 @@ test('HEAD and no-content semantics remain empty without invoking a response rea
   globalThis.fetch=async()=>new Response('',{status:200,headers:{'content-type':'application/json'}});
   assert.equal(await customFetch('/api/profiles/me'),null,'A truly empty payload is still empty, never fabricated');
 });
+
+
+test('Customer native presentation does not replace server roles or website staff routing', async () => {
+ const {accountDestination,nativeAccountReturn}=await import('../../localeats/src/lib/account-entry');
+ for(const role of ['customer','driver','restaurant','admin']) {
+  assert.equal(accountDestination(role,false,true),'/restaurants');
+  assert.equal(accountDestination(role,true,true),role==='customer'?'/cart?restore=1':'/restaurants');
+ }
+ assert.equal(accountDestination('admin',false),'/admin');
+ assert.equal(accountDestination('driver',false),'/driver');
+ assert.equal(accountDestination('restaurant',false),'/restaurant');
+ assert.equal(nativeAccountReturn('customer',false,true),'/account/setup?join=customer');
+ assert.equal(nativeAccountReturn(undefined,false,true),'/account/setup?join=customer');
+ assert.equal(nativeAccountReturn('customer',true,true),'/account/setup?join=customer&checkout=1');
+ for(const role of ['restaurant','driver']) assert.equal(nativeAccountReturn(role,false,true),'/account/setup?join='+role);
+});

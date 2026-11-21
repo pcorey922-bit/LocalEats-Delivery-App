@@ -1,3 +1,41 @@
+# November 21 — owner Customer205 multi-role evidence and audience landing correction
+
+OWNER-OBSERVED Samsung205: existing multi-role identity recognized; Find food,
+Dashboard, Orders, Driver, Notifications, Account, Administrator, Dispatch & orders
+menu entries present. Signing in lands on Administrator dashboard. Record ONLY
+this scope; no background GPS/push/payment or complete physical lifecycle inferred.
+
+Confirmed cause: AccountSetup applies shared accountDestination(role,checkout),
+which intentionally prioritizes admin for WEBSITE, while Driver audience already
+has its own override. NativeSignIn completion/active-handoff return also needed
+consistent customer presentation to avoid competing Account vs setup destinations.
+Focused actual-bootstrap regression failed beforefix, showing /account/setup ->
+/admin instead of expected /restaurants.
+
+Minimal correction: optional customer-app presentation flag in existing route
+helpers. Native CUSTOMER ordinary sign-in returns through setup to restaurant
+discovery for existing roles; actual customer checkout intent still restores cart.
+Explicit restaurant/driver onboarding remains, Driver build still prioritizes driver,
+WEBSITE staff routing unchanged. Identity/profile role/permissions/server checks,
+checkout authorization and saved one-use handoff protections unchanged. No duplicate
+account/profile created or required for the navigation correction. No backend change.
+
+PASS: multi-role native Customer browser verifies all four existing roles land on
+discovery, same profile ID/role, zero profile-create requests, admin/dispatch links
+and owner Driver controls accessible, ordinary customer gets no staff links, restart
+and active saved-owner handoff need no new approval, explicit partner routes retained.
+Existing saved-handoff/cancel/expiry/timeouts and native Driver bootstrap PASS;
+dedicated Driver owner/approval/role-preservation regression PASS;13 mobile API/route/
+response-reader units, UI typecheck/production build/diff PASS. Auth/native provider
+simulated with real disposable local APIs, not physical acceptance of replacement.
+
+Next: push, exact-SHA standard CI + protected replacement CUSTOMER staging APK;
+verify exact source/signature/hash/version before phone test. No Driver APK rebuild,
+Render deployment, migration, hosted settings or provider/financial action required.
+All existing controls/data/signing infrastructure preserved. New phone criterion:
+ordinary sign-in opens customer discovery; Menu still reaches authorized Admin and
+Driver; close/reopen preserves session. Do not repeat older resolved auth investigation.
+
 # November 21 — Customer205 ready for FIRST physical acceptance; software CI verified
 
 Latest functional0ca6023eea4ab7575f814296621c40add3100115 all THREE CI SUCCESS:

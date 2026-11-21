@@ -25,14 +25,17 @@ export function accountStatus(error: unknown): number | undefined {
   return (error as { status?: number } | null)?.status;
 }
 
-export function accountDestination(role: string, checkout: boolean) {
+export function accountDestination(role: string, checkout: boolean, customerApp = false) {
+  // App audience chooses presentation, never account permissions.
+  if (customerApp) return role === "customer" && checkout ? "/cart?restore=1" : "/restaurants";
   if (role === "admin") return "/admin";
   if (role === "restaurant") return "/restaurant";
   if (role === "driver") return "/driver";
   return checkout ? "/cart?restore=1" : "/dashboard";
 }
 
-export function nativeAccountReturn(role?: string, checkout = false) {
+export function nativeAccountReturn(role?: string, checkout = false, customerApp = false) {
   if (role === "restaurant" || role === "driver") return `/account/setup?join=${role}`;
+  if (customerApp) return `/account/setup?join=customer${checkout ? "&checkout=1" : ""}`;
   return checkout ? "/account/setup?join=customer&checkout=1" : "/account";
 }

@@ -29,7 +29,7 @@ export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; chec
     let detached = false;
     if (signedIn.current && !nativeRequestRunning(pending.id)) {
       clearNativeRequest(pending.id); setPending(null); nativeStartup.report('PROFILE');
-      navigate(nativeAccountReturn(pending.role, pending.checkout === true)); return;
+      navigate(nativeAccountReturn(pending.role, pending.checkout === true, !driverApp)); return;
     }
     void runNativeRequest(pending, async signal => {
       while (true) {
@@ -70,7 +70,7 @@ export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; chec
       clearNativeRequest(pending.id); setPending(null); nativeStartup.report('PROFILE');
       // Browser dismissal is optional UX. It MUST NOT gate navigation or startup.
       void Browser.close().catch(() => {});
-      navigate(nativeAccountReturn(pending.role, pending.checkout === true));
+      navigate(nativeAccountReturn(pending.role, pending.checkout === true, !driverApp));
     }).catch(cause => {
       if (detached || cause instanceof NativeStepError && cause.code === 'NATIVE_HANDOFF_CANCELED' && readNativeRequest()?.id !== pending.id) return;
       clearNativeRequest(pending.id); setPending(null); nativeStartup.block(cause instanceof NativeStepError ? cause.code : 'NATIVE_HANDOFF_FAILED');

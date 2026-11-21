@@ -96,7 +96,7 @@ try {
     return response.json();
   }
   if (process.env.ROCOEATS_NATIVE_BOOT_BROWSER === 'true') {
-    if(nativeAudience==='customer') await verifyNativeCustomerStartup({actor,origin});
+    if(nativeAudience==='customer') await verifyNativeCustomerStartup({actor,api,origin});
     else await verifyNativeStartupBootstrap({ actor, origin });
   } else if (process.env.ROCOEATS_DRIVER_APP_BROWSER === 'true') {
     await verifyDriverApp({ actor, api, origin });

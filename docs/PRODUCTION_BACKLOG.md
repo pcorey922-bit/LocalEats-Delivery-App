@@ -1,3 +1,15 @@
+# November 21 — dedicated Customer app multi-role landing fixed
+
+Owner Samsung205 recognizes identity and authorized menu but sign-in lands Admin.
+Reproduced: missing native Customer override to website admin-first policy. Customer
+ordinary sign-in now lands /restaurants with same account/role, staff menu retained;
+Driver priority, explicit partner onboarding, customer cart intent and WEBSITE routing
+preserved. No backend permissions/checkout authorization or duplicate profiles changed.
+Multi-role browser, saved handoff/timeout/session, Driver owner/role tests,13 units,
+UI types/build PASS. Next protected replacement Customer APK + exact-SHA CI/signature
+verification, then focused Samsung landing/workspace/restart check. No Render deploy,
+Driver rebuild, host settings or financial/provider actions. Full evidence in checkpoint.
+
 # November 21 — Customer205 acceptance handoff, no deployment required
 
 Functional0ca6023 all THREE CI SUCCESS; protected Customer205/source0ca6023 run

@@ -199,6 +199,7 @@ function SignUpPage() {
 
 function AccountSetup() {
   const { role, checkout, query, access, hasIntent } = useJoinLinks();
+  const customerApp = Capacitor.isNativePlatform() && import.meta.env.VITE_APP_AUDIENCE !== 'driver' && (!hasIntent || role === 'customer');
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
   const { userId } = useAuth();
@@ -223,12 +224,12 @@ function AccountSetup() {
   useNativeStartup('PROFILE', !!(profile.isError && !missing) || provision.isError);
   const start = () => provision.mutate((user?.fullName?.trim() || (role === 'restaurant' ? 'Restaurant partner' : role === 'driver' ? 'RoCoEats driver' : 'RoCoEats customer')).slice(0, 120));
   useEffect(() => {
-    if (profile.data) setLocation(import.meta.env.VITE_APP_AUDIENCE === 'driver' ? '/driver' : accountDestination(profile.data.role, checkout), { replace: true });
+    if (profile.data) setLocation(import.meta.env.VITE_APP_AUDIENCE === 'driver' ? '/driver' : accountDestination(profile.data.role, checkout, customerApp), { replace: true });
     else if (missing && hasIntent && isLoaded && userId && !attempted.current) {
       attempted.current = true;
       start();
     }
-  }, [profile.data, checkout, missing, hasIntent, isLoaded, userId, setLocation]);
+  }, [profile.data, checkout, customerApp, missing, hasIntent, isLoaded, userId, setLocation]);
   if (!isLoaded) return <SessionLoading />;
   if (!userId) return <Redirect to={`/sign-in${query}`} />;
   if (provision.isError || profile.isError && !missing) {
