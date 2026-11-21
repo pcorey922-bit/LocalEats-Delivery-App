@@ -18,9 +18,16 @@ for attempt in 1 2 3; do
   if [[ "$result" -eq 0 ]]; then exit 0; fi
   # Preserve genuine configuration/compiler failures. Retry only known transient
   # official dependency transport failures, with a bounded backoff.
-  if [[ "$attempt" -eq 3 ]] || ! grep -Eiq '(HTTP|response|status).*50[234]|(download|connect|read).*timed out|connection reset' "$retry_log"; then
+  if [[ "$attempt" -eq 3 ]] || ! grep -Eiq '(HTTP|response|status).*(429|50[234])|(download|connect|read).*timed out|connection reset' "$retry_log"; then
     exit "$result"
   fi
   echo "Transient native dependency download failed; retry $((attempt + 1))/3." >&2
-  sleep "$((retry_delay * attempt))"
+  wait_seconds=$((retry_delay * attempt))
+  # Maven Central can throttle a shared CI runner. Back off rather than issuing
+  # another immediate request. No alternate repositories or unbounded retries.
+  if grep -Eiq '(HTTP|response|status).*429' "$retry_log"; then
+    wait_seconds=$((retry_delay * attempt * 6))
+    if [[ "$wait_seconds" -gt 60 ]]; then wait_seconds=60; fi
+  fi
+  sleep "$wait_seconds"
 done

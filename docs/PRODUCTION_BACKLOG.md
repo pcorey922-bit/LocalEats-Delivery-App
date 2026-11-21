@@ -1,3 +1,11 @@
+# November 21 — release dependency-rate-limit handling
+
+Confirmed Maven429 caused native CI failure; dependency-only helper now backs off
+30s/60s within existing three attempts. Regression reproduced skipped429 beforefix,
+now exact attempts/waits and immediate403/compiler failure PASS. No alternate repo,
+checksum/signing/security/configuration change. Actual CI next; external recovery
+is not assumed. Customer193 fixed-URI callback diagnostic still running separately.
+
 # November 21 — refreshed staging evidence and bounded callback diagnostics
 
 Existing23 checks freshly PASS on76a24ed with actual render_cdn_chain; authenticated

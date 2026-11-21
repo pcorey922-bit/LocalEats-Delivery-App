@@ -1,3 +1,18 @@
+# November 21 — confirmed Maven429 retry defect corrected
+
+7636dd9 native CI44878811006 failed Android customer dependency resolution because
+Maven Central returned HTTP429, not a compiler/app test failure. Existing transport
+helper retried5xx/timeouts but skipped429. Offline regression failed before fix.
+HTTP429 now uses bounded30s/60s backoff within the same THREE-attempt maximum;
+5xx backoff unchanged,403/compiler failures still immediate. Official repositories,
+checksums/signing and all hosted settings unchanged. Offline fixture verifies exact
+waits/attempts and persistent outage failure without real sleeps/downloads; PASS.
+Bash syntax/diff check PASS. Not proof Maven service recovered; final exact-SHA CI
+must still be read honestly. Do not rerun the old failed source while new CI runs.
+
+Customer193 callback diagnostic44879245710 still running at writing; inspect its
+sanitized report once complete. No native behavior change made speculatively.
+
 # November 21 — fresh staging checks PASS; native callback still under diagnosis
 
 Fresh existing read-only verifier: 23/23 PASS, exact live76a24ed542e85c42e8a85d42d59dfd3e20e46ead,
