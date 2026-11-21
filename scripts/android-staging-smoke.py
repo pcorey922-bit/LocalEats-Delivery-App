@@ -3,7 +3,7 @@ No accounts, auth tickets, guest capabilities, orders or payments are supplied.
 ADB is used only on this disposable CI emulator, never the owner's phone.
 """
 import json,os,pathlib,re,subprocess,time,xml.etree.ElementTree as ET
-from staging_apk_policy import verify_smoke_input, parse_ui_hierarchy, verify_driver_signed_out_entry, verify_customer_home
+from staging_apk_policy import verify_smoke_input, parse_ui_hierarchy, verify_driver_signed_out_entry, verify_customer_home, native_callback_diagnostics
 audience=os.environ.get('ROCOEATS_SMOKE_AUDIENCE', 'customer')
 app=verify_smoke_input('smoke-input',audience,os.environ['ROCOEATS_SMOKE_SOURCE'])
 package=app['package']
@@ -56,6 +56,29 @@ def launch(uri=None):
  else:args+=['-n',activity]
  result=shell(*args);assert 'Error:' not in result,result
  shell('pidof',package)
+def diagnose_customer_callback(already_launched=False):
+ try:
+  if not already_launched:
+   shell('am','force-stop',package);launch(scheme+'://auth')
+  activities=shell('dumpsys','activity','activities')
+  logs=adb('logcat','-d','-s','Capacitor:E','Capacitor/Plugin:E','chromium:E','AndroidRuntime:E').decode(errors='replace')
+  callback_diagnostics.update(native_callback_diagnostics(activities,logs,package,scheme))
+  try:
+   wait_text('callback-cold-diagnostic','Sign in or create account in browser',attempts=6)
+   callback_diagnostics['coldProbeReachedSignIn']=True
+  except AssertionError:
+   callback_diagnostics['coldProbeReachedSignIn']=False
+   root=snapshot('callback-cold-state')
+   callback_diagnostics['coldStartupTimeoutObserved']=bool(root is not None and 'NATIVE_STARTUP_TIMEOUT' in labels(root))
+  launch(scheme+'://auth')
+  try:
+   wait_text('callback-warm-diagnostic','Sign in or create account in browser',attempts=6)
+   callback_diagnostics['warmAuthReachedSignIn']=True
+  except AssertionError:
+   callback_diagnostics['warmAuthReachedSignIn']=False
+ except (AssertionError,subprocess.SubprocessError,OSError):
+  callback_diagnostics['diagnosticInterrupted']=True
+
 def crash_check():
  logs=adb('logcat','-d','-s','AndroidRuntime:E').decode(errors='replace')
  for block in logs.split('FATAL EXCEPTION:')[1:]:
@@ -97,19 +120,7 @@ try:
   try:
    root=wait_text('03-cold-auth','Sign in or create account in browser')
   except AssertionError:
-   # Fixed public test URI only. Persist booleans, never raw intents or logs.
-   activities=shell('dumpsys','activity','activities')
-   callback_diagnostics['coldAuthIntentVisible']=any(package in line and scheme+'://auth' in line for line in activities.splitlines())
-   logs=adb('logcat','-d','-s','Capacitor:E','Capacitor/Plugin:E','chromium:E','AndroidRuntime:E').decode(errors='replace')
-   callback_diagnostics['webMessageErrorObserved']=bool(re.search(r'WebMessage|postMessage|JavaScriptReplyProxy',logs,re.I))
-   callback_diagnostics['pluginErrorObserved']=bool(re.search(r'not implemented|Unable to load plugin|Unable to execute plugin',logs,re.I))
-   callback_diagnostics['nativeCrashObserved']=any('Process: '+package+',' in block for block in logs.split('FATAL EXCEPTION:')[1:])
-   launch(scheme+'://auth')
-   try:
-    wait_text('03-warm-auth-diagnostic','Sign in or create account in browser',attempts=3)
-    callback_diagnostics['warmAuthReachedSignIn']=True
-   except AssertionError:
-    callback_diagnostics['warmAuthReachedSignIn']=False
+   diagnose_customer_callback(already_launched=True)
    raise
   mark('cold-start auth callback reaches system-browser sign-in control')
   launch(scheme+'://orders?role=admin')
@@ -121,6 +132,11 @@ try:
   time.sleep(35);root=wait_text('06-relaunch-stable','Browse Restaurants & Menus');verify_customer_home(root)
   mark('customer relaunch survives startup deadline without recovery screen')
  crash_check();mark('no native application crash found');completed=True
+except AssertionError:
+ if audience=='customer' and not callback_diagnostics:
+  callback_diagnostics['earlierAcceptanceFailed']=True
+  diagnose_customer_callback()
+ raise
 finally:
  report={'completed':completed,'runtimePermissions':runtime_permissions,'callbackDiagnostics':callback_diagnostics,'package':package,'source':app['source'],'audience':audience,'businessWritesPerformed':False,'emulator':True,'physicalSamsung':False,'playProtectVerified':False,'authenticatedSignInVerified':False,'paymentTested':False,'checks':results}
  (output/'results.json').write_text(json.dumps(report,indent=2))

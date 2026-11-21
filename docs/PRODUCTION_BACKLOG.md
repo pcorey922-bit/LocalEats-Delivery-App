@@ -1,3 +1,14 @@
+# November 21 — refreshed staging evidence and bounded callback diagnostics
+
+Existing23 checks freshly PASS on76a24ed with actual render_cdn_chain; authenticated
+owner retention/payout/ledger/push observations preserved. Node transport required
+NODE_USE_ENV_PROXY=1, no hosted change. Customer diagnostic44878807414 instead hit
+SDK startup timeout before callback, so root remains unknown. Collector now records
+fixed cold/warm callback and native error booleans even after earlier failure;
+eleven policy tests PASS, original failed acceptance preserved. Next inspect SAME
+Customer193 artifact in existing smoke once with this concrete collector correction.
+No native/config/provider/financial change, no physical acceptance claim.
+
 # November 21 — active Customer Android integration blocker
 
 4838d3f all THREE ordinary CI SUCCESS, but actual Customer193 smoke44704889327 FAIL:

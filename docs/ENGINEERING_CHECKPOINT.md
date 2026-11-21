@@ -1,3 +1,28 @@
+# November 21 — fresh staging checks PASS; native callback still under diagnosis
+
+Fresh existing read-only verifier: 23/23 PASS, exact live76a24ed542e85c42e8a85d42d59dfd3e20e46ead,
+actual render_cdn_chain, DB/worker/auth/Stripe TEST/native/security contracts healthy,
+ordering/live/TEST payout/municipal gates closed. Old readiness lacks retention flag;
+retain OWNER-OBSERVED disabled evidence, no repeated owner request. Environment Node
+fetch initially bypassed required proxy; rerun with NODE_USE_ENV_PROXY=1 succeeded.
+This was tooling network setup, not a staging outage or hosted change.
+
+Customer193 diagnostic44878807414 failed BEFORE callback at global
+NATIVE_STARTUP_TIMEOUT_RESTORING after public Home rendered. callbackDiagnostics empty;
+therefore this run establishes NO callback rejection cause. Source/ZIP digest and
+sanitized report/XML reviewed; no accounts/provider/financial actions performed.
+Bounded SDK failure is preserved, not bypassed. Previous44704889327 cold-callback
+failure remains real; browser cold/warm/malicious URL regressions pass.
+
+Existing smoke failure collection now probes only fixed public auth URI even after
+an earlier acceptance failure, records cold intent visibility, cold/warm sign-in,
+SDK timeout and fixed native error-category booleans. Original acceptance failure
+still fails run. Raw log/intent data is never saved in report. Eleven policy tests
+(including secret-free diagnostics), Python compile and diff check PASS. No app or
+configuration change. Next: one diagnostic run against SAME193 APK; inspect booleans
+before any native transport correction. Do not invent a bridge root cause or mark
+physical Customer acceptance passed. No Render deployment required for tooling.
+
 # November 21 — resume actual Customer cold-callback failure (do not request physical retest yet)
 
 Remote/local HEAD4838d3f8a96ca07d34a75e142a716dd1bb4f447f matched, clean on recovery.

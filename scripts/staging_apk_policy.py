@@ -106,3 +106,15 @@ def verify_customer_home(root):
     for expected in ['Good food', 'Sign In', 'Browse Restaurants & Menus']:
         assert expected.casefold() in text, 'Expected customer homepage control missing'
     assert 'native_startup_timeout' not in text and 'app startup did not finish' not in text, 'Customer startup recovery replaced homepage'
+
+
+def native_callback_diagnostics(activities, logs, package, scheme):
+    """Fixed booleans only: no raw Android intents, URLs, account or log content."""
+    return {
+        'coldAuthIntentVisible': any(package in line and scheme+'://auth' in line for line in activities.splitlines()),
+        'webMessageErrorObserved': bool(re.search(r'WebMessage|postMessage|JavaScriptReplyProxy', logs, re.I)),
+        'nativeBridgeReplyErrorObserved': 'sendResponseMessage: error' in logs,
+        'nativeBridgeThreadErrorObserved': bool(re.search(r'wrongthread|UI thread|main thread', logs, re.I)),
+        'pluginErrorObserved': bool(re.search(r'not implemented|Unable to load plugin|Unable to execute plugin', logs, re.I)),
+        'nativeCrashObserved': any('Process: '+package+',' in block for block in logs.split('FATAL EXCEPTION:')[1:]),
+    }

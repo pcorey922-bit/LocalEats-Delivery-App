@@ -4,7 +4,7 @@ import json
 import hashlib
 import tempfile
 from pathlib import Path
-from staging_apk_policy import staging_identity, verify_staging_manifest, smoke_identity, verify_smoke_source, verify_smoke_input, parse_ui_hierarchy, verify_firebase_resources, verify_driver_signed_out_entry, verify_customer_home
+from staging_apk_policy import staging_identity, verify_staging_manifest, smoke_identity, verify_smoke_source, verify_smoke_input, parse_ui_hierarchy, verify_firebase_resources, verify_driver_signed_out_entry, verify_customer_home, native_callback_diagnostics
 
 class StagingApkPolicyTests(unittest.TestCase):
     def test_customer_default_stays_stable_and_wrong_audience_is_rejected(self):
@@ -22,6 +22,18 @@ class StagingApkPolicyTests(unittest.TestCase):
                 with self.assertRaises(AssertionError): verify_staging_manifest(source + unsafe, audience)
 
 class SignedSmokeSelectionTests(unittest.TestCase):
+    def test_native_callback_evidence_never_persists_raw_logs_or_intents(self):
+        intent = 'mIntent={dat=rocoeats://auth cmp=com.rocoeats.app.staging/MainActivity}'
+        logs = 'sendResponseMessage: error: UI thread private-fixture-value FATAL EXCEPTION: Process: unrelated.package,'
+        result = native_callback_diagnostics(intent, logs, 'com.rocoeats.app.staging', 'rocoeats')
+        self.assertTrue(result['coldAuthIntentVisible'])
+        self.assertTrue(result['nativeBridgeReplyErrorObserved'])
+        self.assertTrue(result['nativeBridgeThreadErrorObserved'])
+        self.assertFalse(result['nativeCrashObserved'])
+        self.assertTrue(all(type(value) is bool for value in result.values()))
+        self.assertNotIn('private-fixture-value', json.dumps(result))
+        self.assertFalse(native_callback_diagnostics(intent, '', 'com.rocoeats.driver.staging', 'rocoeats-driver')['coldAuthIntentVisible'])
+
     def test_customer_home_rejects_legacy_shell_or_startup_error(self):
         valid = '<hierarchy><node text="Good food."/><node text="Sign In"/><node text="Browse Restaurants &amp; Menus"/></hierarchy>'
         verify_customer_home(parse_ui_hierarchy(valid))
