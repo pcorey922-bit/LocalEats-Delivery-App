@@ -13,6 +13,7 @@ output=pathlib.Path('android-smoke-evidence');output.mkdir(exist_ok=True)
 results=[]
 runtime_permissions={}
 completed=False
+callback_diagnostics={}
 def adb(*args,timeout=30):
  return subprocess.check_output([os.environ['ROCOEATS_QA_ADB'],'-e',*args],timeout=timeout,stderr=subprocess.STDOUT)
 def shell(*args,timeout=30):return adb('shell',*args,timeout=timeout).decode(errors='replace')
@@ -93,7 +94,23 @@ try:
   mark('private guest recovery UI reachable without account')
   # Cold-start links must recover into native browser sign-in, not an embedded Google WebView.
   shell('am','force-stop',package);launch(scheme+'://auth')
-  root=wait_text('03-cold-auth','Sign in or create account in browser')
+  try:
+   root=wait_text('03-cold-auth','Sign in or create account in browser')
+  except AssertionError:
+   # Fixed public test URI only. Persist booleans, never raw intents or logs.
+   activities=shell('dumpsys','activity','activities')
+   callback_diagnostics['coldAuthIntentVisible']=any(package in line and scheme+'://auth' in line for line in activities.splitlines())
+   logs=adb('logcat','-d','-s','Capacitor:E','Capacitor/Plugin:E','chromium:E','AndroidRuntime:E').decode(errors='replace')
+   callback_diagnostics['webMessageErrorObserved']=bool(re.search(r'WebMessage|postMessage|JavaScriptReplyProxy',logs,re.I))
+   callback_diagnostics['pluginErrorObserved']=bool(re.search(r'not implemented|Unable to load plugin|Unable to execute plugin',logs,re.I))
+   callback_diagnostics['nativeCrashObserved']=any('Process: '+package+',' in block for block in logs.split('FATAL EXCEPTION:')[1:])
+   launch(scheme+'://auth')
+   try:
+    wait_text('03-warm-auth-diagnostic','Sign in or create account in browser',attempts=3)
+    callback_diagnostics['warmAuthReachedSignIn']=True
+   except AssertionError:
+    callback_diagnostics['warmAuthReachedSignIn']=False
+   raise
   mark('cold-start auth callback reaches system-browser sign-in control')
   launch(scheme+'://orders?role=admin')
   root=wait_text('04-untrusted-link','Sign in securely')
@@ -105,6 +122,6 @@ try:
   mark('customer relaunch survives startup deadline without recovery screen')
  crash_check();mark('no native application crash found');completed=True
 finally:
- report={'completed':completed,'runtimePermissions':runtime_permissions,'package':package,'source':app['source'],'audience':audience,'businessWritesPerformed':False,'emulator':True,'physicalSamsung':False,'playProtectVerified':False,'authenticatedSignInVerified':False,'paymentTested':False,'checks':results}
+ report={'completed':completed,'runtimePermissions':runtime_permissions,'callbackDiagnostics':callback_diagnostics,'package':package,'source':app['source'],'audience':audience,'businessWritesPerformed':False,'emulator':True,'physicalSamsung':False,'playProtectVerified':False,'authenticatedSignInVerified':False,'paymentTested':False,'checks':results}
  (output/'results.json').write_text(json.dumps(report,indent=2))
 print(json.dumps({'passed':len(results),'emulator':True,'physicalDeviceVerified':False}))

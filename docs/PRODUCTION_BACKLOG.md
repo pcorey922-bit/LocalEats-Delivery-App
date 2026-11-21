@@ -1,3 +1,17 @@
+# November 21 — active Customer Android integration blocker
+
+4838d3f all THREE ordinary CI SUCCESS, but actual Customer193 smoke44704889327 FAIL:
+public startup/guest recovery passed, cold auth callback stayed Home. HOLD physical
+Customer193 acceptance; verified signing is not workflow acceptance. Controlled real
+React bootstrap with App-plugin cold/warm callbacks and role-bearing URL rejection
+PASS; actual Android intent/plugin delivery needs sanitized existing-smoke evidence.
+Failure-only diagnostic booleans/warm comparison added, original failure retained;
+ten policy tests and customer/driver native browser regressions PASS. Next run SAME
+signed193 artifact via existing smoke, inspect evidence, fix only confirmed cause.
+Driver187 and iOS signed-out acceptance remain recorded, not authenticated/physical
+acceptance. Prior 23 staging checks/trusted Render chain and owner safeguard/ledger
+observations complete; no hosted changes. Contractor/income/Plaid/letters deferred.
+
 # November 20 — actual iOS entry/restart and signed Android readiness
 
 BOTH iOS signed-out simulator cold/restart checks now PASS with offline screenshot

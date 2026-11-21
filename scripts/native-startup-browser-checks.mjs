@@ -89,6 +89,20 @@ export async function verifyNativeStartupBootstrap({ actor, origin }) {
 
 
 export async function verifyNativeCustomerStartup({actor,origin}) {
+ const callback=await actor('guest');
+ await callback.context().addInitScript(()=>{window.qaNativeBootstrap=true;window.qaNativeLaunchUrl='rocoeats://auth';});
+ await callback.goto(origin);
+ await callback.getByRole('button',{name:'Sign in or create account in browser',exact:true}).waitFor({timeout:5000});
+ await callback.close();
+ const warm=await actor('guest');
+ await warm.context().addInitScript(()=>{window.qaNativeBootstrap=true;});
+ await warm.goto(origin);
+ await warm.waitForFunction(()=>typeof window.qaAppListeners?.appUrlOpen==='function');
+ await warm.evaluate(()=>window.qaAppListeners.appUrlOpen({url:'rocoeats://orders?role=admin'}));
+ await warm.getByText('Browse Restaurants & Menus',{exact:true}).waitFor();
+ await warm.evaluate(()=>window.qaAppListeners.appUrlOpen({url:'rocoeats://auth'}));
+ await warm.getByRole('button',{name:'Sign in or create account in browser',exact:true}).waitFor({timeout:5000});
+ await warm.close();
  for(const role of ['guest','customer']) {
   const page=await actor(role);await page.context().addInitScript(()=>{window.qaNativeBootstrap=true;});await page.clock.install();
   for(const path of ['/','/about','/restaurants']) {

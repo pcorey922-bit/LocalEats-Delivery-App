@@ -44,6 +44,10 @@ try {
       b.onResolve({ filter: /^@capacitor\/core$/ }, () => ({ path: 'core', namespace: 'native-fixture-core' }));
       b.onResolve({ filter: /^\//, namespace: 'native-fixture-core' }, args => ({ path: args.path, namespace: 'file' }));
       b.onLoad({ filter: /.*/, namespace: 'native-fixture-core' }, () => { const source = path.join(root, 'artifacts/localeats/node_modules/@capacitor/core/dist/index.js'); return { loader: 'js', contents: `export * from ${JSON.stringify(source)}; import {Capacitor as original} from ${JSON.stringify(source)}; export const Capacitor={...original,isNativePlatform:()=>!!window.qaNativeBootstrap,getPlatform:()=>window.qaNativeBootstrap?'android':'web'};` }; });
+      b.onResolve({ filter: /^@capacitor\/app$/ }, () => ({ path: 'app', namespace: 'native-fixture-app' }));
+      b.onLoad({filter:/.*/,namespace:'native-fixture-app'},()=>({loader:'js',contents:`
+        export const App={getState:async()=>({isActive:true}),getLaunchUrl:async()=>window.qaNativeLaunchUrl?{url:window.qaNativeLaunchUrl}:undefined,
+        addListener:async(name,callback)=>{window.qaAppListeners??={};window.qaAppListeners[name]=callback;return{remove:async()=>{if(window.qaAppListeners[name]===callback)delete window.qaAppListeners[name]}}}};`}));
       b.onResolve({ filter: /^@clerk\/react\/internal$/ }, () => ({ path: 'internal', namespace: 'clerk-fixture' }));
       b.onResolve({ filter: /^@clerk\/react$/ }, () => ({ path: 'react', namespace: 'clerk-fixture' }));
       b.onLoad({ filter: /.*/, namespace: 'clerk-fixture' }, args => ({ resolveDir: path.join(root, 'artifacts/localeats'), loader: 'js', contents: args.path === 'internal'

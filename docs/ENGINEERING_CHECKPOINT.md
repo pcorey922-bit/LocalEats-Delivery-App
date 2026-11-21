@@ -1,3 +1,42 @@
+# November 21 — resume actual Customer cold-callback failure (do not request physical retest yet)
+
+Remote/local HEAD4838d3f8a96ca07d34a75e142a716dd1bb4f447f matched, clean on recovery.
+All THREE ordinary CI SUCCESS (44704888563/44704896191/44704896157); recovery worktree
+and prior stashes preserved. Nov20 staging76a24ed 23/23 and actual render_cdn_chain
+verification already complete; owner retention/payout/push/ledger observations are
+recorded below. No reason to repeat owner checks or the resolved Driver154 auth work.
+
+IMPORTANT correction to earlier next steps: actual Customer193 emulator44704889327
+FAILED. Install, permissions, public homepage >35s and guest recovery passed; cold
+rocoeats://auth callback then remained on homepage rather than native sign-in.
+Signed artifact193 remains signature/source verified, NOT full acceptance verified.
+Do not ask owner to install/retest Customer193 as a completed candidate yet.
+
+Exact native route parser intends /sign-in for signed-out/no-pending auth callback;
+React MobileLifecycle reads getLaunchUrl and appUrlOpen. Controlled native App-plugin
+fixture now verifies cold and warm auth routing, malicious role-bearing URL denial,
+public startup and existing private/account deadlines; CUSTOMER and DRIVER browser
+regressions PASS. Therefore no demonstrated route-parser/auth-role defect and no
+basis to weaken security or change user permissions. Actual Android native intent/
+plugin bridge delivery remains uncertain. Driver starts on sign-in anyway, so its
+signed-out callback screenshots alone do not establish that customer callbacks work.
+
+Added ONLY sanitized existing-emulator diagnostics on the reproduced failure: whether
+Android task contains the fixed public auth intent, bridge/plugin error-category
+booleans, app-specific native crash and warm-callback comparison. No raw intents/logs/
+IDs/tokens persisted; original cold failure still fails run. Ten APK policy tests,
+Python compile, both native browser regressions and diff check PASS. App/native/
+backend/authentication code unchanged. No new APK or Render deployment required
+for these diagnostics. Next: push and run existing android-smoke once against SAME
+Customer193 source-run44704171924; inspect results.callbackDiagnostics and screenshots,
+then implement the smallest evidence-supported correction. Do not just accept Home
+in place of the intended callback or blindly switch bridges before comparison.
+
+Owner-only gates remain deferred while independent callback diagnosis proceeds.
+No contractor/income verification, Plaid or verification letters are in scope.
+All ordering/payment/payout/cleanup/geographic protections remain OFF; no hosted
+settings/deployments/provider calls/financial operations or database changes.
+
 # November 20 — native acceptance checkpoint: actual simulator evidence preserved
 
 Functional customer startup d4b62acc29df60f0509d292f0e06709b0bbeb896 all THREE ordinary
