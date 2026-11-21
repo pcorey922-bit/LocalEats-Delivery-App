@@ -1,3 +1,25 @@
+# November 21 — current acceptance and software status
+
+Fresh staging23 PASS on76a24ed, actual render_cdn_chain; all ordering/live/payout/
+municipal gates closed, Stripe TEST. Owner-observed retention/ledger/push evidence
+preserved, no repeated owner checks. No hosted/provider/financial operation.
+1981a05 bounded429 retry, 1d8b364 Launcher infrastructure classification and6c80db0
+iOS safe-area correction all THREE ordinary CI SUCCESS. Twelve APK-policy, seven
+simulator-policy, three audience and two privacy tests PASS; browser cold/warm and
+malicious-link guards, UI types/build PASS. Actual Customer iOS safe-area cold/restart
+PASS with screenshot review; same manual44880141514 FAILED overall because Driver
+install failed before launch. No physical/authenticated iOS acceptance claimed.
+
+Next is owner first physical Customer193 sign-in/restart evidence (async request
+sent, no repeat of accepted Driver154). Customer callback remains uncertain because
+later emulator probes were covered by known Launcher ANR; no blind bridge changes
+or further known-ANR retries. Driver187/Customer193 signed artifacts remain valid;
+no new Android build/Render deployment required. Independent next code change must
+follow concrete new acceptance evidence. Real background GPS/push, Apple signing/
+device, authorized provider finance, geographic/legal/hosting gates remain external.
+Contractor/income/employment verification, Plaid and letters explicitly DEFERRED.
+Exact source/CI/artifacts, safety and phone steps in ENGINEERING_CHECKPOINT.md.
+
 # November 21 — native iOS status-bar overlap corrected, verification pending
 
 Confirmed screenshots + Capacitor default NEVER inset explain native customer logo

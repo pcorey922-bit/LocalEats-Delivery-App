@@ -1,3 +1,71 @@
+# November 21 — verified software checkpoint; remaining acceptance gates
+
+STAGING: fresh existing23 checks PASS on76a24ed542e85c42e8a85d42d59dfd3e20e46ead.
+Observed actual render_cdn_chain; health/DB/workers/auth config/Stripe TEST/CSP/HSTS/
+native contracts PASS. Public/private ordering, live charges, TEST payouts and
+municipal enforcement OFF. Retention absent from OLD public response, explicitly
+unverified by tool; OWNER confirmed disabled, both push providers configuration
+required, balanced ledger and zero missing baselines. Do NOT repeat owner checks.
+NODE_USE_ENV_PROXY=1 is required for this Codex environment's read-only HTTP tools.
+
+VERIFIED SOFTWARE:
+-1981a05462764c85b1e08bb01a961304cf7ced0e: bounded dependency429 backoff30s/60s,
+ same three attempts, compiler/403 immediate failure. Reproduced regression beforefix,
+ fixture verifies exact waits without actual delays. All THREE CI SUCCESS.
+-1d8b364933ddc62e143528bcbabc1810ac622229: known Android-owned Launcher ANR fails
+ promptly as infrastructure; no dismissal/retry/protected actions. App ANR/text
+ cannot be misclassified. Twelve policy tests PASS; all THREE CI SUCCESS.
+-6c80db07e89d1e96b228ca031b1dda4bc6d0bad1: supported native iOS automatic safe-area
+ inset fixes logo under status bar, preserving approved homepage/CSS/Android/auth.
+ Real bundled config before/after regression; three audience/seven simulator/two
+ permission tests, UI types/production build PASS. All THREE CI SUCCESS:
+ push44880141096, PR44880144968, native44880144967.
+
+ACTUAL iOS44880141514 is PARTIAL/FAILED overall, never call it wholly successful.
+CUSTOMER job136773423126 SUCCESS: packaged safe-area config/identity, installation,
+cold/restart35s process+offline OCR checks PASS; both screenshots visually reviewed,
+logo clearly below system status bar. Artifact14696849846 source/ZIP digest verified.
+DRIVER job136773422878 failed INSTALL before launch; packaged config/identity passed,
+artifact14698120435 checked. No driver visual, physical, auth, GPS/push/provider or
+financial acceptance inferred. Do not increase timeouts/retry known infrastructure
+without a concrete fix. Previous BOTH-audience signed-out smoke d4b62ac remains
+separate valid evidence. No iOS signing/device acceptance from unsigned builds.
+
+ANDROID: signed Driver187/source3170b04 and Customer193/source7559c7c signatures,
+source/package/hashes verified; artifacts remain valid (latest app setting iOS-only).
+Driver emulator44704067532 ten checks PASS; owner physical154 auth/GPS indicator/
+restart observations preserved, never reopened as a new auth defect.
+Customer44704889327 cold callback failure remains unexplained. Later diagnostics
+44879245710 were ALL obscured by Pixel Launcher ANR, so do NOT infer an app bridge
+cause, switch transports blindly, or repeat that emulator investigation. Controlled
+React cold/warm/malicious-link + account/startup guards PASS. Customer193 is NOT
+physical/end-to-end accepted. No new Android rebuild or backend deploy warranted.
+
+OWNER ACTION already requested once through async question: first read-only Samsung
+CUSTOMER193 acceptance, install as update without uninstalling, leave Home35s, sign
+in with EXISTING CUSTOMER via browser, return and reopen; report visible code or
+behavior only. No order/guest form submission/settings/availability/payment tests.
+https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44704171924
+artifact RoCoEats-Android-Staging-Test-APK. No owner credential/ID request.
+Driver187 optional update link44701171498/artifact RoCoEats-Driver-Android-Staging-Test-APK.
+
+EXACT NEXT ENGINEERING ACTION: fetch latest branch/CI, read owner Customer193 result;
+if failure, use visible stage plus existing diagnostics to reproduce and fix ONLY
+confirmed cause. If no reply, keep physical acceptance pending, do not claim pass or
+rerun blocked OS/provider tests. Remaining external gates: background/locked GPS,
+real push configuration/receipt, authenticated/signed physical iOS, separately
+approved Stripe provider reconciliation/refund/payout evidence, municipal accuracy/
+activation and owner/legal/hosting acceptance. No additional confirmed independently
+missing core workflow established; respond to concrete acceptance evidence.
+Contractor/employment/income verification, Plaid and verification letters DEFERRED.
+
+No Render deploy/settings, provider sends/lookups, financial operations, database or
+signing changes, PR merge or costs. All work on feature/rocoeats-launch-readiness;
+recovery worktree/stashes intact, PR1 OPEN. No urgent Render deployment required;
+additive retention status can wait for separately approved release. Final docs-only
+checkpoint commit CI must be checked on its exact SHA; do not rerun passing local
+suites or rebuild valid APKs merely because documentation is newer.
+
 # November 21 — iOS safe-area correction prepared for actual simulator review
 
 Actual earlier iOS cold/restart screenshots showed customer logo under status-bar
