@@ -1,3 +1,59 @@
+# November 21 — Customer205 ready for FIRST physical acceptance; software CI verified
+
+Latest functional0ca6023eea4ab7575f814296621c40add3100115 all THREE CI SUCCESS:
+Validate push44881554543, Validate PR44881558191, Native44881558248. Protected signed
+CUSTOMER205 run44881554243 SUCCESS, artifact14698008854. ZIP/APK hashes, exact source,
+version205/package com.rocoeats.app.staging, compiled security/permission policy and
+unchanged protected v2 certificate independently checked. No installation/physical
+or real-Clerk redemption acceptance inferred from build. Driver187 remains valid;
+no new Driver build needed. No Render deploy/migration/host configuration required.
+
+Verified fix: native Customer restart at Home now resumes a saved WAITING handoff
+through existing SignInPage/NativeSignIn, preserving same ID/verifier and sanitized
+role/checkout intent, without another auth/begin request/approval. Beforefix regression
+failed; restored customer/restaurant/driver hints across TWO document restarts,
+waiting beyond31s, active-session shortcut, cancel/expiry, stalled redemption timeout
+and interrupted one-use activation protections PASS. Existing Driver session/profile/
+retry browser regressions, four native startup/two navigation unit tests, UI types/
+production build PASS. OS/Clerk/redemption simulated in browser, not provider evidence.
+This does NOT establish the cause of the separate earlier unsigned cold-callback
+failure. No blind bridge change. Prior final docs5f7a52f also all THREE CI SUCCESS.
+
+PHONE ACTION (replaces prior async request's193 download; do not repeat basics if
+owner already completed them):
+https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44881554243
+Artifacts -> RoCoEats-Android-Staging-Test-APK -> extract ZIP -> install APK UPDATE,
+never uninstall existing app/data. Leave Home35s, use EXISTING CUSTOMER credentials
+in secure browser, return and confirm customer account/controls; close/reopen and
+confirm session restoration. Report version and visible code/behavior only, no IDs/
+credentials. No order/guest form submission, settings, availability or payment test.
+Physical acceptance remains PENDING until actual owner result. Driver154 acceptance
+is preserved separately; do not reopen its resolved response-reader investigation.
+
+Other completed work this continuation: fresh staging23 PASS onlive76a24ed with actual
+render_cdn_chain and closed gates; retention/ledger/push dashboard evidence is OWNER
+OBSERVED. Bounded Maven429 backoff and launcher infrastructure classification verified.
+iOS safe-area6c80db0 all standard CI PASS; actual Customer cold/restart screenshots
+show logo below status bar; same optional run44880141514 FAILED overall because Driver
+installation failed BEFORE launch (no new Driver UI claim). No further known launcher/
+installer retry without concrete correction. Do not request exhausted Geocodio calls.
+
+EXACT NEXT: fetch branch and read exact-SHA CI for any newer documentation checkpoint,
+then incorporate FIRST Customer205 physical result. If it fails, reproduce the exact
+visible stage before modifying app code; if it passes, record only observed scope.
+Remaining acceptance: background/locked GPS, real push configuration/receipt, signed/
+authenticated physical iOS, separately authorized provider settlement/refund/payout
+and geographic/legal/hosting acceptance. No other confirmed independent missing core
+workflow currently established after this recovery correction. Do not invent features
+or repeat broad audits. Contractor/income/employment/Plaid/letters remain DEFERRED.
+
+No hosted settings/deployment, financial/provider operations, secret/signing changes,
+DB destruction or PR merge. Public/private ordering, live charges/payouts, cleanup
+and municipal enforcement remain closed; Stripe TEST. Recovery worktree/stashes and
+all prior data preserved. An additive retention public-status release may wait for
+separate approval; none of these native fixes require a Render deployment. Final
+checkpoint is docs-only; do not rebuild205 because documentation HEAD is newer.
+
 # November 21 — confirmed saved Customer native handoff recovery fixed
 
 A focused source/test review found an independently reproducible missing path:

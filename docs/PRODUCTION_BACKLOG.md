@@ -1,3 +1,21 @@
+# November 21 — Customer205 acceptance handoff, no deployment required
+
+Functional0ca6023 all THREE CI SUCCESS; protected Customer205/source0ca6023 run
+44881554243 artifact RoCoEats-Android-Staging-Test-APK verified source/hash/signature/
+manifest. Saved WAITING native handoff now resumes at Customer Home restart with
+same proof/intent, no new approval. Browser recovery, roles, timeouts, active/cancel/
+expired/interrupted one-use guards, Driver regressions, six unit tests/types/build
+PASS; provider/OS simulated, physical205 acceptance still PENDING. Use205 instead of
+193 for pending FIRST Samsung check; exact link/phone steps in checkpoint. Driver154
+physical evidence and187 artifact preserved. No Render deployment/new Driver build.
+
+Fresh staging23 and actual render_cdn_chain PASS; all safeguards/data unchanged.
+iOS Customer safe-area actual smoke PASS, Driver install blocked; optional workflow
+FAILED overall, standard CI PASS. Do not retry known OS Launcher/installer/exhausted
+Geocodio without concrete fix. Next software action depends on actual Customer205
+result; external GPS/push/Apple signing/provider finance/geography/legal/hosting
+acceptance remains. No new unrelated features or contractor/income/Plaid/letters.
+
 # November 21 — actual Customer interrupted-sign-in recovery gap corrected
 
 Native Customer Home had a saved waiting handoff but no resume path, eventually
