@@ -1,3 +1,4 @@
+import { nativeStep } from '../lib/native-startup';
 import { useEffect, useRef } from 'react';
 import { useState } from "react";
 import { useAuth } from "@clerk/react";
@@ -8,6 +9,12 @@ import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 import { accountStatus } from "../lib/account-entry";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { App } from "@capacitor/app";
+
+async function readPushStatus<T>(operation: (signal: AbortSignal) => Promise<T>, signal: AbortSignal): Promise<T> {
+  const controller = new AbortController();
+  try { return await nativeStep('NATIVE_PUSH_STATUS_TIMEOUT', () => operation(controller.signal), signal); }
+  finally { controller.abort(); }
+}
 
 function savedDevice() {
   try {
@@ -35,31 +42,31 @@ export function PushPreferences() {
   const [deviceId, setDeviceId] = useState(savedDevice);
   const app = useQuery({
     queryKey: ["push-native-app"],
-    queryFn: async () => (await App.getInfo()).id,
+    queryFn: ({signal}) => readPushStatus(async () => (await App.getInfo()).id, signal),
     enabled: native,
     retry: false,
   });
   const permission = useQuery({
     queryKey: ["push-permission", userId],
-    queryFn: async () => (await PushNotifications.checkPermissions()).receive,
+    queryFn: ({signal}) => readPushStatus(async () => (await PushNotifications.checkPermissions()).receive, signal),
     enabled: native && !!userId,
     retry: false,
   });
   const config = useQuery({
     queryKey: ["push-configuration", userId],
-    queryFn: () =>
+    queryFn: ({signal}) => readPushStatus(requestSignal =>
       customFetch<{ android: boolean; ios: boolean }>(
-        "/api/notification-devices/config",
-      ),
+        "/api/notification-devices/config", {signal:requestSignal},
+      ), signal),
     enabled: native && !!userId,
     retry: false,
   });
   const status = useQuery({
     queryKey: ["push-registration", userId, deviceId],
-    queryFn: () =>
+    queryFn: ({signal}) => readPushStatus(requestSignal =>
       customFetch<{ registered: true; platform: string; appId: string }>(
-        `/api/notification-devices/${deviceId}`,
-      ),
+        `/api/notification-devices/${deviceId}`, {signal:requestSignal},
+      ), signal),
     enabled: native && !!userId && !!deviceId,
     retry: false,
     refetchOnMount: "always",
@@ -126,9 +133,10 @@ export function PushPreferences() {
       <button
         className="roco-button"
         disabled={
-          config.isFetching || permission.isFetching || status.isFetching
+          config.isFetching || permission.isFetching || status.isFetching || app.isFetching
         }
         onClick={() => {
+          void app.refetch();
           void config.refetch();
           void permission.refetch();
           if (deviceId) void status.refetch();
@@ -136,6 +144,7 @@ export function PushPreferences() {
       >
         Refresh notification status
       </button>
+      {app.isError && <p role="alert">App identity could not be checked. Refresh notification status before registering this device.</p>}
       {config.isPending ? (
         <p role="status">Checking push configuration…</p>
       ) : config.isError ? (
@@ -172,7 +181,7 @@ export function PushPreferences() {
           )}
           <button
             className="roco-button primary"
-            disabled={enroll.isPending || disable.isPending}
+            disabled={enroll.isPending || disable.isPending || app.isPending || app.isError}
             onClick={() => enroll.mutate()}
           >
             {enroll.isPending

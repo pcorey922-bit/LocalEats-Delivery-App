@@ -1,3 +1,32 @@
+# November 21 — notification status/opt-out recovery and iOS controller verified
+
+Customer208 physical sign-in/navigation/session acceptance below remains VALID;
+no repeat phone test or new Customer install requested.34c11752136b6cabaa8eaad8133a192cd15bdb8b
+all THREE CI SUCCESS (44885865086/44885868987/44885868919).
+
+Confirmed next defects: notification status queries could hang indefinitely with
+Refresh disabled, and a hung server revocation prevented native opt-out. Added
+bounded reads with cancellation and explicit app-identity refresh; bounded revocation
+still attempts native opt-out during server failure, retains unconfirmed handles
+for retry, and generation/snapshot fence prevents late cleanup erasing newer enrollment.
+No provider setup, permissions/roles or backend API changes.
+
+Browser reproduction FAILED on original initial configuration hang; corrected tests
+PASS for config/permission/app identity/device-status deadlines, manual refresh with
+no enrollment, server/native removal timeout and retry, aborted transport, identical-
+token newer-registration fence. Existing consent/GPS/registration/legacy opt-out/
+account-switch regressions PASS. Additional simulated iOS path uses owned APNs topic,
+no Android channel, status survives reload, opt-out and late-setup fencing PASS.
+No real APNs/FCM receipt claimed. UI types/production build/diff PASS. All tests use
+mock native/API, no actual provider/GPS or hosted write. Provider sends remain OFF.
+
+Next independently confirmed related gap from source: foreground DutyLocation also
+holds inFlight on a never-resolving upload; foreground heartbeat interval lacks
+bounded requests. Reproduce with existing consent/browser fixture and fix without
+retesting accepted Customer auth. Then run final CI and prepare Driver candidate
+for separately owner-controlled background GPS acceptance. No deployment/settings/
+financial operations, credentials or paid resources authorized or changed.
+
 # November 21 — OWNER PHYSICAL ACCEPTANCE: Customer Android208
 
 Samsung Galaxy S22 Ultra, signed Customer208/source9c91fdc3940b7e69be0724babfd2cdc044b45f0e:

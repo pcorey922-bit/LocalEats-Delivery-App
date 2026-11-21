@@ -1,3 +1,14 @@
+# November 21 — native notification recovery completed offline
+
+Customer208 physically ACCEPTED for scoped sign-in/navigation/identity/session work;
+do not repeat.34c1175 all THREE CI SUCCESS. New bounded notification reads/refresh,
+revocation timeout with native opt-out + retained retry handles, and newer-registration
+cleanup fence PASS mocked browser regression. iOS APNs-topic/no-Android-channel/
+reload/opt-out/deadline path simulated PASS; no real push/device acceptance. UI
+build/types PASS, backend/providers/settings unchanged. Next confirmed foreground
+GPS upload/heartbeat pending-request recovery, then Driver candidate/CI. No Customer
+rebuild or hosted activation required for this offline engineering continuation.
+
 # November 21 — OWNER PHYSICAL ACCEPTANCE: Customer Android208
 
 Samsung Galaxy S22 Ultra, signed Customer208/source9c91fdc3940b7e69be0724babfd2cdc044b45f0e:

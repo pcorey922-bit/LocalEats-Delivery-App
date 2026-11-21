@@ -11,11 +11,11 @@ const { build } = require('esbuild'), { chromium } = require(process.env.PLAYWRI
 const target = await mkdtemp(path.join(tmpdir(), 'rocoeats-background-ui-'));
 const modules = {
   '@clerk/react': `import {useSyncExternalStore} from 'react';const subscribe=cb=>{window.addEventListener('qa-push-account',cb);return()=>window.removeEventListener('qa-push-account',cb)};export const useAuth=()=>{const userId=useSyncExternalStore(subscribe,()=>window.pushUserId||'driver-fixture');return{isLoaded:true,isSignedIn:true,userId,getToken:async()=>null}};`,
-  '@capacitor/core': `export const Capacitor={isNativePlatform:()=>true,getPlatform:()=>'android'};export const registerPlugin=()=>({addWatcher:async(options,callback)=>{window.emitFix=fix=>callback(fix);return 'watch-'+(++window.bgStarts)},removeWatcher:async({id})=>{window.bgRemovals.push(id)}});`,
+  '@capacitor/core': `export const Capacitor={isNativePlatform:()=>true,getPlatform:()=>location.search.includes('ios=true')?'ios':'android'};export const registerPlugin=()=>({addWatcher:async(options,callback)=>{window.emitFix=fix=>callback(fix);return 'watch-'+(++window.bgStarts)},removeWatcher:async({id})=>{window.bgRemovals.push(id)}});`,
   '@capacitor/browser': `export const Browser={close:async()=>{},open:async()=>{}};`,
-  '@capacitor/app': `export const App={getInfo:async()=>{if(window.pushInfoDelay)await new Promise(resolve=>{window.finishPushInfo=resolve});return{id:'com.rocoeats.driver.staging'}},addListener:async()=>({remove:async()=>{}})};`,
+  '@capacitor/app': `export const App={getInfo:async()=>{if(window.pushInfoDelay)await new Promise(resolve=>{window.finishPushInfo=resolve});return{id:location.search.includes('ios=true')?'com.rocoeats.driver':'com.rocoeats.driver.staging'}},addListener:async()=>({remove:async()=>{}})};`,
   '@capacitor/geolocation': `export const Geolocation={watchPosition:async()=> 'foreground-fixture',clearWatch:async()=>{}};`,
-  '@capacitor/push-notifications': `const listeners={};export const PushNotifications={createChannel:async channel=>{if(window.pushChannelDelay)await new Promise(resolve=>{window.finishPushChannel=resolve});if(!window.bgPermission)throw Error('Channel before consent');window.pushChannel=channel;},checkPermissions:async()=>({receive:window.bgPermission?'granted':'denied'}),requestPermissions:async()=>{window.pushPermissionRequests=(window.pushPermissionRequests||0)+1;if(window.pushPermissionDelay)await new Promise(resolve=>{window.finishPushPermission=resolve});return{receive:window.bgPermission?'granted':'denied'}},addListener:async(name,callback)=>{if(name==='registration'&&window.pushListenerDelay)await new Promise(resolve=>{window.finishPushListener=resolve});listeners[name]=callback;window.pushListenersFinished=(window.pushListenersFinished||0)+1;return{remove:async()=>{if(listeners[name]===callback)delete listeners[name]}}},register:async()=>{window.pushRegisterCalls=(window.pushRegisterCalls||0)+1;listeners.registration({value:'mock_push_token_not_real_123456'})},unregister:async()=>{window.pushUnregisterCalls=(window.pushUnregisterCalls||0)+1}};`,
+  '@capacitor/push-notifications': `const listeners={};export const PushNotifications={createChannel:async channel=>{if(window.pushChannelDelay)await new Promise(resolve=>{window.finishPushChannel=resolve});if(!window.bgPermission)throw Error('Channel before consent');window.pushChannel=channel;},checkPermissions:async()=>{if(window.pushPermissionReadDelay)await new Promise(resolve=>{window.finishPushPermissionRead=resolve});return{receive:window.bgPermission?'granted':'denied'}},requestPermissions:async()=>{window.pushPermissionRequests=(window.pushPermissionRequests||0)+1;if(window.pushPermissionDelay)await new Promise(resolve=>{window.finishPushPermission=resolve});return{receive:window.bgPermission?'granted':'denied'}},addListener:async(name,callback)=>{if(name==='registration'&&window.pushListenerDelay)await new Promise(resolve=>{window.finishPushListener=resolve});listeners[name]=callback;window.pushListenersFinished=(window.pushListenersFinished||0)+1;return{remove:async()=>{if(listeners[name]===callback)delete listeners[name]}}},register:async()=>{window.pushRegisterCalls=(window.pushRegisterCalls||0)+1;listeners.registration({value:location.search.includes('ios=true')?'a'.repeat(64):'mock_push_token_not_real_123456'})},unregister:async()=>{window.pushUnregisterCalls=(window.pushUnregisterCalls||0)+1;if(window.pushNativeRemoveDelay)await new Promise(resolve=>{window.finishPushNativeRemove=resolve})}};`,
 };
 await build({ entryPoints: [path.join(root, 'artifacts/localeats/tests/background-browser.tsx')], outfile: path.join(target, 'app.js'), bundle: true, format: 'esm', platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"development"', 'import.meta.env.VITE_APP_AUDIENCE': '"driver"', 'import.meta.env.VITE_API_ORIGIN': 'undefined' }, plugins: [{ name: 'native-fixture', setup(b) { b.onResolve({ filter: /^(@capacitor\/(core|app|browser|geolocation|push-notifications)|@clerk\/react)$/ }, args => ({ path: args.path, namespace: 'qa-native' })); b.onLoad({ filter: /.*/, namespace: 'qa-native' }, args => ({ contents: modules[args.path], loader: 'js', resolveDir: path.join(root,'artifacts/localeats') })); } }] });
 const assets = path.join(root, 'artifacts/localeats/dist/public/assets');
@@ -51,6 +51,69 @@ try {
   await page.waitForFunction(() => window.bgRemovals.includes('watch-2'));
   assert.equal(await page.getByRole('complementary', { name: 'On-duty location status', exact: true }).count(), 0);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  for(const [flag,finish,message] of [
+   ['pushConfigDelay','finishPushConfig','Push configuration could not be checked'],
+   ['pushPermissionReadDelay','finishPushPermissionRead','Device notification permission could not be checked.'],
+   ['pushInfoDelay','finishPushInfo','App identity could not be checked.'],
+   ['pushStatusDelay','finishPushStatus','Device registration could not be checked.'],
+  ]) {
+   const read=await browser.newPage();
+   await read.addInitScript(flag=>{window[flag]=true;localStorage.setItem('rocoeats-push-device-id','11111111-1111-4111-8111-111111111119');localStorage.setItem('qa-server-push','true');},flag);
+   await read.clock.install();await read.goto(`http://127.0.0.1:${server.address().port}/?push=true`);
+   await read.waitForFunction(finish=>typeof window[finish]==='function',finish);
+   await read.clock.fastForward(16000);await read.getByText(message,{exact:false}).first().waitFor({timeout:3000});
+   assert.equal(await read.getByRole('button',{name:'Refresh notification status',exact:true}).isEnabled(),true);
+   if(flag==='pushConfigDelay')assert.equal(await read.evaluate(()=>window.pushConfigReadAborted),true);
+   await read.evaluate(([flag,finish])=>{window[flag]=false;window[finish]();},[flag,finish]);await read.waitForTimeout(30);
+   await read.getByRole('button',{name:'Refresh notification status',exact:true}).click();
+   await read.getByRole('status').filter({hasText:'This device is registered to your current account'}).waitFor();
+   assert.equal(await read.evaluate(()=>window.pushRegisterCalls||0),0);await read.close();
+  }
+  console.log('PASS: hung push configuration/permission/app identity/device reads become actionable and refresh recovers without enrollment. Native/API simulated.');
+  for(const [flag,finish] of [['pushDeleteDelay','finishPushDelete'],['pushNativeRemoveDelay','finishPushNativeRemove']]) {
+   const revoke=await browser.newPage();
+   await revoke.addInitScript(()=>{localStorage.setItem('rocoeats-push-device-id','11111111-1111-4111-8111-111111111119');localStorage.setItem('qa-server-push','true');});
+   await revoke.clock.install();await revoke.goto(`http://127.0.0.1:${server.address().port}/?push=true`);
+   await revoke.getByRole('status').filter({hasText:'This device is registered to your current account'}).waitFor();
+   await revoke.evaluate(flag=>{window[flag]=true;},flag);
+   await revoke.getByRole('button',{name:'Disable push for this device',exact:true}).click();
+   await revoke.waitForFunction(finish=>typeof window[finish]==='function',finish);
+   await revoke.clock.fastForward(16000);await revoke.getByRole('alert').filter({hasText:'Could not confirm push removal'}).waitFor({timeout:3000});
+   assert.equal(await revoke.evaluate(()=>window.pushUnregisterCalls),1,'Native opt-out is attempted despite a hung server');
+   if(flag==='pushDeleteDelay')assert.equal(await revoke.evaluate(()=>window.pushDeleteAborted),true);
+   assert.ok(await revoke.evaluate(()=>localStorage.getItem('rocoeats-push-device-id')));
+   await revoke.evaluate(([flag,finish])=>{window[flag]=false;window[finish]();},[flag,finish]);await revoke.waitForTimeout(30);
+   assert.ok(await revoke.evaluate(()=>localStorage.getItem('rocoeats-push-device-id')),'Late removal cannot fabricate confirmed opt-out');
+   await revoke.getByRole('button',{name:'Disable push for this device',exact:true}).click();
+   await revoke.getByRole('status').filter({hasText:'Push registration removed'}).waitFor();await revoke.close();
+  }
+  const changed=await browser.newPage();
+  await changed.addInitScript(()=>{localStorage.setItem('rocoeats-push-token','mock_push_token_not_real_123456');localStorage.setItem('rocoeats-push-device-id','11111111-1111-4111-8111-111111111119');localStorage.setItem('qa-server-push','true');});
+  await changed.goto(`http://127.0.0.1:${server.address().port}/?push=true`);
+  await changed.getByRole('status').filter({hasText:'This device is registered to your current account'}).waitFor();
+  await changed.evaluate(()=>{window.pushNativeRemoveDelay=true;});await changed.getByRole('button',{name:'Disable push for this device',exact:true}).click();
+  await changed.waitForFunction(()=>typeof window.finishPushNativeRemove==='function');
+  await changed.evaluate(()=>window.directRegisterPush());
+  await changed.evaluate(()=>window.finishPushNativeRemove());
+  await changed.getByRole('alert').filter({hasText:'Could not confirm push removal'}).waitFor();
+  assert.equal(await changed.evaluate(()=>localStorage.getItem('rocoeats-push-token')),'mock_push_token_not_real_123456');
+  assert.ok(await changed.evaluate(()=>localStorage.getItem('rocoeats-push-device-id')));await changed.close();
+  console.log('PASS: hung server/native opt-out is bounded and retryable; native opt-out attempted, revocation handles retained, late old cleanup cannot erase a newer registration. All simulated.');
+  const ios=await browser.newPage();
+  await ios.goto(`http://127.0.0.1:${server.address().port}/?push=true&ios=true`);
+  await ios.getByRole('button',{name:'Enable mobile push notifications',exact:true}).click();
+  await ios.getByRole('status').filter({hasText:'This device is registered to your current account'}).waitFor();
+  assert.deepEqual(await ios.evaluate(()=>({platform:window.pushRegistration.platform,appId:window.pushRegistration.appId,channel:!!window.pushChannel})),{platform:'ios',appId:'com.rocoeats.driver',channel:false});
+  await ios.reload();await ios.getByRole('status').filter({hasText:'This device is registered to your current account'}).waitFor();
+  await ios.getByRole('button',{name:'Disable push for this device',exact:true}).click();
+  await ios.getByRole('status').filter({hasText:'Push registration removed'}).waitFor();
+  await ios.clock.install();await ios.evaluate(()=>{window.pushInfoDelay=true;});
+  await ios.getByRole('button',{name:'Enable mobile push notifications',exact:true}).click();
+  await ios.waitForFunction(()=>typeof window.finishPushInfo==='function');await ios.clock.fastForward(16000);
+  await ios.getByRole('alert').filter({hasText:'registration timed out'}).waitFor();
+  const iosRegistrations=await ios.evaluate(()=>window.pushRegisterCalls);await ios.evaluate(()=>window.finishPushInfo());await ios.waitForTimeout(30);
+  assert.equal(await ios.evaluate(()=>window.pushRegisterCalls),iosRegistrations);await ios.close();
+  console.log('PASS: simulated iOS enrollment uses its owned APNs topic with no Android channel, restores server-confirmed status, opts out, and fences late setup after timeout. No real APNs/device evidence.');
   // Every pre-token phase is bounded; a late result must not enroll a device.
   for(const [flag,finish] of [['pushConfigDelay','finishPushConfig'],['pushPermissionDelay','finishPushPermission'],['pushChannelDelay','finishPushChannel'],['pushInfoDelay','finishPushInfo']]) {
    await page.goto(`http://127.0.0.1:${server.address().port}/?push=true`);

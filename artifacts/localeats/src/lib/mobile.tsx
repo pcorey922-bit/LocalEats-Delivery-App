@@ -1,3 +1,4 @@
+import { nativeStep } from './native-startup';
 import pushPolicy from '../../../../config/native-push-policy.json';
 import { readNativeRequest } from './native-auth-request';
 import { mobileReturnRoute, mobileCallbackRoute } from "./mobile-return";
@@ -13,12 +14,14 @@ import { PushNotifications } from "@capacitor/push-notifications";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 type PushEnrollment = { signal?: AbortSignal; promise: Promise<void>; cancel: () => void };
 let registration: PushEnrollment | null = null;
+let registrationGeneration = 0;
 export function cancelPushRegistration() { registration?.cancel(); }
 export function registerPush(options: { signal?: AbortSignal } = {}): Promise<void> {
   if (!Capacitor.isNativePlatform()) return Promise.reject(new Error('Mobile push enrollment requires the Android or iOS app. In-app notifications remain available.'));
   if (options.signal?.aborted) return Promise.reject(options.signal.reason);
   if (registration?.signal === options.signal && registration) return registration.promise;
   registration?.cancel();
+  registrationGeneration++;
   const controller = new AbortController(), signal = controller.signal;
   const cancel = () => controller.abort(new Error('Push registration canceled because the account or screen changed. Retry while signed in.'));
   options.signal?.addEventListener('abort', cancel, {once:true});
@@ -102,16 +105,28 @@ export async function unregisterPush() {
   const pendingToken = localStorage.getItem('rocoeats-push-pending-token');
   // A device that was never enrolled may have no Firebase app configuration.
   if (!token && !deviceId && !pendingToken) return;
+  const generation = ++registrationGeneration;
   let failure: unknown;
+  async function bounded<T>(operation: (signal: AbortSignal) => Promise<T>) {
+    const controller = new AbortController();
+    try { return await nativeStep('NATIVE_PUSH_REMOVAL_TIMEOUT', () => operation(controller.signal), controller.signal); }
+    finally { controller.abort(); }
+  }
   for (const target of [deviceId ? {deviceId} : token ? {token} : null, pendingToken ? {token:pendingToken} : null]) {
     if (!target) continue;
-    try { await customFetch('/api/notification-devices',{method:'DELETE',body:JSON.stringify(target)}); }
+    try { await bounded(signal => customFetch('/api/notification-devices',{method:'DELETE',signal,body:JSON.stringify(target)})); }
     catch (error) { failure ??= error; }
   }
   // Do not clear the saved registration when the server could not revoke it.
   // This retains an explicit retry instead of reporting a false opt-out.
-  try { if (Capacitor.isNativePlatform()) await PushNotifications.unregister(); }
+  try { if (Capacitor.isNativePlatform()) await bounded(() => PushNotifications.unregister()); }
   catch (error) { failure ??= error; }
+  if (!failure && (generation !== registrationGeneration ||
+      localStorage.getItem('rocoeats-push-token') !== token ||
+      localStorage.getItem('rocoeats-push-device-id') !== deviceId ||
+      localStorage.getItem('rocoeats-push-pending-token') !== pendingToken)) {
+    failure = new Error('Device registration changed during removal. Refresh notification status before retrying.');
+  }
   if (!failure) {
     localStorage.removeItem("rocoeats-push-token");
     localStorage.removeItem('rocoeats-push-device-id');
