@@ -1,0 +1,4 @@
+{
+  "customer": { "id": "com.rocoeats.app", "name": "RoCoEats", "scheme": "rocoeats" },
+  "driver": { "id": "com.rocoeats.driver", "name": "RoCoEats Driver", "scheme": "rocoeats-driver" }
+}

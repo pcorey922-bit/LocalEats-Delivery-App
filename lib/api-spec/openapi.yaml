@@ -699,9 +699,33 @@ components:
         region:
           type: string
       required: [id, name, description, city, region]
+    ModifierGroup:
+      type: object
+      properties:
+        id: { type: string, minLength: 1, maxLength: 80 }
+        name: { type: string, minLength: 1, maxLength: 100 }
+        minSelections: { type: integer, minimum: 0, maximum: 30 }
+        maxSelections: { type: integer, minimum: 1, maximum: 30 }
+        options:
+          type: array
+          minItems: 1
+          maxItems: 30
+          items:
+            type: object
+            properties:
+              id: { type: string, minLength: 1, maxLength: 80 }
+              name: { type: string, minLength: 1, maxLength: 100 }
+              priceCents: { type: integer, minimum: 0, maximum: 100000 }
+            required: [id, name, priceCents]
+      required: [id, name, minSelections, maxSelections, options]
     MenuItem:
       type: object
       properties:
+        modifierGroups:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/ModifierGroup"
         id:
           type: string
           format: uuid
@@ -875,6 +899,11 @@ components:
     MenuItemInput:
       type: object
       properties:
+        modifierGroups:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/ModifierGroup"
         categoryId:
           type: string
           format: uuid
@@ -895,6 +924,11 @@ components:
     MenuItemUpdate:
       type: object
       properties:
+        modifierGroups:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/ModifierGroup"
         categoryId:
           type: string
           format: uuid
@@ -1003,6 +1037,12 @@ components:
     PlaceOrderItemInput:
       type: object
       properties:
+        modifiers:
+          type: object
+          additionalProperties:
+            type: array
+            maxItems: 30
+            items: { type: string, maxLength: 80 }
         menuItemId:
           type: string
           format: uuid
@@ -1023,6 +1063,14 @@ components:
         addressId:
           type: string
           format: uuid
+        tipCents:
+          type: integer
+          minimum: 0
+          maximum: 100000
+          default: 0
+        expectedTotalCents:
+          type: integer
+          minimum: 1
         items:
           type: array
           minItems: 1
@@ -1033,6 +1081,15 @@ components:
     OrderItem:
       type: object
       properties:
+        modifierSnapshot:
+          type: array
+          items:
+            type: object
+            properties:
+              group: { type: string }
+              option: { type: string }
+              priceCents: { type: integer }
+            required: [group, option, priceCents]
         id:
           type: string
           format: uuid

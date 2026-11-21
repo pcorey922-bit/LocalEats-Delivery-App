@@ -1,0 +1,45 @@
+# Owner must review and approve paid resources in Render before deploying.
+services:
+  - type: web
+    name: rocoeats-staging
+    runtime: docker
+    branch: feature/rocoeats-launch-readiness
+    region: ohio
+    plan: 0.5c-512mb
+    autoDeployTrigger: "off"
+    dockerfilePath: ./Dockerfile
+    preDeployCommand: pnpm --filter @workspace/db migrate
+    healthCheckPath: /livez
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rocoeats-staging-db
+          property: connectionString
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: LOCALEATS_ADMIN_CLERK_USER_IDS
+        sync: false
+      - key: ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: PAYMENT_PROVIDER
+        value: stripe_test
+      - key: ROCOEATS_PRIVATE_STAGING
+        value: "true"
+      - key: ROCOEATS_ORDERING_ENABLED
+        value: "false"
+      - key: PG_POOL_MAX
+        value: "5"
+databases:
+  - name: rocoeats-staging-db
+    region: ohio
+    plan: 0.1c-256mb
+    postgresMajorVersion: "17"
+    databaseName: rocoeats_staging
+    diskSizeGB: 1
+    storageAutoscalingEnabled: false
+    ipAllowList: []

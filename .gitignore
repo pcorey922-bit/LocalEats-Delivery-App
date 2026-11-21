@@ -47,3 +47,25 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+**/android/.gradle/
+**/android/local.properties
+**/android/**/build/
+**/ios/App/Pods/
+
+**/google-services.json
+**/GoogleService-Info.plist
+*.p8
+
+**/ios/build/
+**/ios/release-build/
+artifacts/localeats/android/app/src/driver/AndroidManifest.xml
+artifacts/localeats/ios/App/App/Driver-Info.plist
+__pycache__/
