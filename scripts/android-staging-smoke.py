@@ -3,7 +3,7 @@ No accounts, auth tickets, guest capabilities, orders or payments are supplied.
 ADB is used only on this disposable CI emulator, never the owner's phone.
 """
 import json,os,pathlib,re,subprocess,time,xml.etree.ElementTree as ET
-from staging_apk_policy import verify_smoke_input, parse_ui_hierarchy, verify_driver_signed_out_entry, verify_customer_home, native_callback_diagnostics
+from staging_apk_policy import verify_smoke_input, parse_ui_hierarchy, verify_driver_signed_out_entry, verify_customer_home, native_callback_diagnostics, emulator_infrastructure_failure
 audience=os.environ.get('ROCOEATS_SMOKE_AUDIENCE', 'customer')
 app=verify_smoke_input('smoke-input',audience,os.environ['ROCOEATS_SMOKE_SOURCE'])
 package=app['package']
@@ -14,6 +14,9 @@ results=[]
 runtime_permissions={}
 completed=False
 callback_diagnostics={}
+infrastructure_failure=None
+class EmulatorInfrastructureError(AssertionError):
+ pass
 def adb(*args,timeout=30):
  return subprocess.check_output([os.environ['ROCOEATS_QA_ADB'],'-e',*args],timeout=timeout,stderr=subprocess.STDOUT)
 def shell(*args,timeout=30):return adb('shell',*args,timeout=timeout).decode(errors='replace')
@@ -36,6 +39,11 @@ def wait_text(name,expected,attempts=18):
   root=snapshot(name)
   if root is None:
    time.sleep(2);continue
+  failure=emulator_infrastructure_failure(root)
+  if failure:
+   global infrastructure_failure
+   infrastructure_failure=failure
+   raise EmulatorInfrastructureError('Emulator infrastructure blocked UI: '+failure)
   captured=True;text=labels(root)
   if 'Something went wrong' in text or 'NATIVE_STARTUP_TIMEOUT' in text:raise AssertionError('Application error boundary or startup recovery appeared; inspect anonymous screenshot')
   if expected.casefold() in text.casefold():return root
@@ -66,6 +74,8 @@ def diagnose_customer_callback(already_launched=False):
   try:
    wait_text('callback-cold-diagnostic','Sign in or create account in browser',attempts=6)
    callback_diagnostics['coldProbeReachedSignIn']=True
+  except EmulatorInfrastructureError:
+   raise
   except AssertionError:
    callback_diagnostics['coldProbeReachedSignIn']=False
    root=snapshot('callback-cold-state')
@@ -74,8 +84,12 @@ def diagnose_customer_callback(already_launched=False):
   try:
    wait_text('callback-warm-diagnostic','Sign in or create account in browser',attempts=6)
    callback_diagnostics['warmAuthReachedSignIn']=True
+  except EmulatorInfrastructureError:
+   raise
   except AssertionError:
    callback_diagnostics['warmAuthReachedSignIn']=False
+ except EmulatorInfrastructureError:
+  callback_diagnostics['blockedByEmulatorInfrastructure']=True
  except (AssertionError,subprocess.SubprocessError,OSError):
   callback_diagnostics['diagnosticInterrupted']=True
 
@@ -132,12 +146,12 @@ try:
   time.sleep(35);root=wait_text('06-relaunch-stable','Browse Restaurants & Menus');verify_customer_home(root)
   mark('customer relaunch survives startup deadline without recovery screen')
  crash_check();mark('no native application crash found');completed=True
-except AssertionError:
- if audience=='customer' and not callback_diagnostics:
+except AssertionError as failure:
+ if audience=='customer' and not callback_diagnostics and not isinstance(failure,EmulatorInfrastructureError):
   callback_diagnostics['earlierAcceptanceFailed']=True
   diagnose_customer_callback()
  raise
 finally:
- report={'completed':completed,'runtimePermissions':runtime_permissions,'callbackDiagnostics':callback_diagnostics,'package':package,'source':app['source'],'audience':audience,'businessWritesPerformed':False,'emulator':True,'physicalSamsung':False,'playProtectVerified':False,'authenticatedSignInVerified':False,'paymentTested':False,'checks':results}
+ report={'completed':completed,'runtimePermissions':runtime_permissions,'callbackDiagnostics':callback_diagnostics,'infrastructureFailure':infrastructure_failure,'package':package,'source':app['source'],'audience':audience,'businessWritesPerformed':False,'emulator':True,'physicalSamsung':False,'playProtectVerified':False,'authenticatedSignInVerified':False,'paymentTested':False,'checks':results}
  (output/'results.json').write_text(json.dumps(report,indent=2))
 print(json.dumps({'passed':len(results),'emulator':True,'physicalDeviceVerified':False}))

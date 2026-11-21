@@ -4,7 +4,7 @@ import json
 import hashlib
 import tempfile
 from pathlib import Path
-from staging_apk_policy import staging_identity, verify_staging_manifest, smoke_identity, verify_smoke_source, verify_smoke_input, parse_ui_hierarchy, verify_firebase_resources, verify_driver_signed_out_entry, verify_customer_home, native_callback_diagnostics
+from staging_apk_policy import staging_identity, verify_staging_manifest, smoke_identity, verify_smoke_source, verify_smoke_input, parse_ui_hierarchy, verify_firebase_resources, verify_driver_signed_out_entry, verify_customer_home, native_callback_diagnostics, emulator_infrastructure_failure
 
 class StagingApkPolicyTests(unittest.TestCase):
     def test_customer_default_stays_stable_and_wrong_audience_is_rejected(self):
@@ -22,6 +22,13 @@ class StagingApkPolicyTests(unittest.TestCase):
                 with self.assertRaises(AssertionError): verify_staging_manifest(source + unsafe, audience)
 
 class SignedSmokeSelectionTests(unittest.TestCase):
+    def test_launcher_anr_is_infrastructure_without_hiding_app_anr(self):
+        launcher=parse_ui_hierarchy("<hierarchy><node package='android' text=\"Pixel Launcher isn't responding\"/></hierarchy>")
+        self.assertEqual(emulator_infrastructure_failure(launcher),'system_launcher_unresponsive')
+        for package,text in [('android',"RoCoEats isn't responding"),('com.rocoeats.app.staging',"Pixel Launcher isn't responding")]:
+            root=parse_ui_hierarchy('<hierarchy><node/></hierarchy>');root.find('node').set('package',package);root.find('node').set('text',text)
+            self.assertIsNone(emulator_infrastructure_failure(root))
+
     def test_native_callback_evidence_never_persists_raw_logs_or_intents(self):
         intent = 'mIntent={dat=rocoeats://auth cmp=com.rocoeats.app.staging/MainActivity}'
         logs = 'sendResponseMessage: error: UI thread private-fixture-value FATAL EXCEPTION: Process: unrelated.package,'

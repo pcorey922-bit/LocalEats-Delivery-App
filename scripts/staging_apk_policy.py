@@ -118,3 +118,11 @@ def native_callback_diagnostics(activities, logs, package, scheme):
         'pluginErrorObserved': bool(re.search(r'not implemented|Unable to load plugin|Unable to execute plugin', logs, re.I)),
         'nativeCrashObserved': any('Process: '+package+',' in block for block in logs.split('FATAL EXCEPTION:')[1:]),
     }
+
+
+def emulator_infrastructure_failure(root):
+    """Recognize the known OS launcher blocker; never classify app-owned text."""
+    for node in root.iter('node'):
+        if node.get('package') == 'android' and re.search(r'launcher.*(?:isn.t responding|not responding)', node.get('text', ''), re.I):
+            return 'system_launcher_unresponsive'
+    return None

@@ -1,3 +1,13 @@
+# November 21 — OS failure classified; native bridge must not be changed blindly
+
+Customer callback diagnostic44879245710 was obscured by Pixel Launcher ANR in ALL
+cold/warm screenshots; do not infer transport defect from its false UI booleans.
+Existing smoke now fails promptly with infrastructure classification and no further
+probes/dismissals; app ANR remains app failure. Twelve policy tests PASS, no new APK
+or hosted change. No more known-ANR retries. Next independent observed iOS defect:
+header/logo under status bar, review native safe-area insets without branding changes.
+Native CI1981a05 SUCCESS; fresh staging23 PASS. Physical/provider gates unchanged.
+
 # November 21 — release dependency-rate-limit handling
 
 Confirmed Maven429 caused native CI failure; dependency-only helper now backs off

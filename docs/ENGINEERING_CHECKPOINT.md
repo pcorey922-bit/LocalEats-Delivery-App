@@ -1,3 +1,30 @@
+# November 21 — callback diagnostic BLOCKED by OS Launcher, not proven app bridge fault
+
+Actual44879245710 report coldAuthIntentVisible=true, cold/warm sign-in=false,
+no native bridge/plugin/crash log categories. Crucially ALL inspected XML/screens
+were covered by Android's "Pixel Launcher isn't responding" modal. Artifact14696873589
+ZIP digest/source checked; image visually reviewed. These booleans are NOT evidence
+of an app bridge defect. Do NOT blindly change modern/legacy transport or rerun the
+known launcher failure. Earlier44704889327 callback failure remains unexplained;
+Customer193 is source/signature verified, not physical/end-to-end accepted.
+
+Existing smoke now detects ONLY Android-owned launcher ANR as infrastructure,
+fails immediately with system_launcher_unresponsive, skips callback probes when
+blocked. It never dismisses dialogs or grants permissions. App-owned text/app ANR
+cannot be reclassified by this check. Twelve policy regressions/Python syntax PASS.
+No new APK or backend deployment required for this correction; no more emulator
+reruns warranted merely for known OS ANR. Last successful Driver emulator/iOS runs
+remain separately recorded; no regression in previously accepted Driver154 proven.
+
+1981a05 native CI44879461533 SUCCESS after bounded dependency429 handling;
+Validate workflows still running at writing. Current staging23 freshly PASS on76a,
+all owner evidence preserved. Next independent native usability defect from actual
+iOS screenshots: safe-area header/logo overlaps system status bar. Review supported
+native container inset setting (default is never) and test without homepage redesign.
+Physical Customer193/Android callback evidence may ultimately require owner phone;
+no request for credentials or previously failed owner test, no new device acceptance
+claimed. All hosted/provider/financial settings/data unchanged.
+
 # November 21 — confirmed Maven429 retry defect corrected
 
 7636dd9 native CI44878811006 failed Android customer dependency resolution because
