@@ -27,8 +27,24 @@ export async function verifyDriverApp({ actor, api, origin }) {
   assert.equal(await driver.getByRole('complementary', { name: 'On-duty location status', exact: true }).count(), 0, 'A reload never silently restarts GPS');
   await driver.getByRole('button', { name: 'Reconnect on this device', exact: true }).click();
   await driver.getByRole('button', { name: 'Go offline', exact: true }).waitFor();
+  // Real controller -> authenticated local API -> database -> dispatch visibility.
+  // Native GPS only is simulated; no provider, hosted data or real location.
+  const profile=await api('driver','/profiles/me');let locationWrites=0;
+  driver.on('request',request=>{if(request.method()==='POST'&&new URL(request.url()).pathname==='/api/driver/location')locationWrites++;});
+  await driver.waitForFunction(()=>typeof window.qaEmitForegroundFix==='function');
+  await driver.evaluate(()=>window.qaEmitForegroundFix({coords:{latitude:35.88,longitude:-84.69,accuracy:8},timestamp:Date.now()}));
+  await driver.getByText('Last successful upload',{exact:false}).waitFor();
+  const dispatch=await api('admin','/admin/dispatch');
+  const position=dispatch.drivers.find(candidate=>candidate.profileId===profile.id);
+  assert.equal(position.locationStatus,'fresh');assert.equal(position.location.latitude,35.88);assert.equal(position.location.longitude,-84.69);
   await driver.getByRole('button', { name: 'Go offline', exact: true }).click();
   await driver.getByRole('button', { name: 'Go online', exact: true }).waitFor();
+  const writesBeforeLate=locationWrites;
+  await driver.evaluate(()=>window.qaEmitForegroundFix({coords:{latitude:35.89,longitude:-84.68,accuracy:8},timestamp:Date.now()}));
+  await driver.waitForTimeout(50);assert.equal(locationWrites,writesBeforeLate,'Late native callback after offline must not post location');
+  const afterOffline=(await api('admin','/admin/dispatch')).drivers.find(candidate=>candidate.profileId===profile.id);
+  assert.equal(afterOffline?.location??null,null,'Going offline removes location from dispatch');
+  console.log('PASS: driver foreground controller writes fresh GPS through real local role-authorized API into dispatch; going offline clears visibility and blocks late native callbacks. Native coordinates/Clerk simulated, no hosted/provider operations.');
   const unapproved = await actor('unapprovedDriver');
   await unapproved.goto(origin);
   assert.equal((await api('unapprovedDriver', '/driver/availability')).approved, false);

@@ -1,3 +1,23 @@
+# November 21 — accepted Customer208; Driver213 and native recovery verified
+
+Customer208 owner's scoped physical sign-in/navigation/identity/permissions/session
+acceptance RECORDED; no repeat test. Functional73f85c7 all THREE CI SUCCESS, signed
+Driver213/run44887092509 artifact RoCoEats-Driver-Android-Staging-Test-APK verified
+source/hash/version/manifest/protected certificate. Background/foreground GPS and
+heartbeat timeout recovery, invalid-fix/strict-ack safety, notification read/setup/
+opt-out recovery + Android/iOS mocked controller regressions/types/build PASS.
+New REAL LOCAL driver-controller -> API/database -> dispatch GPS integration PASS:
+fresh coordinates visible, offline clears visibility and late callback sends nothing.
+Native location/Clerk simulated, no actual provider/hosted proof. Test-only latest
+commit needs CI but does NOT require another Driver213 build/Customer208 rebuild.
+
+Next actual on-duty/locked-screen GPS evidence needs owner's explicit device consent;
+real push providers unconfigured, signing/physical iOS unfinished awaiting protected
+Apple provisioning/device access. Do not claim those from compile/mocks, rerun known
+OS failures or repeat accepted auth. No Render deploy, hosted/provider/financial
+operations, activation, paid resources or permission changes. Exact evidence/links/
+remaining acceptance in checkpoint; preserve all historical data and safeguards.
+
 # November 21 — driver GPS recovery ready for candidate build
 
 Customer208 physical tested workflows ACCEPTED; no repeat. Foreground upload/heartbeat

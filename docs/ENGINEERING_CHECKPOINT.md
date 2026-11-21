@@ -1,3 +1,60 @@
+# November 21 — verified Driver213 recovery candidate + real local GPS/dispatch integration
+
+Customer Android208 physically ACCEPTED for owner's sign-in/customer-first landing,
+Admin/Driver menu, unchanged identity/permissions, close/reopen/session recovery and
+no observed startup/navigation failure. Do not ask to repeat these accepted workflows.
+No claim of Customer push/checkout or physical iOS/background GPS acceptance.
+
+Functional73f85c7f0e218f839b2e860951e38e837fe96e7f ALL THREE CI SUCCESS:
+Validate push44887092191, PR44887096569, Native44887096549. Protected DRIVER213 build
+44887092509 SUCCESS; artifact14700009888 RoCoEats-Driver-Android-Staging-Test-APK.
+Exact source/ZIP+APK hash/package com.rocoeats.driver.staging/version213/manifest and
+unchanged protected v2 certificate independently verified. No physical installation/
+GPS acceptance inferred.34c1175 and0a29655 also all THREE CI SUCCESS. No Render deploy,
+migration, provider setup or Customer208 rebuild required for this continuation.
+
+New test-only integration: simulated native foreground fix through REAL local role-
+authorized driver controller/API/PGlite/dispatch. Fresh lat/lon visible to admin;
+Go offline removes dispatch coordinates and late native callback creates NO request.
+PASS existing dedicated Driver eligibility/owner exception/auth-failure regressions
+in same changed-component harness. Not real GPS/Clerk/provider or hosted data proof.
+Current test-only commit does not change Driver213 runtime; do not rebuild it merely
+because documentation/test HEAD is newer. Latest exact-SHA CI must still be read.
+
+Completed code: bounded background/foreground GPS and heartbeat requests, fresh-fix
+retry after stall, late-response fencing, no heartbeat overlap, reject invalid fixes
+before slot/ISO conversion, strict location acknowledgement. Notification pre-token
+setup/read/status/opt-out deadlines; app-identity refresh; revocation retry evidence
+retained and newer-registration fence. Android+iOS push controllers simulated PASS,
+iOS uses owned APNs topic with no Android channel, no actual sends/receipt claim.
+Ten GPS units, relevant browser integration/consent/permission/cancellation/late-event
+regressions, UI types/production build PASS. Full CI already includes real local order
+through delivery/ledger workflow with SIMULATED payments; no reason to rerun it by
+hand or call it new Stripe TEST evidence. App auth/navigation code untouched.
+
+NEXT OWNER-ONLY ACCEPTANCE: Driver213 install UPDATE without uninstalling when ready
+for explicit on-duty/background-location consent test; no orders/payments/provider
+push sends needed. Link:
+https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44887092509
+artifact RoCoEats-Driver-Android-Staging-Test-APK. Actual locked-screen/network-loss
+GPS and off-duty/privacy behavior require physical evidence; never start operations
+from tools. Keep Customer208 installed/accepted, no blanket auth retest requested.
+Android/iOS push owner-observed configuration required; protected provider setup and
+real receipt need separate authorization. iOS compile/simulator evidence preserved,
+signed-device packaging/signing and physical acceptance remain INCOMPLETE and need
+owner-controlled Apple team/provisioning inputs/device access, not compilation proof.
+
+NEXT ENGINEERING: inspect exact-SHA CI, preserve this checkpoint, incorporate new
+physical/provider results when available. Do NOT repeat known Android Launcher ANR,
+iOS installer failures or exhausted Geocodio without a concrete correction. No other
+confirmed independently missing runtime workflow established in this focused work;
+do not invent features/audits. Contractor/income/Plaid/verification letters deferred.
+
+No hosted settings/deployments/data, ordering/payment/payout/cleanup/municipal gates,
+credentials, signing infrastructure, Neon recovery, historical financial/test order
+or PR1 changed. Stripe TEST, public/private ordering/live/payout/geographic activation
+remain closed. No actual provider calls/financial operations or new paid resources.
+
 # November 21 — foreground driver transport recovery completed; Customer208 accepted
 
 Customer Android208 OWNER physical sign-in/navigation/identity/permissions/restart

@@ -44,6 +44,8 @@ try {
       b.onResolve({ filter: /^@capacitor\/core$/ }, () => ({ path: 'core', namespace: 'native-fixture-core' }));
       b.onResolve({ filter: /^\//, namespace: 'native-fixture-core' }, args => ({ path: args.path, namespace: 'file' }));
       b.onLoad({ filter: /.*/, namespace: 'native-fixture-core' }, () => { const source = path.join(root, 'artifacts/localeats/node_modules/@capacitor/core/dist/index.js'); return { loader: 'js', contents: `export * from ${JSON.stringify(source)}; import {Capacitor as original} from ${JSON.stringify(source)}; export const Capacitor={...original,isNativePlatform:()=>!!window.qaNativeBootstrap,getPlatform:()=>window.qaNativeBootstrap?'android':'web'};` }; });
+      b.onResolve({filter:/^@capacitor\/geolocation$/},()=>({path:'geolocation',namespace:'native-fixture-geolocation'}));
+      b.onLoad({filter:/.*/,namespace:'native-fixture-geolocation'},()=>({loader:'js',contents:`export const Geolocation={watchPosition:async(options,callback)=>{window.qaEmitForegroundFix=position=>callback(position);return 'qa-foreground-watch';},clearWatch:async()=>{}};`}));
       b.onResolve({ filter: /^@capacitor\/app$/ }, () => ({ path: 'app', namespace: 'native-fixture-app' }));
       b.onLoad({filter:/.*/,namespace:'native-fixture-app'},()=>({loader:'js',contents:`
         export const App={getState:async()=>({isActive:true}),getLaunchUrl:async()=>window.qaNativeLaunchUrl?{url:window.qaNativeLaunchUrl}:undefined,
