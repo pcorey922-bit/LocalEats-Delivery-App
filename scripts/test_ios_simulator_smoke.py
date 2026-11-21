@@ -21,6 +21,7 @@ class SmokeTests(unittest.TestCase):
         expected = json.loads((smoke.ROOT / 'config/native-audiences.json').read_text())[audience]
         (app / 'Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier': expected['id'], 'CFBundleDisplayName': expected['name'], 'CFBundleExecutable': 'App', 'CFBundleURLTypes': [{'CFBundleURLSchemes': [expected['scheme']]}]}))
         (app / 'App').write_bytes(b'not-a-real-binary')
+        (app / 'capacitor.config.json').write_text(json.dumps({'ios':{'contentInset':'automatic'}}))
         (app / 'public' / 'fixture.js').write_text(json.dumps(config))
         return app
 
@@ -57,6 +58,15 @@ class SmokeTests(unittest.TestCase):
                 self.assertFalse(report['financialOperationsPerformed'])
                 self.assertEqual(calls[-1][1], ['xcrun', 'simctl', 'delete', DEVICE])
                 self.assertFalse(any(any(word in args for word in ['openurl', 'privacy', 'push', 'erase', 'all']) for _, args in calls))
+
+    def test_compiled_safe_area_must_not_retain_old_default(self):
+        for ios in [{}, {'contentInset':'never'}]:
+            with tempfile.TemporaryDirectory() as directory:
+                root=Path(directory);app=self.fixture(root);calls=[]
+                (app/'capacitor.config.json').write_text(json.dumps({'ios':ios}))
+                with self.assertRaisesRegex(smoke.SmokeFailure,'compiled_ios_safe_area'):
+                    smoke.run_smoke(app,'driver','a'*40,root/'report',self.runner(calls),lambda _:None)
+                self.assertFalse(calls)
 
     def test_wrong_identity_or_missing_staging_assets_never_creates_device(self):
         for mode in ('wrong_identity', 'missing_assets'):

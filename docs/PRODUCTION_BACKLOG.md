@@ -1,3 +1,13 @@
+# November 21 — native iOS status-bar overlap corrected, verification pending
+
+Confirmed screenshots + Capacitor default NEVER inset explain native customer logo
+under status bar. Supported automatic iOS content inset added, no website/branding/
+Android/auth change. Real config before/after regression, three audience tests, seven
+simulator guards, two permission tests, UI types/build PASS. Existing ios-smoke once
+on new source + visual review next; physical iOS remains unverified. No Android APK
+rebuild or Render deploy required. Do NOT rerun known Android Launcher ANR or infer
+bridge defect from blocked diagnostics. All staging safeguards/data preserved.
+
 # November 21 — OS failure classified; native bridge must not be changed blindly
 
 Customer callback diagnostic44879245710 was obscured by Pixel Launcher ANR in ALL

@@ -66,6 +66,10 @@ def run_smoke(app, audience, source, output, run=execute, pause=time.sleep):
         contents = [p.read_bytes() for p in assets if not p.is_symlink()]
         if not contents or not all(any(value.encode() in data for data in contents) for value in config.values()):
             raise SmokeFailure('public_staging_configuration')
+        native_config = json.loads((app / 'capacitor.config.json').read_text())
+        if native_config.get('ios', {}).get('contentInset') != 'automatic':
+            raise SmokeFailure('compiled_ios_safe_area')
+        report['checks'].append('compiled_ios_safe_area')
         report.update({'package': expected['id'], 'name': expected['name'], 'scheme': expected['scheme'], 'apiOrigin': config['apiOrigin'], 'executableSha256': hashlib.sha256((app / executable).read_bytes()).hexdigest()})
         report['checks'].append('compiled_identity_and_public_staging_configuration')
         runtime, device_type = select_device(json.loads(run('simulator_inventory', ['xcrun', 'simctl', 'list', '--json'])))

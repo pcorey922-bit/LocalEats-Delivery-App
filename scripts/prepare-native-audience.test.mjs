@@ -19,3 +19,24 @@ test('driver-only permissions preserve the customer manifests and make the upstr
   assert.equal((driver.ios.match(/<key>UIBackgroundModes<\/key>/g) || []).length, 1);
   assert.throws(() => driverNativeManifests(android, driver.ios), /Review existing/);
 });
+
+test('real native configuration protects iOS safe areas without changing audience isolation', async () => {
+  const { createRequire } = await import('node:module');
+  const { fileURLToPath } = await import('node:url');
+  const { spawnSync } = await import('node:child_process');
+  const require = createRequire(new URL('../artifacts/api-server/package.json', import.meta.url));
+  const { build } = require('esbuild');
+  const result = await build({entryPoints:[fileURLToPath(new URL('../artifacts/localeats/capacitor.config.ts',import.meta.url))],bundle:true,platform:'node',format:'esm',write:false,logLevel:'silent'});
+  const moduleUrl = 'data:text/javascript;base64,'+Buffer.from(result.outputFiles[0].text).toString('base64');
+  for (const audience of ['customer','driver']) {
+    const child = spawnSync(process.execPath,['--input-type=module','-e',`const {default:config}=await import(${JSON.stringify(moduleUrl)});console.log(JSON.stringify(config));`],{encoding:'utf8',timeout:10000,env:{ROCOEATS_NATIVE_AUDIENCE:audience}});
+    assert.ifError(child.error);
+    assert.equal(child.status,0,child.stderr);
+    const config = JSON.parse(child.stdout);
+    assert.equal(config.ios?.contentInset,'automatic','Native content must avoid the iOS status bar and home indicator');
+    assert.equal(config.appId,nativeAudienceEnvironment(audience).ROCOEATS_NATIVE_APP_ID);
+    assert.equal(config.android.webContentsDebuggingEnabled,false);
+    assert.equal(config.plugins.CapacitorHttp.enabled,audience==='driver');
+    assert.equal(config.includePlugins.includes('@capacitor-community/background-geolocation'),audience==='driver');
+  }
+});

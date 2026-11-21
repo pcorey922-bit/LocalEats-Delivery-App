@@ -1,3 +1,25 @@
+# November 21 — iOS safe-area correction prepared for actual simulator review
+
+Actual earlier iOS cold/restart screenshots showed customer logo under status-bar
+clock. Upstream Capacitor CAPInstanceDescriptor defaults content inset to NEVER;
+CAPBridgeViewController assigns that value to WKWebView scroll adjustment. Use the
+supported ios.contentInset=automatic for both native audiences. No website CSS,
+homepage/buttons, authentication, Android transport or permissions changed.
+
+Real bundled-config regression fails original missing inset, passes corrected
+customer+driver config, preserving IDs, debug OFF, driver-only HTTP/background plugin.
+Seven simulator-policy tests (including compiled capacitor.config.json inset guard),
+two existing native permission tests, three audience tests, UI typecheck/production
+build and diff check PASS. Actual iOS smoke/screenshot validation still required;
+no physical or authenticated acceptance inferred. Android193/187 do not need rebuild
+for an iOS-only configuration setting. No Render deployment or new credentials.
+
+Next: push and run existing ios-smoke on this source once, inspect both screenshots/
+reports and exact-SHA CI. Known Pixel Launcher Android failure must NOT be rerun.
+Customer cold auth remains uncertain; bridge unchanged. All23 staging checks fresh
+PASS; retention/ledger/push dashboard evidence owner-observed, no repeated request.
+No hosted/provider/financial operation, data or signing changes.
+
 # November 21 — callback diagnostic BLOCKED by OS Launcher, not proven app bridge fault
 
 Actual44879245710 report coldAuthIntentVisible=true, cold/warm sign-in=false,
