@@ -1,5 +1,7 @@
+import { useDriverAvailability } from '../hooks/use-driver-availability';
+import { Capacitor } from '@capacitor/core';
 import { useAppForeground } from "../hooks/use-app-foreground";
-import { useDutyIntent } from "../hooks/use-duty-intent";
+import { useDutyIntent, useDutyStatus } from "../hooks/use-duty-intent";
 import { dutyIntent } from "../lib/duty-intent";
 import { NavigationActions } from "./navigation-actions";
 import type { NavigationAddress } from "../lib/navigation";
@@ -16,18 +18,9 @@ import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 export function DriverAvailability() {
   const { userId } = useAuth();
   const intent = useDutyIntent(userId ?? null);
+  const locationStatus = useDutyStatus(userId ?? null);
   const client = useQueryClient();
-  const state = useQuery({
-    queryKey: ["driver-availability", userId],
-    queryFn: () =>
-      customFetch<{
-        approved: boolean;
-        online: boolean;
-        available: boolean;
-        activeOrderId: string | null;
-      }>("/api/driver/availability"),
-    refetchInterval: 15000,
-  });
+  const state = useDriverAvailability();
   const [error, setError] = useState("");
   const update = useMutation({
     mutationFn: (available: boolean) => {
@@ -48,6 +41,7 @@ export function DriverAvailability() {
   return (
     <section className="roco-card">
       <h2>Your availability</h2>
+      {import.meta.env.VITE_APP_AUDIENCE === 'driver' && <p role="status">Location session: {locationStatus}</p>}
       <p>
         Going online shares your current location with authorized dispatch while
         the RoCoEats app is active and you choose to stay online. Going offline
@@ -61,6 +55,11 @@ export function DriverAvailability() {
       </p>
       {state.data?.available && !state.data?.online && (
         <p role="status">Your dispatch connection expired. No new offers will be assigned until you reconnect on this device.</p>
+      )}
+      {import.meta.env.VITE_APP_AUDIENCE === 'driver' && Capacitor.isNativePlatform() && state.data?.approved && (
+        state.data.online && intent && !state.isError
+          ? <p><a className="roco-button" href="#driver-background-sharing">Set up background sharing</a></p>
+          : <p>{state.data.available ? "Reconnect below to show background-sharing controls. Background sharing is off until you explicitly enable it." : "Go online below to show background-sharing controls. Background sharing is off until you explicitly enable it."}</p>
       )}
       <p>
         {state.data?.activeOrderId

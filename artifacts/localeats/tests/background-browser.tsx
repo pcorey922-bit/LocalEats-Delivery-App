@@ -9,6 +9,7 @@ import { BackgroundDutyRecovery } from '../src/pages/background-duty-location';
 import { dutyIntent } from '../src/lib/duty-intent';
 import { PushPreferences } from '../src/pages/push-preferences';
 const qa = window as unknown as {
+  dutyAvailabilityInvalid?:boolean; dutyAvailable?: boolean; dutyApproved?: boolean; dutyReconnectFails?:boolean; dutyReconnectDelay?:boolean; finishDutyReconnect?:()=>void; dutyReconnectWrites?:number; dutyAvailabilityDelay?:boolean; dutyAvailabilityAborted?:boolean; finishDutyAvailability?:()=>void;
   dutyLease?: boolean; dutyLastHeartbeat?: number; refreshDuty: () => Promise<void>;
   bgPermission: boolean; bgStarts: number; bgRemovals: string[]; bgUploads: number;
   bgDenied: boolean; emitFix?: (fix: unknown) => void; offline: () => void;
@@ -26,7 +27,10 @@ qa.directRegisterPush=()=>registerPush();
 qa.bgPermission = true; qa.bgStarts = 0; qa.bgRemovals = []; qa.bgUploads = 0; qa.bgDenied = false;
 qa.offline = () => dutyIntent.set('driver-fixture', false);
 qa.pushConfigured = true; qa.pushRegistered = localStorage.getItem('qa-server-push') === 'true'; qa.pushDeleteFails = false;
-dutyIntent.set('driver-fixture', true);
+const reconnect = location.search.includes('reconnect=true');
+qa.dutyAvailable=true;qa.dutyApproved=true;
+if(reconnect) {qa.bgPermission=false;qa.dutyLease=true;qa.dutyLastHeartbeat=Date.now()-121000;}
+dutyIntent.set('driver-fixture', !reconnect);
 window.fetch = async (input, options) => {
   const url = String(input);
   if (url === '/api/notification-devices/config') { if(qa.pushConfigDelay) { options?.signal?.addEventListener('abort',()=>{qa.pushConfigReadAborted=true;},{once:true}); await new Promise<void>(resolve=>{qa.finishPushConfig=resolve;}); } return Response.json({ android: qa.pushConfigured, ios: location.search.includes('ios=true') && qa.pushConfigured }); }
@@ -44,10 +48,20 @@ window.fetch = async (input, options) => {
     qa.pushRegistered = true; localStorage.setItem('qa-server-push', 'true'); return Response.json({ registered: true, deviceId: '11111111-1111-4111-8111-111111111119' }, { status: 201 });
   }
   if (url.startsWith('/api/notification-devices/')) { if(qa.pushStatusDelay)await new Promise<void>(resolve=>{qa.finishPushStatus=resolve;}); return qa.pushRegistered ? Response.json({ registered: true, platform: location.search.includes('ios=true')?'ios':'android', appId: location.search.includes('ios=true')?'com.rocoeats.driver':'com.rocoeats.driver.staging' }) : Response.json({ error: 'Not registered' }, { status: 404 }); }
-  if (url === '/api/profiles/me') return Response.json({ id: 'driver-fixture', role: 'driver', displayName: 'Fixture Driver', createdAt: '2026-11-18T00:00:00.000Z' });
+  if (url === '/api/profiles/me') return Response.json({ id: 'driver-fixture', role: location.search.includes('owner=true') ? 'admin' : 'driver', displayName: 'Fixture Driver', createdAt: '2026-11-18T00:00:00.000Z' });
   if (url === '/api/driver/availability') {
-    if (options?.method === 'PUT') qa.dutyLastHeartbeat = Date.now();
-    return Response.json({ approved: true, available: true, online: !qa.dutyLease || Date.now() - (qa.dutyLastHeartbeat ?? 0) < 90000, activeOrderId: qa.dutyOrderId ?? null });
+    if (options?.method === 'PUT') {
+      qa.dutyReconnectWrites=(qa.dutyReconnectWrites??0)+1;
+      if(qa.dutyReconnectDelay)await new Promise<void>(resolve=>{qa.finishDutyReconnect=resolve;});
+      if(qa.dutyReconnectFails)return Response.json({error:'Reconnect rejected by server'},{status:403});
+      qa.dutyAvailable=JSON.parse(String(options.body)).available;
+      qa.dutyLastHeartbeat=Date.now();
+      // Real PUT response deliberately omits approval; GET establishes eligibility.
+      return Response.json({available:qa.dutyAvailable,online:qa.dutyAvailable,activeOrderId:null});
+    }
+    if(qa.dutyAvailabilityDelay) {options?.signal?.addEventListener('abort',()=>{qa.dutyAvailabilityAborted=true;},{once:true});await new Promise<void>(resolve=>{qa.finishDutyAvailability=resolve;});}
+    if(qa.dutyAvailabilityInvalid)return Response.json({available:true,online:true});
+    return Response.json({ approved: qa.dutyApproved, available: qa.dutyAvailable, online: !!qa.dutyAvailable && (!qa.dutyLease || Date.now() - (qa.dutyLastHeartbeat ?? 0) < 90000), activeOrderId: qa.dutyOrderId ?? null });
   }
   if (url === '/api/driver/location') {
     qa.bgUploads++;
@@ -66,4 +80,4 @@ window.fetch = async (input, options) => {
 };
 const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 qa.refreshDuty=()=>client.invalidateQueries({queryKey:['driver-availability']});
-createRoot(document.getElementById('root')!).render(<QueryClientProvider client={client}>{location.search.includes('push=true') ? <PushPreferences/> : <><BackgroundDutyRecovery/><DriverAvailability/><DriverDutySession/></>}</QueryClientProvider>);
+createRoot(document.getElementById('root')!).render(<QueryClientProvider client={client}>{location.search.includes('push=true') ? <PushPreferences/> : <><BackgroundDutyRecovery/><DriverAvailability/><DriverDutySession/>{location.search.includes('permissions=true') && <PushPreferences/>}</>}</QueryClientProvider>);

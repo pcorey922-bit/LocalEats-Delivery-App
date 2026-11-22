@@ -16,6 +16,7 @@ export async function verifyDriverApp({ actor, api, origin }) {
   await driver.goto(origin);
   await driver.waitForURL(origin + '/driver');
   await driver.getByRole('button', { name: 'Go online', exact: true }).waitFor();
+  await driver.getByText('Go online or reconnect on this device to receive delivery offers.',{exact:true}).waitFor();
   await driver.getByRole('button', { name: 'Menu', exact: true }).click();
   const nav = driver.getByRole('navigation', { name: 'Main navigation', exact: true });
   await nav.getByRole('link', { name: 'Earnings', exact: true }).waitFor();

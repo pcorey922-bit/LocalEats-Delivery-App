@@ -1,3 +1,65 @@
+# November 22 — Driver219 reconnect succeeds; missing activation NOT resolved physically
+
+Recovered clean primary c4fdaf80ddda29e868ff70bb86d1f849c85b16de, remote matched;
+checkpoint CI44980872928/44980872969/44980869802 all SUCCESS. No unfinished work lost.
+NEW OWNER Samsung219 evidence: reconnect SUCCEEDED, normal Online/Go offline returned;
+offers recovered to No paid deliveries. However background checkbox/enable button STILL
+ABSENT throughout page; notification permission not granted. Background sharing has
+NOT been activated; physical background GPS remains NOT ACCEPTED. This supersedes
+any inference that initial reconnect alone explains the current absence.
+
+Confirmed implementation: consent renders in global DriverDutySession only when Clerk
+signed in, driver/admin profile, no profile/availability query errors, explicit device
+intent, server approved/available/online, dedicated native Driver audience. Notification
+permission is requested AFTER choosing Enable; it is not a visibility gate.219 APK
+contains the component and activation text, local packaged assets (no server URL),
+proper native permissions/private FGS. Deployed76a24ed GET/PUT contracts compatible.
+We have NOT captured the failing device's exact gate/response; do not invent a cause.
+
+Corrections: all3 availability observers now share bounded20s session-aware reads
+(existing401 renewal/read retry policy; mutations unchanged/no write replay). Query
+failure no longer silently removes all explanation. Strict GET response validation
+distinguishes missing/coerced flags from actual denied approval; invalid responses
+are not automatically retried. Only safe stage/HTTP codes are reported. Global inactive controller shows
+safe gate reason; existing device-intent store publishes account/process-local status
+only, NEVER grants intent or persists it. Availability shows Location session code
+including NOT_STARTED if global controller never reports, READY_NATIVE vs READY_WEB,
+approval/profile/read/connection gates, and link to activation section when connected.
+Offline offers409 is normal actionable Go-online/reconnect state, not generic account
+failure. Background notification denial has precise phone Settings instructions;
+permission display refreshes after request, independent of Firebase/APNs registration.
+No auth/approval/lease/role/consent relaxation, account or session record changes.
+
+Validation: initial missing-guidance regression failed before correction; new actual
+React/Chromium mocked-native/API regression PASS for fresh-process/server-denied /
+approved-driver+admin reconnect, denied notification before visible consent, denied
+activation/no watcher, subsequent permission grant/cleanup, status refresh with ZERO
+provider registration, process reload/explicit intent, approval denial, hung availability.
+Existing native GPS/push consent/timeout/opt-out/fencing regression suite PASS.16 focused
+background/duty-intent/availability-response units PASS. Real LOCAL API/PGlite Driver integration PASS:
+normal409 offers UI, approved/unapproved/admin/customer authorization, reconnect,
+foreground GPS/dispatch/offline, stalled session/profile/restart recovery. Native and
+Clerk simulated; no physical/native-provider acceptance asserted. UI types/build PASS;
+CI/source/artifact final results must still be read after push. Existing chunk warning.
+
+NEXT OWNER CANDIDATE TEST (only after verified signing): install update, keep app open,
+tap Reconnect if shown. Read Location session under Your availability, tap Set up
+background sharing, report exact code + whether checkbox/button appear. If permission
+prompt appears after explicit checkbox+Enable, allow notifications (or Settings→Apps→
+RoCoEats Driver Staging→Notifications), reconnect/re-enable as instructed. If controls
+still missing, stop and report safe code; no repeated auth/Customer208/order/payment
+trial. Only after service notification/upload appears test background/lock/offline.
+Do NOT mark acceptance passed from simulated READY_NATIVE or successful compilation.
+
+NEXT INDEPENDENT: exact-SHA CI + protected signed Driver diagnostic/recovery candidate;
+then use physical gate result to correct actual remaining Samsung blocker. Do not
+repeat broad auth/staging audits or guess native promotion/permission causes. Native
+startForeground error propagation remains a source-level review item, NOT established
+as the cause (service never activated). Push providers/iOS protected signing/real GPS
+and provider financial evidence remain external acceptance gaps. No Render deployment
+or migration required for this client-only correction. All hosted gates/data/financial
+records, Neon recovery and signing preserved. No provider/financial operation performed.
+
 # November 22 — verified Driver219 physical-background candidate
 
 FUNCTIONAL HEAD 8bf4d04baab5e51a4fbe361283838f252f375284, primary branch

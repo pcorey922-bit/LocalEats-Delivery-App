@@ -30,3 +30,23 @@ test("offline intent updates subscribers synchronously before network persistenc
   s.set("driver", true);
   assert.equal(observed, false);
 });
+
+test("location diagnostics never grant tracking intent and are process/account scoped", () => {
+ const s=createDutyIntentStore();let notifications=0;const unsubscribe=s.subscribe(()=>notifications++);
+ assert.equal(s.status('owner'),'DRIVER_SESSION_NOT_STARTED');
+ s.report('owner','DRIVER_READY_NATIVE');assert.equal(s.get('owner'),false);
+ assert.equal(s.status('other'),'DRIVER_SESSION_NOT_STARTED');
+ s.report('owner','DRIVER_READY_NATIVE');assert.equal(notifications,1);
+ assert.equal(createDutyIntentStore().status('owner'),'DRIVER_SESSION_NOT_STARTED');
+ s.clear();assert.equal(s.status('owner'),'DRIVER_SESSION_NOT_STARTED');unsubscribe();
+});
+
+import {driverAvailabilityResponse,DriverAvailabilityResponseError} from '../../localeats/src/lib/driver-availability';
+test("availability rejects incomplete or coerced flags without treating them as revoked driver approval",()=>{
+ const valid={approved:true,available:true,online:true,activeOrderId:null};
+ assert.deepEqual(driverAvailabilityResponse(valid),valid);
+ assert.equal(driverAvailabilityResponse({...valid,approved:false}).approved,false);
+ for(const invalid of [undefined,null,'',[],{}, {...valid,approved:undefined},{...valid,approved:'true'}, {...valid,available:1},{...valid,online:'false'},{...valid,activeOrderId:''},{...valid,ownerDriverAccess:'true'}]) {
+  assert.throws(()=>driverAvailabilityResponse(invalid),DriverAvailabilityResponseError);
+ }
+});

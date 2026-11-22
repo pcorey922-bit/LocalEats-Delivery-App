@@ -1,3 +1,4 @@
+import { useDriverAvailability } from '../hooks/use-driver-availability';
 import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
@@ -16,14 +17,7 @@ type Application = {
 };
 export function DriverApplication() {
   const { userId } = useAuth();
-  const access = useQuery({
-    queryKey: ["driver-availability", userId],
-    queryFn: () =>
-      customFetch<{ ownerDriverAccess: boolean; approved: boolean }>(
-        "/api/driver/availability",
-      ),
-    enabled: !!userId,
-  });
+  const access = useDriverAvailability();
   const q = useQuery({
     queryKey: ["driver-application", userId],
     queryFn: () => customFetch<Application | null>("/api/driver/application"),

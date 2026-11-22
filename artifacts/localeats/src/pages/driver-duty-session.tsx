@@ -7,7 +7,10 @@ import { useCallback, useEffect, useState } from "react";
 import { Capacitor } from '@capacitor/core';
 import { BackgroundDutyLocation } from './background-duty-location';
 import { useAuth } from "@clerk/react";
-import { useQuery } from "@tanstack/react-query";
+import { useDriverAvailability } from '../hooks/use-driver-availability';
+import { accountReadMessage } from '../lib/account-read';
+import { accountStatus } from '../lib/account-entry';
+import { DriverAvailabilityResponseError } from '../lib/driver-availability';
 import { DutyLocation } from "./duty-location";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 export function DriverDutySession() {
@@ -18,18 +21,7 @@ export function DriverDutySession() {
   const profile = useAccountProfile();
   const enabled =
     !!isSignedIn && ["driver", "admin"].includes(profile.data?.role ?? "");
-  const state = useQuery({
-    queryKey: ["driver-availability", userId],
-    queryFn: () =>
-      customFetch<{
-        approved: boolean;
-        available: boolean;
-        online: boolean;
-        activeOrderId: string | null;
-      }>("/api/driver/availability"),
-    enabled,
-    refetchInterval: 15000,
-  });
+  const state = useDriverAvailability(enabled);
   const [error, setError] = useState("");
   const [background, setBackground] = useState(false), [consent, setConsent] = useState(false);
   const foreground = useAppForeground();
@@ -42,6 +34,19 @@ export function DriverDutySession() {
     !!state.data?.approved &&
     !!state.data?.available &&
     !!state.data?.online;
+  const phase = !isSignedIn ? 'DRIVER_SIGN_IN_REQUIRED'
+    : profile.isError ? 'DRIVER_PROFILE_ERROR'
+    : !profile.data ? 'DRIVER_PROFILE_PENDING'
+    : !enabled ? 'DRIVER_ROLE_REQUIRED'
+    : state.isError ? (state.error instanceof DriverAvailabilityResponseError ? 'DRIVER_AVAILABILITY_RESPONSE_INVALID' : `DRIVER_AVAILABILITY_HTTP_${accountStatus(state.error) ?? 'UNKNOWN'}`)
+    : !state.data ? 'DRIVER_AVAILABILITY_PENDING'
+    : !state.data.approved ? 'DRIVER_APPROVAL_REQUIRED'
+    : !intent ? 'DRIVER_DEVICE_RECONNECT_REQUIRED'
+    : !state.data.available || !state.data.online ? 'DRIVER_CONNECTION_EXPIRED'
+    : !Capacitor.isNativePlatform() ? 'DRIVER_READY_WEB'
+    : background ? 'DRIVER_BACKGROUND_REQUESTED' : 'DRIVER_READY_NATIVE';
+  useEffect(() => { if (userId) dutyIntent.report(userId, phase); }, [userId, phase]);
+  useEffect(() => () => { if (userId) dutyIntent.report(userId, 'DRIVER_SESSION_STOPPED'); }, [userId]);
   const backgroundFailure = useCallback((message: string) => {
     setError(message);
     if (userId) dutyIntent.set(userId, false);
@@ -77,7 +82,22 @@ export function DriverDutySession() {
       clearInterval(timer);
     };
   }, [active, userId, foreground]);
-  if (!active) return error ? <aside className="roco-alert" role="alert">{error}</aside> : null;
+  if (!active) {
+    if (error) return <aside className="roco-alert" role="alert">{error}</aside>;
+    if (import.meta.env.VITE_APP_AUDIENCE !== 'driver' || !isSignedIn) return null;
+    // Never silently omit the reason activation is unavailable. Safe gate codes
+    // contain no identity, token, coordinates or raw provider response.
+    const reason = profile.isError ? 'Account access could not be checked. Open Account access or retry the workspace. Code: DRIVER_PROFILE_ERROR.'
+      : !profile.data ? 'Checking driver account access. Code: DRIVER_PROFILE_PENDING.'
+      : !enabled ? 'An authorized driver or administrator account is required. Code: DRIVER_ROLE_REQUIRED.'
+      : state.isError ? `Driver availability could not be checked. Code: ${phase}. ${accountReadMessage(state.error)}`
+      : !state.data ? 'Checking driver availability. Code: DRIVER_AVAILABILITY_PENDING.'
+      : !state.data.approved ? 'Server driver approval is required. Code: DRIVER_APPROVAL_REQUIRED.'
+      : !intent ? 'This app has not reconnected for this session. Reconnect under Your availability to enable background setup. Code: DRIVER_DEVICE_RECONNECT_REQUIRED.'
+      : !state.data.available || !state.data.online ? 'Dispatch connection is offline or expired. Reconnect under Your availability. Code: DRIVER_CONNECTION_EXPIRED.'
+      : 'Driver connection could not be verified. Retry availability.';
+    return <aside className="roco-notice" aria-label="Driver connection status"><strong>Background sharing is off.</strong><p role="status">{reason}</p></aside>;
+  }
   return (
     <aside className="roco-notice" aria-label="On-duty location status">
       <strong>You are on duty.</strong>
@@ -87,7 +107,7 @@ export function DriverDutySession() {
         activeOrderId={state.data?.activeOrderId ?? null}
       />}
       {import.meta.env.VITE_APP_AUDIENCE === 'driver' && Capacitor.isNativePlatform() && (
-        <section aria-label="Background location permission">
+        <section id="driver-background-sharing" aria-label="Background location permission">
           {!background ? <>
             <p><strong>Foreground-only location sharing</strong></p>
             <p>Go online does not enable background sharing. Keep RoCoEats visible, or enable background location below before switching apps or locking your screen. Without updates, dispatch marks you offline after 90 seconds and requires reconnecting.</p>
@@ -100,6 +120,7 @@ export function DriverDutySession() {
           </> : <button className="roco-button" onClick={() => { setBackground(false); setConsent(false); }}>Stop background sharing; use foreground only</button>}
         </section>
       )}
+      {import.meta.env.VITE_APP_AUDIENCE === 'driver' && !Capacitor.isNativePlatform() && <p role="status">Background location requires the installed Driver app. Code: DRIVER_NATIVE_PLATFORM_UNAVAILABLE.</p>}
       {error && <p role="alert">{error}</p>}
     </aside>
   );

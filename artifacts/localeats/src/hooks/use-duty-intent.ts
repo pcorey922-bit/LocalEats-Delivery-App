@@ -7,3 +7,7 @@ export function useDutyIntent(userId: string | null) {
     () => false,
   );
 }
+
+export function useDutyStatus(userId: string | null) {
+  return useSyncExternalStore(dutyIntent.subscribe, () => dutyIntent.status(userId), () => 'DRIVER_SESSION_NOT_STARTED');
+}
