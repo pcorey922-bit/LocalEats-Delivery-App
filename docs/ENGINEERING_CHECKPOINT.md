@@ -1,3 +1,65 @@
+# November 22 — Driver225 SCREEN-LOCK physical acceptance BLOCKED
+
+NEW OWNER EVIDENCE (Samsung Galaxy S22 Ultra, signed225):11:48PM on-duty/background
+sharing enabled;11:50:17 Dispatch available/fresh GPS; last accepted GPS receipt
+11:50:48; last heartbeat receipt11:50:49. After screen-lock segment,11:53 Driver
+DRIVER_DEVICE_RECONNECT_REQUIRED + DUTY_ACK_EXPIRED; Dispatch disconnected/zero approved
+online. Background with screen UNLOCKED worked. Physical screen-lock GPS FAILED,
+not accepted. Preserve successful auth/foreground/unlocked behavior and all safeguards.
+Recovered clean remote2d45defd5fd756f647fd36e3bfcdfeb8f15cb58b; its3 workflows
+44986182119/44986182120/44986177926 all SUCCESS. No unfinished work lost.
+
+TIMING: if11:50:49 were the last SERVER-PROCESSED heartbeat,90s freshness would close
+about11:52:19. That is consistent with disconnection by11:53. However displayed
+receipts are phone-side response-processing times, not DB/audit timestamps; later
+native requests could have reached server without JS recording their responses.
+Do NOT claim an exact final DB heartbeat, native HTTP status, or a401 from these facts.
+Native watchdog baseline is challenge ISSUE time before acknowledgement;75s from
+that baseline can expire earlier than75s after the visible receipt. DUTY_ACK_EXPIRED
+proves missing accepted native acknowledgement, not WHY it was missing or whether
+watchdog execution itself was delayed until unlock. No hidden financial/order activity.
+
+SOURCE REVIEW:225 native timer/wake lock are independent of WebView timers, BUT API
+request initiation, Clerk token acquisition and response-to-native acknowledgement
+still pass through JavaScript. Native GPS also bridges to JS before upload. A native
+pulse is NOT an autonomous native HTTP heartbeat. We must not describe225 as having
+removed all WebView dependencies. Capacitor8.6 Bridge/Activity keepRunning is true;
+no demonstrated explicit screen-off onPause/pauseTimers call in that lifecycle.
+Do NOT blindly force WebView onResume or rewrite working authentication.
+
+Android official documentation confirms Doze may defer network and ignore partial
+wake locks; foreground service/notification alone does not establish Doze exemption:
+https://developer.android.com/training/monitoring-device-state/doze-standby
+https://source.android.com/docs/core/power/platform_mgmt
+This is a plausible screen-lock cause, NOT yet demonstrated on this Samsung.
+Native watchdog remains fail-closed and server90s expiry unchanged. Exact runtime
+facts missing: whether native pulses were scheduled/bridged, native HTTP started /
+completed/failed/timed out, deviceIdle/powerSaver/optimization exemption/network state.
+No authenticated historical request logs or device access available to this session.
+
+SPECIFIC OWNER DIAGNOSTIC REQUEST SENT (read ONLY, no new GPS/sign-in test):
+Settings -> Apps -> RoCoEats Driver Staging -> Battery: Unrestricted/Optimized/Restricted;
+Settings -> Battery -> Power saving: on/off; Background usage limits: whether Driver
+is Sleeping/Deep sleeping; Wi-Fi vs mobile data during failed lock test.
+These private device settings cannot be inspected through GitHub or Render. No settings
+change requested yet. Do not assume Optimized or a policy exemption from guesses.
+
+NEXT ENGINEERING AFTER ANSWER: if OS restrictions evident, verify precise Android
+PowerManager exemption semantics and prepare explicit device-side readiness guidance /
+read-only preflight; never silently change device power policy. If already unrestricted,
+add narrow native power/pulse/HTTP-stage evidence BEFORE selecting a transport/lifecycle
+fix. Existing JS receipt codes cannot distinguish a suspended bridge from completed
+native HTTP whose result was delayed. Avoid speculative auth rewrites, expiry increases,
+notification-only cosmetics, duplicate permission prompts or another unsupported
+"fixed" APK. Produce replacement only for a verified correction or clearly identified
+necessary native diagnostic, accurately labeling its purpose/remaining physical gap.
+
+No runtime fix justified yet by these observations alone; no APK rebuild, redundant
+passing suites, new provider calls, hosted configuration, deployment or financial
+operation performed. Evidence-only checkpoint; automatic docs CI separate/pending.
+All public/private ordering/live/payout/retention/municipal gates unchanged; Stripe
+TEST, historical data/order/ledger, Neon recovery, signing and PR1 preserved.
+
 # November 22 — Driver225 native liveness candidate verified; physical GPS pending
 
 FUNCTIONAL SOURCE71ca9bc1eb2578c8db7d73c9fdf4e095915a08ba pushed on primary branch,

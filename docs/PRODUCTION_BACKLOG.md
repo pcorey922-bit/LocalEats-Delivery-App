@@ -1,3 +1,18 @@
+# November 22 — Driver225 locked-screen acceptance FAILED
+
+Owner unlocked-background worked; lock stopped last visible GPS11:50:48/heartbeat
+11:50:49; by11:53 DUTY_ACK_EXPIRED/DEVICE_RECONNECT_REQUIRED and Dispatch disconnected.
+Conditional server90s expiry ~11:52:19 consistent, exact DB/native HTTP timeline unknown.
+225 native pulse still uses JS to get Clerk token/initiate HTTP/ack; wake lock/FGS
+alone does not exempt Doze. Native timer expiry code does not prove HTTP rejection,
+network timeout or JS suspension. No root cause fabricated; no runtime correction yet.
+Owner READ-ONLY diagnostic pending: app Battery policy, Power saving, Sleeping/Deep
+sleeping membership, Wi-Fi/mobile data during lock. No repeat GPS/auth test or device
+setting change requested. Then choose minimal power-readiness/native stage diagnostic
+or evidenced transport fix; do not increase90s, force WebView lifecycle or rebuild an
+unproven repair. Physical background GPS remains BLOCKED. No hosted/financial/provider
+operations, settings/deploy changes; accepted customer/auth and signing preserved.
+
 # November 22 — Driver225 GPS-independent liveness correction verified
 
 71ca9bc1eb2578c8db7d73c9fdf4e095915a08ba ALL THREE CI SUCCESS:
