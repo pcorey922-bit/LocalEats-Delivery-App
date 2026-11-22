@@ -3,13 +3,12 @@ import { useAuth } from '@clerk/react';
 import { dutyIntent } from '../lib/duty-intent';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, useRef } from 'react';
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
-import type { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
+import { nativeDutyBridge as watcher, recordDutyStage, type DutyTraceKind } from '../lib/native-duty-diagnostics';
 import { backgroundDutySession } from '../lib/background-duty';
 import { customFetch } from '../../../../lib/api-client-react/src/custom-fetch';
 
-const watcher = registerPlugin<BackgroundGeolocationPlugin & {acknowledgeDuty(options:{id:string;sequence:string}):Promise<void>}>('BackgroundGeolocation');
 const storageKey = 'rocoeats-background-watch:v1'; // Watch ID only, never a token or position.
 let cleanup = Promise.resolve();
 function clearSavedWatcher() {
@@ -23,6 +22,15 @@ function clearSavedWatcher() {
 }
 
 export function BackgroundDutyRecovery() {
+  const {isLoaded,isSignedIn,userId}=useAuth();
+  const previousUser=useRef<string|null|undefined>(undefined);
+  useEffect(()=>{
+    if(!isLoaded)return;
+    if((isSignedIn===false || previousUser.current!==undefined && previousUser.current!==(userId??null)) && Capacitor.getPlatform()==='android' && import.meta.env.VITE_APP_AUDIENCE==='driver') {
+      try{void watcher.clearDutyDiagnostics().catch(()=>{});}catch{}
+    }
+    previousUser.current=userId??null;
+  },[isLoaded,isSignedIn,userId]);
   const [error, setError] = useState('');
   useEffect(() => {
     if (import.meta.env.VITE_APP_AUDIENCE !== 'driver' || !Capacitor.isNativePlatform()) return;
@@ -38,21 +46,26 @@ export function BackgroundDutyLocation({ onFatal }: { onFatal: (message: string)
   const [message, setMessage] = useState('Starting background location with your permission…');
   useEffect(() => {
     let disposed = false, permissionDenied = false;
+    let nativeId:string|undefined;
     const session = backgroundDutySession({ watcher: {
       addWatcher: async (options, callback) => {
         await clearSavedWatcher();
         const id = await watcher.addWatcher(options, (fix, error) => {
           const pulse = fix as unknown as {dutyPulse?:boolean; sequence?:unknown} | undefined;
-          if (pulse?.dutyPulse === true && typeof pulse.sequence === 'string') callback(undefined, error, {sequence:pulse.sequence});
-          else callback(fix && fix.time !== null ? { latitude: fix.latitude, longitude: fix.longitude, accuracy: fix.accuracy, time: fix.time, simulated: fix.simulated } : undefined, error);
+          if (pulse?.dutyPulse === true && typeof pulse.sequence === 'string') {recordDutyStage(nativeId,'JS_PULSE','HEARTBEAT');callback(undefined, error, {sequence:pulse.sequence});}
+          else {if(fix)recordDutyStage(nativeId,'JS_GPS','GPS');callback(fix && fix.time !== null ? { latitude: fix.latitude, longitude: fix.longitude, accuracy: fix.accuracy, time: fix.time, simulated: fix.simulated } : undefined, error);}
         });
+        nativeId=id;
         try { localStorage.setItem(storageKey, id); }
         catch (error) { await watcher.removeWatcher({ id }); throw error; }
         return id;
       },
       ...(Capacitor.getPlatform() === 'android' ? {acknowledgeDuty:(id:string,sequence:string)=>watcher.acknowledgeDuty({id,sequence})} : {}),
       removeWatcher: async ({ id }) => { await watcher.removeWatcher({ id }); if (localStorage.getItem(storageKey) === id) localStorage.removeItem(storageKey); },
-    }, api: (path,options)=>driverDutyRequest(customFetch,()=>tokenGetter.current({skipCache:true}),path,options),
+    }, api: (path,options)=> {
+      const kind:DutyTraceKind=path.endsWith('/heartbeat')?'HEARTBEAT':path.endsWith('/availability')?'AVAILABILITY':'GPS';
+      return driverDutyRequest(customFetch,()=>tokenGetter.current({skipCache:true}),path,{...options,onStage:stage=>recordDutyStage(nativeId,stage,kind)});
+    },
       evidence: value => { if (!disposed && userId) dutyIntent.record(userId,value); },
       permission: async () => {
         if (Capacitor.getPlatform() !== 'android') return true;

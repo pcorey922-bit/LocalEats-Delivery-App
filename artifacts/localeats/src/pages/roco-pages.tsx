@@ -1,3 +1,4 @@
+import { NativeDutyDiagnostics } from './native-duty-diagnostics';
 import { useNativeStartup } from '../components/native-startup-boundary';
 import { PushPreferences } from './push-preferences';
 import { RestaurantAccessState } from '../components/restaurant-access-state';
@@ -205,7 +206,7 @@ export function RestaurantPage() {
   const reload = () => { invalidate(client, getGetMyRestaurantQueryKey(), getListMyOrdersQueryKey()); };
   if (profile.isLoading || (profile.data?.role === 'restaurant' && mine.isLoading)) return <Shell><Loading/></Shell>;
   if (profile.isError && accountStatus(profile.error) === 404) return <Redirect to="/account/setup?join=restaurant" />;
-  if (profile.isError) return <Shell><main className="roco-main"><PageIntro eyebrow="Restaurant access" title="We couldn’t open your workspace."/><LoadError retry={() => void profile.refetch()} message={accountStatus(profile.error) === 403 ? "This account does not have restaurant workspace access. Private staging requires an invitation." : "Check your connection or sign in again."}/><p><Link href="/account/access?join=restaurant">Check account access</Link> · <Link href="/sign-in?join=restaurant">Sign in again</Link></p></main></Shell>;
+  if (profile.isError) return <Shell><main className="roco-main"><PageIntro eyebrow="Restaurant access" title="We couldn’t open your workspace."/><NativeDutyDiagnostics/><LoadError retry={() => void profile.refetch()} message={accountStatus(profile.error) === 403 ? "This account does not have restaurant workspace access. Private staging requires an invitation." : "Check your connection or sign in again."}/><p><Link href="/account/access?join=restaurant">Check account access</Link> · <Link href="/sign-in?join=restaurant">Sign in again</Link></p></main></Shell>;
   if (profile.data?.role !== 'restaurant') return <Shell><main className="roco-main"><PageIntro eyebrow="Restaurant access" title="Your restaurant workspace.">Sign in with your restaurant partner account.</PageIntro><Link href="/account/access?join=restaurant">Check account access</Link></main></Shell>;
   if (mine.isError && (mine.error as {status?: number})?.status === 404) return <Shell><main className="roco-main"><PageIntro eyebrow="Restaurant onboarding" title="Bring your business to the table."/> <RestaurantOnboarding/></main></Shell>;
   if (mine.isError) return <Shell><main className="roco-main"><LoadError retry={() => void mine.refetch()} message="Your restaurant profile is unavailable or this role is not permitted."/></main></Shell>;

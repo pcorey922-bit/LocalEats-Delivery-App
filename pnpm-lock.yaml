@@ -84,7 +84,8 @@ overrides:
   js-yaml: 4.3.2
 
 patchedDependencies:
-  '@capacitor-community/background-geolocation@1.3.1': 8d3875332df9d0cf76b5604ecbb22aa4a11ef8106b922e84e7f55d1078fdaaa7
+  '@capacitor-community/background-geolocation@1.3.1': 516b1343f1e95c6a052c0a7304154b802d987122e8f45f750ff8d276656a5eae
+  '@capacitor/android@8.6.0': 2fa047655b29e3dc4fac6214bc3f41e61b69c89129aed1b6b4f2ccc94c69136a
 
 importers:
 
@@ -178,10 +179,10 @@ importers:
     dependencies:
       '@capacitor-community/background-geolocation':
         specifier: 1.3.1
-        version: 1.3.1(patch_hash=8d3875332df9d0cf76b5604ecbb22aa4a11ef8106b922e84e7f55d1078fdaaa7)(@capacitor/core@8.6.0)
+        version: 1.3.1(patch_hash=516b1343f1e95c6a052c0a7304154b802d987122e8f45f750ff8d276656a5eae)(@capacitor/core@8.6.0)
       '@capacitor/android':
         specifier: ^8.6.0
-        version: 8.6.0(@capacitor/core@8.6.0)
+        version: 8.6.0(patch_hash=2fa047655b29e3dc4fac6214bc3f41e61b69c89129aed1b6b4f2ccc94c69136a)(@capacitor/core@8.6.0)
       '@capacitor/app':
         specifier: ^8.1.2
         version: 8.1.2(@capacitor/core@8.6.0)
@@ -4035,11 +4036,11 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
-  '@capacitor-community/background-geolocation@1.3.1(patch_hash=8d3875332df9d0cf76b5604ecbb22aa4a11ef8106b922e84e7f55d1078fdaaa7)(@capacitor/core@8.6.0)':
+  '@capacitor-community/background-geolocation@1.3.1(patch_hash=516b1343f1e95c6a052c0a7304154b802d987122e8f45f750ff8d276656a5eae)(@capacitor/core@8.6.0)':
     dependencies:
       '@capacitor/core': 8.6.0
 
-  '@capacitor/android@8.6.0(@capacitor/core@8.6.0)':
+  '@capacitor/android@8.6.0(patch_hash=2fa047655b29e3dc4fac6214bc3f41e61b69c89129aed1b6b4f2ccc94c69136a)(@capacitor/core@8.6.0)':
     dependencies:
       '@capacitor/core': 8.6.0
 

@@ -7,8 +7,10 @@ export type FetchResponseEvidence = {
   declaredLength: number | null;
   textLength: number | null;
 };
+export type FetchRequestStage = 'TOKEN_START' | 'TOKEN_READY' | 'TOKEN_FAILED' | 'JS_HTTP_START' | 'JS_HTTP_RETURN' | 'JS_HTTP_FAILED' | 'JS_BODY_START' | 'JS_BODY_READY';
 export type CustomFetchOptions = RequestInit & {
   responseType?: "json" | "text" | "blob" | "auto";
+  onStage?: (stage: FetchRequestStage) => void;
   onResponse?: (evidence: Readonly<FetchResponseEvidence>) => void;
 };
 
@@ -369,8 +371,9 @@ async function fetchApi<T>(input: RequestInfo | URL, options: CustomFetchOptions
     try{const target=new URL(originalUrl),base=new URL(_baseUrl);return target.origin===base.origin&&target.pathname.startsWith("/api/");}catch{return false;}
   })();
   input = applyBaseUrl(input);
-  const { responseType = "auto", onResponse, headers: headersInit, ...init } = options;
+  const { responseType = "auto", onResponse, onStage, headers: headersInit, ...init } = options;
 
+  const stage = (value:FetchRequestStage) => {try{onStage?.(value);}catch{/* Diagnostics cannot change transport behavior. */}};
   const method = resolveMethod(input, init.method);
 
   if (init.body != null && (method === "GET" || method === "HEAD")) {
@@ -394,7 +397,10 @@ async function fetchApi<T>(input: RequestInfo | URL, options: CustomFetchOptions
   // Attach bearer token when an auth getter is configured and no
   // Authorization header has been explicitly provided.
   if (trustedApiRequest && _authTokenGetter && !headers.has("authorization")) {
-    const token = await _authTokenGetter();
+    stage('TOKEN_START');
+    let token:string|null;
+    try {token=await _authTokenGetter();stage('TOKEN_READY');}
+    catch(error){stage('TOKEN_FAILED');throw error;}
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
     }
@@ -407,7 +413,10 @@ async function fetchApi<T>(input: RequestInfo | URL, options: CustomFetchOptions
   const requestInfo = { method, url: resolveUrl(input) };
 
   init.signal?.throwIfAborted();
-  const response = await fetch(input, { ...init, method, headers });
+  stage('JS_HTTP_START');
+  let response:Response;
+  try {response=await fetch(input, { ...init, method, headers });stage('JS_HTTP_RETURN');}
+  catch(error){stage('JS_HTTP_FAILED');throw error;}
 
   const media = getMediaType(response.headers);
   const length = response.headers.get('content-length');
@@ -420,11 +429,14 @@ async function fetchApi<T>(input: RequestInfo | URL, options: CustomFetchOptions
     textLength: null,
   };
   try {
+    stage('JS_BODY_START');
     if (!response.ok) {
       const errorData = await parseErrorBody(response, method, evidence);
+      stage('JS_BODY_READY');
       throw new ApiError(response, errorData, requestInfo);
     }
-    return (await parseSuccessBody(response, responseType, requestInfo, evidence)) as T;
+    const result=await parseSuccessBody(response, responseType, requestInfo, evidence);
+    stage('JS_BODY_READY');return result as T;
   } finally {
     onResponse?.(Object.freeze({ ...evidence }));
   }

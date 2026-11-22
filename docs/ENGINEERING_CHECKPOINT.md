@@ -1,3 +1,77 @@
+# November 22 — Unrestricted225 FAILED; native screen-lock diagnostic instrumentation
+
+NEW OWNER evidence: SAME225 on Samsung S22 Ultra also failed with Battery UNRESTRICTED,
+Power saving OFF, no Sleeping/Deep sleeping listing, Wi-Fi ACTIVE/mobile enabled,
+permissions unchanged, no reinstall/hosted change. Before lock receipts advanced;
+INITIAL captures heartbeat00:13:36/GPS00:13:37 (not proven FINAL successes).
+After3min lock Dispatch disconnected/zero approved online at00:18; Driver at00:19
+reported native duty acknowledgement/location unavailable. Do NOT assert a final
+server heartbeat or that battery optimization alone caused this. Both modes failed;
+physical locked background GPS remains BLOCKED. No identical uninstrumented retest.
+Recovered primary6903de89715d70b596bdbd9c5125c5c008cd85c7 clean, preserved all work.
+
+IMPLEMENTED DIAGNOSTICS, NOT A CLAIMED SCREEN-LOCK FIX:
+- Version-pinned observational @capacitor/android8.6 patch wraps EXISTING native HTTP
+  handler, retaining original transport/TLS/auth/body/timeouts/exceptions. Opt-in only
+  during consented driver background duty, scoped staging driver telemetry + Clerk
+  development/proxy session requests; unrelated financial/customer/provider traffic
+  excluded. Native start/result/HTTP status/timeout/interruption/error captured BEFORE
+  JS receives response. Local numeric request sequence correlates native spans.
+- Existing driver plugin captures monotonic native pulse, GPS callback count/age,
+  native ack/expiry reason, screen/power/network observations (including actual Doze /
+  exemption/Low Power Standby/wakeHeld/validated active transport/data-saver flags).
+  Snapshot at native expiry is distinct from later unlocked report-read power state.
+  wakeHeld is NOT proof that Android honored the lock. Network callbacks are native
+  observations, not automatically proof of a Wi-Fi/cellular handoff.
+- Bounded96-event RAM ring + bounded enum counters; retains late native HTTP completion
+  after watchdog stop, fences old sessions, clears on sign-out/account changes; process
+  death loses evidence. Never stores URLs, tokens, headers, bodies, coordinates,
+  account/order/watcher IDs, SSIDs or arbitrary exception text. Native stage-report API
+  prevents JS from claiming native ACK/result events.
+- Existing customFetch has optional safe enum observations for token getter, fetch
+  handoff/return and body-read stages; observer failure cannot alter request behavior.
+  Native controller reports JS pulse/GPS receipt and token/HTTP/body stages. No auth
+  protocol, refresh/retry rule,90s server expiry or native watchdog decision changed.
+- Driver availability includes local Read screen-lock diagnostics / Copy sanitized
+  diagnostics, including failed profile-read recovery. Strict JS whitelist before
+  display/copy, bounded read/retry, late results fenced. Read does not mutate duty,
+  issue HTTP, restart GPS or upload report. Copy fallback is selectable textarea.
+
+VALIDATION:27 targeted units PASS (existing GPS/401/late-token/evidence safety + new
+redaction/transport-observer/body-stage proof). ACTUAL Java lease/trace tests PASS:
+consent scope, HTTP completion after expiry, request correlation, generation fence,
+bounded memory, redaction, native fix receipt and clear/source attribution. Existing
+React/Chromium native/API fixture PASS plus mobile report read/copy/no-mutation/hung
+read recovery. Real LOCAL API/PGlite Driver role/session/GPS/offline integration PASS.
+Shared API-client declarations rebuilt; UI types and production build PASS. Referenced
+dist initially stale caused missing exported type; corrected by rebuilding project,
+not by bypassing types. Native Android/iOS compilation/signing/exact-SHA CI pending.
+PNPM frozen patches/supply-chain validation retained. Patch context-line whitespace
+attribute applies only generated unified-diff syntax, not source/security checks.
+
+NEXT: verify exact-SHA CI + protected diagnostic Driver APK; verify actual DEX includes
+DutyTrace + native HTTP observation/power collector. This is new diagnostic evidence,
+NOT a speculative repair. No Render deploy/backend/migration/config needed.
+Owner next ONLY after verified build: update without uninstalling; same failed
+Unrestricted/Wi-Fi+mobile/permissions; explicit duty/background consent and receipts;
+Chrome Dispatch ->3min lock -> Chrome status BEFORE Driver resume -> Driver Read
+screen-lock diagnostics BEFORE reconnect/re-enable/force-close (new background session
+resets trace). Copy sanitized report regardless of pass/fail, then Go offline. No
+orders/payments/provider sends. Review trace before declaring a fix or asking repeats.
+
+INTERPRETATION: native PULSE with no JS_PULSE -> bridge/JS delivery path; JS token start
+without ready -> token retrieval stage. Native HTTP start without result -> no terminal
+native outcome observed; timeout/status codes identify actual outcomes where present.
+Native HTTP200 before expiry without JS return/body/ACK -> completion/ack delivery gap
+(not proof HTTP200 body was valid; native fix must validate online:true). Native fix
+callbacks with missing JS_GPS -> bridge; absent callbacks require power/FLP analysis.
+JS observations instrument background controller only; foreground/read observers may
+have native-only events. Do not label those ordinary native-only reads as stalled JS.
+If native critical path migration is justified, secure native Clerk session/refresh
+must accompany native HTTP; cached expired JWTs or presence resurrection prohibited.
+Native networking still subject to OS policy; do not promise a transport rewrite
+bypasses Doze. All hosted data/settings/signing/financial/ordering safeguards preserved.
+
 # November 22 — Driver225 Samsung power observations; controlled same-APK comparison
 
 NEW OWNER READ-ONLY FACTS: Driver Staging Battery=OPTIMIZED; Samsung Power saving=OFF;

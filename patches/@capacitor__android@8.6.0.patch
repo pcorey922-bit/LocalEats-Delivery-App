@@ -1,0 +1,150 @@
+diff --git a/capacitor/src/main/java/com/getcapacitor/plugin/util/DutyTrace.java b/capacitor/src/main/java/com/getcapacitor/plugin/util/DutyTrace.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..6ad38243a3b5adc47231755d8105214118ea581b
+--- /dev/null
++++ b/capacitor/src/main/java/com/getcapacitor/plugin/util/DutyTrace.java
+@@ -0,0 +1,115 @@
++package com.getcapacitor.plugin.util;
++
++import java.net.URI;
++import java.util.*;
++
++/** Opt-in, bounded RAM-only driver diagnostics. Never retains request data. */
++public final class DutyTrace {
++    public enum Kind { NONE, HEARTBEAT, GPS, AVAILABILITY, AUTH }
++    public enum StopReason { NONE, LOCAL_STOP, ACK_EXPIRED, PERMISSION_LOST, LOCATION_REQUEST_FAILED, SERVICE_FAILED }
++    public enum Stage {
++        START, STOPPED, EXPIRED, PULSE, NATIVE_GPS_FIX, JS_PULSE, JS_GPS,
++        TOKEN_START, TOKEN_READY, TOKEN_FAILED, JS_HTTP_START, JS_HTTP_RETURN, JS_HTTP_FAILED, JS_BODY_START, JS_BODY_READY,
++        NATIVE_HTTP_START, NATIVE_HTTP_RESULT, NATIVE_HTTP_TIMEOUT, NATIVE_HTTP_INTERRUPTED,
++        NATIVE_HTTP_ERROR, ACK_CONFIRMED, ACK_REJECTED, SCREEN_OFF, SCREEN_ON, POWER, NETWORK, EXPIRY_POWER, REPORT_READ
++    }
++    public static final class Request {
++        private final long generation;
++        private final Kind kind;
++        private final long serial;
++        private Request(long generation, Kind kind,long serial) { this.generation=generation; this.kind=kind;this.serial=serial; }
++    }
++    private static long generation=0, started=0, lastFixEvent=-20000, requestSerial=0;
++    private static boolean active=false;
++    private static String state="IDLE";
++    private static StopReason stopReason=StopReason.NONE;
++    private static final int LIMIT=96;
++    private static final Deque<Map<String,Object>> events=new ArrayDeque<>();
++    private static final Map<String,long[]> counters=new LinkedHashMap<>();
++    private static Map<String,Object> lastPower=Collections.emptyMap();
++    private static long fixAgeMs=-1;
++    private static long elapsed(long now) { return Math.max(0,now-started); }
++    public static boolean isJsStage(Stage stage) {
++        return EnumSet.of(Stage.JS_PULSE,Stage.JS_GPS,Stage.TOKEN_START,Stage.TOKEN_READY,Stage.TOKEN_FAILED,Stage.JS_HTTP_START,Stage.JS_HTTP_RETURN,Stage.JS_HTTP_FAILED,Stage.JS_BODY_START,Stage.JS_BODY_READY).contains(stage);
++    }
++    public static synchronized long begin(long now) {
++        generation++; requestSerial=0; started=now; active=true; state="ACTIVE";stopReason=StopReason.NONE; events.clear(); counters.clear();
++        lastPower=Collections.emptyMap(); fixAgeMs=-1; lastFixEvent=-20000;
++        record(generation,Stage.START,Kind.NONE,0,now);return generation;
++    }
++    public static synchronized void clear() {
++        generation++;active=false;state="IDLE";stopReason=StopReason.NONE;events.clear();counters.clear();lastPower=Collections.emptyMap();fixAgeMs=-1;
++    }
++    public static synchronized void end(long owner, boolean expired, long now) {
++        end(owner,expired,now,expired?StopReason.ACK_EXPIRED:StopReason.LOCAL_STOP);
++    }
++    public static synchronized void end(long owner, boolean expired, long now,StopReason reason) {
++        if(owner!=generation || !active)return;
++        record(owner,expired?Stage.EXPIRED:Stage.STOPPED,Kind.NONE,0,now);
++        active=false;state=expired?"EXPIRED":"STOPPED";stopReason=reason;
++    }
++    public static synchronized void record(long owner, Stage stage, Kind kind, int status, long now) {
++        if(owner!=generation || state.equals("IDLE"))return;
++        String key=stage.name()+"."+kind.name();
++        long[] count=counters.computeIfAbsent(key,k->new long[3]);
++        count[0]++;count[1]=elapsed(now);count[2]=status>=100&&status<=599?status:0;
++        if(stage==Stage.NATIVE_GPS_FIX && elapsed(now)-lastFixEvent<20000)return;
++        if(stage==Stage.NATIVE_GPS_FIX)lastFixEvent=elapsed(now);
++        Map<String,Object> event=new LinkedHashMap<>();event.put("ms",elapsed(now));event.put("stage",stage.name());event.put("kind",kind.name());
++        if(status>=100&&status<=599)event.put("status",status);
++        append(event);
++    }
++    private static void append(Map<String,Object> event) {
++        while(events.size()>=LIMIT)events.removeFirst();events.addLast(event);
++    }
++    public static synchronized void fix(long owner,long age,long now) {
++        if(owner!=generation || !active)return;
++        fixAgeMs=Math.max(-1,Math.min(age,86400000));record(owner,Stage.NATIVE_GPS_FIX,Kind.GPS,0,now);
++    }
++    public static synchronized void power(long owner,Stage stage,Map<String,Object> values,long now) {
++        if(owner!=generation || state.equals("IDLE"))return;
++        Map<String,Object> safe=new LinkedHashMap<>();
++        for(String key:Arrays.asList("interactive","deviceIdle","powerSave","ignoringOptimizations","lowPowerStandby","lowPowerExempt","networkValidated","wakeHeld","receiverListening","networkCallback")) {
++            Object value=values.get(key);safe.put(key,value instanceof Boolean?value:null);
++        }
++        Object transport=values.get("transport");
++        safe.put("transport",Arrays.asList("WIFI","CELLULAR","ETHERNET","VPN","OTHER","NONE","UNKNOWN").contains(transport)?transport:"UNKNOWN");
++        Object restrict=values.get("dataSaver");safe.put("dataSaver",restrict instanceof Integer&&(Integer)restrict>=0&&(Integer)restrict<=3?restrict:null);
++        if(stage==Stage.POWER && lastPower.equals(safe))return;
++        lastPower=Collections.unmodifiableMap(safe);record(owner,stage,Kind.NONE,0,now);
++        events.getLast().put("power",lastPower);
++    }
++    public static Kind category(String url,String method) {
++        try {
++            URI uri=new URI(url);if(!"https".equals(uri.getScheme()) || uri.getUserInfo()!=null)return Kind.NONE;
++            String host=uri.getHost(),path=uri.getPath();if(host==null || path==null)return Kind.NONE;
++            if(host.equals("localeats-delivery-app.onrender.com")) {
++                if("POST".equals(method) && path.equals("/api/driver/heartbeat"))return Kind.HEARTBEAT;
++                if("POST".equals(method) && (path.equals("/api/driver/location")||path.matches("/api/driver/orders/[a-f0-9-]+/location")))return Kind.GPS;
++                if("GET".equals(method)&&path.equals("/api/driver/availability"))return Kind.AVAILABILITY;
++                if(path.startsWith("/api/__clerk/")&&path.contains("/client/sessions/"))return Kind.AUTH;
++            }
++            if(host.endsWith(".clerk.accounts.dev")&&path.startsWith("/v1/client/sessions/"))return Kind.AUTH;
++        } catch(Exception ignored) { /* No URL/error text retained. */ }
++        return Kind.NONE;
++    }
++    public static synchronized Request startRequest(String url,String method,long now) {
++        if(!active)return new Request(0,Kind.NONE,0);
++        Kind kind=category(url,method);
++        if(kind==Kind.NONE)return new Request(0,kind,0);
++        record(generation,Stage.NATIVE_HTTP_START,kind,0,now);
++        long serial=++requestSerial;events.getLast().put("request",serial);return new Request(generation,kind,serial);
++    }
++    public static synchronized void finish(Request request,Stage stage,int status,long now) {
++        if(request.generation==0 || request.generation!=generation || state.equals("IDLE"))return;
++        record(request.generation,stage,request.kind,status,now);events.getLast().put("request",request.serial);
++    }
++    public static synchronized Map<String,Object> snapshot(long now) {
++        Map<String,Object> report=new LinkedHashMap<>();report.put("schema",1);report.put("state",state);report.put("active",active);report.put("stopReason",stopReason.name());
++        report.put("elapsedMs",state.equals("IDLE")?0:elapsed(now));report.put("nativeFixAgeMs",fixAgeMs);
++        List<Map<String,Object>> rows=new ArrayList<>();for(Map<String,Object> event:events)rows.add(new LinkedHashMap<>(event));report.put("events",rows);
++        Map<String,Object> summary=new LinkedHashMap<>();
++        counters.forEach((key,v)->{Map<String,Object> entry=new LinkedHashMap<>();entry.put("count",v[0]);entry.put("lastMs",v[1]);if(v[2]>0)entry.put("status",v[2]);summary.put(key,entry);});
++        report.put("counters",summary);report.put("power",lastPower);return report;
++    }
++}
+diff --git a/capacitor/src/main/java/com/getcapacitor/plugin/util/HttpRequestHandler.java b/capacitor/src/main/java/com/getcapacitor/plugin/util/HttpRequestHandler.java
+index d92eb9bb44dc0b064312ca43f97a78206a67be21..030c637675cbcf4dd8a18bcdcf98a908b8fc0738 100644
+--- a/capacitor/src/main/java/com/getcapacitor/plugin/util/HttpRequestHandler.java
++++ b/capacitor/src/main/java/com/getcapacitor/plugin/util/HttpRequestHandler.java
+@@ -383,6 +383,24 @@ public class HttpRequestHandler {
+      * @throws JSONException thrown when the incoming JSON is malformed
+      */
+     public static JSObject request(PluginCall call, String httpMethod, Bridge bridge)
++        throws IOException, URISyntaxException, JSONException {
++        // Observation only: preserve original headers, body, TLS, timeout and exceptions.
++        String method=httpMethod!=null?httpMethod:call.getString("method","GET");
++        DutyTrace.Request trace=DutyTrace.startRequest(call.getString("url",""),method.toUpperCase(Locale.ROOT),android.os.SystemClock.elapsedRealtime());
++        try {
++            JSObject result=requestUnobserved(call,httpMethod,bridge);
++            DutyTrace.finish(trace,DutyTrace.Stage.NATIVE_HTTP_RESULT,result.optInt("status",0),android.os.SystemClock.elapsedRealtime());
++            return result;
++        } catch(java.net.SocketTimeoutException error) {
++            DutyTrace.finish(trace,DutyTrace.Stage.NATIVE_HTTP_TIMEOUT,0,android.os.SystemClock.elapsedRealtime());throw error;
++        } catch(java.io.InterruptedIOException error) {
++            DutyTrace.finish(trace,DutyTrace.Stage.NATIVE_HTTP_INTERRUPTED,0,android.os.SystemClock.elapsedRealtime());throw error;
++        } catch(IOException | URISyntaxException | JSONException | RuntimeException error) {
++            DutyTrace.finish(trace,DutyTrace.Stage.NATIVE_HTTP_ERROR,0,android.os.SystemClock.elapsedRealtime());throw error;
++        }
++    }
++
++    private static JSObject requestUnobserved(PluginCall call, String httpMethod, Bridge bridge)
+         throws IOException, URISyntaxException, JSONException {
+         String urlString = call.getString("url", "");
+         JSObject headers = call.getObject("headers", new JSObject());

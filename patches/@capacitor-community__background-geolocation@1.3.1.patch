@@ -1,20 +1,30 @@
 diff --git a/android/src/main/AndroidManifest.xml b/android/src/main/AndroidManifest.xml
-index 9e65984854cfb3d7bde5d56b0ab25974c8eccf6e..3c0f49721b86609230093fead5de5586ce48fc67 100644
+index 9e65984854cfb3d7bde5d56b0ab25974c8eccf6e..ba0ffa2d899978c4e926775a15ccdb025bbb397a 100644
 --- a/android/src/main/AndroidManifest.xml
 +++ b/android/src/main/AndroidManifest.xml
-@@ -16,6 +16,7 @@
+@@ -16,6 +16,8 @@
      <!-- Android SDK 33+ requires the POST_NOTIFICATIONS runtime permission to
      display the foreground service notification. -->
      <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 +    <uses-permission android:name="android.permission.WAKE_LOCK" />
++    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
      <uses-feature android:name="android.hardware.location.gps" />
  </manifest>
    
 diff --git a/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocation.java b/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocation.java
-index a92fcf9bad0139d203964afb1550ea5ba03ce99b..e84a01ebee7895ce094fdae659709b2a446d3017 100644
+index a92fcf9bad0139d203964afb1550ea5ba03ce99b..beb7b1051c1848f928e2366c9816f8d35aef4222 100644
 --- a/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocation.java
 +++ b/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocation.java
-@@ -73,7 +73,7 @@ public class BackgroundGeolocation extends Plugin {
+@@ -33,6 +33,8 @@ import com.google.android.gms.location.LocationServices;
+ import com.google.android.gms.tasks.OnSuccessListener;
+ 
+ import org.json.JSONObject;
++import com.getcapacitor.plugin.util.DutyTrace;
++import android.os.SystemClock;
+ 
+ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+ 
+@@ -73,7 +75,7 @@ public class BackgroundGeolocation extends Plugin {
      @PluginMethod(returnType = PluginMethod.RETURN_CALLBACK)
      public void addWatcher(final PluginCall call) {
          if (service == null) {
@@ -23,7 +33,7 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..e84a01ebee7895ce094fdae659709b2a
              return;
          }
          call.setKeepAlive(true);
-@@ -81,11 +81,14 @@ public class BackgroundGeolocation extends Plugin {
+@@ -81,11 +83,14 @@ public class BackgroundGeolocation extends Plugin {
          if (getPermissionState("location") != PermissionState.GRANTED) {
              if (call.getBoolean("requestPermissions", true)) {
                  requestPermissionForAlias("location", call, "locationPermissionsCallback");
@@ -38,7 +48,7 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..e84a01ebee7895ce094fdae659709b2a
          }
          if (call.getBoolean("stale", false)) {
              fetchLastLocation(call);
-@@ -156,11 +159,12 @@ public class BackgroundGeolocation extends Plugin {
+@@ -156,11 +161,12 @@ public class BackgroundGeolocation extends Plugin {
  
              backgroundNotification = builder.build();
          }
@@ -56,7 +66,7 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..e84a01ebee7895ce094fdae659709b2a
      }
  
      @PermissionCallback
-@@ -170,15 +174,20 @@ public class BackgroundGeolocation extends Plugin {
+@@ -170,15 +176,39 @@ public class BackgroundGeolocation extends Plugin {
              call.reject("User denied location permission", "NOT_AUTHORIZED");
              return;
          }
@@ -74,6 +84,25 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..e84a01ebee7895ce094fdae659709b2a
 +    }
 +
 +    @PluginMethod
++    public void recordDutyStage(PluginCall call) {
++        try {
++            DutyTrace.Stage stage=DutyTrace.Stage.valueOf(call.getString("stage",""));
++            if(!DutyTrace.isJsStage(stage)){call.reject("Unknown diagnostic stage","DUTY_DIAGNOSTIC_INVALID");return;}
++            if(service!=null) DutyTrace.record(service.traceOwner(call.getString("id")),stage,DutyTrace.Kind.valueOf(call.getString("kind","NONE")),0,SystemClock.elapsedRealtime());
++            call.resolve();
++        } catch(IllegalArgumentException error) { call.reject("Unknown diagnostic stage", "DUTY_DIAGNOSTIC_INVALID"); }
++    }
++    @PluginMethod
++    public void getDutyDiagnostics(PluginCall call) {
++        try {
++            if(service!=null)service.diagnosticSnapshot();
++            call.resolve(new JSObject(new JSONObject(DutyTrace.snapshot(SystemClock.elapsedRealtime())).toString()));
++        } catch(Exception error) { call.reject("Native diagnostic unavailable", "DUTY_DIAGNOSTIC_UNAVAILABLE"); }
++    }
++    @PluginMethod
++    public void clearDutyDiagnostics(PluginCall call) { DutyTrace.clear();call.resolve(); }
++
++    @PluginMethod
 +    public void acknowledgeDuty(PluginCall call) {
 +        try {
 +            String id = call.getString("id");
@@ -86,7 +115,7 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..e84a01ebee7895ce094fdae659709b2a
      }
  
      @PluginMethod()
-@@ -253,6 +262,14 @@ public class BackgroundGeolocation extends Plugin {
+@@ -253,6 +283,14 @@ public class BackgroundGeolocation extends Plugin {
              if (call == null) {
                  return;
              }
@@ -102,10 +131,18 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..e84a01ebee7895ce094fdae659709b2a
              if (location != null) {
                  call.resolve(formatLocation(location));
 diff --git a/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocationService.java b/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocationService.java
-index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..527c65b4b12f6a7ea4f25c3a4a92fc782c1d98f0 100644
+index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..86d049b559ddd8856afe6603d1feec882c5d938a 100644
 --- a/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocationService.java
 +++ b/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocationService.java
-@@ -17,7 +17,16 @@ import com.google.android.gms.location.LocationRequest;
+@@ -10,6 +10,7 @@ import android.os.Build;
+ import android.os.IBinder;
+ 
+ import com.getcapacitor.Logger;
++import com.getcapacitor.plugin.util.DutyTrace;
+ import com.google.android.gms.location.FusedLocationProviderClient;
+ import com.google.android.gms.location.LocationAvailability;
+ import com.google.android.gms.location.LocationCallback;
+@@ -17,7 +18,16 @@ import com.google.android.gms.location.LocationRequest;
  import com.google.android.gms.location.LocationResult;
  import com.google.android.gms.location.LocationServices;
  
@@ -123,17 +160,21 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..527c65b4b12f6a7ea4f25c3a4a92fc78
  
  import androidx.localbroadcastmanager.content.LocalBroadcastManager;
  
-@@ -39,8 +48,64 @@ public class BackgroundGeolocationService extends Service {
+@@ -39,8 +49,78 @@ public class BackgroundGeolocationService extends Service {
          public LocationRequest locationRequest;
          public LocationCallback locationCallback;
          public Notification backgroundNotification;
 +        public DutyLease dutyLease;
++        public volatile long traceGeneration;
 +        public PowerManager.WakeLock wakeLock;
 +    }
 +    private final ConcurrentHashMap<String, Watcher> watchers = new ConcurrentHashMap<>();
 +    private final ScheduledExecutorService dutyClock = Executors.newSingleThreadScheduledExecutor();
 +
 +    private ScheduledFuture<?> dutyTask;
++    private volatile long diagnosticGeneration=0;
++    private volatile String diagnosticWatcherId;
++    private final DutyPowerMonitor powerMonitor=new DutyPowerMonitor(this,()->watchers.values().stream().anyMatch(w->w.wakeLock!=null&&w.wakeLock.isHeld()));
 +    private synchronized void ensureDutyClock() {
 +        if (dutyTask != null) return;
 +        dutyTask = dutyClock.scheduleAtFixedRate(() -> {
@@ -147,7 +188,11 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..527c65b4b12f6a7ea4f25c3a4a92fc78
 +                    expire(watcher, permission ? "DUTY_ACK_EXPIRED" : "NOT_AUTHORIZED");
 +                } else {
 +                    long pulse = watcher.dutyLease.pulse(now);
-+                    if (pulse != 0) broadcast(watcher.id, "dutyPulse", Long.toString(pulse));
++                    if (pulse != 0) {
++                        powerMonitor.sample(DutyTrace.Stage.POWER);
++                        DutyTrace.record(watcher.traceGeneration,DutyTrace.Stage.PULSE,DutyTrace.Kind.HEARTBEAT,0,now);
++                        broadcast(watcher.id, "dutyPulse", Long.toString(pulse));
++                    }
 +                }
 +                } catch (RuntimeException error) { expire(watcher, "DUTY_SERVICE_UNAVAILABLE"); }
 +            }
@@ -159,6 +204,9 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..527c65b4b12f6a7ea4f25c3a4a92fc78
 +        LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcast(intent);
 +    }
 +    private void expire(Watcher watcher, String code) {
++        powerMonitor.sample(DutyTrace.Stage.EXPIRY_POWER);
++        DutyTrace.StopReason reason="DUTY_ACK_EXPIRED".equals(code)?DutyTrace.StopReason.ACK_EXPIRED:"NOT_AUTHORIZED".equals(code)?DutyTrace.StopReason.PERMISSION_LOST:"DUTY_LOCATION_UNAVAILABLE".equals(code)?DutyTrace.StopReason.LOCATION_REQUEST_FAILED:DutyTrace.StopReason.SERVICE_FAILED;
++        DutyTrace.end(watcher.traceGeneration,true,SystemClock.elapsedRealtime(),reason);
 +        try { remove(watcher.id); }
 +        finally { broadcast(watcher.id, "dutyError", code); }
 +    }
@@ -177,6 +225,9 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..527c65b4b12f6a7ea4f25c3a4a92fc78
 +            if (watcher.wakeLock != null && watcher.wakeLock.isHeld()) watcher.wakeLock.release();
 +            if (getNotification() == null) stopForeground(true);
 +            if (watchers.values().stream().noneMatch(w -> w.dutyLease != null) && dutyTask != null) {
++                powerMonitor.sample(DutyTrace.Stage.POWER);
++                DutyTrace.end(diagnosticGeneration,false,SystemClock.elapsedRealtime());
++                powerMonitor.stop();
 +                dutyTask.cancel(false); dutyTask = null;
 +            }
 +        }
@@ -189,7 +240,7 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..527c65b4b12f6a7ea4f25c3a4a92fc78
  
      @Override
      public IBinder onBind(Intent intent) {
-@@ -53,16 +118,13 @@ public class BackgroundGeolocationService extends Service {
+@@ -53,16 +133,13 @@ public class BackgroundGeolocationService extends Service {
      // service is terminated immediately.
      @Override
      public boolean onUnbind(Intent intent) {
@@ -208,7 +259,7 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..527c65b4b12f6a7ea4f25c3a4a92fc78
              if (watcher.backgroundNotification != null) {
                  return watcher.backgroundNotification;
              }
-@@ -71,14 +133,7 @@ public class BackgroundGeolocationService extends Service {
+@@ -71,14 +148,7 @@ public class BackgroundGeolocationService extends Service {
      }
  
      private void promote(Notification notification) {
@@ -224,7 +275,7 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..527c65b4b12f6a7ea4f25c3a4a92fc78
      }
  
      // Handles requests from the activity.
-@@ -86,7 +141,8 @@ public class BackgroundGeolocationService extends Service {
+@@ -86,7 +156,8 @@ public class BackgroundGeolocationService extends Service {
          void addWatcher(
                  final String id,
                  Notification backgroundNotification,
@@ -234,7 +285,16 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..527c65b4b12f6a7ea4f25c3a4a92fc78
          ) {
              FusedLocationProviderClient client = LocationServices.getFusedLocationProviderClient(
                      BackgroundGeolocationService.this
-@@ -122,18 +178,25 @@ public class BackgroundGeolocationService extends Service {
+@@ -101,6 +172,8 @@ public class BackgroundGeolocationService extends Service {
+                 @Override
+                 public void onLocationResult(LocationResult locationResult) {
+                     Location location = locationResult.getLastLocation();
++                    Watcher current=watchers.get(id);
++                    if(current!=null&&current.dutyLease!=null&&location!=null) DutyTrace.fix(current.traceGeneration,(SystemClock.elapsedRealtimeNanos()-location.getElapsedRealtimeNanos())/1000000,SystemClock.elapsedRealtime());
+                     Intent intent = new Intent(ACTION_BROADCAST);
+                     intent.putExtra("location", location);
+                     intent.putExtra("id", id);
+@@ -122,18 +195,28 @@ public class BackgroundGeolocationService extends Service {
              watcher.locationRequest = locationRequest;
              watcher.locationCallback = callback;
              watcher.backgroundNotification = backgroundNotification;
@@ -247,7 +307,10 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..527c65b4b12f6a7ea4f25c3a4a92fc78
 +                watcher.wakeLock.setReferenceCounted(false);
 +            }
 +            watchers.put(id, watcher);
-+            if (supervisedDuty) ensureDutyClock();
++            if (supervisedDuty) {
++                diagnosticGeneration=DutyTrace.begin(SystemClock.elapsedRealtime());diagnosticWatcherId=id;
++                watcher.traceGeneration=diagnosticGeneration;powerMonitor.start(diagnosticGeneration);ensureDutyClock();
++            }
  
 -            // According to Android Studio, this method can throw a Security Exception if
 -            // permissions are not yet granted. Rather than check the permissions, which is fiddly,
@@ -266,7 +329,7 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..527c65b4b12f6a7ea4f25c3a4a92fc78
  
              // Promote the service to the foreground if necessary.
              // Ideally we would only call 'startForeground' if the service is not already
-@@ -141,46 +204,34 @@ public class BackgroundGeolocationService extends Service {
+@@ -141,46 +224,40 @@ public class BackgroundGeolocationService extends Service {
              // in API level 29 and seems to behave weirdly, as reported in #120. However,
              // it appears that 'startForeground' is idempotent, so we just call it repeatedly
              // each time a background watcher is added.
@@ -288,15 +351,17 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..527c65b4b12f6a7ea4f25c3a4a92fc78
 -                    }
 -                    return;
 -                }
--            }
 +        void removeWatcher(String id) { remove(id); }
 +        boolean acknowledgeDuty(String id, long sequence) {
 +            Watcher watcher = watchers.get(id);
-+            if (watcher == null || watcher.dutyLease == null || !watcher.dutyLease.acknowledge(sequence, SystemClock.elapsedRealtime())) return false;
++            if (watcher == null || watcher.dutyLease == null || !watcher.dutyLease.acknowledge(sequence, SystemClock.elapsedRealtime())) {
++                DutyTrace.record(traceOwner(id),DutyTrace.Stage.ACK_REJECTED,DutyTrace.Kind.HEARTBEAT,0,SystemClock.elapsedRealtime());return false;
+             }
++            DutyTrace.record(watcher.traceGeneration,DutyTrace.Stage.ACK_CONFIRMED,DutyTrace.Kind.HEARTBEAT,0,SystemClock.elapsedRealtime());
 +            renewWakeLock(watcher); return true;
          }
  
-         void onPermissionsGranted() {
+-        void onPermissionsGranted() {
 -            // If permissions were granted while the app was in the background, for example in
 -            // the Settings app, the watchers need restarting.
 -            for (Watcher watcher : watchers) {
@@ -307,13 +372,16 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..527c65b4b12f6a7ea4f25c3a4a92fc78
 -                        null
 -                );
 -            }
--
++        long traceOwner(String id) { return id!=null&&id.equals(diagnosticWatcherId)?diagnosticGeneration:0; }
++        void diagnosticSnapshot() { powerMonitor.sample(DutyTrace.Stage.REPORT_READ); }
+ 
 -            // From Android 14, a location foreground service can not be started
 -            // without location permissions, so any earlier attempt to promote the
 -            // service will have failed. See issue #153.
 -            Notification notification = getNotification();
 -            if (notification != null) {
 -                promote(notification);
++        void onPermissionsGranted() {
 +            try {
 +                for (Watcher watcher : watchers.values()) {
 +                    watcher.client.removeLocationUpdates(watcher.locationCallback);
@@ -368,4 +436,73 @@ index 0000000000000000000000000000000000000000..503fcaea353d74990d12fbe98ed540ea
 +        return true;
 +    }
 +    public synchronized void stop() { stopped = true; }
++}
+diff --git a/android/src/main/java/com/equimaps/capacitor_background_geolocation/DutyPowerMonitor.java b/android/src/main/java/com/equimaps/capacitor_background_geolocation/DutyPowerMonitor.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..830c81ac54b78854c81166a7f0109deabb62729b
+--- /dev/null
++++ b/android/src/main/java/com/equimaps/capacitor_background_geolocation/DutyPowerMonitor.java
+@@ -0,0 +1,63 @@
++package com.equimaps.capacitor_background_geolocation;
++
++import android.content.*;
++import android.net.*;
++import android.os.*;
++import androidx.core.content.ContextCompat;
++import com.getcapacitor.plugin.util.DutyTrace;
++import java.util.*;
++import java.util.function.Supplier;
++
++/** Read-only power/network observations. Never changes battery policy or stores identifiers. */
++final class DutyPowerMonitor {
++    private final Context context;
++    private final Supplier<Boolean> wakeHeld;
++    private volatile long generation;
++    private volatile boolean listening=false;
++    private volatile ConnectivityManager.NetworkCallback network;
++    DutyPowerMonitor(Context context,Supplier<Boolean> wakeHeld) { this.context=context;this.wakeHeld=wakeHeld; }
++    private Boolean safe(Supplier<Boolean> read) {try{return read.get();}catch(RuntimeException ignored){return null;}}
++    private final BroadcastReceiver receiver=new BroadcastReceiver(){
++        @Override public void onReceive(Context context,Intent intent){
++            String action=intent.getAction();
++            sample(Intent.ACTION_SCREEN_OFF.equals(action)?DutyTrace.Stage.SCREEN_OFF:Intent.ACTION_SCREEN_ON.equals(action)?DutyTrace.Stage.SCREEN_ON:DutyTrace.Stage.POWER);
++        }
++    };
++    synchronized void start(long owner) {
++        stop();generation=owner;
++        IntentFilter filter=new IntentFilter();filter.addAction(Intent.ACTION_SCREEN_OFF);filter.addAction(Intent.ACTION_SCREEN_ON);
++        filter.addAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED);filter.addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED);
++        if(Build.VERSION.SDK_INT>=33)filter.addAction(PowerManager.ACTION_LOW_POWER_STANDBY_ENABLED_CHANGED);
++        try{ContextCompat.registerReceiver(context,receiver,filter,ContextCompat.RECEIVER_NOT_EXPORTED);listening=true;}catch(RuntimeException ignored){listening=false;}
++        ConnectivityManager manager=(ConnectivityManager)context.getSystemService(Context.CONNECTIVITY_SERVICE);
++        network=new ConnectivityManager.NetworkCallback(){
++            @Override public void onAvailable(Network value){sample(DutyTrace.Stage.NETWORK);}
++            @Override public void onLost(Network value){sample(DutyTrace.Stage.NETWORK);}
++            @Override public void onCapabilitiesChanged(Network value,NetworkCapabilities capabilities){sample(DutyTrace.Stage.NETWORK);}
++        };
++        try{manager.registerDefaultNetworkCallback(network);}catch(RuntimeException ignored){network=null;}
++        sample(DutyTrace.Stage.POWER);
++    }
++    synchronized void stop() {
++        if(listening){try{context.unregisterReceiver(receiver);}catch(RuntimeException ignored){}listening=false;}
++        if(network!=null){try{((ConnectivityManager)context.getSystemService(Context.CONNECTIVITY_SERVICE)).unregisterNetworkCallback(network);}catch(RuntimeException ignored){}network=null;}
++    }
++    void sample(DutyTrace.Stage stage) {
++        long owner=generation;if(owner==0)return;
++        Map<String,Object> state=new LinkedHashMap<>();
++        PowerManager power=(PowerManager)context.getSystemService(Context.POWER_SERVICE);
++        state.put("interactive",safe(()->power.isInteractive()));state.put("deviceIdle",safe(()->power.isDeviceIdleMode()));
++        state.put("powerSave",safe(()->power.isPowerSaveMode()));state.put("ignoringOptimizations",safe(()->power.isIgnoringBatteryOptimizations(context.getPackageName())));
++        state.put("lowPowerStandby",Build.VERSION.SDK_INT>=33?safe(()->power.isLowPowerStandbyEnabled()):null);
++        state.put("lowPowerExempt",Build.VERSION.SDK_INT>=34?safe(()->power.isExemptFromLowPowerStandby()):null);
++        state.put("receiverListening",listening);state.put("networkCallback",network!=null);state.put("wakeHeld",safe(wakeHeld));state.put("transport","UNKNOWN");
++        try{
++            ConnectivityManager manager=(ConnectivityManager)context.getSystemService(Context.CONNECTIVITY_SERVICE);
++            Network current=manager.getActiveNetwork();NetworkCapabilities caps=current==null?null:manager.getNetworkCapabilities(current);
++            state.put("networkValidated",caps!=null&&caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED));
++            state.put("transport",caps==null?"NONE":caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)?"VPN":caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)?"WIFI":caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)?"CELLULAR":caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)?"ETHERNET":"OTHER");
++            state.put("dataSaver",manager.getRestrictBackgroundStatus());
++        }catch(RuntimeException ignored){}
++        DutyTrace.power(owner,stage,state,SystemClock.elapsedRealtime());
++    }
 +}

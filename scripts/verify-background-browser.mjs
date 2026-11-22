@@ -11,7 +11,7 @@ const { build } = require('esbuild'), { chromium } = require(process.env.PLAYWRI
 const target = await mkdtemp(path.join(tmpdir(), 'rocoeats-background-ui-'));
 const modules = {
   '@clerk/react': `import {useSyncExternalStore} from 'react';const subscribe=cb=>{window.addEventListener('qa-push-account',cb);return()=>window.removeEventListener('qa-push-account',cb)};export const useAuth=()=>{const userId=useSyncExternalStore(subscribe,()=>window.pushUserId||'driver-fixture');return{isLoaded:true,isSignedIn:true,userId,getToken:async()=>null}};`,
-  '@capacitor/core': `export const Capacitor={isNativePlatform:()=>true,getPlatform:()=>location.search.includes('ios=true')?'ios':'android'};export const registerPlugin=()=>({addWatcher:async(options,callback)=>{window.emitFix=fix=>callback(fix);window.emitDutyPulse=sequence=>callback({dutyPulse:true,sequence});window.emitDutyError=code=>callback(undefined,{code});const id='watch-'+(++window.bgStarts);if(window.bgStartDelay)await new Promise(resolve=>{window.finishBgStart=resolve});return id},acknowledgeDuty:async({id,sequence})=>{window.nativeDutyAcks??=[];window.nativeDutyAcks.push({id,sequence});},removeWatcher:async({id})=>{window.bgRemovals.push(id)}});`,
+  '@capacitor/core': `export const Capacitor={isNativePlatform:()=>true,getPlatform:()=>location.search.includes('ios=true')?'ios':'android'};export const registerPlugin=()=>({addWatcher:async(options,callback)=>{window.emitFix=fix=>callback(fix);window.emitDutyPulse=sequence=>callback({dutyPulse:true,sequence});window.emitDutyError=code=>callback(undefined,{code});const id='watch-'+(++window.bgStarts);if(window.bgStartDelay)await new Promise(resolve=>{window.finishBgStart=resolve});return id},acknowledgeDuty:async({id,sequence})=>{window.nativeDutyAcks??=[];window.nativeDutyAcks.push({id,sequence});},getDutyDiagnostics:async()=>{window.traceReads=(window.traceReads||0)+1;if(window.traceDelay)await new Promise(resolve=>{window.finishTraceRead=resolve});return {schema:1,state:'EXPIRED',active:false,elapsedMs:180000,nativeFixAgeMs:0,token:'DO_NOT_LEAK',events:[{ms:1000,stage:'NATIVE_HTTP_RESULT',kind:'HEARTBEAT',status:200,body:'DO_NOT_LEAK'}],counters:{'NATIVE_HTTP_RESULT.HEARTBEAT':{count:1,lastMs:1000,status:200}},power:{transport:'WIFI',deviceIdle:true,wakeHeld:false,ssid:'DO_NOT_LEAK'}}},recordDutyStage:async event=>{window.traceStages??=[];window.traceStages.push(event.stage)},clearDutyDiagnostics:async()=>{window.traceClears=(window.traceClears||0)+1},removeWatcher:async({id})=>{window.bgRemovals.push(id)}});`,
   '@capacitor/browser': `export const Browser={close:async()=>{},open:async()=>{}};`,
   '@capacitor/app': `const appListeners=new Set();window.setAppActive=isActive=>{for(const callback of appListeners)callback({isActive})};export const App={getInfo:async()=>{if(window.pushInfoDelay)await new Promise(resolve=>{window.finishPushInfo=resolve});return{id:location.search.includes('ios=true')?'com.rocoeats.driver':'com.rocoeats.driver.staging'}},addListener:async(name,callback)=>{if(name==='appStateChange')appListeners.add(callback);return{remove:async()=>{appListeners.delete(callback)}}}};`,
   '@capacitor/geolocation': `export const Geolocation={watchPosition:async(options,callback)=>{window.emitForegroundFix=fix=>callback(fix);return 'foreground-fixture'},clearWatch:async()=>{window.foregroundRemovals=(window.foregroundRemovals||0)+1}};`,
@@ -25,6 +25,25 @@ let browser;
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 try {
   browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
+  const diagnostic=await browser.newPage({viewport:{width:393,height:851}});await diagnostic.clock.install();
+  await diagnostic.goto(`http://127.0.0.1:${server.address().port}/?reconnect=true`);
+  await diagnostic.getByRole('button',{name:'Reconnect on this device',exact:true}).waitFor();
+  const beforeTrace=await diagnostic.evaluate(()=>({writes:window.dutyReconnectWrites||0,gps:window.bgUploads,heartbeats:window.dutyHeartbeats||0}));
+  await diagnostic.getByRole('button',{name:'Read screen-lock diagnostics',exact:true}).click();
+  const report=diagnostic.getByRole('textbox',{name:'Sanitized native duty report',exact:true});await report.waitFor();
+  assert.equal((await report.inputValue()).includes('DO_NOT_LEAK'),false);assert.equal(JSON.parse(await report.inputValue()).state,'EXPIRED');
+  assert.deepEqual(await diagnostic.evaluate(()=>({writes:window.dutyReconnectWrites||0,gps:window.bgUploads,heartbeats:window.dutyHeartbeats||0})),beforeTrace,'Reading diagnostics cannot mutate duty or send GPS/heartbeat');
+  await diagnostic.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{window.copiedDutyReport=value;}}}));
+  await diagnostic.getByRole('button',{name:'Copy sanitized diagnostics',exact:true}).click();
+  await diagnostic.waitForFunction(()=>typeof window.copiedDutyReport==='string');
+  assert.equal(await diagnostic.evaluate(()=>window.copiedDutyReport),await report.inputValue());
+  await diagnostic.evaluate(()=>{window.traceDelay=true;});await diagnostic.getByRole('button',{name:'Read screen-lock diagnostics',exact:true}).click();
+  await diagnostic.waitForFunction(()=>typeof window.finishTraceRead==='function');await diagnostic.clock.fastForward(16000);
+  await diagnostic.getByText('Native diagnostics could not be read.',{exact:false}).waitFor({timeout:3000});
+  assert.equal(await report.count(),0);await diagnostic.evaluate(()=>{window.traceDelay=false;window.finishTraceRead();});
+  await diagnostic.getByRole('button',{name:'Read screen-lock diagnostics',exact:true}).click();await report.waitFor();
+  assert.equal(await diagnostic.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await diagnostic.close();
+  console.log('PASS: native report survives expired duty, whitelists safe fields, reads/copies without API mutation, and a hung read is bounded/retryable with late results fenced. Native API simulated.');
   const reconnect=await browser.newPage({viewport:{width:393,height:851}});
   await reconnect.goto(`http://127.0.0.1:${server.address().port}/?reconnect=true&permissions=true`);
   await reconnect.getByText('Reconnect below to show background-sharing controls. Background sharing is off until you explicitly enable it.',{exact:true}).waitFor({timeout:3000});

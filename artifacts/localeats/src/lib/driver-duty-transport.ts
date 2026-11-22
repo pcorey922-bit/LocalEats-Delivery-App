@@ -1,4 +1,5 @@
-type Options = { method?: string; signal: AbortSignal; body?: string; headers?: HeadersInit };
+import type { FetchRequestStage } from '../../../../lib/api-client-react/src/custom-fetch';
+type Options = { method?: string; signal: AbortSignal; body?: string; headers?: HeadersInit; onStage?:(stage:FetchRequestStage)=>void };
 /** Renew once only after a definite authentication rejection. Never retry unknown
  * network outcomes, permission denial, expired duty, ordering or financial writes.
  * These telemetry endpoints authenticate before their timestamp-deduplicated writes. */
@@ -13,7 +14,10 @@ export async function driverDutyRequest<T>(
       (path==='/api/driver/heartbeat' || path==='/api/driver/location' || /^\/api\/driver\/orders\/[a-f0-9-]+\/location$/.test(path));
     if ((error as {status?:number})?.status!==401 || !allowed) throw error;
     options.signal.throwIfAborted();
-    const token=await renew();
+    const stage=(value:FetchRequestStage)=>{try{options.onStage?.(value);}catch{}};
+    stage('TOKEN_START');
+    let token:string|null;
+    try{token=await renew();stage('TOKEN_READY');}catch(error){stage('TOKEN_FAILED');throw error;}
     options.signal.throwIfAborted();
     if(!token)throw error;
     const headers=new Headers(options.headers);headers.set('Authorization',`Bearer ${token}`);

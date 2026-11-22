@@ -1,3 +1,4 @@
+import { NativeDutyDiagnostics } from './native-duty-diagnostics';
 import { useDriverAvailability } from '../hooks/use-driver-availability';
 import { Capacitor } from '@capacitor/core';
 import { useAppForeground } from "../hooks/use-app-foreground";
@@ -42,6 +43,7 @@ export function DriverAvailability() {
   return (
     <section className="roco-card">
       <h2>Your availability</h2>
+      <NativeDutyDiagnostics/>
       {import.meta.env.VITE_APP_AUDIENCE === 'driver' && <><p role="status">Location session: {locationStatus}</p><p>Last server heartbeat acknowledgement: {evidence.heartbeatAt ? new Date(evidence.heartbeatAt).toLocaleTimeString() : 'Not yet confirmed'}. Last accepted GPS upload: {evidence.locationAt ? new Date(evidence.locationAt).toLocaleTimeString() : 'Not yet confirmed'}.</p>{evidence.failure && <p role="status">Location recovery: {evidence.failure}</p>}{evidence.locationFailure && <p role="status">GPS upload recovery: {evidence.locationFailure}</p>}</>}
       <p>
         Going online shares your current location with authorized dispatch while

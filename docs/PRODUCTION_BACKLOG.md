@@ -1,3 +1,20 @@
+# November 22 — Driver225 Unrestricted failure; instrumented native evidence next
+
+Both Optimized and Unrestricted locked tests FAILED. Power saving off, no sleep lists,
+Wi-Fi active/mobile enabled, no handoff evidence. Initial00:13:36HB/00:13:37GPS are not
+proven final server acknowledgements; by00:18/00:19 disconnected/native duty error.
+Implemented bounded RAM-only native pulse/GPS/power/screen/HTTP start+result evidence,
+safe request correlation and expiry reason, JS token/fetch/body stages, redacted local
+read/copy with timeout/account fences. No request/auth/90s/watchdog decision changes.
+27 units + actual Java policy/trace + native browser report/GPS/push + localAPI/PGlite
+Driver integration + refreshed client declarations/UI types/build PASS. CI/native build
+and diagnostic APK require final verification. No claimed fix or physical acceptance.
+Next one instrumented test: same settings,3min lock, Chrome before Driver; Read/Copy
+report BEFORE reconnect/new consent/force-close, then offline. Analyze native vs JS /
+HTTP vs auth/power outcomes before implementing minimum evidenced correction. No
+identical uninstrumented repeats, expired-token caching, expiry increase or speculative
+backend/auth rewrite. No Render deploy/settings/data/provider/financial operations.
+
 # November 22 — Driver225 controlled Battery comparison required
 
 Owner facts: Battery OPTIMIZED, Power saving OFF, no Sleeping/Deep sleeping listing;
