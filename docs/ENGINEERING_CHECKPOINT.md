@@ -1,3 +1,59 @@
+# November 22 — verified Driver219 physical-background candidate
+
+FUNCTIONAL HEAD 8bf4d04baab5e51a4fbe361283838f252f375284, primary branch
+feature/rocoeats-launch-readiness, PR1 OPEN/unmerged. All THREE exact-SHA CI SUCCESS:
+Validate push44980349607, Validate PR44980356303, Native PR44980356335 (customer +
+driver Android/iOS compile). Signed Driver run44980362815 SUCCESS, version219.
+Artifact14737567646: RoCoEats-Driver-Android-Staging-Test-APK,
+ZIP SHA256 74a2d648a7ed67752a639e0745825e3d0c7cd30da123e5fd3660ad02d8a2930e.
+Verified exact packaged source, APK checksum, com.rocoeats.driver.staging/version219,
+app-private location FGS/type8, notification/location permissions, no all-time location,
+unchanged public v2 signing certificate f22e58f4da4e5d64f9ac5d4f0fc8abfe2595e395511552f7fb385205c7d18296.
+Download from https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44980362815
+Artifacts -> RoCoEats-Driver-Android-Staging-Test-APK -> extract ZIP -> APK -> Update.
+No uninstall, Customer208 rebuild, backend deployment or hosted setting change needed.
+
+Completed47eb9f3f720ef1a8fa66abc0fc3d2306a9cca47c: foreground-only warning,
+90-second lease-expiry explanation, realistic app-state/lease browser reproduction,
+consented simulated background continuity/offline privacy. Completed8bf4d04: reproduced
+then fixed unbounded native permission/watcher initialization (15s each), late grant
+fence and removal of late-created watcher.12 background units PASS; prior2 duty-intent
++1 server-presence units PASS. Real React/Chromium controller regressions PASS for
+foreground/background GPS, new native-step timeouts, consent/cleanup/recovery and
+Android+iOS push enrollment/opt-out/fencing. UI typecheck/build PASS. CI additionally
+validates local API/database/order/ledger integration with simulated providers; no
+new Stripe/Geocodio/push/provider acceptance is asserted.
+
+Owner confirms213 ONLY used Go online: native background consent/service was not
+enabled. Two-minute foreground-only expiry is reproduced; actual device timestamps,
+process death, notification/service behavior were not captured. Absence of All the
+time is expected for this consented foreground-service design; not evidence of cause.
+Customer208 accepted sign-in/navigation/permissions/restart preserved. Background GPS
+acceptance remains PENDING, not passed by compilation or mocked events.
+
+NEXT OWNER PHONE TEST: update Driver219; Go online; check background-sharing consent;
+tap Enable background location for this session WHILE VISIBLE. Allow notifications
+and precise While using location. Wait for RoCoEats on-duty notification + successful
+upload status, then background/lock for two minutes and resume. Pass: online controls,
+fresh upload, no reconnect. Go offline: ongoing notification/service stops, no further
+uploads. If absent notification/reconnect/error, report exact status and timing only;
+no repeat Customer208/auth investigation. No orders/payments/provider push sends needed.
+
+NEXT ENGINEERING: incorporate actual explicit-service physical result; if it fails,
+trace sanitized native promotion/permission/bridge lifecycle and server freshness
+without guessing. Dependency internally catches startForeground errors; review exact
+error propagation with a native failure test before changing third-party lifecycle.
+No evidence that path was exercised in the213 foreground-only trial. No speculative
+permission expansion or silent restart/consent persistence. Remaining external gates:
+real background GPS/offline privacy; provider push credentials/authorized receipt;
+Apple protected provisioning/signed-device+iOS physical; separately authorized real
+financial provider reconciliation/refund/payout evidence; geographic acceptance.
+All public/private ordering/live charges/payouts/retention/municipal gates and Stripe
+TEST unchanged. No hosted config/deploy/data/provider/financial operation performed.
+Neon recovery, historical $19.19 order/ledger, signing and recovery worktree preserved.
+This final checkpoint-only commit needs its own exact-SHA CI result; functional8bf4d04
+and signed219 outcomes above are already SUCCESS. Never equate pending docs CI with pass.
+
 # November 22 — bounded native background initialization
 
 Guidance/lifecycle regression commit47eb9f3f720ef1a8fa66abc0fc3d2306a9cca47c pushed;

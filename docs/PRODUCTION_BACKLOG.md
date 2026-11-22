@@ -1,3 +1,19 @@
+# November 22 — Driver219 ready for scoped physical acceptance
+
+8bf4d04baab5e51a4fbe361283838f252f375284 ALL THREE CI SUCCESS:
+Validate44980349607/44980356303, Native44980356335. Protected signed219/run44980362815
+SUCCESS, artifact14737567646 RoCoEats-Driver-Android-Staging-Test-APK verified against
+source/hash/package/version/private service/permissions/unchanged signing certificate.
+Foreground-only expiry guidance + native setup timeout/late-watcher cleanup completed,
+tested and pushed. No Render deployment/Customer208 rebuild required.
+Owner213 test only used Go online, did not enable background service. Next phone test
+is219 explicit consent -> notification/upload -> background2min -> fresh online ->
+offline stops. Physical background GPS remains pending. No need All the time permission.
+Concrete follow-up if it fails: native service start error propagation and bridge/session
+lifecycle with actual evidence. Push/iOS protected signing/provider financial/geographic
+acceptance remain external blockers; no new provider calls/activation/hosted changes.
+Final checkpoint-only commit CI separate from successful functional source above.
+
 # November 22 — background native initialization recovery
 
 Confirmed offline: unresolved native permission/watcher setup could hang indefinitely;
