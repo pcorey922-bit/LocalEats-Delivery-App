@@ -1,7 +1,7 @@
 import { useDriverAvailability } from '../hooks/use-driver-availability';
 import { Capacitor } from '@capacitor/core';
 import { useAppForeground } from "../hooks/use-app-foreground";
-import { useDutyIntent, useDutyStatus } from "../hooks/use-duty-intent";
+import { useDutyIntent, useDutyStatus, useDutyEvidence } from "../hooks/use-duty-intent";
 import { dutyIntent } from "../lib/duty-intent";
 import { NavigationActions } from "./navigation-actions";
 import type { NavigationAddress } from "../lib/navigation";
@@ -19,6 +19,7 @@ export function DriverAvailability() {
   const { userId } = useAuth();
   const intent = useDutyIntent(userId ?? null);
   const locationStatus = useDutyStatus(userId ?? null);
+  const evidence = useDutyEvidence(userId ?? null);
   const client = useQueryClient();
   const state = useDriverAvailability();
   const [error, setError] = useState("");
@@ -41,7 +42,7 @@ export function DriverAvailability() {
   return (
     <section className="roco-card">
       <h2>Your availability</h2>
-      {import.meta.env.VITE_APP_AUDIENCE === 'driver' && <p role="status">Location session: {locationStatus}</p>}
+      {import.meta.env.VITE_APP_AUDIENCE === 'driver' && <><p role="status">Location session: {locationStatus}</p><p>Last server heartbeat acknowledgement: {evidence.heartbeatAt ? new Date(evidence.heartbeatAt).toLocaleTimeString() : 'Not yet confirmed'}. Last accepted GPS upload: {evidence.locationAt ? new Date(evidence.locationAt).toLocaleTimeString() : 'Not yet confirmed'}.</p>{evidence.failure && <p role="status">Location recovery: {evidence.failure}</p>}{evidence.locationFailure && <p role="status">GPS upload recovery: {evidence.locationFailure}</p>}</>}
       <p>
         Going online shares your current location with authorized dispatch while
         the RoCoEats app is active and you choose to stay online. Going offline

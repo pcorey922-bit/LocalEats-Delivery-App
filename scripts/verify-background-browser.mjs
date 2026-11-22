@@ -11,7 +11,7 @@ const { build } = require('esbuild'), { chromium } = require(process.env.PLAYWRI
 const target = await mkdtemp(path.join(tmpdir(), 'rocoeats-background-ui-'));
 const modules = {
   '@clerk/react': `import {useSyncExternalStore} from 'react';const subscribe=cb=>{window.addEventListener('qa-push-account',cb);return()=>window.removeEventListener('qa-push-account',cb)};export const useAuth=()=>{const userId=useSyncExternalStore(subscribe,()=>window.pushUserId||'driver-fixture');return{isLoaded:true,isSignedIn:true,userId,getToken:async()=>null}};`,
-  '@capacitor/core': `export const Capacitor={isNativePlatform:()=>true,getPlatform:()=>location.search.includes('ios=true')?'ios':'android'};export const registerPlugin=()=>({addWatcher:async(options,callback)=>{window.emitFix=fix=>callback(fix);const id='watch-'+(++window.bgStarts);if(window.bgStartDelay)await new Promise(resolve=>{window.finishBgStart=resolve});return id},removeWatcher:async({id})=>{window.bgRemovals.push(id)}});`,
+  '@capacitor/core': `export const Capacitor={isNativePlatform:()=>true,getPlatform:()=>location.search.includes('ios=true')?'ios':'android'};export const registerPlugin=()=>({addWatcher:async(options,callback)=>{window.emitFix=fix=>callback(fix);window.emitDutyPulse=sequence=>callback({dutyPulse:true,sequence});window.emitDutyError=code=>callback(undefined,{code});const id='watch-'+(++window.bgStarts);if(window.bgStartDelay)await new Promise(resolve=>{window.finishBgStart=resolve});return id},acknowledgeDuty:async({id,sequence})=>{window.nativeDutyAcks??=[];window.nativeDutyAcks.push({id,sequence});},removeWatcher:async({id})=>{window.bgRemovals.push(id)}});`,
   '@capacitor/browser': `export const Browser={close:async()=>{},open:async()=>{}};`,
   '@capacitor/app': `const appListeners=new Set();window.setAppActive=isActive=>{for(const callback of appListeners)callback({isActive})};export const App={getInfo:async()=>{if(window.pushInfoDelay)await new Promise(resolve=>{window.finishPushInfo=resolve});return{id:location.search.includes('ios=true')?'com.rocoeats.driver':'com.rocoeats.driver.staging'}},addListener:async(name,callback)=>{if(name==='appStateChange')appListeners.add(callback);return{remove:async()=>{appListeners.delete(callback)}}}};`,
   '@capacitor/geolocation': `export const Geolocation={watchPosition:async(options,callback)=>{window.emitForegroundFix=fix=>callback(fix);return 'foreground-fixture'},clearWatch:async()=>{window.foregroundRemovals=(window.foregroundRemovals||0)+1}};`,
@@ -75,6 +75,26 @@ try {
   assert.equal(await pendingDuty.evaluate(()=>window.dutyAvailabilityAborted),true);
   assert.equal(await pendingDuty.getByRole('checkbox').count(),0);await pendingDuty.close();
   console.log('PASS: administrator-driver reconnect and process restart preserve explicit intent; server approval denial cannot reveal tracking; hung availability is bounded and actionable. Native/API simulated.');
+  const noGps=await browser.newPage();await noGps.clock.install();
+  await noGps.goto(`http://127.0.0.1:${server.address().port}/?reconnect=true`);
+  await noGps.getByRole('button',{name:'Reconnect on this device',exact:true}).click();
+  await noGps.getByRole('checkbox').check();await noGps.evaluate(()=>{window.bgPermission=true;});
+  await noGps.getByRole('button',{name:'Enable background location for this session',exact:true}).click();
+  await noGps.waitForFunction(()=>window.bgStarts===1);await noGps.evaluate(()=>window.setAppActive(false));
+  for(let sequence=1;sequence<=8;sequence++) {
+    await noGps.clock.fastForward(20000);await noGps.evaluate(sequence=>window.emitDutyPulse(String(sequence)),sequence);
+    await noGps.waitForFunction(sequence=>window.nativeDutyAcks?.length===sequence,sequence);
+  }
+  await noGps.evaluate(()=>window.refreshDuty());
+  assert.equal(await noGps.evaluate(()=>window.bgUploads),0,'Native keepalive cannot fabricate GPS');
+  assert.equal(await noGps.getByRole('button',{name:'Reconnect on this device',exact:true}).count(),0);
+  await noGps.getByText('Last server heartbeat acknowledgement:',{exact:false}).waitFor();
+  await noGps.evaluate(()=>window.emitDutyError('DUTY_ACK_EXPIRED'));
+  await noGps.getByText('Location session: DRIVER_DEVICE_RECONNECT_REQUIRED',{exact:true}).waitFor();
+  await noGps.waitForFunction(()=>window.bgRemovals.includes('watch-1'));
+  await noGps.getByText('Location recovery: DUTY_ACK_EXPIRED',{exact:true}).waitFor();
+  await noGps.getByText('Last server heartbeat acknowledgement:',{exact:false}).waitFor();await noGps.close();
+  console.log('PASS: native pulses maintain authenticated presence over 160 seconds with ZERO GPS uploads; native acknowledgement expiry removes watcher and requires explicit reconnect. Bridge/API simulated; actual Java lease policy tested separately.');
   // Reproduce the observed Go-online-only path without real GPS or hosted writes.
   const duty=await browser.newPage();await duty.clock.install();
   await duty.goto(`http://127.0.0.1:${server.address().port}`);

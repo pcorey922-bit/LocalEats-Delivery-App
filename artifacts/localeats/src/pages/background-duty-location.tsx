@@ -1,12 +1,15 @@
+import { driverDutyRequest } from '../lib/driver-duty-transport';
+import { useAuth } from '@clerk/react';
+import { dutyIntent } from '../lib/duty-intent';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import type { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
 import { backgroundDutySession } from '../lib/background-duty';
 import { customFetch } from '../../../../lib/api-client-react/src/custom-fetch';
 
-const watcher = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
+const watcher = registerPlugin<BackgroundGeolocationPlugin & {acknowledgeDuty(options:{id:string;sequence:string}):Promise<void>}>('BackgroundGeolocation');
 const storageKey = 'rocoeats-background-watch:v1'; // Watch ID only, never a token or position.
 let cleanup = Promise.resolve();
 function clearSavedWatcher() {
@@ -30,19 +33,27 @@ export function BackgroundDutyRecovery() {
 
 export function BackgroundDutyLocation({ onFatal }: { onFatal: (message: string) => void }) {
   const client = useQueryClient();
+  const {userId, getToken} = useAuth();
+  const tokenGetter = useRef(getToken); tokenGetter.current=getToken;
   const [message, setMessage] = useState('Starting background location with your permission…');
   useEffect(() => {
     let disposed = false, permissionDenied = false;
     const session = backgroundDutySession({ watcher: {
       addWatcher: async (options, callback) => {
         await clearSavedWatcher();
-        const id = await watcher.addWatcher(options, (fix, error) => callback(fix && fix.time !== null ? { latitude: fix.latitude, longitude: fix.longitude, accuracy: fix.accuracy, time: fix.time, simulated: fix.simulated } : undefined, error));
+        const id = await watcher.addWatcher(options, (fix, error) => {
+          const pulse = fix as unknown as {dutyPulse?:boolean; sequence?:unknown} | undefined;
+          if (pulse?.dutyPulse === true && typeof pulse.sequence === 'string') callback(undefined, error, {sequence:pulse.sequence});
+          else callback(fix && fix.time !== null ? { latitude: fix.latitude, longitude: fix.longitude, accuracy: fix.accuracy, time: fix.time, simulated: fix.simulated } : undefined, error);
+        });
         try { localStorage.setItem(storageKey, id); }
         catch (error) { await watcher.removeWatcher({ id }); throw error; }
         return id;
       },
+      ...(Capacitor.getPlatform() === 'android' ? {acknowledgeDuty:(id:string,sequence:string)=>watcher.acknowledgeDuty({id,sequence})} : {}),
       removeWatcher: async ({ id }) => { await watcher.removeWatcher({ id }); if (localStorage.getItem(storageKey) === id) localStorage.removeItem(storageKey); },
-    }, api: customFetch,
+    }, api: (path,options)=>driverDutyRequest(customFetch,()=>tokenGetter.current({skipCache:true}),path,options),
+      evidence: value => { if (!disposed && userId) dutyIntent.record(userId,value); },
       permission: async () => {
         if (Capacitor.getPlatform() !== 'android') return true;
         const permission = await PushNotifications.requestPermissions();
@@ -59,6 +70,6 @@ export function BackgroundDutyLocation({ onFatal }: { onFatal: (message: string)
     });
     void session.start().catch(() => { if (!disposed && !permissionDenied) onFatal('Background location could not start. Check location and notification permissions, then reconnect explicitly.'); });
     return () => { disposed = true; void session.stop().catch(() => onFatal('Location service could not stop. Disable location permission in device settings and reopen RoCoEats.')); };
-  }, [onFatal, client]);
+  }, [onFatal, client, userId]);
   return <section aria-label="Background driver location"><p role="status">{message}</p><p>Sharing continues while this session remains authorized, including while the app is backgrounded. Authorized participants in your active delivery can also view your shared position. Android shows an ongoing notification; iOS shows its location indicator. Going offline stops sharing. A restart or expired session requires explicit reconnect. Keep your device charged.</p></section>;
 }

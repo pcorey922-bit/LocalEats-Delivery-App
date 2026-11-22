@@ -50,3 +50,9 @@ test("availability rejects incomplete or coerced flags without treating them as 
   assert.throws(()=>driverAvailabilityResponse(invalid),DriverAvailabilityResponseError);
  }
 });
+
+test("receipt evidence survives duty stop but never crosses accounts or sign-out",()=>{
+ const store=createDutyIntentStore();store.record('driver',{heartbeatAt:123,locationAt:120,failure:'DUTY_ACK_EXPIRED'});store.set('driver',false);
+ assert.equal(store.evidence('driver').heartbeatAt,123);assert.equal(store.evidence('other').heartbeatAt,undefined);
+ assert.equal(createDutyIntentStore().evidence('driver').heartbeatAt,undefined);store.clear();assert.equal(store.evidence('driver').heartbeatAt,undefined);
+});

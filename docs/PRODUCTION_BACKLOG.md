@@ -1,3 +1,21 @@
+# November 22 — Driver222 background session failed; native heartbeat/watchdog implemented
+
+Owner observed native on-duty notification but Dispatch offline11:11PM, Driver resume
+11:12PM DEVICE_RECONNECT_REQUIRED, notification permission GRANTED. Physical background
+GPS NOT PASSED. Root mechanism reproduced: heartbeat depended on GPS callbacks and
+native service lacked server-ack deadline. Exact device callback/network cause unknown.
+Existing native plugin patched with20s independent pulses, monotonic30s initial/75s
+ack watchdog, bounded on-duty wake lock, stop/permission/start-failure cleanup. Server
+90s unchanged. Strict server ack, no stale GPS laundering, no silent reconnect. Bounded
+single401 Clerk renewal only for authenticated telemetry; no uncertain/financial replay.
+Memory-only per-account HB/GPS receipt times + separate failure codes survive duty stop.
+25 focused units, actual JVM policy, native-controller browser/no-GPS+expiry regressions,
+local API/PGlite driver/session/GPS integration, UI types/build/2 privacy units PASS.
+Next native CI + protected signed Driver candidate, then owner physical timestamps /
+Dispatch BEFORE Driver foreground to detect real background GPS. No Render deployment,
+hosted settings/provider/financial operations or activation. Customer208 acceptance /
+account permissions/signing preserved; actual Android service acceptance still pending.
+
 # November 22 — Driver222 candidate verified, physical diagnosis pending
 
 c2e69cbbc6c2f32da8d9118ba2ebee2081d09165 ALL THREE CI SUCCESS:

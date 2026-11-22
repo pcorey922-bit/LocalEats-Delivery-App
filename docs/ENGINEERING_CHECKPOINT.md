@@ -1,3 +1,66 @@
+# November 22 — Driver222 background failure: native liveness correction
+
+NEW OWNER EVIDENCE: v222 background activation produced ongoing RoCoEats on-duty
+notification. Administrator Dispatch reported offline/no sharing at11:11PM; returning
+at11:12PM showed DRIVER_DEVICE_RECONNECT_REQUIRED, Offline, permission GRANTED.
+Background GPS physical acceptance remains FAILED/NOT PASSED. This supersedes earlier
+notes limited to hidden activation controls. Exact historical HTTP/GPS/heartbeat ack
+traces are unavailable without authenticated evidence; do not invent a401 or OS-kill.
+DEVICE_RECONNECT_REQUIRED means local duty intent false (fatal response or new process),
+not independently proof of a particular server or Android cause.
+
+CONFIRMED DEFECT reproduced: background heartbeat was conditional on VALID GPS callback;
+no GPS/no JS callback meant no presence renewal, despite native FGS continuing. Native
+service had no server-acknowledgement watchdog. A late heartbeat after90s correctly409s
+and requires explicit reconnect. Two regressions failed before correction. The source
+mechanism explains service-vs-server divergence; physical callback interruption reason
+remains unverified. Server90s expiry and all authorization/eligibility unchanged.
+
+CORRECTION: pinned pnpm patch to EXISTING background-geolocation1.3.1 Android service,
+not a parallel service. Monotonic native20s pulses independent of GPS/WebView timers;
+JS uses existing authenticated heartbeat API and acknowledges only strict online:true.
+Native initial grace30s, thereafter75s from pulse ISSUE time (not response receipt),
+rejecting duplicate/unknown/late acknowledgements. Bounded partial CPU wake lock only
+within consented duty, with2s cleanup allowance; missing acknowledgements remove native
+watcher/ongoing notification even if JS cannot clean up. Last watcher removal cancels
+native scheduling and releases wake lock; process/service destruction cleans everything.
+Permission/start/promotion failures propagate sanitized errors and stop tracking.
+No All-time location permission; FGS remains private/location-only. Normal WAKE_LOCK
+permission added only through driver-excluded plugin; customer native boundaries stay.
+No credentials/addresses/coordinates stored in native lease or new diagnostics.
+
+Background transport renews Clerk ONCE only after definite401 for whitelisted telemetry
+endpoints; original GPS body preserved. Network-unknown/403/409, availability mutation,
+order/payment/financial writes never replayed. Expired duty cannot be resurrected.
+Native pulse independent of stalled GPS upload; GPS freshness/accuracy/simulation rules
+unchanged. Heartbeat does not fabricate coordinates or turn stale GPS fresh.
+Availability now retains per-account MEMORY-ONLY last server heartbeat receipt, accepted
+GPS receipt and separate safe failure codes after duty stops; clear on sign-out/process
+restart. Times are local-device receipt times, not independent server-clock evidence.
+
+LOCAL VALIDATION:25 focused units PASS (no-GPS pulse/invalid ack/auth/expiry/stalled GPS,
+late-result/token fencing, telemetry renewal, evidence isolation). Actual patched Java
+lease compiled/run onJVM21 PASS: initial/exact expiry, issue-time anchor, late/duplicate
+challenge,4min no-GPS pulses, permanent stop/monotonic rollback. Existing React/Chromium
+native/API mocked GPS/push suite PASS plus160s GPS-independent presence, zero fabricated
+GPS, expiry reason/last receipts retained. Real LOCAL API/PGlite dedicated Driver role /
+session/restart/GPS/offline integration PASS. UI types/build and2 privacy units PASS.
+CI now runs native Java policy before Android driver compile and protected signing;
+actual Android/iOS compilation, exact-SHA CI and signed APK still need final results.
+Never equate JVM/mocks/builds with physical Android service/GPS acceptance.
+
+NEXT: verify exact-SHA CI/native Android service compilation, repair failures, protected
+signed Driver candidate; verify source/package/version/hash/private FGS/wake permission /
+unchanged signer and DEX pulse/watchdog code. No Render deploy/migration/settings needed.
+Owner test: update without uninstalling; reconnect/explicit consent while visible;
+wait for heartbeat AND GPS receipt times. Use separate Chrome Administrator Dispatch
+while Driver remains backgrounded; inspect BOTH online and GPS timestamps BEFORE
+resuming Driver, including lock/unlock with Chrome foreground. Capture receipt times /
+failure codes if failed. A living heartbeat alone does NOT establish background GPS.
+Then Go offline must remove notification/location. No order/payment/push sends needed.
+All closed ordering/live/payout/retention/municipal gates, Stripe TEST, hosted data,
+Neon recovery/signing/PR1 preserved. No hosted/provider/financial operations performed.
+
 # November 22 — verified Driver222; physical activation still unresolved
 
 Functional c2e69cbbc6c2f32da8d9118ba2ebee2081d09165 pushed on primary branch.

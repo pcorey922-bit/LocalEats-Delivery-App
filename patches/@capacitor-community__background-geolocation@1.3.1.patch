@@ -1,0 +1,371 @@
+diff --git a/android/src/main/AndroidManifest.xml b/android/src/main/AndroidManifest.xml
+index 9e65984854cfb3d7bde5d56b0ab25974c8eccf6e..3c0f49721b86609230093fead5de5586ce48fc67 100644
+--- a/android/src/main/AndroidManifest.xml
++++ b/android/src/main/AndroidManifest.xml
+@@ -16,6 +16,7 @@
+     <!-- Android SDK 33+ requires the POST_NOTIFICATIONS runtime permission to
+     display the foreground service notification. -->
+     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
++    <uses-permission android:name="android.permission.WAKE_LOCK" />
+     <uses-feature android:name="android.hardware.location.gps" />
+ </manifest>
+   
+diff --git a/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocation.java b/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocation.java
+index a92fcf9bad0139d203964afb1550ea5ba03ce99b..e84a01ebee7895ce094fdae659709b2a446d3017 100644
+--- a/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocation.java
++++ b/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocation.java
+@@ -73,7 +73,7 @@ public class BackgroundGeolocation extends Plugin {
+     @PluginMethod(returnType = PluginMethod.RETURN_CALLBACK)
+     public void addWatcher(final PluginCall call) {
+         if (service == null) {
+-            call.reject("Service not running.");
++            call.reject("Service not running.", "DUTY_SERVICE_NOT_READY");
+             return;
+         }
+         call.setKeepAlive(true);
+@@ -81,11 +81,14 @@ public class BackgroundGeolocation extends Plugin {
+         if (getPermissionState("location") != PermissionState.GRANTED) {
+             if (call.getBoolean("requestPermissions", true)) {
+                 requestPermissionForAlias("location", call, "locationPermissionsCallback");
++                return;
+             } else {
+                 call.reject("Permission denied.", "NOT_AUTHORIZED");
++                return;
+             }
+         } else if (!isLocationEnabled(getContext())) {
+             call.reject("Location services disabled.", "NOT_AUTHORIZED");
++            return;
+         }
+         if (call.getBoolean("stale", false)) {
+             fetchLastLocation(call);
+@@ -156,11 +159,12 @@ public class BackgroundGeolocation extends Plugin {
+ 
+             backgroundNotification = builder.build();
+         }
+-        service.addWatcher(
+-                call.getCallbackId(),
+-                backgroundNotification,
+-                call.getFloat("distanceFilter", 0f)
+-        );
++        try {
++            service.addWatcher(call.getCallbackId(), backgroundNotification, call.getFloat("distanceFilter", 0f), call.getBoolean("dutyHeartbeat", false));
++        } catch (Exception error) {
++            service.removeWatcher(call.getCallbackId());
++            call.reject("Background location service could not start", "DUTY_SERVICE_START_FAILED");
++        }
+     }
+ 
+     @PermissionCallback
+@@ -170,15 +174,20 @@ public class BackgroundGeolocation extends Plugin {
+             call.reject("User denied location permission", "NOT_AUTHORIZED");
+             return;
+         }
+-        if (call.getBoolean("stale", false)) {
+-            fetchLastLocation(call);
+-        }
+-        if (service != null) {
+-            service.onPermissionsGranted();
+-            // The handleOnResume method will now be called, and we don't need it to call
+-            // service.onPermissionsGranted again so we reset this flag.
+-            stoppedWithoutPermissions = false;
+-        }
++        stoppedWithoutPermissions = false;
++        addWatcher(call);
++    }
++
++    @PluginMethod
++    public void acknowledgeDuty(PluginCall call) {
++        try {
++            String id = call.getString("id");
++            long sequence = Long.parseLong(call.getString("sequence", "0"));
++            if (id == null || service == null || !service.acknowledgeDuty(id, sequence)) {
++                call.reject("On-duty acknowledgement expired", "DUTY_ACK_EXPIRED"); return;
++            }
++            call.resolve();
++        } catch (NumberFormatException error) { call.reject("Invalid acknowledgement", "DUTY_ACK_INVALID"); }
+     }
+ 
+     @PluginMethod()
+@@ -253,6 +262,14 @@ public class BackgroundGeolocation extends Plugin {
+             if (call == null) {
+                 return;
+             }
++            if (intent.hasExtra("dutyError")) {
++                call.reject("Background duty stopped; reconnect explicitly", intent.getStringExtra("dutyError"));
++                call.release(getBridge()); return;
++            }
++            if (intent.hasExtra("dutyPulse")) {
++                JSObject pulse = new JSObject(); pulse.put("dutyPulse", true); pulse.put("sequence", intent.getStringExtra("dutyPulse"));
++                call.resolve(pulse); return;
++            }
+             Location location = intent.getParcelableExtra("location");
+             if (location != null) {
+                 call.resolve(formatLocation(location));
+diff --git a/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocationService.java b/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocationService.java
+index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..527c65b4b12f6a7ea4f25c3a4a92fc782c1d98f0 100644
+--- a/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocationService.java
++++ b/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocationService.java
+@@ -17,7 +17,16 @@ import com.google.android.gms.location.LocationRequest;
+ import com.google.android.gms.location.LocationResult;
+ import com.google.android.gms.location.LocationServices;
+ 
+-import java.util.HashSet;
++import java.util.concurrent.ConcurrentHashMap;
++import java.util.concurrent.Executors;
++import java.util.concurrent.ScheduledExecutorService;
++import java.util.concurrent.TimeUnit;
++import java.util.concurrent.ScheduledFuture;
++import android.os.SystemClock;
++import android.os.PowerManager;
++import android.content.pm.PackageManager;
++import android.Manifest;
++import androidx.core.content.ContextCompat;
+ 
+ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+ 
+@@ -39,8 +48,64 @@ public class BackgroundGeolocationService extends Service {
+         public LocationRequest locationRequest;
+         public LocationCallback locationCallback;
+         public Notification backgroundNotification;
++        public DutyLease dutyLease;
++        public PowerManager.WakeLock wakeLock;
++    }
++    private final ConcurrentHashMap<String, Watcher> watchers = new ConcurrentHashMap<>();
++    private final ScheduledExecutorService dutyClock = Executors.newSingleThreadScheduledExecutor();
++
++    private ScheduledFuture<?> dutyTask;
++    private synchronized void ensureDutyClock() {
++        if (dutyTask != null) return;
++        dutyTask = dutyClock.scheduleAtFixedRate(() -> {
++            for (Watcher watcher : watchers.values()) {
++                if (watcher.dutyLease == null) continue;
++                try {
++                boolean permission = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
++                    ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
++                long now = SystemClock.elapsedRealtime();
++                if (!permission || watcher.dutyLease.expired(now)) {
++                    expire(watcher, permission ? "DUTY_ACK_EXPIRED" : "NOT_AUTHORIZED");
++                } else {
++                    long pulse = watcher.dutyLease.pulse(now);
++                    if (pulse != 0) broadcast(watcher.id, "dutyPulse", Long.toString(pulse));
++                }
++                } catch (RuntimeException error) { expire(watcher, "DUTY_SERVICE_UNAVAILABLE"); }
++            }
++        }, 1, 1, TimeUnit.SECONDS);
++    }
++    private void broadcast(String id, String key, String value) {
++        Intent intent = new Intent(ACTION_BROADCAST);
++        intent.putExtra("id", id); intent.putExtra(key, value);
++        LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcast(intent);
++    }
++    private void expire(Watcher watcher, String code) {
++        try { remove(watcher.id); }
++        finally { broadcast(watcher.id, "dutyError", code); }
++    }
++    private synchronized void renewWakeLock(Watcher watcher) {
++        if (watchers.get(watcher.id) != watcher || watcher.wakeLock == null) return;
++        long remaining = watcher.dutyLease.remaining(SystemClock.elapsedRealtime());
++        if (remaining > 0) watcher.wakeLock.acquire(remaining + 2000); // Permit watchdog cleanup before CPU sleep.
++    }
++    private synchronized void remove(String id) {
++        Watcher watcher = watchers.remove(id);
++        if (watcher == null) return;
++        if (watcher.dutyLease != null) watcher.dutyLease.stop();
++        try { watcher.client.removeLocationUpdates(watcher.locationCallback); }
++        catch (RuntimeException ignored) { /* Lease revoked; always release notification/wake lock. */ }
++        finally {
++            if (watcher.wakeLock != null && watcher.wakeLock.isHeld()) watcher.wakeLock.release();
++            if (getNotification() == null) stopForeground(true);
++            if (watchers.values().stream().noneMatch(w -> w.dutyLease != null) && dutyTask != null) {
++                dutyTask.cancel(false); dutyTask = null;
++            }
++        }
++    }
++    private void stopWatchers() { for (String id : watchers.keySet()) remove(id); }
++    @Override public void onDestroy() {
++        dutyClock.shutdownNow(); stopWatchers(); super.onDestroy();
+     }
+-    private HashSet<Watcher> watchers = new HashSet<Watcher>();
+ 
+     @Override
+     public IBinder onBind(Intent intent) {
+@@ -53,16 +118,13 @@ public class BackgroundGeolocationService extends Service {
+     // service is terminated immediately.
+     @Override
+     public boolean onUnbind(Intent intent) {
+-        for (Watcher watcher : watchers) {
+-            watcher.client.removeLocationUpdates(watcher.locationCallback);
+-        }
+-        watchers = new HashSet<Watcher>();
++        stopWatchers();
+         stopSelf();
+         return false;
+     }
+ 
+     Notification getNotification() {
+-        for (Watcher watcher : watchers) {
++        for (Watcher watcher : watchers.values()) {
+             if (watcher.backgroundNotification != null) {
+                 return watcher.backgroundNotification;
+             }
+@@ -71,14 +133,7 @@ public class BackgroundGeolocationService extends Service {
+     }
+ 
+     private void promote(Notification notification) {
+-        try {
+-            // The 'startForeground' method has been known to fail due to weird
+-            // permission bugs, so we prevent any exceptions from
+-            // crashing the app. See issue #86.
+-            startForeground(NOTIFICATION_ID, notification);
+-        } catch (Exception exception) {
+-            Logger.error("Failed to foreground service", exception);
+-        }
++        startForeground(NOTIFICATION_ID, notification);
+     }
+ 
+     // Handles requests from the activity.
+@@ -86,7 +141,8 @@ public class BackgroundGeolocationService extends Service {
+         void addWatcher(
+                 final String id,
+                 Notification backgroundNotification,
+-                float distanceFilter
++                float distanceFilter,
++                boolean supervisedDuty
+         ) {
+             FusedLocationProviderClient client = LocationServices.getFusedLocationProviderClient(
+                     BackgroundGeolocationService.this
+@@ -122,18 +178,25 @@ public class BackgroundGeolocationService extends Service {
+             watcher.locationRequest = locationRequest;
+             watcher.locationCallback = callback;
+             watcher.backgroundNotification = backgroundNotification;
+-            watchers.add(watcher);
++            if (supervisedDuty) {
++                if (backgroundNotification == null) throw new IllegalArgumentException("On-duty service needs notification");
++                watcher.dutyLease = new DutyLease(SystemClock.elapsedRealtime());
++                PowerManager power = (PowerManager)getSystemService(POWER_SERVICE);
++                watcher.wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "RoCoEats:DriverDuty");
++                watcher.wakeLock.setReferenceCounted(false);
++            }
++            watchers.put(id, watcher);
++            if (supervisedDuty) ensureDutyClock();
+ 
+-            // According to Android Studio, this method can throw a Security Exception if
+-            // permissions are not yet granted. Rather than check the permissions, which is fiddly,
+-            // we simply ignore the exception.
++            // Propagate startup permission failures to the authenticated UI; never
++            // leave a notification claiming that a failed location request is active.
+             try {
+                 watcher.client.requestLocationUpdates(
+                         watcher.locationRequest,
+                         watcher.locationCallback,
+                         null
+-                );
+-            } catch (SecurityException ignore) {}
++                ).addOnFailureListener(error -> { if (watcher.dutyLease != null) expire(watcher, "DUTY_LOCATION_UNAVAILABLE"); });
++            } catch (SecurityException denied) { remove(id); throw denied; }
+ 
+             // Promote the service to the foreground if necessary.
+             // Ideally we would only call 'startForeground' if the service is not already
+@@ -141,46 +204,34 @@ public class BackgroundGeolocationService extends Service {
+             // in API level 29 and seems to behave weirdly, as reported in #120. However,
+             // it appears that 'startForeground' is idempotent, so we just call it repeatedly
+             // each time a background watcher is added.
+-            if (backgroundNotification != null) {
+-                promote(backgroundNotification);
++            synchronized (BackgroundGeolocationService.this) {
++                if (backgroundNotification != null && watchers.get(id) == watcher) promote(backgroundNotification);
+             }
++            renewWakeLock(watcher);
+         }
+ 
+-        void removeWatcher(String id) {
+-            for (Watcher watcher : watchers) {
+-                if (watcher.id.equals(id)) {
+-                    watcher.client.removeLocationUpdates(watcher.locationCallback);
+-                    watchers.remove(watcher);
+-                    if (getNotification() == null) {
+-                        stopForeground(true);
+-                    }
+-                    return;
+-                }
+-            }
++        void removeWatcher(String id) { remove(id); }
++        boolean acknowledgeDuty(String id, long sequence) {
++            Watcher watcher = watchers.get(id);
++            if (watcher == null || watcher.dutyLease == null || !watcher.dutyLease.acknowledge(sequence, SystemClock.elapsedRealtime())) return false;
++            renewWakeLock(watcher); return true;
+         }
+ 
+         void onPermissionsGranted() {
+-            // If permissions were granted while the app was in the background, for example in
+-            // the Settings app, the watchers need restarting.
+-            for (Watcher watcher : watchers) {
+-                watcher.client.removeLocationUpdates(watcher.locationCallback);
+-                watcher.client.requestLocationUpdates(
+-                        watcher.locationRequest,
+-                        watcher.locationCallback,
+-                        null
+-                );
+-            }
+-
+-            // From Android 14, a location foreground service can not be started
+-            // without location permissions, so any earlier attempt to promote the
+-            // service will have failed. See issue #153.
+-            Notification notification = getNotification();
+-            if (notification != null) {
+-                promote(notification);
++            try {
++                for (Watcher watcher : watchers.values()) {
++                    watcher.client.removeLocationUpdates(watcher.locationCallback);
++                    watcher.client.requestLocationUpdates(watcher.locationRequest, watcher.locationCallback, null);
++                }
++                Notification notification = getNotification();
++                if (notification != null) promote(notification);
++            } catch (RuntimeException error) {
++                for (Watcher watcher : watchers.values()) expire(watcher, "DUTY_SERVICE_START_FAILED");
+             }
+         }
+ 
+         void stopService() {
++            stopWatchers();
+             BackgroundGeolocationService.this.stopSelf();
+         }
+     }
+diff --git a/android/src/main/java/com/equimaps/capacitor_background_geolocation/DutyLease.java b/android/src/main/java/com/equimaps/capacitor_background_geolocation/DutyLease.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..503fcaea353d74990d12fbe98ed540ea0ec202b9
+--- /dev/null
++++ b/android/src/main/java/com/equimaps/capacitor_background_geolocation/DutyLease.java
+@@ -0,0 +1,32 @@
++package com.equimaps.capacitor_background_geolocation;
++
++/** Monotonic, memory-only acknowledgement lease. No credential or location storage. */
++public final class DutyLease {
++    public static final long INITIAL_MS = 30000;
++    public static final long ACK_MS = 75000; // Shorter than the unchanged 90s server lease.
++    public static final long PULSE_MS = 20000;
++    private long baseline, issuedAt, lastPulse;
++    private long sequence = 0, pending = 0;
++    private boolean acknowledged = false, stopped = false;
++    public DutyLease(long now) { baseline = now; lastPulse = now - PULSE_MS; }
++    public synchronized boolean expired(long now) {
++        return stopped || now < baseline || now - baseline >= (acknowledged ? ACK_MS : INITIAL_MS);
++    }
++    public synchronized long remaining(long now) {
++        return expired(now) ? 0 : (acknowledged ? ACK_MS : INITIAL_MS) - (now - baseline);
++    }
++    public synchronized long pulse(long now) {
++        if (expired(now) || now - lastPulse < PULSE_MS) return 0;
++        lastPulse = now;
++        if (pending == 0) { pending = ++sequence; issuedAt = now; }
++        return pending;
++    }
++    public synchronized boolean acknowledge(long challenge, long now) {
++        if (expired(now) || now < issuedAt || pending == 0 || challenge != pending) return false;
++        // Use native request-issue time, not receipt time: slow JS/network must
++        // never extend the service beyond the server heartbeat's validity.
++        baseline = issuedAt; acknowledged = true; pending = 0;
++        return true;
++    }
++    public synchronized void stop() { stopped = true; }
++}

@@ -1,16 +1,20 @@
 import { nativeStep } from './native-startup';
 export type DutyFix = { latitude: number; longitude: number; accuracy: number; time: number; simulated?: boolean };
+export type DutyPulse = { sequence: string };
+export type DutyEvidence = { heartbeatAt?: number; locationAt?: number; failure?: string | null; locationFailure?: string | null };
 type Options = { method?: 'GET' | 'POST'; body?: string; signal: AbortSignal };
 type Dependencies = {
   watcher: {
-    addWatcher(options: { backgroundTitle: string; backgroundMessage: string; requestPermissions: boolean; stale: boolean; distanceFilter: number }, callback: (fix?: DutyFix, error?: { code?: string }) => void): Promise<string>;
+    addWatcher(options: { backgroundTitle: string; backgroundMessage: string; requestPermissions: boolean; stale: boolean; distanceFilter: number; dutyHeartbeat?: boolean }, callback: (fix?: DutyFix, error?: { code?: string }, pulse?: DutyPulse) => void): Promise<string>;
     removeWatcher(options: { id: string }): Promise<void>;
+    acknowledgeDuty?: (id: string, sequence: string) => Promise<void>;
   };
   permission: () => Promise<boolean>;
   api: <T>(path: string, options: Options) => Promise<T>;
   status: (message: string) => void;
   fatal: (message: string) => void;
   now?: () => number;
+  evidence?: (evidence: DutyEvidence) => void;
 };
 
 type DutyAccess = { approved: true; available: true; online: true; activeOrderId: string | null };
@@ -25,6 +29,7 @@ function eligible(value: unknown): value is DutyAccess {
  * or bypass endpoint. Native HTTP is enabled only in the dedicated driver build. */
 export function backgroundDutySession(deps: Dependencies) {
   let stopped = false, inFlight = false, lastAttempt = -Infinity;
+  let pulseBusy = false, pendingPulse: DutyPulse | undefined, acknowledgedSequence = '';
   let starting: Promise<void> | undefined, id: string | undefined, removing: Promise<void> | undefined;
   const abort = new AbortController(), now = deps.now ?? Date.now;
   async function request<T>(path: string, options: Options): Promise<T> {
@@ -53,8 +58,29 @@ export function backgroundDutySession(deps: Dependencies) {
     deps.fatal(message);
     void stop().catch(() => deps.status('Location service could not stop. Disable location permission in device settings and reopen RoCoEats.'));
   };
+  async function dutyPulse(pulse: DutyPulse) {
+    if (stopped || !deps.watcher.acknowledgeDuty || !/^[1-9][0-9]{0,18}$/.test(pulse.sequence) || pulse.sequence === acknowledgedSequence) return;
+    if (!id) { pendingPulse = pulse; return; }
+    if (pulseBusy) return;
+    pulseBusy = true;
+    try {
+      const result = await request<{online:boolean}>('/api/driver/heartbeat', {method:'POST', signal:abort.signal});
+      if (stopped) return;
+      if (result?.online !== true) throw Error('Unverified heartbeat acknowledgement');
+      deps.evidence?.({heartbeatAt:now(),failure:null});
+      await nativeStep('NATIVE_DUTY_ACK_TIMEOUT', () => deps.watcher.acknowledgeDuty!(id!, pulse.sequence), abort.signal);
+      if (!stopped) acknowledgedSequence = pulse.sequence;
+    } catch (error) {
+      if (stopped) return;
+      deps.evidence?.({failure: /^[A-Z_0-9]+$/.test(String((error as {code?:string})?.code ?? '')) ? String((error as {code?:string}).code) : `DUTY_HEARTBEAT_HTTP_${(error as {status?:number})?.status ?? 'UNCONFIRMED'}`});
+      if ([401,403,409].includes((error as {status?:number})?.status ?? 0) || String((error as {code?:string})?.code ?? '').startsWith('DUTY_'))
+        fail('Background duty authorization or acknowledgement expired. Sharing stopped; reconnect explicitly.');
+      else deps.status('Dispatch heartbeat was not confirmed. The native service will stop if acknowledgements do not recover.');
+    } finally { pulseBusy = false; }
+  }
   async function position(fix?: DutyFix, error?: { code?: string }) {
     if (stopped) return;
+    if (error?.code?.startsWith('DUTY_')) { deps.evidence?.({failure:error.code}); fail('Native background duty stopped because its server acknowledgement or location service was unavailable. Reconnect explicitly.'); return; }
     if (error?.code === 'NOT_AUTHORIZED') { fail('Background location permission is unavailable. Reconnect explicitly after reviewing device permissions.'); return; }
     if (error || !fix) { deps.status('Waiting for a GPS fix. Dispatch may show your location as stale.'); return; }
     const age = now() - fix.time;
@@ -69,7 +95,9 @@ export function backgroundDutySession(deps: Dependencies) {
     lastAttempt = now();
     try {
       const options = { method: 'POST' as const, signal: abort.signal };
-      await request('/api/driver/heartbeat', options);
+      const heartbeat = await request<{online:boolean}>('/api/driver/heartbeat', options);
+      if (heartbeat?.online !== true) throw Error('Unverified heartbeat acknowledgement');
+      if (!stopped) deps.evidence?.({heartbeatAt:now(),failure:null});
       if (stopped) return;
       const availability = await request<unknown>('/api/driver/availability', { signal: abort.signal });
       if (stopped) return;
@@ -78,6 +106,7 @@ export function backgroundDutySession(deps: Dependencies) {
       const result = await request<{ accepted: boolean }>('/api/driver/location', { ...options, body });
       if (stopped) return;
       if (!result || typeof result.accepted !== 'boolean') throw Error('Invalid location acknowledgement');
+      if (result.accepted === true) deps.evidence?.({locationAt:now(),locationFailure:null});
       if (result.accepted === true && availability.activeOrderId) {
         await request(`/api/driver/orders/${encodeURIComponent(availability.activeOrderId)}/location`, { ...options, body });
       }
@@ -85,6 +114,7 @@ export function backgroundDutySession(deps: Dependencies) {
     } catch (error) {
       if (stopped) return;
       const code = (error as { status?: number })?.status;
+      deps.evidence?.({locationFailure:`DUTY_LOCATION_HTTP_${code ?? 'UNCONFIRMED'}`});
       if ([401, 403, 409].includes(code ?? 0)) fail('Driver session or on-duty access could not be verified. Background sharing stopped. Reopen the app and reconnect explicitly.');
       else deps.status('Location upload interrupted. Retrying on a fresh GPS update; dispatch may show stale location.');
     } finally { inFlight = false; }
@@ -99,7 +129,8 @@ export function backgroundDutySession(deps: Dependencies) {
         if (stopped) return;
         if (!eligible(access)) throw Error('Current driver approval and online availability are required. Reconnect explicitly.');
         await nativeStep('NATIVE_LOCATION_WATCHER_TIMEOUT', async () => {
-          id = await deps.watcher.addWatcher({ backgroundTitle: 'RoCoEats Driver · On duty', backgroundMessage: 'Sharing your driver location. Go offline in RoCoEats to stop.', requestPermissions: true, stale: false, distanceFilter: 0 }, (fix, error) => { void position(fix, error); });
+          id = await deps.watcher.addWatcher({ backgroundTitle: 'RoCoEats Driver · On duty', backgroundMessage: 'Sharing your driver location. Go offline in RoCoEats to stop.', requestPermissions: true, stale: false, distanceFilter: 0, dutyHeartbeat: !!deps.watcher.acknowledgeDuty }, (fix, error, pulse) => { if (pulse) void dutyPulse(pulse); else void position(fix, error); });
+          if (!stopped && pendingPulse) { const pulse = pendingPulse; pendingPulse = undefined; void dutyPulse(pulse); }
           // Native calls cannot necessarily be canceled. A watcher returned after
           // timeout/stop must be removed even though the caller has already left.
           if (stopped) await remove().catch(() => deps.status('Location service could not stop. Disable location permission in device settings and reopen RoCoEats.'));

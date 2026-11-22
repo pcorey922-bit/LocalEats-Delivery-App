@@ -6,12 +6,12 @@ const flush = () => new Promise<void>(resolve => setImmediate(resolve));
 const deferred = <T>() => { let resolve!: (v: T) => void; const promise = new Promise<T>(r => { resolve = r; }); return { promise, resolve }; };
 function fixture(overrides: Partial<Deps> = {}) {
   let time = 1_800_000, order: string | null = 'order-a';
-  let callback: (fix?: DutyFix, error?: { code?: string }) => void = () => {};
+  let callback: (fix?: DutyFix, error?: { code?: string }, pulse?:{sequence:string}) => void = () => {};
   const calls: string[] = [], removed: string[] = [], fatal: string[] = [], statuses: string[] = [];
   const deps: Deps = {
     now: () => time, permission: async () => true,
     watcher: { addWatcher: async (_options, cb) => { callback = cb; return 'watch-1'; }, removeWatcher: async ({ id }) => { removed.push(id); } },
-    api: async <T>(path: string) => { calls.push(path); return (path.endsWith('/availability') ? { approved: true, available: true, online: true, activeOrderId: order } : { accepted: true }) as T; },
+    api: async <T>(path: string) => { calls.push(path); return (path.endsWith('/availability') ? { approved: true, available: true, online: true, activeOrderId: order } : path.endsWith('/heartbeat') ? {online:true} : { accepted: true }) as T; },
     status: v => statuses.push(v), fatal: v => fatal.push(v), ...overrides,
   };
   return { session: backgroundDutySession(deps), calls, removed, fatal, statuses,
@@ -59,7 +59,7 @@ test('invalid/stale/simulated GPS is rejected and a transient outage recovers on
     if (preflight) { preflight = false; return {approved:true,available:true,online:true,activeOrderId:null} as T; }
     attempts++;
     if (attempts === 1) throw { status: 503 };
-    return (path.endsWith('/availability') ? { approved: true, available: true, online: true, activeOrderId: null } : { accepted: true }) as T;
+    return (path.endsWith('/availability') ? { approved: true, available: true, online: true, activeOrderId: null } : path.endsWith('/heartbeat') ? {online:true} : { accepted: true }) as T;
   } });
   await f.session.start();
   for (const invalid of [{ latitude: NaN }, { longitude: 181 }, { accuracy: -1 }, { time: 0 }, { time: 9e12 }, { simulated: true }]) f.emit(invalid);
@@ -97,7 +97,7 @@ test('stop while eligibility is pending never starts GPS, and permission revocat
 
 test('malformed location acknowledgement never reports success or forwards to the active order', async () => {
   const calls:string[]=[];
-  const f=fixture({api:async<T>(path:string)=>{calls.push(path);return (path.endsWith('/availability')?{approved:true,available:true,online:true,activeOrderId:'order-a'}:{accepted:'false'}) as T;}});
+  const f=fixture({api:async<T>(path:string)=>{calls.push(path);return (path.endsWith('/availability')?{approved:true,available:true,online:true,activeOrderId:'order-a'}:path.endsWith('/heartbeat')?{online:true}:{accepted:'false'}) as T;}});
   await f.session.start();f.emit();await flush();
   assert.equal(calls.some(path=>path.includes('/orders/')),false);
   assert.match(f.statuses.at(-1)!,/interrupted/);await f.session.stop();
@@ -109,7 +109,7 @@ test('hung background upload releases its slot and a late acknowledgement cannot
  const f=fixture({api:async<T>(path,options)=>{
   calls.push(path);
   if(path.endsWith('/heartbeat')&&stalled){stalled=false;signal=options.signal;return await late.promise as T;}
-  return (path.endsWith('/availability')?{approved:true,available:true,online:true,activeOrderId:'order-a'}:{accepted:true}) as T;
+  return (path.endsWith('/availability')?{approved:true,available:true,online:true,activeOrderId:'order-a'}:path.endsWith('/heartbeat')?{online:true}:{accepted:true}) as T;
  }});
  await f.session.start();f.emit();await flush();
  t.mock.timers.tick(15000);await flush();await flush();
@@ -156,4 +156,50 @@ test('unresolved native watcher is bounded, and a late-created watcher is remove
   assert.deepEqual(removed,['late-after-timeout']);
   callback?.({latitude:35.8,longitude:-84.7,accuracy:5,time:1800000});await flush();
   assert.deepEqual(f.calls,['/api/driver/availability']);
+});
+
+test('native duty pulses renew presence without GPS and acknowledge only verified server heartbeats', async () => {
+  let callback: Function = () => {};const acks:string[]=[];const calls:string[]=[];
+  const f=fixture({watcher:{addWatcher:async(_options,cb)=>{callback=cb;return 'native-watch';},removeWatcher:async()=>{},acknowledgeDuty:async(id,sequence)=>{acks.push(id+':'+sequence);}},api:async<T>(path)=>{calls.push(path);return (path.endsWith('/availability')?{approved:true,available:true,online:true,activeOrderId:null}:{online:true}) as T;}});
+  await f.session.start();
+  for(const sequence of ['1','2','3','4','5','6','7']) {callback(undefined,undefined,{sequence});await flush();await flush();}
+  assert.equal(calls.filter(p=>p.endsWith('/heartbeat')).length,7);
+  assert.equal(calls.filter(p=>p.includes('/location')).length,0,'No GPS is fabricated to keep presence alive');
+  assert.equal(acks.length,7);await f.session.stop();callback(undefined,undefined,{sequence:'8'});await flush();assert.equal(acks.length,7);
+});
+
+test('native duty watchdog expiry stops sharing and never silently reconnects', async () => {
+  const f=fixture();await f.session.start();f.fail('DUTY_ACK_EXPIRED');await flush();await flush();
+  assert.equal(f.fatal.length,1);assert.deepEqual(f.removed,['watch-1']);f.emit();await flush();assert.deepEqual(f.calls,['/api/driver/availability']);
+});
+
+test('native acknowledgement is withheld for invalid server responses and revoked authorization', async () => {
+ for (const result of [{online:false},{online:'true'},null,401,403,409]) {
+  let callback:Function=()=>{};let acks=0;
+  const f=fixture({watcher:{addWatcher:async(_options,cb)=>{callback=cb;return 'watch';},removeWatcher:async()=>{},acknowledgeDuty:async()=>{acks++;}},api:async<T>(path)=>{
+   if(path.endsWith('/availability'))return {approved:true,available:true,online:true,activeOrderId:null} as T;
+   if(typeof result==='number')throw {status:result};return result as T;
+  }});
+  await f.session.start();callback(undefined,undefined,{sequence:'1'});await flush();await flush();
+  assert.equal(acks,0);if(typeof result==='number')assert.equal(f.fatal.length,1);await f.session.stop();
+ }
+});
+
+test('timed-out native pulse never acknowledges a late response or replays after stop', async t => {
+ t.mock.timers.enable({apis:['setTimeout']});const late=deferred<unknown>();let callback:Function=()=>{};let acks=0;
+ const f=fixture({watcher:{addWatcher:async(_options,cb)=>{callback=cb;return 'watch';},removeWatcher:async()=>{},acknowledgeDuty:async()=>{acks++;}},api:async<T>(path)=>path.endsWith('/availability')?{approved:true,available:true,online:true,activeOrderId:null} as T:await late.promise as T});
+ await f.session.start();callback(undefined,undefined,{sequence:'1'});await flush();t.mock.timers.tick(15000);await flush();
+ await f.session.stop();late.resolve({online:true});await flush();await flush();assert.equal(acks,0);
+});
+
+test('native heartbeat remains independent of a stalled GPS upload', async () => {
+ const delayed=deferred<unknown>();let callback:Function=()=>{};let acks=0;
+ const f=fixture({watcher:{addWatcher:async(_options,cb)=>{callback=cb;return 'watch';},removeWatcher:async()=>{},acknowledgeDuty:async()=>{acks++;}},api:async<T>(path)=>{
+  if(path.endsWith('/availability'))return {approved:true,available:true,online:true,activeOrderId:null} as T;
+  if(path.endsWith('/heartbeat'))return {online:true} as T;
+  return await delayed.promise as T;
+ }});
+ await f.session.start();callback({latitude:35.8,longitude:-84.7,accuracy:5,time:1800000});await flush();
+ callback(undefined,undefined,{sequence:'1'});await flush();await flush();assert.equal(acks,1);
+ await f.session.stop();delayed.resolve({accepted:true});await flush();
 });
