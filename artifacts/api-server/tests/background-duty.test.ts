@@ -132,3 +132,28 @@ test('timed-out background eligibility cannot start a watcher after a late respo
  late.resolve({approved:true,available:true,online:true,activeOrderId:null});await flush();
  assert.equal(watchers,0);await f.session.stop();
 });
+
+test('unresolved native permission is bounded and its late grant cannot start GPS', async t => {
+  t.mock.timers.enable({apis:['setTimeout']});
+  const permission=deferred<boolean>();let watchers=0;
+  const f=fixture({permission:()=>permission.promise,watcher:{addWatcher:async()=>{watchers++;return 'late'},removeWatcher:async()=>{}}});
+  const starting=f.session.start();let rejected=false;void starting.catch(()=>{rejected=true;});await flush();
+  t.mock.timers.tick(15000);await flush();assert.equal(rejected,true);
+  await assert.rejects(starting,/NATIVE_LOCATION_PERMISSION_TIMEOUT/);
+  permission.resolve(true);await flush();assert.equal(watchers,0);assert.deepEqual(f.calls,[]);
+  await f.session.stop();
+});
+
+test('unresolved native watcher is bounded, and a late-created watcher is removed without uploads', async t => {
+  t.mock.timers.enable({apis:['setTimeout']});
+  const watcher=deferred<string>();let callback:((fix?:DutyFix)=>void)|undefined;const removed:string[]=[];
+  const f=fixture({watcher:{addWatcher:(_options,cb)=>{callback=cb;return watcher.promise;},removeWatcher:async({id})=>{removed.push(id);}}});
+  const starting=f.session.start();let rejected=false;void starting.catch(()=>{rejected=true;});await flush();
+  t.mock.timers.tick(15000);await flush();assert.equal(rejected,true);
+  await assert.rejects(starting,/NATIVE_LOCATION_WATCHER_TIMEOUT/);
+  await f.session.stop();
+  watcher.resolve('late-after-timeout');await flush();await flush();
+  assert.deepEqual(removed,['late-after-timeout']);
+  callback?.({latitude:35.8,longitude:-84.7,accuracy:5,time:1800000});await flush();
+  assert.deepEqual(f.calls,['/api/driver/availability']);
+});

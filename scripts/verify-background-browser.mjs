@@ -11,7 +11,7 @@ const { build } = require('esbuild'), { chromium } = require(process.env.PLAYWRI
 const target = await mkdtemp(path.join(tmpdir(), 'rocoeats-background-ui-'));
 const modules = {
   '@clerk/react': `import {useSyncExternalStore} from 'react';const subscribe=cb=>{window.addEventListener('qa-push-account',cb);return()=>window.removeEventListener('qa-push-account',cb)};export const useAuth=()=>{const userId=useSyncExternalStore(subscribe,()=>window.pushUserId||'driver-fixture');return{isLoaded:true,isSignedIn:true,userId,getToken:async()=>null}};`,
-  '@capacitor/core': `export const Capacitor={isNativePlatform:()=>true,getPlatform:()=>location.search.includes('ios=true')?'ios':'android'};export const registerPlugin=()=>({addWatcher:async(options,callback)=>{window.emitFix=fix=>callback(fix);return 'watch-'+(++window.bgStarts)},removeWatcher:async({id})=>{window.bgRemovals.push(id)}});`,
+  '@capacitor/core': `export const Capacitor={isNativePlatform:()=>true,getPlatform:()=>location.search.includes('ios=true')?'ios':'android'};export const registerPlugin=()=>({addWatcher:async(options,callback)=>{window.emitFix=fix=>callback(fix);const id='watch-'+(++window.bgStarts);if(window.bgStartDelay)await new Promise(resolve=>{window.finishBgStart=resolve});return id},removeWatcher:async({id})=>{window.bgRemovals.push(id)}});`,
   '@capacitor/browser': `export const Browser={close:async()=>{},open:async()=>{}};`,
   '@capacitor/app': `const appListeners=new Set();window.setAppActive=isActive=>{for(const callback of appListeners)callback({isActive})};export const App={getInfo:async()=>{if(window.pushInfoDelay)await new Promise(resolve=>{window.finishPushInfo=resolve});return{id:location.search.includes('ios=true')?'com.rocoeats.driver':'com.rocoeats.driver.staging'}},addListener:async(name,callback)=>{if(name==='appStateChange')appListeners.add(callback);return{remove:async()=>{appListeners.delete(callback)}}}};`,
   '@capacitor/geolocation': `export const Geolocation={watchPosition:async(options,callback)=>{window.emitForegroundFix=fix=>callback(fix);return 'foreground-fixture'},clearWatch:async()=>{window.foregroundRemovals=(window.foregroundRemovals||0)+1}};`,
@@ -58,6 +58,23 @@ try {
   await duty.evaluate(()=>window.emitFix({latitude:35.8,longitude:-84.7,accuracy:5,time:Date.now(),simulated:false}));
   assert.equal(await duty.evaluate(()=>window.bgUploads),offUploads);await duty.close();
   console.log('PASS: foreground-only hidden lease expires with explicit recovery; consented background fixes sustain eligibility over two minutes; offline stops watcher/late uploads. Native/API simulated.');
+  for(const [flag,finish] of [['pushPermissionDelay','finishPushPermission'],['bgStartDelay','finishBgStart']]) {
+    const stalled=await browser.newPage();await stalled.clock.install();
+    await stalled.goto(`http://127.0.0.1:${server.address().port}`);
+    await stalled.getByRole('checkbox').check();await stalled.evaluate(flag=>{window[flag]=true;},flag);
+    await stalled.getByRole('button',{name:'Enable background location for this session',exact:true}).click();
+    await stalled.waitForFunction(finish=>typeof window[finish]==='function',finish);
+    await stalled.clock.fastForward(16000);
+    await stalled.getByRole('alert').filter({hasText:'Background location could not start.'}).waitFor({timeout:3000});
+    await stalled.evaluate(finish=>window[finish](),finish);
+    if(flag==='bgStartDelay') {
+      await stalled.waitForFunction(()=>window.bgRemovals.includes('watch-1'));
+      await stalled.evaluate(()=>window.emitFix({latitude:35.8,longitude:-84.7,accuracy:5,time:Date.now(),simulated:false}));
+    } else assert.equal(await stalled.evaluate(()=>window.bgStarts),0);
+    assert.equal(await stalled.evaluate(()=>window.bgUploads),0);
+    await stalled.close();
+  }
+  console.log('PASS: stalled native background permission/watcher setup reaches actionable recovery; late grants cannot start GPS and late watchers are removed. Native/API simulated.');
   const gps=await browser.newPage();
   await gps.addInitScript(()=>{window.dutyOrderId='order-current';});await gps.clock.install();
   await gps.goto(`http://127.0.0.1:${server.address().port}`);

@@ -1,3 +1,15 @@
+# November 22 — background native initialization recovery
+
+Confirmed offline: unresolved native permission/watcher setup could hang indefinitely;
+reproduced two failing regressions then bounded both steps, late-grant/watcher fencing
+and cleanup.12 background units + actual-component browser failure/recovery suite,
+UI types/build PASS. Not the cause of Go-online-only213 observation.47eb9f3 guidance
+commit pushed, exact-SHA CI pending at last read. Next protected Driver candidate +
+physical explicit-consent foreground-service test; no Customer208/Render rebuild.
+Native startForeground error propagation remains reviewable; no Samsung occurrence
+established. Push providers/physical iOS/financial provider evidence still external.
+No hosted changes, real provider calls, financial operations or activation performed.
+
 # November 22 — Driver213 foreground-only trial clarified
 
 Owner confirms ONLY Go online was used; background consent/service was not enabled.

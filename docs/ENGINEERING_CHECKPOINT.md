@@ -1,3 +1,28 @@
+# November 22 — bounded native background initialization
+
+Guidance/lifecycle regression commit47eb9f3f720ef1a8fa66abc0fc3d2306a9cca47c pushed;
+its THREE CI runs44980137736/44980247782/44980247792 were still running when read.
+Do not mark them passed until exact conclusions are available.
+
+A separate confirmed software defect was reproduced: permission() and native
+addWatcher() could remain unresolved forever before the existing API deadlines.
+Two new units FAILED before correction. Background controller now bounds each native
+step at15 seconds using existing nativeStep, ends the attempt on initialization
+failure, fences late permission grants and removes any late-created watcher. No
+silent retries, restored consent or privileged requests after stop/timeout. This was
+NOT the cause of the owner's Go-online-only213 trial; no device claim is made.
+Twelve background-duty units PASS (plus prior duty-intent/presence tests); actual
+React/browser stalled-permission and stalled-watcher recovery/late cleanup PASS,
+as do existing foreground/background GPS and Android+iOS push controller regressions.
+UI typecheck and production build PASS; existing bundle-size warning remains.
+
+Next: push/verify exact-SHA CI, build protected Driver staging candidate from verified
+functional HEAD, verify source/version/hash/manifest/certificate before offering it.
+Native dependency promotion failures remain a source-level review item; no permission
+expansion or dependency changes made. No backend deploy/migration/settings required.
+Owner physical explicit-consent/ongoing-notification/background/timestamps/offline
+acceptance remains pending; Customer208 acceptance and all closed gates preserved.
+
 # November 22 — recovered checkpoint; Driver213 background path clarified
 
 Recovered clean primary HEAD 6f91c6b5b3125139cc14b0a16dd16fcca37ba801;

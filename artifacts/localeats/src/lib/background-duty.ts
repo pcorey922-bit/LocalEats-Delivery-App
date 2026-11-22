@@ -92,15 +92,24 @@ export function backgroundDutySession(deps: Dependencies) {
   return {
     start() {
       starting ??= (async () => {
-        if (!await deps.permission()) throw Error('Background location requires device permission and, on Android, a visible notification.');
+        if (!await nativeStep('NATIVE_LOCATION_PERMISSION_TIMEOUT', deps.permission, abort.signal)) throw Error('Background location requires device permission and, on Android, a visible notification.');
         if (stopped) return;
         deps.status('Verifying current on-duty access before starting background location…');
         const access = await request<unknown>('/api/driver/availability', { signal: abort.signal });
         if (stopped) return;
         if (!eligible(access)) throw Error('Current driver approval and online availability are required. Reconnect explicitly.');
-        id = await deps.watcher.addWatcher({ backgroundTitle: 'RoCoEats Driver · On duty', backgroundMessage: 'Sharing your driver location. Go offline in RoCoEats to stop.', requestPermissions: true, stale: false, distanceFilter: 0 }, (fix, error) => { void position(fix, error); });
-        if (stopped) await remove();
-      })().catch(error => { if (!stopped) throw error; });
+        await nativeStep('NATIVE_LOCATION_WATCHER_TIMEOUT', async () => {
+          id = await deps.watcher.addWatcher({ backgroundTitle: 'RoCoEats Driver · On duty', backgroundMessage: 'Sharing your driver location. Go offline in RoCoEats to stop.', requestPermissions: true, stale: false, distanceFilter: 0 }, (fix, error) => { void position(fix, error); });
+          // Native calls cannot necessarily be canceled. A watcher returned after
+          // timeout/stop must be removed even though the caller has already left.
+          if (stopped) await remove().catch(() => deps.status('Location service could not stop. Disable location permission in device settings and reopen RoCoEats.'));
+        }, abort.signal);
+      })().catch(error => {
+        if (stopped) return;
+        stopped = true;
+        abort.abort();
+        throw error;
+      });
       return starting;
     },
     stop,
