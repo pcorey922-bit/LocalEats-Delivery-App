@@ -1,3 +1,21 @@
+# November 22 — Driver213 foreground-only trial clarified
+
+Owner confirms ONLY Go online was used; background consent/service was not enabled.
+Physical background GPS remains UNVERIFIED, not a demonstrated service failure.
+90-second heartbeat expiry + reconnect reproduced in local component/browser test;
+consented simulated native callbacks keep driver eligible beyond two minutes and
+explicit offline stops watcher/late uploads. Added foreground-only guidance and
+expired-connection explanation, preserving explicit consent/authorization/lease.
+13 targeted units, changed-component browser regressions, UI types/build PASS.
+Await exact-SHA CI and signed Driver candidate; no Customer208 rebuild/retest needed.
+Owner physical next: enable consent/service while app visible, verify ongoing Android
+notification/upload, background two minutes, check online/freshness, offline stops.
+All-time permission intentionally absent for foreground-service architecture; do not
+add it blindly. Native dependency startForeground error propagation remains a concrete
+source-level review item; no evidence it caused the unenabled213 trial. Push credentials,
+physical GPS/iOS and real-provider financial evidence remain external acceptance gaps.
+No hosted changes/deploy/activation/provider/financial operations authorized or made.
+
 # NEXT PRIORITY AFTER RESET — Driver213 physical background GPS NOT PASSED
 
 Owner Samsung S22 Ultra: precise location ON; Android offers only While using /

@@ -86,9 +86,20 @@ export function DriverDutySession() {
         available={active}
         activeOrderId={state.data?.activeOrderId ?? null}
       />}
-      {import.meta.env.VITE_APP_AUDIENCE === 'driver' && Capacitor.isNativePlatform() && <section aria-label="Background location permission">
-        {!background ? <><label className="roco-field"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)}/>I want to share my driver location with authorized dispatch and active order participants while this app is in the background during this on-duty session.</label><button className="roco-button" disabled={!consent} onClick={() => { setError(''); setBackground(true); }}>Enable background location for this session</button></> : <button className="roco-button" onClick={() => { setBackground(false); setConsent(false); }}>Stop background sharing; use foreground only</button>}
-      </section>}
+      {import.meta.env.VITE_APP_AUDIENCE === 'driver' && Capacitor.isNativePlatform() && (
+        <section aria-label="Background location permission">
+          {!background ? <>
+            <p><strong>Foreground-only location sharing</strong></p>
+            <p>Go online does not enable background sharing. Keep RoCoEats visible, or enable background location below before switching apps or locking your screen. Without updates, dispatch marks you offline after 90 seconds and requires reconnecting.</p>
+            <p>Start sharing while this app is open. On Android, allow notifications and wait for the RoCoEats on-duty notification before leaving the app. “Allow only while using the app” supports this foreground service; “Allow all the time” is not required.</p>
+            <label className="roco-field">
+              <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)}/>
+              I want to share my driver location with authorized dispatch and active order participants while this app is in the background during this on-duty session.
+            </label>
+            <button className="roco-button" disabled={!consent} onClick={() => { setError(''); setBackground(true); }}>Enable background location for this session</button>
+          </> : <button className="roco-button" onClick={() => { setBackground(false); setConsent(false); }}>Stop background sharing; use foreground only</button>}
+        </section>
+      )}
       {error && <p role="alert">{error}</p>}
     </aside>
   );

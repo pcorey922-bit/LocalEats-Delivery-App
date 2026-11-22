@@ -13,8 +13,8 @@ const modules = {
   '@clerk/react': `import {useSyncExternalStore} from 'react';const subscribe=cb=>{window.addEventListener('qa-push-account',cb);return()=>window.removeEventListener('qa-push-account',cb)};export const useAuth=()=>{const userId=useSyncExternalStore(subscribe,()=>window.pushUserId||'driver-fixture');return{isLoaded:true,isSignedIn:true,userId,getToken:async()=>null}};`,
   '@capacitor/core': `export const Capacitor={isNativePlatform:()=>true,getPlatform:()=>location.search.includes('ios=true')?'ios':'android'};export const registerPlugin=()=>({addWatcher:async(options,callback)=>{window.emitFix=fix=>callback(fix);return 'watch-'+(++window.bgStarts)},removeWatcher:async({id})=>{window.bgRemovals.push(id)}});`,
   '@capacitor/browser': `export const Browser={close:async()=>{},open:async()=>{}};`,
-  '@capacitor/app': `export const App={getInfo:async()=>{if(window.pushInfoDelay)await new Promise(resolve=>{window.finishPushInfo=resolve});return{id:location.search.includes('ios=true')?'com.rocoeats.driver':'com.rocoeats.driver.staging'}},addListener:async()=>({remove:async()=>{}})};`,
-  '@capacitor/geolocation': `export const Geolocation={watchPosition:async(options,callback)=>{window.emitForegroundFix=fix=>callback(fix);return 'foreground-fixture'},clearWatch:async()=>{}};`,
+  '@capacitor/app': `const appListeners=new Set();window.setAppActive=isActive=>{for(const callback of appListeners)callback({isActive})};export const App={getInfo:async()=>{if(window.pushInfoDelay)await new Promise(resolve=>{window.finishPushInfo=resolve});return{id:location.search.includes('ios=true')?'com.rocoeats.driver':'com.rocoeats.driver.staging'}},addListener:async(name,callback)=>{if(name==='appStateChange')appListeners.add(callback);return{remove:async()=>{appListeners.delete(callback)}}}};`,
+  '@capacitor/geolocation': `export const Geolocation={watchPosition:async(options,callback)=>{window.emitForegroundFix=fix=>callback(fix);return 'foreground-fixture'},clearWatch:async()=>{window.foregroundRemovals=(window.foregroundRemovals||0)+1}};`,
   '@capacitor/push-notifications': `const listeners={};export const PushNotifications={createChannel:async channel=>{if(window.pushChannelDelay)await new Promise(resolve=>{window.finishPushChannel=resolve});if(!window.bgPermission)throw Error('Channel before consent');window.pushChannel=channel;},checkPermissions:async()=>{if(window.pushPermissionReadDelay)await new Promise(resolve=>{window.finishPushPermissionRead=resolve});return{receive:window.bgPermission?'granted':'denied'}},requestPermissions:async()=>{window.pushPermissionRequests=(window.pushPermissionRequests||0)+1;if(window.pushPermissionDelay)await new Promise(resolve=>{window.finishPushPermission=resolve});return{receive:window.bgPermission?'granted':'denied'}},addListener:async(name,callback)=>{if(name==='registration'&&window.pushListenerDelay)await new Promise(resolve=>{window.finishPushListener=resolve});listeners[name]=callback;window.pushListenersFinished=(window.pushListenersFinished||0)+1;return{remove:async()=>{if(listeners[name]===callback)delete listeners[name]}}},register:async()=>{window.pushRegisterCalls=(window.pushRegisterCalls||0)+1;listeners.registration({value:location.search.includes('ios=true')?'a'.repeat(64):'mock_push_token_not_real_123456'})},unregister:async()=>{window.pushUnregisterCalls=(window.pushUnregisterCalls||0)+1;if(window.pushNativeRemoveDelay)await new Promise(resolve=>{window.finishPushNativeRemove=resolve})}};`,
 };
 await build({ entryPoints: [path.join(root, 'artifacts/localeats/tests/background-browser.tsx')], outfile: path.join(target, 'app.js'), bundle: true, format: 'esm', platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"development"', 'import.meta.env.VITE_APP_AUDIENCE': '"driver"', 'import.meta.env.VITE_API_ORIGIN': 'undefined' }, plugins: [{ name: 'native-fixture', setup(b) { b.onResolve({ filter: /^(@capacitor\/(core|app|browser|geolocation|push-notifications)|@clerk\/react)$/ }, args => ({ path: args.path, namespace: 'qa-native' })); b.onLoad({ filter: /.*/, namespace: 'qa-native' }, args => ({ contents: modules[args.path], loader: 'js', resolveDir: path.join(root,'artifacts/localeats') })); } }] });
@@ -25,6 +25,39 @@ let browser;
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 try {
   browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
+  // Reproduce the observed Go-online-only path without real GPS or hosted writes.
+  const duty=await browser.newPage();await duty.clock.install();
+  await duty.goto(`http://127.0.0.1:${server.address().port}`);
+  await duty.getByText('Foreground-only location sharing',{exact:true}).waitFor({timeout:3000});
+  await duty.evaluate(()=>{window.dutyLease=true;window.dutyLastHeartbeat=Date.now();window.setAppActive(false);});
+  await duty.waitForFunction(()=>window.foregroundRemovals>0);
+  const beforeHidden=await duty.evaluate(()=>window.dutyHeartbeats);
+  await duty.clock.fastForward(121000);await duty.evaluate(()=>window.refreshDuty());
+  assert.equal(await duty.evaluate(()=>window.dutyHeartbeats),beforeHidden,'Foreground-only heartbeat stops when hidden');
+  assert.equal(await duty.evaluate(()=>window.bgStarts),0,'Go online must not imply background consent');
+  await duty.evaluate(()=>window.setAppActive(true));
+  await duty.getByText('Your dispatch connection expired. No new offers will be assigned until you reconnect on this device.',{exact:true}).waitFor({timeout:3000});
+  await duty.getByRole('button',{name:'Reconnect on this device',exact:true}).click();
+  await duty.getByRole('button',{name:'Go offline',exact:true}).waitFor();
+  const enableDuty=duty.getByRole('button',{name:'Enable background location for this session',exact:true});
+  assert.equal(await enableDuty.isDisabled(),true,'Reconnect must not silently restore background consent');
+  await duty.getByRole('checkbox').check();await enableDuty.click();
+  await duty.waitForFunction(()=>window.bgStarts===1);await duty.evaluate(()=>window.setAppActive(false));
+  for(let i=0;i<4;i++) {
+    await duty.clock.fastForward(31000);
+    await duty.evaluate(()=>window.emitFix({latitude:35.8,longitude:-84.7,accuracy:5,time:Date.now(),simulated:false}));
+    await duty.getByRole('status').filter({hasText:'Background location uploaded'}).waitFor();
+    await duty.waitForFunction(()=>Date.now()-window.dutyLastHeartbeat<1000);
+  }
+  await duty.evaluate(()=>window.refreshDuty());
+  assert.equal(await duty.getByRole('button',{name:'Reconnect on this device',exact:true}).count(),0);
+  assert.equal(await duty.evaluate(()=>window.bgUploads),4);
+  await duty.evaluate(()=>window.setAppActive(true));await duty.getByRole('button',{name:'Go offline',exact:true}).click();
+  await duty.waitForFunction(()=>window.bgRemovals.includes('watch-1'));
+  const offUploads=await duty.evaluate(()=>window.bgUploads);
+  await duty.evaluate(()=>window.emitFix({latitude:35.8,longitude:-84.7,accuracy:5,time:Date.now(),simulated:false}));
+  assert.equal(await duty.evaluate(()=>window.bgUploads),offUploads);await duty.close();
+  console.log('PASS: foreground-only hidden lease expires with explicit recovery; consented background fixes sustain eligibility over two minutes; offline stops watcher/late uploads. Native/API simulated.');
   const gps=await browser.newPage();
   await gps.addInitScript(()=>{window.dutyOrderId='order-current';});await gps.clock.install();
   await gps.goto(`http://127.0.0.1:${server.address().port}`);

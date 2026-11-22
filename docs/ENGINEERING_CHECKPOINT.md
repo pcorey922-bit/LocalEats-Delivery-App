@@ -1,3 +1,66 @@
+# November 22 — recovered checkpoint; Driver213 background path clarified
+
+Recovered clean primary HEAD 6f91c6b5b3125139cc14b0a16dd16fcca37ba801;
+final pre-reset checkpoint WAS pushed. Exact-SHA CI all THREE SUCCESS:
+Validate PR44889484533, push44889481092, Native44889484559. Recovery worktree,
+stashes, signed artifacts, migrations and financial data preserved.
+
+NEW OWNER EVIDENCE: Driver213 test used ONLY Go online. The owner did NOT enable
+background-sharing consent/service. Therefore this trial did not exercise native
+background GPS and does not prove a background-service defect. Physical acceptance
+remains NOT PASSED. The reported permission choices/precise setting are preserved.
+
+SOURCE + LOCAL REPRODUCTION: Go online uses foreground-only GPS/heartbeat. Native
+app-state hidden stops these; database heartbeat freshness closes at 90 seconds.
+DriverAvailability selects Reconnect whenever availability remains true but online
+freshness or device-local intent is absent, and offers Go offline everywhere.
+No automatic lease resurrection or persisted tracking consent is permitted. The
+observed two-minute foreground-only test is consistent with this designed expiry;
+actual hosted heartbeat timestamps/process lifecycle were not captured, so do not
+claim those were independently measured on the Samsung.
+
+Small correction: explicit foreground-only/90-second/background-consent instructions
+in DriverDutySession; start while visible, await Android ongoing notification;
+DriverAvailability explains expired dispatch connection and no offers until reconnect.
+No permission/session/role/lease changes. All-time permission is intentionally absent:
+Driver uses a consented location-type foreground service, target SDK36, fine/coarse +
+FOREGROUND_SERVICE_LOCATION/POST_NOTIFICATIONS, app-private service. Platform guidance:
+https://developer.android.com/develop/sensors-and-location/location/permissions
+https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start
+Starting while visible matters; this is not permission to silently start from background.
+
+Validation: new actual-component Chromium regression reproduces Go-online-only hide
+for121 seconds, no native background watcher/heartbeat, explicit expired recovery;
+reconnect leaves background consent OFF. Explicit consent + simulated native fixes
+maintain eligible state beyond two minutes; offline removes watcher and fences late
+callbacks. Fixture broadcasts native app-state to ALL subscribers and models server
+90-second lease. These are simulated native/API results, not Android/hosted evidence.
+Existing background/foreground GPS, Android+iOS push recovery/opt-out browser regressions
+PASS; 13 focused background-duty/duty-intent/server-presence units PASS; UI typecheck
+and production build PASS (existing large-chunk warning). Exact final CI and signed
+candidate details must be read before reporting them passed/available.
+
+OWNER NEXT (candidate after signing): update Driver only without uninstalling; keep
+Customer208 accepted. Go online; check background consent; tap Enable background
+location for this session WHILE VISIBLE; allow notifications/location While using +
+precise. Wait for on-duty notification and an upload status. Background/lock for two
+minutes, resume: expected online controls and fresh successful upload, no reconnect.
+Then Go offline: notification/service should stop; no further location uploads.
+If no notification or reconnect occurs, report those exact observations and status;
+do not change Android permissions blindly. No order/payment/push-provider send needed.
+Real backend timestamp progression while backgrounded still requires owner-authorized
+inspection/device evidence; no actual location submitted by tools.
+
+NEXT INDEPENDENT TASK: finish exact-SHA CI/artifact verification and native GPS service
+failure reporting/lifecycle review if concrete gaps are established. Dependency native
+service currently catches startForeground failures internally; whether this occurs on
+Samsung is UNKNOWN (it was not enabled in reported trial). Do not infer physical
+success from watcher creation. Real push providers remain unconfigured; signed physical
+iOS needs owner-controlled Apple provisioning; financial provider evidence still needs
+separate authorization. Do not repeat Customer208/authentication/23 staging checks.
+All hosted settings, data, Neon recovery, completed $19.19 TEST order, security gates,
+signing secrets preserved. No deploy/provider calls/financial operation/PR merge.
+
 # USAGE-RESET CHECKPOINT — November 21: Driver213 physical background acceptance NOT PASSED
 
 NEW OWNER-OBSERVED Samsung Galaxy S22 Ultra / signed DRIVER213:

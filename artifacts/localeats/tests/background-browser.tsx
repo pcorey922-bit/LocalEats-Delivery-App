@@ -3,11 +3,13 @@ import { registerPush } from '../src/lib/mobile';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { DriverAvailability } from '../src/pages/delivery-tracking';
 import { DriverDutySession } from '../src/pages/driver-duty-session';
 import { BackgroundDutyRecovery } from '../src/pages/background-duty-location';
 import { dutyIntent } from '../src/lib/duty-intent';
 import { PushPreferences } from '../src/pages/push-preferences';
 const qa = window as unknown as {
+  dutyLease?: boolean; dutyLastHeartbeat?: number; refreshDuty: () => Promise<void>;
   bgPermission: boolean; bgStarts: number; bgRemovals: string[]; bgUploads: number;
   bgDenied: boolean; emitFix?: (fix: unknown) => void; offline: () => void;
   pushPostAborted?: boolean; pushPosts?: number;
@@ -43,7 +45,10 @@ window.fetch = async (input, options) => {
   }
   if (url.startsWith('/api/notification-devices/')) { if(qa.pushStatusDelay)await new Promise<void>(resolve=>{qa.finishPushStatus=resolve;}); return qa.pushRegistered ? Response.json({ registered: true, platform: location.search.includes('ios=true')?'ios':'android', appId: location.search.includes('ios=true')?'com.rocoeats.driver':'com.rocoeats.driver.staging' }) : Response.json({ error: 'Not registered' }, { status: 404 }); }
   if (url === '/api/profiles/me') return Response.json({ id: 'driver-fixture', role: 'driver', displayName: 'Fixture Driver', createdAt: '2026-11-18T00:00:00.000Z' });
-  if (url === '/api/driver/availability') return Response.json({ approved: true, available: true, online: true, activeOrderId: qa.dutyOrderId ?? null });
+  if (url === '/api/driver/availability') {
+    if (options?.method === 'PUT') qa.dutyLastHeartbeat = Date.now();
+    return Response.json({ approved: true, available: true, online: !qa.dutyLease || Date.now() - (qa.dutyLastHeartbeat ?? 0) < 90000, activeOrderId: qa.dutyOrderId ?? null });
+  }
   if (url === '/api/driver/location') {
     qa.bgUploads++;
     if(qa.dutyPostDelay) { options?.signal?.addEventListener('abort',()=>{qa.dutyPostAborted=true;},{once:true}); await new Promise<void>(resolve=>{qa.finishDutyPost=resolve;}); }
@@ -53,8 +58,12 @@ window.fetch = async (input, options) => {
   if (url === '/api/driver/heartbeat') {
     qa.dutyHeartbeats=(qa.dutyHeartbeats??0)+1;
     if(qa.dutyHeartbeatDelay) { options?.signal?.addEventListener('abort',()=>{qa.dutyHeartbeatAborted=true;},{once:true}); await new Promise<void>(resolve=>{qa.finishDutyHeartbeat=resolve;}); }
+    if (qa.dutyLease && qa.dutyLastHeartbeat !== undefined && Date.now() - qa.dutyLastHeartbeat >= 90000) return Response.json({error:'Reconnect explicitly'}, {status:409});
+    qa.dutyLastHeartbeat=Date.now();
     return Response.json({online:true});
   }
   return Response.json({ online: true });
 };
-createRoot(document.getElementById('root')!).render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{location.search.includes('push=true') ? <PushPreferences/> : <><BackgroundDutyRecovery/><DriverDutySession/></>}</QueryClientProvider>);
+const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+qa.refreshDuty=()=>client.invalidateQueries({queryKey:['driver-availability']});
+createRoot(document.getElementById('root')!).render(<QueryClientProvider client={client}>{location.search.includes('push=true') ? <PushPreferences/> : <><BackgroundDutyRecovery/><DriverAvailability/><DriverDutySession/></>}</QueryClientProvider>);

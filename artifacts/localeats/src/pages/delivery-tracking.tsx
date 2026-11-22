@@ -59,6 +59,9 @@ export function DriverAvailability() {
           ? "Online — ready for offers"
           : "Offline — new deliveries will not be assigned"}
       </p>
+      {state.data?.available && !state.data?.online && (
+        <p role="status">Your dispatch connection expired. No new offers will be assigned until you reconnect on this device.</p>
+      )}
       <p>
         {state.data?.activeOrderId
           ? "You have an active delivery. Complete or release it before taking another."
