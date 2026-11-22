@@ -1,3 +1,47 @@
+# November 22 — verified Driver222; physical activation still unresolved
+
+Functional c2e69cbbc6c2f32da8d9118ba2ebee2081d09165 pushed on primary branch.
+All THREE exact-SHA CI SUCCESS: Validate push44982517540, PR44982521821,
+Native PR44982521815 (both customer/driver Android+iOS). Signed Driver222 run44982533117
+SUCCESS. GitHub watcher temporarily returned503; direct run stayed in_progress then
+completed SUCCESS, so no build was rerun or workflow failure inferred from watcher.
+Artifact14738790940 RoCoEats-Driver-Android-Staging-Test-APK verified ZIP SHA256
+fbe02fa2c4d807beb6d9e6c03458aea3355850f907629842d25ecfc36ed28e4f,
+packaged source/hash, com.rocoeats.driver.staging/version222, private location FGS,
+permission boundaries/no All-time location, unchanged existing v2 signing certificate.
+Packaged JS specifically verified to contain Location session, setup link, safe gate
+codes and notification-denial recovery. No backend deployment/migration needed.
+
+Download https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44982533117
+Artifacts -> RoCoEats-Driver-Android-Staging-Test-APK -> extract -> APK -> Update.
+Do not uninstall or rebuild accepted Customer208. NEXT PHONE CHECK is NARROW:
+1. Keep Driver open; Reconnect if shown (already physically verified to work in219).
+2. Under Your availability read Location session and tap Set up background sharing.
+3. If checkbox/button absent, report exact code or field absence, STOP; do not loop
+   sign-in/reconnect or start background/order/payment trials.
+4. Only if visible, explicitly consent/Enable. Android notification permission can
+   be allowed without Firebase/provider enrollment; if denied use app Notifications
+   settings then reconnect/re-enable. All-time location is not needed by this design.
+Actual physical background notification, GPS timestamp progression and offline stop
+remain UNVERIFIED. Do not mark Samsung activation fixed from mocked READY_NATIVE.
+
+Confirmed software fixes: bounded consistent strict availability reads, invalid-field
+vs denied-approval distinction, explicit local/session gate feedback and activation
+anchor, normal offline409 offers message, precise OS permission denial and permission
+cache refresh (no push registration).16 units, actual-component native/API browser
+regressions, real LOCAL API/PGlite Driver role/session/GPS/offline integration, UI
+types/build PASS. Compile/mocks are not real native GPS/Clerk/provider acceptance.
+Root of219 missing controls AFTER successful reconnect still NOT reproduced; owner
+must provide safe gate code from222 to identify actual global controller state.219
+artifact verified to include component/controls and no remote server URL; no unsupported
+claim that permission denial, account authorization or service startup caused absence.
+
+No hosted configuration/deploy/data/financial/provider changes. All closed ordering,
+Stripe TEST/live/payout/retention/municipal safeguards, signing and recovery preserved.
+Next independent work follows concrete device/provider evidence; do not invent unrelated
+features or repeat completed audits. Final checkpoint-only SHA needs separate CI read;
+functional/source222 CI above already all SUCCESS.
+
 # November 22 — Driver219 reconnect succeeds; missing activation NOT resolved physically
 
 Recovered clean primary c4fdaf80ddda29e868ff70bb86d1f849c85b16de, remote matched;
