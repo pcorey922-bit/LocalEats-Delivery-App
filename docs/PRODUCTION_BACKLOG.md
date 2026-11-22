@@ -1,3 +1,21 @@
+# November 22 — Driver225 controlled Battery comparison required
+
+Owner facts: Battery OPTIMIZED, Power saving OFF, no Sleeping/Deep sleeping listing;
+Wi-Fi AND mobile enabled with Wi-Fi ACTIVE; NO handoff evidence. Optimization is a
+plausible contributor, not a proven root cause. Doze/Low Power Standby can restrict
+foreground-service networking/wake locks; app UI alone does not establish exemptions.
+Native pulse still needs JS for Clerk/auth/initiation/response ack; CapacitorHttp is
+ALREADY native-enabled. Pure native HTTP alone would not solve paused token refresh
+or OS networking restriction. Preserve90s and fail-closed behavior.
+Next owner-only comparison: SAME225 APK, only app Battery -> Unrestricted, same active
+Wi-Fi/mobile/permissions, explicit duty+background consent, verify both receipts,
+Chrome Dispatch before Driver resume after3min lock, record times/codes, offline and
+restore Optimized. One pass supports policy contribution; does not establish full
+acceptance. No speculative replacement APK/runtime rewrite yet. If failure persists,
+implement native stage/power/HTTP-result diagnostics before selecting transport/auth
+correction. Exact phone procedure and privacy boundaries in engineering checkpoint.
+No hosted/deploy/data/provider/financial changes; physical locked GPS remains BLOCKED.
+
 # November 22 — Driver225 locked-screen acceptance FAILED
 
 Owner unlocked-background worked; lock stopped last visible GPS11:50:48/heartbeat

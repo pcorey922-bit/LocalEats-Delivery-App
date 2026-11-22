@@ -1,3 +1,67 @@
+# November 22 — Driver225 Samsung power observations; controlled same-APK comparison
+
+NEW OWNER READ-ONLY FACTS: Driver Staging Battery=OPTIMIZED; Samsung Power saving=OFF;
+NOT in Sleeping or Deep sleeping apps. Both Wi-Fi AND mobile data were enabled,
+Wi-Fi active/prioritized during failed lock test. No intentional network switch and
+NO evidence of a Wi-Fi/mobile handoff. Do not describe mobile data as disabled or
+attribute the gap to an unobserved handoff. No device settings changed for inspection.
+Primary remote18d52d74e854625beb10e22727d1290e5788e1b9 recovered clean.
+
+INTERPRETATION: Optimized is a plausible contributor, NOT proof Doze caused failure.
+Power saving off and absence from Samsung sleep lists do not rule out Doze/Low Power
+Standby. Android documents that standby may disable network/ignore wake locks even
+for foreground services. A working ongoing notification is not an exemption check.
+https://developer.android.com/training/monitoring-device-state/doze-standby
+https://developer.android.com/reference/android/os/PowerManager#isLowPowerStandbyEnabled()
+Unrestricted app Battery UI is not proof of every platform/vendor exemption.
+
+SOURCE CONFIRMED: native timer/watchdog schedule pulses, but JS must receive pulse,
+obtain/refresh Clerk token, initiate request and relay response acknowledgement.
+CapacitorHttp is already enabled (native HTTP worker) and legacy bridge already true.
+Simply enabling those again or claiming all HTTP is currently pure browser fetch is
+incorrect. Native network execution alone does not remove JS initiation/auth renewal.
+Current records cannot distinguish no native request from native HTTP completion whose
+JS response processing was deferred. DUTY_ACK_EXPIRED correctly rejects missing/late
+native acks, but cannot identify Doze vs JS vs network/401 without additional evidence.
+Historical exact server heartbeat still unverified;11:52:19 expiry remains conditional
+on11:50:49 actually being final server-processed HB, not merely visible local receipt.
+
+NEXT NECESSARY OWNER COMPARISON — SAME installed signed Driver225, no APK rebuild:
+1. Go offline and confirm ongoing service notification stops. Settings -> Apps ->
+   RoCoEats Driver Staging -> Battery -> Unrestricted. This changes ONLY that app's
+   device power setting; no Render/account/financial/security setting changes.
+2. Keep Wi-Fi+mobile data enabled as before; stay on same Wi-Fi, same place/permissions,
+   Power saving OFF; do not deliberately toggle networks, force-stop or sign out.
+3. Reopen Driver225; Go online/Reconnect; explicitly enable background consent/service.
+   Wait until BOTH heartbeat and accepted GPS receipt times advance; note the times.
+4. Home -> separate Chrome Administrator Dispatch; verify online/fresh GPS. Lock phone
+   THREE minutes (exceeds75s native and90s server windows). Unlock into Chrome FIRST;
+   inspect status/GPS time BEFORE reopening Driver. Then capture Driver receipt times
+   and any recovery code. A notification/heartbeat alone is NOT physical GPS success.
+5. Go offline; confirm notification and sharing stop. Restore Battery -> Optimized
+   after recording results; do not leave background test running. No orders/payments.
+A successful single comparison supports policy contribution but does NOT establish
+root cause or production/physical acceptance across conditions. Failure cannot by
+itself distinguish JS suspension, Low Power Standby, HTTP failure or token handling.
+Do not perform another repeated broad auth/order/device test.
+
+ARCHITECTURE EVALUATION: production locked-screen critical scheduling, GPS/network IO,
+server ack deadlines and stop/cleanup should be owned natively. Any native auth path
+must support secure refresh/session revocation compatible with existing Clerk handoff;
+never cache expired JWTs, weaken approval, extend90s or copy web credentials. Native
+transport still needs valid OS network/power eligibility. No speculative auth rewrite
+or APK is justified before this isolated comparison. If it fails, next software task
+is narrow native stage/power evidence captured at screen-off/expiry: monotonic pulse /
+bridge/HTTP-start/result statuses, PowerManager deviceIdle/powerSave/ignoreOptimizations /
+LowPowerStandby flags and sanitized network transport/validation. No tokens/URLs/bodies /
+coordinates/SSIDs in diagnostic record. Then select the minimum evidenced correction.
+
+No runtime code changed, new regression claims made, redundant suites rerun or APK
+produced in this evidence-only turn. Existing tests/CI evidence preserved. Docs diff
+checked; docs CI separate. All hosted config/data/deploy/signing,90s expiry, fail-closed
+watchdog, closed ordering/live/payout/retention/municipal gates and Stripe TEST preserved.
+Physical Driver225 screen-lock GPS acceptance remains BLOCKED. No provider/financial ops.
+
 # November 22 — Driver225 SCREEN-LOCK physical acceptance BLOCKED
 
 NEW OWNER EVIDENCE (Samsung Galaxy S22 Ultra, signed225):11:48PM on-duty/background
