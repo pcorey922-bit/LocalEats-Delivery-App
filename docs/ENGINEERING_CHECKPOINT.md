@@ -1,3 +1,65 @@
+# November 22 — Driver230 native diagnostic APK verified; screen-lock fix NOT claimed
+
+FUNCTIONAL SOURCE c816985e240faaea3df92aab0e05d40cb442d3dc on primary branch,
+PR1 unmerged. ALL THREE exact-SHA CI SUCCESS: Validate push44990967370,
+Validate PR44990970591, Native PR44990970586 (both customer/driver Android+iOS).
+Signed Driver230 diagnostic run44990980560 SUCCESS. Artifact14741932269:
+RoCoEats-Driver-Android-Staging-Test-APK. ZIP SHA256
+cfdccce5689b21292974dad57235281c9c4da2479930e13d7a69ec01c914b8cf.
+Verified source/APK digest/com.rocoeats.driver.staging/version230, unchanged protected
+v2 certificate f22e58f4da4e5d64f9ac5d4f0fc8abfe2595e395511552f7fb385205c7d18296,
+private location-only FGS + permission boundaries/no All-time location. Actual DEX
+verified DutyTrace/DutyPowerMonitor, native HTTP wrapper, expiry power/native result /
+JS body markers + getter; packaged JS verified Read/Copy diagnostic viewer.
+Download https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44990980560
+Artifacts -> RoCoEats-Driver-Android-Staging-Test-APK -> extract -> APK -> Update.
+No uninstall, backend/Render deployment, migration or hosted setting change required.
+
+This is EXPLICITLY AN INSTRUMENTED DIAGNOSTIC BUILD, not a speculative repair or
+physical screen-lock acceptance.225 failed Optimized AND Unrestricted; exact native
+request/JS/power interruption remains unknown. Initial00:13:36/37 receipts are not
+proven final server timestamps. No unobserved network handoff or Doze cause asserted.
+Implemented native bounded RAM pulse/GPS/screen/power/HTTP-start/result/timeout traces,
+separate JS token/fetch/body stages, native stop reason/request span sequences,
+late native outcomes after watchdog expiry and old-session/account clear/fences.
+Strict report redaction, local read/copy, bounded failure/retry, no automatic upload.
+No tokens/headers/bodies/URLs/coordinates/account IDs/SSIDs/error text retained.
+Held wake lock and validated network do not prove CPU/network policy permitted work.
+27 targeted units, actual JVM native trace/lease tests, mobile native-bridge/API
+browser report/GPS/push regressions, real LOCAL API/PGlite driver role/session/GPS /
+offline integration, referenced declarations/UI types/production build PASS. CI broad
+API/container/native checks PASS. No physical native diagnostic acceptance yet.
+
+NEXT OWNER PHONE — ONE NECESSARY INSTRUMENTED TEST, not another uninstrumented225 loop:
+1. Update230, preserve account/app data. Use the same failed Unrestricted/Power-saving
+   OFF/Wi-Fi-active+mobile-enabled/permissions conditions; do not toggle networks.
+2. Go online/Reconnect, explicit background consent/Enable while visible. Wait for
+   ongoing notification and heartbeat AND accepted GPS receipt times to advance.
+3. Home -> separate Chrome Administrator Dispatch. Lock3min. Unlock into Chrome FIRST;
+   note Dispatch status/GPS time before resuming Driver (foreground can mask gap).
+4. Return Driver -> Your availability -> Read screen-lock diagnostics -> Copy sanitized
+   diagnostics. Send this JSON regardless of outcome. Read BEFORE reconnecting,
+   enabling a new background session, signing out or force-closing (these reset/lose
+   trace). Viewer also available on workspace profile-read error recovery.
+5. Then Go offline/Go offline everywhere and confirm notification/sharing stop. No
+   order/payment/refund/push/provider test needed. Physical background GPS stays BLOCKED.
+
+NEXT ENGINEERING: inspect native trace BEFORE selecting fix or requesting another run.
+PULSE vs JS_PULSE separates native scheduling/bridge delivery; token stages identify
+where token retrieval stops. Native HTTP request sequence/start/result/timeout/status
+is captured before JS processing. Native200 with no JS fetch/body/ACK is evidence of
+handoff/processing gap, NOT license to ACK without validating online:true. Unfinished
+native request means no terminal outcome observed, not automatically server rejection.
+Native GPS callback/age vs JS_GPS/accepted upload separates FLP/bridge/HTTP paths.
+JS stages cover background controller; unrelated foreground/polling requests may have
+native-only events. If critical native migration is justified, secure native Clerk
+session/refresh must accompany transmission; cached JWTs/expired-duty resurrection /
+increased90s are prohibited. Native HTTP does not bypass OS power policy.
+All90s/fail-closed/server authorization/GPS validation/hosted ordering/payment/payout /
+retention/municipal safeguards, Stripe TEST, historical data/Neon/signing preserved.
+No hosted deploy/config/data/financial/provider operations or PR merge performed.
+Final evidence-only checkpoint SHA has separate CI; diagnostic source above all PASS.
+
 # November 22 — Unrestricted225 FAILED; native screen-lock diagnostic instrumentation
 
 NEW OWNER evidence: SAME225 on Samsung S22 Ultra also failed with Battery UNRESTRICTED,

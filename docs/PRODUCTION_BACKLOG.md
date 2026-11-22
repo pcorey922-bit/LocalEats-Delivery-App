@@ -1,3 +1,18 @@
+# November 22 — Driver230 diagnostic evidence collection READY, GPS acceptance BLOCKED
+
+c816985e240faaea3df92aab0e05d40cb442d3dc ALL THREE CI SUCCESS:
+Validate44990967370/44990970591, Native44990970586. Signed diagnostic230/run44990980560
+SUCCESS/artifact14741932269 verified source/hash/version/package/private service/signer
+and actual native power/HTTP trace bytecode+report viewer. No backend deploy required.
+27 units + actual Java trace/lease + native browser report/copy/no-mutation/timeout /
+GPS/push + localAPI/PGlite Driver integration + types/build/broadCI PASS.
+This is instrumentation, NOT a screen-lock fix. Both225 power modes failed; exactstage
+still unknown. Next one230 test under same settings: lock3min, Chrome Dispatch before
+Driver resume, Read/Copy sanitized native report BEFORE reconnect/new sharing/forceclose,
+then offline. Preserve native report; interpret stage/power/HTTP vs JS/auth before a
+minimum evidenced correction. No identical uninstrumented retest or speculative token /
+expiry/network workaround. No hosted/financial/provider operations; safeguards intact.
+
 # November 22 — Driver225 Unrestricted failure; instrumented native evidence next
 
 Both Optimized and Unrestricted locked tests FAILED. Power saving off, no sleep lists,
