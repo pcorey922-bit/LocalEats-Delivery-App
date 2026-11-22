@@ -1,3 +1,61 @@
+# November 22 — Driver225 native liveness candidate verified; physical GPS pending
+
+FUNCTIONAL SOURCE71ca9bc1eb2578c8db7d73c9fdf4e095915a08ba pushed on primary branch,
+PR1 unmerged. ALL THREE exact-SHA CI SUCCESS: Validate push44985648388,
+Validate PR44985653608, Native PR44985653682 (customer+driver Android/iOS).
+Protected signed Driver225 run44985665040 SUCCESS; actual native Java policy test
+also ran successfully in signing. Artifact14740400208:
+RoCoEats-Driver-Android-Staging-Test-APK. ZIP SHA256
+f8a947aa7b011f700699bd8576fc5a12b8448e885d9f6a3000958a8e5162c663.
+Verified exact source/APK checksum/com.rocoeats.driver.staging/version225, private
+location-only FGS, notification/location/normal WAKE_LOCK permissions, no All-time
+location, unchanged v2 signer f22e58f4da4e5d64f9ac5d4f0fc8abfe2595e395511552f7fb385205c7d18296.
+Actual APK DEX contains DutyLease/native pulses/ack method/watchdog/wake-lock tag;
+packaged JS includes retained HB/GPS receipt and separate recovery diagnostics.
+Download https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/44985665040
+Artifacts -> RoCoEats-Driver-Android-Staging-Test-APK -> extract -> APK -> Update.
+No uninstall, backend/Render deploy, migration, hosted setting or provider setup needed.
+
+REPRODUCED/FIXED: valid-GPS-dependent background heartbeat + unbounded native service
+life when JS/requests stop. Native20s pulses now independent of GPS and WebView timers;
+strict authenticated server heartbeat ack gates native monotonic lease/wake lock.
+Initial30s then75s from native challenge issuance (not response receipt), stale/duplicate
+acks rejected; expiry/permission/stop/destruction removes watchers/notification and
+releases wake lock/scheduling. Server90s expiry unchanged; stale GPS stays stale.
+One bounded401 Clerk renewal only for telemetry, no expired-duty/unknown-outcome /
+financial/order replay. Exact physical trigger of222 callback/transport interruption
+still UNVERIFIED; do not claim those historical requests were captured or invent401.
+
+VALIDATION:25 targeted Node units, actual patched Java monotonic lease execution,
+mocked-native/API real-component browser suite including160s no-GPS keepalive and
+watchdog cleanup/retained evidence, real LOCAL API/PGlite driver authorization/session /
+restart/GPS/offline integration, UI types/build,2 privacy units PASS. CI broader
+API/integration/container + actual native builds PASS. None establishes physical
+background Android GPS, real push/provider or physical iOS acceptance.
+
+NEXT OWNER PHONE ACCEPTANCE (Driver ONLY; preserve accepted Customer208):
+1. Update225; reconnect while app visible. Check consent and Enable background sharing.
+   Wait for ongoing notification AND advancing server heartbeat/accepted GPS receipt.
+2. Home -> separate Chrome -> existing Administrator Dispatch. Keep Driver backgrounded
+   FIVE minutes, including a two-minute screen lock while Chrome is foreground.
+3. Unlock back into CHROME FIRST. Before reopening Driver, verify driver online and
+   Dispatch GPS time advancing/fresh. Reopening Driver first can mask background gaps.
+4. Return Driver; record last heartbeat/GPS receipt times and safe recovery code if
+   failed. Go offline: notification must disappear and Dispatch sharing stop. No
+   orders/payments/provider push sends needed. If only heartbeat advances but GPS does
+   not, GPS acceptance FAILS; never call this passed from online/notification alone.
+Receipt times are phone-local response times; fields survive duty stop only in memory,
+are account-scoped and clear on sign-out/process restart. No coordinates/token logging.
+
+NEXT ENGINEERING: inspect exact safe timestamps/codes from this explicit-service test.
+If heartbeat fails, distinguish native expiry vs auth401/409 vs transport timeout;
+if heartbeat survives but GPS does not, inspect actual native fix delivery/permission /
+Fused Location path. Do not increase90s, fake positions, auto-reconnect, repeat accepted
+Customer/auth audits or change hosting. Preserve all closed ordering/live/payout /
+retention/municipal gates and Stripe TEST, existing order/ledger/Neon recovery/signing.
+No hosted data/config/deploy, financial/provider operations or PR merge performed.
+This final checkpoint-only commit has separate CI; functional225 source above all PASS.
+
 # November 22 — Driver222 background failure: native liveness correction
 
 NEW OWNER EVIDENCE: v222 background activation produced ongoing RoCoEats on-duty

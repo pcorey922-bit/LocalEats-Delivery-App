@@ -1,3 +1,20 @@
+# November 22 — Driver225 GPS-independent liveness correction verified
+
+71ca9bc1eb2578c8db7d73c9fdf4e095915a08ba ALL THREE CI SUCCESS:
+Validate44985648388/44985653608, Native44985653682. Signed Driver225/run44985665040
+SUCCESS/artifact14740400208 verified source/hash/package/version/private service /
+permissions/unchanged v2 signer and actual DEX native pulse/watchdog code.
+25 units, actual JVM policy, native browser regressions, localAPI/database Driver /
+session/GPS integration, types/build/privacy PASS. No Render deployment needed.
+GPS-coupled heartbeat and missing native ack timeout corrected WITHOUT changing90s
+server lease or GPS freshness. Native pulses/wake-lock lease fail closed; telemetry
+401 renewal bounded; separate retained receipt/failure evidence. Physical225 acceptance
+PENDING: owner must see online AND fresh GPS in separate Chrome Dispatch before
+Driver foreground after5min background/lock. Heartbeat-only success is NOT GPS success.
+Then offline must stop notification/sharing. Exact222 callback/transport trigger still
+unknown; no historical private logs invented, no phone acceptance from mocks/builds.
+All safeguards/data/signing preserved, no deployment/provider/financial operations.
+
 # November 22 — Driver222 background session failed; native heartbeat/watchdog implemented
 
 Owner observed native on-duty notification but Dispatch offline11:11PM, Driver resume
