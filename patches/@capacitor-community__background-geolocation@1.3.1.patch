@@ -12,7 +12,7 @@ index 9e65984854cfb3d7bde5d56b0ab25974c8eccf6e..ba0ffa2d899978c4e926775a15ccdb02
  </manifest>
    
 diff --git a/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocation.java b/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocation.java
-index a92fcf9bad0139d203964afb1550ea5ba03ce99b..c93824fd0e6615d2445a78026d89ca11cca0e197 100644
+index a92fcf9bad0139d203964afb1550ea5ba03ce99b..38dd69a1c827fa6f82be4a3269de616ff43dfbc7 100644
 --- a/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocation.java
 +++ b/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocation.java
 @@ -33,6 +33,11 @@ import com.google.android.gms.location.LocationServices;
@@ -27,7 +27,7 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..c93824fd0e6615d2445a78026d89ca11
  
  import androidx.localbroadcastmanager.content.LocalBroadcastManager;
  
-@@ -49,9 +54,78 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+@@ -49,9 +54,83 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
          }
  )
  public class BackgroundGeolocation extends Plugin {
@@ -102,12 +102,17 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..c93824fd0e6615d2445a78026d89ca11
 +        catch(RejectedExecutionException error){job.cancel("DUTY_REQUEST_BUSY");}
 +    }
 +    @PluginMethod
++    public void getNativeDutyState(PluginCall call){
++        if(service==null){call.resolve(new JSObject().put("active",false));return;}
++        call.resolve(service.nativeDutyState(call.getString("id","")));
++    }
++    @PluginMethod
 +    public void cancelDutyRequest(PluginCall call){DutyJob job=dutyJobs.get(call.getString("requestId",""));if(job!=null)job.cancel("DUTY_REQUEST_CANCELED");call.resolve();}
 +
      private void fetchLastLocation(PluginCall call) {
          try {
              LocationServices.getFusedLocationProviderClient(
-@@ -73,7 +147,7 @@ public class BackgroundGeolocation extends Plugin {
+@@ -73,7 +152,7 @@ public class BackgroundGeolocation extends Plugin {
      @PluginMethod(returnType = PluginMethod.RETURN_CALLBACK)
      public void addWatcher(final PluginCall call) {
          if (service == null) {
@@ -116,7 +121,7 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..c93824fd0e6615d2445a78026d89ca11
              return;
          }
          call.setKeepAlive(true);
-@@ -81,11 +155,14 @@ public class BackgroundGeolocation extends Plugin {
+@@ -81,11 +160,14 @@ public class BackgroundGeolocation extends Plugin {
          if (getPermissionState("location") != PermissionState.GRANTED) {
              if (call.getBoolean("requestPermissions", true)) {
                  requestPermissionForAlias("location", call, "locationPermissionsCallback");
@@ -131,7 +136,7 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..c93824fd0e6615d2445a78026d89ca11
          }
          if (call.getBoolean("stale", false)) {
              fetchLastLocation(call);
-@@ -156,11 +233,12 @@ public class BackgroundGeolocation extends Plugin {
+@@ -156,11 +238,12 @@ public class BackgroundGeolocation extends Plugin {
  
              backgroundNotification = builder.build();
          }
@@ -141,7 +146,7 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..c93824fd0e6615d2445a78026d89ca11
 -                call.getFloat("distanceFilter", 0f)
 -        );
 +        try {
-+            service.addWatcher(call.getCallbackId(), backgroundNotification, call.getFloat("distanceFilter", 0f), call.getBoolean("dutyHeartbeat", false));
++            service.addWatcher(call.getCallbackId(), backgroundNotification, call.getFloat("distanceFilter", 0f), call.getBoolean("dutyHeartbeat", false), call.getString("nativePrincipal"));
 +        } catch (Exception error) {
 +            service.removeWatcher(call.getCallbackId());
 +            call.reject("Background location service could not start", "DUTY_SERVICE_START_FAILED");
@@ -149,7 +154,7 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..c93824fd0e6615d2445a78026d89ca11
      }
  
      @PermissionCallback
-@@ -170,15 +248,39 @@ public class BackgroundGeolocation extends Plugin {
+@@ -170,15 +253,39 @@ public class BackgroundGeolocation extends Plugin {
              call.reject("User denied location permission", "NOT_AUTHORIZED");
              return;
          }
@@ -198,13 +203,22 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..c93824fd0e6615d2445a78026d89ca11
      }
  
      @PluginMethod()
-@@ -253,6 +355,14 @@ public class BackgroundGeolocation extends Plugin {
+@@ -253,6 +360,23 @@ public class BackgroundGeolocation extends Plugin {
              if (call == null) {
                  return;
              }
 +            if (intent.hasExtra("dutyError")) {
 +                call.reject("Background duty stopped; reconnect explicitly", intent.getStringExtra("dutyError"));
 +                call.release(getBridge()); return;
++            }
++            if(intent.hasExtra("dutyReceipt")){
++                JSObject receipt=new JSObject();receipt.put("dutyReceipt",true);
++                if(intent.getLongExtra("heartbeatAt",0)>0)receipt.put("heartbeatAt",intent.getLongExtra("heartbeatAt",0));
++                if(intent.getLongExtra("locationAt",0)>0)receipt.put("locationAt",intent.getLongExtra("locationAt",0));
++                receipt.put("location",intent.getBooleanExtra("location",false));call.resolve(receipt);return;
++            }
++            if(intent.hasExtra("dutyWarning")){
++                JSObject warning=new JSObject();warning.put("dutyWarning",intent.getStringExtra("dutyWarning"));warning.put("location",intent.getBooleanExtra("locationWarning",false));call.resolve(warning);return;
 +            }
 +            if (intent.hasExtra("dutyPulse")) {
 +                JSObject pulse = new JSObject(); pulse.put("dutyPulse", true); pulse.put("sequence", intent.getStringExtra("dutyPulse"));
@@ -213,7 +227,7 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..c93824fd0e6615d2445a78026d89ca11
              Location location = intent.getParcelableExtra("location");
              if (location != null) {
                  call.resolve(formatLocation(location));
-@@ -342,6 +452,8 @@ public class BackgroundGeolocation extends Plugin {
+@@ -342,6 +466,8 @@ public class BackgroundGeolocation extends Plugin {
          if (service != null) {
              service.stopService();
          }
@@ -223,7 +237,7 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..c93824fd0e6615d2445a78026d89ca11
      }
  }
 diff --git a/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocationService.java b/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocationService.java
-index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..86d049b559ddd8856afe6603d1feec882c5d938a 100644
+index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..b7bde6e89ba894f14d4b9cb67c8c3a20217715d4 100644
 --- a/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocationService.java
 +++ b/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocationService.java
 @@ -10,6 +10,7 @@ import android.os.Build;
@@ -252,11 +266,13 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..86d049b559ddd8856afe6603d1feec88
  
  import androidx.localbroadcastmanager.content.LocalBroadcastManager;
  
-@@ -39,8 +49,78 @@ public class BackgroundGeolocationService extends Service {
+@@ -39,8 +49,82 @@ public class BackgroundGeolocationService extends Service {
          public LocationRequest locationRequest;
          public LocationCallback locationCallback;
          public Notification backgroundNotification;
 +        public DutyLease dutyLease;
++        public NativeDutyEngine nativeEngine;
++        public volatile long heartbeatReceipt,locationReceipt;
 +        public volatile long traceGeneration;
 +        public PowerManager.WakeLock wakeLock;
 +    }
@@ -283,6 +299,7 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..86d049b559ddd8856afe6603d1feec88
 +                    if (pulse != 0) {
 +                        powerMonitor.sample(DutyTrace.Stage.POWER);
 +                        DutyTrace.record(watcher.traceGeneration,DutyTrace.Stage.PULSE,DutyTrace.Kind.HEARTBEAT,0,now);
++                        if(watcher.nativeEngine!=null)watcher.nativeEngine.pulse(pulse);
 +                        broadcast(watcher.id, "dutyPulse", Long.toString(pulse));
 +                    }
 +                }
@@ -297,7 +314,7 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..86d049b559ddd8856afe6603d1feec88
 +    }
 +    private void expire(Watcher watcher, String code) {
 +        powerMonitor.sample(DutyTrace.Stage.EXPIRY_POWER);
-+        DutyTrace.StopReason reason="DUTY_ACK_EXPIRED".equals(code)?DutyTrace.StopReason.ACK_EXPIRED:"NOT_AUTHORIZED".equals(code)?DutyTrace.StopReason.PERMISSION_LOST:"DUTY_LOCATION_UNAVAILABLE".equals(code)?DutyTrace.StopReason.LOCATION_REQUEST_FAILED:DutyTrace.StopReason.SERVICE_FAILED;
++        DutyTrace.StopReason reason="DUTY_ACK_EXPIRED".equals(code)?DutyTrace.StopReason.ACK_EXPIRED:"NOT_AUTHORIZED".equals(code)?DutyTrace.StopReason.PERMISSION_LOST:code.startsWith("DUTY_AUTH")?DutyTrace.StopReason.AUTH_FAILED:"DUTY_LOCATION_UNAVAILABLE".equals(code)?DutyTrace.StopReason.LOCATION_REQUEST_FAILED:DutyTrace.StopReason.SERVICE_FAILED;
 +        DutyTrace.end(watcher.traceGeneration,true,SystemClock.elapsedRealtime(),reason);
 +        try { remove(watcher.id); }
 +        finally { broadcast(watcher.id, "dutyError", code); }
@@ -310,6 +327,7 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..86d049b559ddd8856afe6603d1feec88
 +    private synchronized void remove(String id) {
 +        Watcher watcher = watchers.remove(id);
 +        if (watcher == null) return;
++        if (watcher.nativeEngine != null) watcher.nativeEngine.stop();
 +        if (watcher.dutyLease != null) watcher.dutyLease.stop();
 +        try { watcher.client.removeLocationUpdates(watcher.locationCallback); }
 +        catch (RuntimeException ignored) { /* Lease revoked; always release notification/wake lock. */ }
@@ -332,7 +350,7 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..86d049b559ddd8856afe6603d1feec88
  
      @Override
      public IBinder onBind(Intent intent) {
-@@ -53,16 +133,13 @@ public class BackgroundGeolocationService extends Service {
+@@ -53,16 +137,13 @@ public class BackgroundGeolocationService extends Service {
      // service is terminated immediately.
      @Override
      public boolean onUnbind(Intent intent) {
@@ -351,7 +369,7 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..86d049b559ddd8856afe6603d1feec88
              if (watcher.backgroundNotification != null) {
                  return watcher.backgroundNotification;
              }
-@@ -71,14 +148,7 @@ public class BackgroundGeolocationService extends Service {
+@@ -71,14 +152,7 @@ public class BackgroundGeolocationService extends Service {
      }
  
      private void promote(Notification notification) {
@@ -367,26 +385,34 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..86d049b559ddd8856afe6603d1feec88
      }
  
      // Handles requests from the activity.
-@@ -86,7 +156,8 @@ public class BackgroundGeolocationService extends Service {
+@@ -86,8 +160,15 @@ public class BackgroundGeolocationService extends Service {
          void addWatcher(
                  final String id,
                  Notification backgroundNotification,
 -                float distanceFilter
 +                float distanceFilter,
-+                boolean supervisedDuty
++                boolean supervisedDuty,
++                String nativePrincipal
          ) {
++            NativeDutyEngine.Client nativeClient=NativeDutyRuntime.client();
++            if(nativePrincipal!=null){
++                if(!supervisedDuty||nativeClient==null||!nativePrincipal.equals(nativeClient.principal()))throw new SecurityException("Native driver authentication required");
++                for(Watcher previous:watchers.values())if(previous.nativeEngine!=null)remove(previous.id);
++            }
              FusedLocationProviderClient client = LocationServices.getFusedLocationProviderClient(
                      BackgroundGeolocationService.this
-@@ -101,6 +172,8 @@ public class BackgroundGeolocationService extends Service {
+             );
+@@ -101,6 +182,9 @@ public class BackgroundGeolocationService extends Service {
                  @Override
                  public void onLocationResult(LocationResult locationResult) {
                      Location location = locationResult.getLastLocation();
 +                    Watcher current=watchers.get(id);
 +                    if(current!=null&&current.dutyLease!=null&&location!=null) DutyTrace.fix(current.traceGeneration,(SystemClock.elapsedRealtimeNanos()-location.getElapsedRealtimeNanos())/1000000,SystemClock.elapsedRealtime());
++                    if(current!=null&&current.nativeEngine!=null&&location!=null)current.nativeEngine.location(location.getLatitude(),location.getLongitude(),location.hasAccuracy()?location.getAccuracy():Double.NaN,location.getTime(),location.isFromMockProvider());
                      Intent intent = new Intent(ACTION_BROADCAST);
                      intent.putExtra("location", location);
                      intent.putExtra("id", id);
-@@ -122,18 +195,28 @@ public class BackgroundGeolocationService extends Service {
+@@ -122,18 +206,52 @@ public class BackgroundGeolocationService extends Service {
              watcher.locationRequest = locationRequest;
              watcher.locationCallback = callback;
              watcher.backgroundNotification = backgroundNotification;
@@ -401,12 +427,36 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..86d049b559ddd8856afe6603d1feec88
 +            watchers.put(id, watcher);
 +            if (supervisedDuty) {
 +                diagnosticGeneration=DutyTrace.begin(SystemClock.elapsedRealtime());diagnosticWatcherId=id;
-+                watcher.traceGeneration=diagnosticGeneration;powerMonitor.start(diagnosticGeneration);ensureDutyClock();
++                watcher.traceGeneration=diagnosticGeneration;powerMonitor.start(diagnosticGeneration);
++            }
++
++            if(nativePrincipal!=null){
++                watcher.nativeEngine=new NativeDutyEngine(nativeClient,nativePrincipal,new NativeDutyEngine.Clock(){
++                    public long monotonic(){return SystemClock.elapsedRealtime();}
++                    public long wall(){return System.currentTimeMillis();}
++                },new NativeDutyEngine.Callbacks(){
++                    public boolean acknowledge(long sequence){return acknowledgeNativeDuty(id,sequence);}
++                    public void fatal(String code){expire(watcher,code);}
++                    public void receipt(boolean location,long receivedAt){
++                        if(watchers.get(id)!=watcher)return;
++                        if(location)watcher.locationReceipt=receivedAt;else watcher.heartbeatReceipt=receivedAt;
++                        Intent receipt=new Intent(ACTION_BROADCAST);receipt.putExtra("id",id);receipt.putExtra("dutyReceipt",true);
++                        receipt.putExtra("heartbeatAt",watcher.heartbeatReceipt);receipt.putExtra("locationAt",watcher.locationReceipt);
++                        receipt.putExtra("location",location);LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcast(receipt);
++                    }
++                    public void warning(boolean location,String code){
++                        if(watchers.get(id)!=watcher)return;
++                        Intent warning=new Intent(ACTION_BROADCAST);warning.putExtra("id",id);warning.putExtra("dutyWarning",code);warning.putExtra("locationWarning",location);
++                        LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcast(warning);
++                    }
++                });
 +            }
  
 -            // According to Android Studio, this method can throw a Security Exception if
 -            // permissions are not yet granted. Rather than check the permissions, which is fiddly,
 -            // we simply ignore the exception.
++            if(supervisedDuty)ensureDutyClock();
++
 +            // Propagate startup permission failures to the authenticated UI; never
 +            // leave a notification claiming that a failed location request is active.
              try {
@@ -421,7 +471,7 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..86d049b559ddd8856afe6603d1feec88
  
              // Promote the service to the foreground if necessary.
              // Ideally we would only call 'startForeground' if the service is not already
-@@ -141,46 +224,40 @@ public class BackgroundGeolocationService extends Service {
+@@ -141,46 +259,50 @@ public class BackgroundGeolocationService extends Service {
              // in API level 29 and seems to behave weirdly, as reported in #120. However,
              // it appears that 'startForeground' is idempotent, so we just call it repeatedly
              // each time a background watcher is added.
@@ -443,9 +493,19 @@ index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..86d049b559ddd8856afe6603d1feec88
 -                    }
 -                    return;
 -                }
++        com.getcapacitor.JSObject nativeDutyState(String id){
++            Watcher watcher=watchers.get(id);com.getcapacitor.JSObject result=new com.getcapacitor.JSObject();
++            boolean active=watcher!=null&&watcher.nativeEngine!=null&&watcher.nativeEngine.active()&&watcher.dutyLease!=null&&!watcher.dutyLease.expired(SystemClock.elapsedRealtime());
++            result.put("active",active);
++            if(active){if(watcher.heartbeatReceipt>0)result.put("heartbeatAt",watcher.heartbeatReceipt);if(watcher.locationReceipt>0)result.put("locationAt",watcher.locationReceipt);}
++            return result;
++        }
 +        void removeWatcher(String id) { remove(id); }
-+        boolean acknowledgeDuty(String id, long sequence) {
++        boolean acknowledgeDuty(String id, long sequence) {return acknowledge(id,sequence,false);}
++        private boolean acknowledgeNativeDuty(String id,long sequence){return acknowledge(id,sequence,true);}
++        private boolean acknowledge(String id,long sequence,boolean nativeTransport) {
 +            Watcher watcher = watchers.get(id);
++            if(watcher!=null&&watcher.nativeEngine!=null&&!nativeTransport)return false;
 +            if (watcher == null || watcher.dutyLease == null || !watcher.dutyLease.acknowledge(sequence, SystemClock.elapsedRealtime())) {
 +                DutyTrace.record(traceOwner(id),DutyTrace.Stage.ACK_REJECTED,DutyTrace.Kind.HEARTBEAT,0,SystemClock.elapsedRealtime());return false;
              }
@@ -618,4 +678,117 @@ index 0000000000000000000000000000000000000000..598a66150ee294cfd30caa433c3d8a06
 +    public Result complete(long now){return !terminal.compareAndSet(false,true)?Result.IGNORED:withinDeadline(now)?Result.ACCEPT:Result.TIMEOUT;}
 +    public boolean cancel(){return terminal.compareAndSet(false,true);}
 +    public static boolean validHeartbeat(int status,Object online){return status==200&&Boolean.TRUE.equals(online);}
++}
+diff --git a/android/src/main/java/com/equimaps/capacitor_background_geolocation/NativeDutyEngine.java b/android/src/main/java/com/equimaps/capacitor_background_geolocation/NativeDutyEngine.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..72e7fa87299a28a0a1d99a70be501a0d062b2af1
+--- /dev/null
++++ b/android/src/main/java/com/equimaps/capacitor_background_geolocation/NativeDutyEngine.java
+@@ -0,0 +1,93 @@
++package com.equimaps.capacitor_background_geolocation;
++
++import java.util.*;
++import java.util.concurrent.*;
++import java.util.concurrent.atomic.AtomicBoolean;
++import java.util.function.BooleanSupplier;
++import java.text.SimpleDateFormat;
++
++/** Critical duty state machine has no Activity, WebView, JS callback or token cache. */
++public final class NativeDutyEngine {
++    public static final class Response {
++        public final int status; public final Map<String,Object> body;
++        public Response(int status,Map<String,Object> body){this.status=status;this.body=body==null?Collections.emptyMap():Collections.unmodifiableMap(new HashMap<>(body));}
++    }
++    public interface Client {
++        String principal();
++        CompletableFuture<Response> request(String path,String method,Map<String,Object> body,BooleanSupplier active);
++    }
++    public interface Clock { long monotonic(); long wall(); }
++    public interface Callbacks {
++        boolean acknowledge(long sequence);
++        void fatal(String code);
++        void receipt(boolean location,long receivedAt);
++        void warning(boolean location,String code);
++    }
++    private final Client client; private final String principal;
++    private final Clock clock;private final Callbacks callbacks;
++    private final AtomicBoolean active=new AtomicBoolean(true),heartbeatBusy=new AtomicBoolean(),locationBusy=new AtomicBoolean();
++    private final Set<CompletableFuture<?>> requests=ConcurrentHashMap.newKeySet();
++    private volatile long lastLocationAttempt=Long.MIN_VALUE;
++    public NativeDutyEngine(Client client,String principal,Clock clock,Callbacks callbacks){
++        this.client=Objects.requireNonNull(client);this.principal=Objects.requireNonNull(principal);this.clock=clock;this.callbacks=callbacks;
++    }
++    public boolean active(){return active.get();}
++    private boolean identity(){
++        if(!active())return false;
++        try{if(principal.equals(client.principal()))return true;}catch(RuntimeException ignored){}
++        fail("DUTY_AUTH_CHANGED");return false;
++    }
++    private void fail(String code){if(active.compareAndSet(true,false)){cancelRequests();callbacks.fatal(code);}}
++    private void cancelRequests(){for(CompletableFuture<?> request:requests)request.cancel(true);requests.clear();}
++    public void stop(){active.set(false);cancelRequests();}
++    private static <T> CompletableFuture<T> failed(Throwable error){CompletableFuture<T> future=new CompletableFuture<>();future.completeExceptionally(error);return future;}
++    private CompletableFuture<Response> request(String path,String method,Map<String,Object> body){
++        if(!identity())return failed(new CancellationException());
++        CompletableFuture<Response> request;
++        try{request=client.request(path,method,body,()->active()&&principal.equals(client.principal()));}
++        catch(RuntimeException failure){return failed(failure);}
++        requests.add(request);request.whenComplete((value,error)->requests.remove(request));
++        if(!active())request.cancel(true);return request;
++    }
++    private boolean accepted(Response response,boolean location){
++        if(response==null){callbacks.warning(location,"NATIVE_DUTY_RESPONSE_UNAVAILABLE");return false;}
++        if(response.status==401||response.status==403||response.status==409){fail("DUTY_AUTH_REJECTED");return false;}
++        if(response.status!=200){callbacks.warning(location,"NATIVE_DUTY_TRANSPORT_INTERRUPTED");return false;}
++        return true;
++    }
++    public void pulse(long sequence){
++        if(sequence<=0||!identity()||!heartbeatBusy.compareAndSet(false,true))return;
++        request("/api/driver/heartbeat","POST",null).whenComplete((response,error)->{
++            try{
++                if(!identity())return;
++                if(error!=null){callbacks.warning(false,"NATIVE_DUTY_TOKEN_OR_HTTP_INTERRUPTED");return;}
++                if(!accepted(response,false))return;
++                if(!DutyRequestGate.validHeartbeat(response.status,response.body.get("online"))){fail("DUTY_NATIVE_RESPONSE_INVALID");return;}
++                if(!callbacks.acknowledge(sequence)){fail("DUTY_ACK_EXPIRED");return;}
++                if(active())callbacks.receipt(false,clock.wall());
++            }finally{heartbeatBusy.set(false);}
++        });
++    }
++    public void location(double latitude,double longitude,double accuracy,long observedAt,boolean simulated){
++        if(!identity())return;
++        long age=clock.wall()-observedAt;
++        if(!Double.isFinite(latitude)||!Double.isFinite(longitude)||!Double.isFinite(accuracy)||Math.abs(latitude)>90||Math.abs(longitude)>180||accuracy<0||accuracy>10000||age>120000||age< -30000||simulated){callbacks.warning(true,"NATIVE_DUTY_GPS_REJECTED");return;}
++        long now=clock.monotonic();
++        if(lastLocationAttempt!=Long.MIN_VALUE&&now-lastLocationAttempt<30000||!locationBusy.compareAndSet(false,true))return;
++        lastLocationAttempt=now;
++        request("/api/driver/availability","GET",null).thenCompose(access->{
++            if(!identity()||!accepted(access,true))return CompletableFuture.completedFuture(null);
++            Object order=access.body.get("activeOrderId");
++            if(!Boolean.TRUE.equals(access.body.get("approved"))||!Boolean.TRUE.equals(access.body.get("available"))||!Boolean.TRUE.equals(access.body.get("online"))||!access.body.containsKey("activeOrderId")||order!=null&&(!(order instanceof String)||!((String)order).matches("[a-f0-9-]{36}"))){fail("DUTY_ACCESS_RESPONSE_INVALID");return CompletableFuture.completedFuture(null);}
++            SimpleDateFormat format=new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",Locale.US);format.setTimeZone(TimeZone.getTimeZone("UTC"));
++            Map<String,Object> position=new HashMap<>();position.put("latitude",latitude);position.put("longitude",longitude);position.put("accuracyMeters",accuracy);position.put("observedAt",format.format(new Date(observedAt)));
++            return request("/api/driver/location","POST",position).thenCompose(result->{
++                if(!identity()||!accepted(result,true))return CompletableFuture.completedFuture(null);
++                if(!(result.body.get("accepted") instanceof Boolean)){fail("DUTY_LOCATION_RESPONSE_INVALID");return CompletableFuture.completedFuture(null);}
++                if(!Boolean.TRUE.equals(result.body.get("accepted")))return CompletableFuture.completedFuture(null);
++                callbacks.receipt(true,clock.wall());
++                return order==null?CompletableFuture.completedFuture(null):request("/api/driver/orders/"+order+"/location","POST",position).thenApply(delivery->{if(identity())accepted(delivery,true);return null;});
++            });
++        }).whenComplete((ignored,error)->{if(error!=null&&identity())callbacks.warning(true,"NATIVE_DUTY_TOKEN_OR_HTTP_INTERRUPTED");locationBusy.set(false);});
++    }
++}
+diff --git a/android/src/main/java/com/equimaps/capacitor_background_geolocation/NativeDutyRuntime.java b/android/src/main/java/com/equimaps/capacitor_background_geolocation/NativeDutyRuntime.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..414b8e4b11c97c20d346a81d8e2afbc2dd172481
+--- /dev/null
++++ b/android/src/main/java/com/equimaps/capacitor_background_geolocation/NativeDutyRuntime.java
+@@ -0,0 +1,8 @@
++package com.equimaps.capacitor_background_geolocation;
++/** Driver application installs its official SDK client; no credential crosses this holder. */
++public final class NativeDutyRuntime {
++    private static volatile NativeDutyEngine.Client client;
++    private NativeDutyRuntime(){}
++    public static void install(NativeDutyEngine.Client value){client=value;}
++    public static NativeDutyEngine.Client client(){return client;}
 +}

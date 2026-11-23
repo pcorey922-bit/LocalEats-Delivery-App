@@ -1,3 +1,15 @@
+# November 23 — Native engine layer implemented; Driver activation intentionally OFF
+
+Official SDK bridge d096599 ALL THREE CI PASS. Added native service-owned engine /
+SDK-authenticated cookie-free HTTPS transport; native scheduler/GPS/strict ACK no
+longer require JS. Actual JVM engine+lease4min with JS absent PASS (provider/SDK fake),
+plus expiry/stop/late/token-deadline/role/actor/GPS regression tests. SDK/HTTP adapters
+API compile checked; real Android CI pending.75s/90s/fail-closed unchanged.
+UI/ticket migration NOT wired, plugin UNREGISTERED: no signed replacement or physical
+request. Next atomically project native SDK principal into Driver UI, existing ticket
+handoff + native watcher mode/receipts/resume state and test all session flows before
+activation. Customer/website/iOS auth unchanged. No host/provider/financial operation.
+
 # November 23 — Native Clerk prerequisite clarified; bridge foundation not activated
 
 Owner observed Native applications enabled; NO Android/iOS registrations. No settings

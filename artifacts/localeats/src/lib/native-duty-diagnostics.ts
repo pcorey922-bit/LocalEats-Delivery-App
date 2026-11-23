@@ -17,7 +17,7 @@ export function recordDutyStage(id:string|undefined,stage:DutyJsStage,kind:DutyT
  try{void nativeDutyBridge.recordDutyStage({id,stage,kind}).catch(()=>{});}catch{/* Diagnostic support never changes duty execution. */}
 }
 
-const stages=new Set(['START','STOPPED','EXPIRED','PULSE','NATIVE_GPS_FIX','JS_PULSE','JS_GPS','TOKEN_START','TOKEN_READY','TOKEN_FAILED','JS_HTTP_START','JS_HTTP_RETURN','JS_HTTP_FAILED','JS_BODY_START','JS_BODY_READY','JS_BODY_FAILED','NATIVE_HTTP_START','NATIVE_HTTP_RESULT','NATIVE_HTTP_TIMEOUT','NATIVE_HTTP_INTERRUPTED','NATIVE_HTTP_ERROR','ACK_CONFIRMED','ACK_REJECTED','SCREEN_OFF','SCREEN_ON','POWER','NETWORK','EXPIRY_POWER','REPORT_READ']);
+const stages=new Set(['NATIVE_TOKEN_START','NATIVE_TOKEN_READY','NATIVE_TOKEN_FAILED','START','STOPPED','EXPIRED','PULSE','NATIVE_GPS_FIX','JS_PULSE','JS_GPS','TOKEN_START','TOKEN_READY','TOKEN_FAILED','JS_HTTP_START','JS_HTTP_RETURN','JS_HTTP_FAILED','JS_BODY_START','JS_BODY_READY','JS_BODY_FAILED','NATIVE_HTTP_START','NATIVE_HTTP_RESULT','NATIVE_HTTP_TIMEOUT','NATIVE_HTTP_INTERRUPTED','NATIVE_HTTP_ERROR','ACK_CONFIRMED','ACK_REJECTED','SCREEN_OFF','SCREEN_ON','POWER','NETWORK','EXPIRY_POWER','REPORT_READ']);
 const kinds=new Set(['NONE','HEARTBEAT','GPS','AVAILABILITY','AUTH']);
 const object=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
 const integer=(v:unknown):v is number=>Number.isSafeInteger(v)&&Number(v)>=0;
@@ -39,5 +39,5 @@ export function sanitizeDutyDiagnostics(value:unknown) {
   const [stage,kind,...extra]=key.split('.');if(extra.length||!stages.has(stage)||!kinds.has(kind)||!object(count)||!integer(count.count)||!integer(count.lastMs))continue;
   counters[key]={count:count.count,lastMs:count.lastMs,...(integer(count.status)&&count.status>=100&&count.status<=599?{status:count.status}:{})};
  }
- return {schema:1,stopReason:['NONE','LOCAL_STOP','ACK_EXPIRED','PERMISSION_LOST','LOCATION_REQUEST_FAILED','SERVICE_FAILED'].includes(String(value.stopReason))?String(value.stopReason):'UNKNOWN',state:String(value.state),active:value.active,elapsedMs:value.elapsedMs,nativeFixAgeMs:integer(value.nativeFixAgeMs)&&value.nativeFixAgeMs<=86400000?value.nativeFixAgeMs:-1,events,counters,power:power(value.power)};
+ return {schema:1,stopReason:['NONE','LOCAL_STOP','ACK_EXPIRED','PERMISSION_LOST','LOCATION_REQUEST_FAILED','SERVICE_FAILED','AUTH_FAILED'].includes(String(value.stopReason))?String(value.stopReason):'UNKNOWN',state:String(value.state),active:value.active,elapsedMs:value.elapsedMs,nativeFixAgeMs:integer(value.nativeFixAgeMs)&&value.nativeFixAgeMs<=86400000?value.nativeFixAgeMs:-1,events,counters,power:power(value.power)};
 }

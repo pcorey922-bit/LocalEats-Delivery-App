@@ -8,12 +8,15 @@ import java.util.concurrent.*;
 /** Explicit native session bridge. No provider response/error text is logged. */
 @CapacitorPlugin(name="RoCoEatsNativeClerk")
 public class NativeClerkPlugin extends Plugin {
+    private static NativeDutyHttpClient dutyClient;
     private final ExecutorService requests=new ThreadPoolExecutor(2,2,0,TimeUnit.SECONDS,new ArrayBlockingQueue<Runnable>(8));
     private NativeClerkSession session(){return NativeClerkSession.get(getContext());}
     private interface Operation {JSObject run() throws Exception;}
     private void request(PluginCall call,Operation operation){
         CompletableFuture<Void> configured=new CompletableFuture<>();
-        getActivity().runOnUiThread(()->{try{session().configure(getActivity());configured.complete(null);}catch(Exception ignored){configured.completeExceptionally(new SecurityException("NATIVE_AUTH_CONFIG_MISSING"));}});
+        getActivity().runOnUiThread(()->{try{session().configure(getActivity());
+            synchronized(NativeClerkPlugin.class){if(dutyClient==null)dutyClient=new NativeDutyHttpClient(session(),BuildConfig.ROCOEATS_API_ORIGIN);com.equimaps.capacitor_background_geolocation.NativeDutyRuntime.install(dutyClient);}
+            configured.complete(null);}catch(Exception ignored){configured.completeExceptionally(new SecurityException("NATIVE_AUTH_CONFIG_MISSING"));}});
         try{requests.submit(()->{try{configured.get(12000,TimeUnit.MILLISECONDS);session().awaitInitialized();call.resolve(operation.run());}catch(Exception ignored){call.reject("Native authentication did not complete","NATIVE_AUTH_REQUEST_FAILED");}});}
         catch(RejectedExecutionException ignored){call.reject("Native authentication unavailable","NATIVE_AUTH_UNAVAILABLE");}
     }

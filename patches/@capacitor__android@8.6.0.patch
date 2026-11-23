@@ -101,10 +101,10 @@ index 46bc17417ffa51e8c839b6bd375b4fc8cb7fa984..b23641f4b91905fbfa11de4293797e8c
          this.http(call, null);
 diff --git a/capacitor/src/main/java/com/getcapacitor/plugin/util/DutyTrace.java b/capacitor/src/main/java/com/getcapacitor/plugin/util/DutyTrace.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..48e3d5a50189de83d658987dec229f3ca46244e6
+index 0000000000000000000000000000000000000000..88fd61acaf6aa088a410177f110149bf5f39dde5
 --- /dev/null
 +++ b/capacitor/src/main/java/com/getcapacitor/plugin/util/DutyTrace.java
-@@ -0,0 +1,122 @@
+@@ -0,0 +1,124 @@
 +package com.getcapacitor.plugin.util;
 +
 +import java.net.URI;
@@ -113,8 +113,9 @@ index 0000000000000000000000000000000000000000..48e3d5a50189de83d658987dec229f3c
 +/** Opt-in, bounded RAM-only driver diagnostics. Never retains request data. */
 +public final class DutyTrace {
 +    public enum Kind { NONE, HEARTBEAT, GPS, AVAILABILITY, AUTH }
-+    public enum StopReason { NONE, LOCAL_STOP, ACK_EXPIRED, PERMISSION_LOST, LOCATION_REQUEST_FAILED, SERVICE_FAILED }
++    public enum StopReason { NONE, LOCAL_STOP, ACK_EXPIRED, PERMISSION_LOST, LOCATION_REQUEST_FAILED, SERVICE_FAILED, AUTH_FAILED }
 +    public enum Stage {
++        NATIVE_TOKEN_START, NATIVE_TOKEN_READY, NATIVE_TOKEN_FAILED,
 +        START, STOPPED, EXPIRED, PULSE, NATIVE_GPS_FIX, JS_PULSE, JS_GPS,
 +        TOKEN_START, TOKEN_READY, TOKEN_FAILED, JS_HTTP_START, JS_HTTP_RETURN, JS_HTTP_FAILED, JS_BODY_START, JS_BODY_READY, JS_BODY_FAILED,
 +        NATIVE_HTTP_START, NATIVE_HTTP_RESULT, NATIVE_HTTP_TIMEOUT, NATIVE_HTTP_INTERRUPTED,
@@ -141,6 +142,7 @@ index 0000000000000000000000000000000000000000..48e3d5a50189de83d658987dec229f3c
 +    public static boolean isJsStage(Stage stage) {
 +        return EnumSet.of(Stage.JS_PULSE,Stage.JS_GPS,Stage.TOKEN_START,Stage.TOKEN_READY,Stage.TOKEN_FAILED,Stage.JS_HTTP_START,Stage.JS_HTTP_RETURN,Stage.JS_HTTP_FAILED,Stage.JS_BODY_START,Stage.JS_BODY_READY).contains(stage);
 +    }
++    public static synchronized long currentOwner(){return active?generation:0;}
 +    public static synchronized long begin(long now) {
 +        generation++; requestSerial=0; started=now; active=true; state="ACTIVE";stopReason=StopReason.NONE; events.clear(); counters.clear();
 +        lastPower=Collections.emptyMap(); fixAgeMs=-1; lastFixEvent=-20000;

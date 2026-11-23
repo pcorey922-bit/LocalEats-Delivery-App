@@ -1,3 +1,46 @@
+# November 23 — Native duty engine/transport implemented, UI migration still OFF
+
+SDK FOUNDATION d096599a15eec7db14219bef2c3e80933543e802 ALL THREE CI SUCCESS:
+Validate45133512941/45133518815, Native45133518861 (both Android+iOS audiences).
+Official Clerk1.5 bridge compiles on current AGP8.13/Gradle8.14.3; no Kotlin compiler /
+major Gradle upgrade needed. Owner Native API enabled, no package registrations;
+no configuration change made or requested. Current ticket flow retains existing
+proof-bound custom callback, does not introduce SDK hosted OAuth callbacks.
+
+IMPLEMENTED NEXT LAYER (pending commit/Android CI, still NOT activated):
+- Actual pure-Java NativeDutyEngine + existing DutyLease run without any JS callback.
+  Service native clock invokes SDK-authenticated heartbeat requests and strict native
+  ACK; native GPS callback submits approved, fresh/nonmock locations and current
+  authorized delivery updates. Independent heartbeat/GPS request slots,30s GPS throttle,
+  native stop/account/late-response fences. No permission,75s ACK or90s server change.
+- Driver NativeDutyHttpClient uses official SDK token retrieval/one401 renewal plus
+  bounded HTTPS, native15s total gate,5s I/O, fixed backend telemetry route allowlist,
+  no redirect, strict body/size validation. Dedicated OkHttp NO_COOKIES avoids ambient
+  WebView credentials; no Origin spoofing, cookie extraction or alternate auth.
+  SDK provider failure distinguished from unavailable transport without raw errors.
+- Native-owned service refuses external JS ACK calls. Read-only native receipt/state
+  projection for foreground recovery; native token stage diagnostics are nonce-only,
+  no token/user/location/header payload. Caller generation/expiry cannot be reset by
+  a UI read. Native service still starts only with supervised notification/consent.
+- Native plugin/client remains UNREGISTERED in MainActivity and current Driver UI
+  still uses existing auth. No signed APK or owner test requested. Migration must be
+  atomic: native UI session/ticket source AND native-owned duty option together.
+
+VALIDATION: actual JVM engine+lease4min test has NO JS runtime; authenticated SDK/HTTP
+simulated. Tests cover native stop/expiry/cancel/late results, pending-token deadline
+slot recovery, strict online JSON/401/403/409, actor change, invalid GPS/server approval
+and independent heartbeat during stalled GPS. Existing native lease/trace/request/auth
+fence tests PASS. Native SDK+HTTP Java adapters compile against actual public SDK1.5 /
+OkHttp jars with Android/compiler stubs (annotation warnings; not Android runtime).
+Full Android CI pending for this layer. SDK/client initialization was never executed
+against a real account/provider. No Render/config/data/provider/financial operation.
+
+NEXT: complete Driver-only native auth projection hooks/provider and existing ticket
+activation; install/register official client; wire native-owned duty receipts/foreground
+state read with ZERO JS network/ACK on that path. Test start/restart/role denial/cancel /
+SDK failure + full JS absence, then native builds/CI before any signed replacement.
+Website/Customer/iOS keep current authentication. Do NOT ship a half-migrated login.
+
 # November 23 — Native API already enabled; official SDK bridge foundation underway
 
 OWNER read-only Clerk evidence: development Native applications ENABLED (Disable

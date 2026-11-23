@@ -26,7 +26,7 @@ public final class DutyTraceTest {
   DutyTrace.power(next,DutyTrace.Stage.SCREEN_OFF,power,92001);
   check(!DutyTrace.snapshot(92002).toString().contains("DO_NOT_LEAK"),"Power fields strictly sanitized");
   DutyTrace.fix(next,123,92003);check(DutyTrace.snapshot(92004).get("nativeFixAgeMs").equals(123L),"Native fix receipt independent of JavaScript");
-  check(DutyTrace.isJsStage(DutyTrace.Stage.JS_PULSE)&&!DutyTrace.isJsStage(DutyTrace.Stage.ACK_CONFIRMED),"JavaScript cannot claim native acknowledgements");
+  check(DutyTrace.isJsStage(DutyTrace.Stage.JS_PULSE)&&!DutyTrace.isJsStage(DutyTrace.Stage.ACK_CONFIRMED)&&!DutyTrace.isJsStage(DutyTrace.Stage.NATIVE_TOKEN_READY),"JavaScript cannot claim native acknowledgements");
   DutyTrace.Request auth=DutyTrace.startRequest("https://clever-bobcat-2358.clerk.accounts.dev/v1/client/sessions/opaque/tokens","POST",93000);
   DutyTrace.authBody(auth.owner(),auth.serial(),DutyTrace.Stage.JS_BODY_START,93001);
   DutyTrace.authBody(auth.owner(),auth.serial(),DutyTrace.Stage.JS_BODY_READY,93002);
