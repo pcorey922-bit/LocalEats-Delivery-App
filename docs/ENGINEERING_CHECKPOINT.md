@@ -1,3 +1,43 @@
+# November 23 — Native API already enabled; official SDK bridge foundation underway
+
+OWNER read-only Clerk evidence: development Native applications ENABLED (Disable
+button visible); Android and iOS have NO application registrations. No changes made.
+Missing registrations are NOT established as the233 failure: its auth ran through
+browser Clerk and native HTTP completed200. No registration/config change authorized.
+Official native SDK supports proof-bound ticket consumption; existing browser handoff
+can remain. Native hosted OAuth callbacks/production registrations are separate work.
+Do not infer that unregistered production/native callback acceptance has passed.
+
+660c76bb41c25419fd9e5edd26f35bc364c3b12c ALL THREE CI SUCCESS:
+Validate push45130645949, PR45130651688, Native45130651734.5 bridge-reader/29 focused
+units, JVM/browser/types/build and broad Android+iOS CI passed. No signed APK built.
+This is the validated scoped reader correction, NOT full native background acceptance.
+
+IMPLEMENTED SDK FOUNDATION ONLY (pending commit/Android CI, not activated in UI/FGS):
+- Driver-only pinned official com.clerk:clerk-android-api1.5.0. Inspected public AAR:
+  minSDK24/compileSDK36/minAGP1.0 compatible metadata; SDK uses Kotlin2.4.21 /
+  coroutines1.11.0. Java continuation bridge avoids a Kotlin compiler or Gradle-major
+  upgrade. Public immutable staging SDK key/origin are BuildConfig, never a secret.
+- Native ticket -> SDK active session, SDK token renewal, existing principal/task
+  checks, native deadlines and operation generation fences; no WebView cookie/token
+  extraction. Noncredential persistent logout intent blocks stale SDK restoration if
+  provider sign-out fails. Native service stops before sign-out or a new ticket.
+- Plugin is NOT registered/initialized yet. Existing UI/auth/FGS therefore unchanged;
+  do not package a physical replacement. Next wire a single native principal into
+  Driver UI and move heartbeat/GPS scheduling into native service; no parallel login.
+- Unused SDK OAuth activities/biometric permission removed in Driver manifest overlay;
+  SDK shared-session provider forced private+disabled. Customer manifest/dependencies
+  unchanged. API-compatible bridge compiled locally against actual SDK1.5 AAR plus
+  Android/compiler stubs (annotation warnings only); this is not an Android build.
+  Actual JVM supersession/cancel/logout fence and4 audience/manifest tests PASS.
+  Full Android/Gradle compatibility must be verified by CI before activation.
+
+NEXT ENGINEERING: complete native session projection + existing ticket activation for
+Driver only, then native-owned token/HTTP/ACK/GPS with fully paused JS tests, strict
+roles/consent/generation/deadline/90s behavior. Keep migration off until those pass.
+Native API is enabled already; no further owner setting action is currently needed.
+No Render/Clerk configuration/deploy/provider/private-session/financial operation.
+
 # November 23 — Driver233 FAILED: Clerk token resolver stalls after native auth200
 
 OWNER physical Samsung evidence supersedes233 acceptance instructions below. Do NOT

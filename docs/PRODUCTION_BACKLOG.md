@@ -1,3 +1,18 @@
+# November 23 — Native Clerk prerequisite clarified; bridge foundation not activated
+
+Owner observed Native applications enabled; NO Android/iOS registrations. No settings
+changed. Do not blame registrations for233 (browser SDK/native auth200 completed).
+Reader correction660c76b ALL THREE CI passed; physical GPS remains BLOCKED.
+Official Driver-only Clerk API1.5 Java bridge foundation implemented, not registered or
+activated: ticket/session/token/secure SDK persistence, native deadlines, account and
+logout fences; immutable public staging config. No copied WebView credentials, custom
+auth authority or role grants. Native SDK min24/compile36 metadata verified, actual
+API compile check +JVM guard/4 manifest tests passed; Android build CI still required.
+Next: same-principal Driver UI/ticket migration plus native service-owned auth/heartbeat/
+GPS and full-JS-suspension tests before any signed replacement or physical request.
+No immediate owner action needed; NativeAPI already enabled. Future production/app
+registration acceptance remains unverified. No backend/hosted/provider/financial change.
+
 # November 23 — Driver233 token-refresh failure; native auth is the GPS blocker
 
 Physical233 FAILED. Native HB20081147 -> ACK81148 -> bodyREADY81159 shows previous

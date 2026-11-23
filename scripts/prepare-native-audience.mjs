@@ -12,6 +12,10 @@ export function driverNativeManifests(android, ios) {
   // generated overlay. Override the upstream exported service to be app-private.
   if (!android.includes('xmlns:tools=')) android = android.replace('<manifest ', '<manifest xmlns:tools="http://schemas.android.com/tools" ');
   android = android.replace('</application>', '<service android:name="com.equimaps.capacitor_background_geolocation.BackgroundGeolocationService" android:exported="false" tools:replace="android:exported"/>\n    </application>');
+  // Ticket handoff only: do not add an unused biometric permission or exported
+  // SDK OAuth/shared-account entry point to the existing private Driver app.
+  android=android.replace('</manifest>', '<uses-permission android:name="android.permission.USE_BIOMETRIC" tools:node="remove"/>\n</manifest>');
+  android=android.replace('</application>', '<provider android:name="com.clerk.api.sharedsession.SharedSessionSyncProvider" android:authorities="${applicationId}.clerk.shared-session-sync" android:exported="false" android:enabled="false" tools:replace="android:exported,android:enabled"/><activity android:name="com.clerk.api.sso.SSOReceiverActivity" tools:node="remove"/><activity android:name="com.clerk.api.sso.SSOManagerActivity" tools:node="remove"/>\n</application>');
   const purpose = 'With your consent, RoCoEats Driver shares your location with authorized dispatch and active order participants while on duty, including in the background. Go offline to stop sharing.';
   ios = ios.replace(/(<key>NSLocationWhenInUseUsageDescription<\/key>\s*<string>)[^<]*(<\/string>)/, `$1${purpose}$2`);
   const extra = `<key>NSLocationAlwaysAndWhenInUseUsageDescription</key><string>${purpose}</string><key>UIBackgroundModes</key><array><string>location</string></array>`;

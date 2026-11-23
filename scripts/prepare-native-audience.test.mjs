@@ -40,3 +40,17 @@ test('real native configuration protects iOS safe areas without changing audienc
     assert.equal(config.includePlugins.includes('@capacitor-community/background-geolocation'),audience==='driver');
   }
 });
+
+test('native Driver SDK retains existing ticket callback and removes unused credential-sharing/OAuth/biometric entrypoints',async()=>{
+ const android=await readFile(new URL('../artifacts/localeats/android/app/src/main/AndroidManifest.xml',import.meta.url),'utf8');
+ const ios=await readFile(new URL('../artifacts/localeats/ios/App/App/Info.plist',import.meta.url),'utf8');
+ const driver=driverNativeManifests(android,ios).android;
+ assert.match(driver,/USE_BIOMETRIC" tools:node="remove"/);
+ assert.match(driver,/SharedSessionSyncProvider[^>]+android:exported="false"[^>]+android:enabled="false"/);
+ assert.match(driver,/SSOReceiverActivity" tools:node="remove"/);
+ assert.match(driver,/SSOManagerActivity" tools:node="remove"/);
+ assert.ok(!android.includes('com.clerk.api'));
+ const gradle=await readFile(new URL('../artifacts/localeats/android/app/build.gradle',import.meta.url),'utf8');
+ assert.match(gradle,/if \(audience == 'driver'\) \{\s*implementation 'com.clerk:clerk-android-api:1\.5\.0'/);
+ assert.match(gradle,/buildConfigField "String", "ROCOEATS_CLERK_KEY"/);
+});

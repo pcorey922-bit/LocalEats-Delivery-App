@@ -16,8 +16,9 @@ const output=await mkdtemp(path.join(tmpdir(),'roco-native-duty-'));
 const java=process.env.JAVA_HOME ? path.join(process.env.JAVA_HOME,'bin/java') : 'java';
 function run(args){const r=spawnSync(java,args,{stdio:'inherit'});if(r.error)throw r.error;if(r.status!==0)throw Error('Native duty lease validation failed');}
 try {
- run(['-m','jdk.compiler/com.sun.tools.javac.Main','-d',output,source,path.join(path.dirname(source),'DutyRequestGate.java'),trace,path.join(root,'scripts/native-tests/DutyLeaseTest.java'),path.join(root,'scripts/native-tests/DutyTraceTest.java'),path.join(root,'scripts/native-tests/DutyRequestGateTest.java')]);
+ run(['-m','jdk.compiler/com.sun.tools.javac.Main','-d',output,source,path.join(path.dirname(source),'DutyRequestGate.java'),trace,path.join(root,'scripts/native-tests/DutyLeaseTest.java'),path.join(root,'scripts/native-tests/DutyTraceTest.java'),path.join(root,'scripts/native-tests/DutyRequestGateTest.java'),path.join(root,'artifacts/localeats/android/app/src/driver/java/com/rocoeats/app/NativeAuthFence.java'),path.join(root,'scripts/native-tests/NativeAuthFenceTest.java')]);
  run(['-cp',output,'DutyLeaseTest']);
  run(['-cp',output,'DutyTraceTest']);
  run(['-cp',output,'DutyRequestGateTest']);
+ run(['-cp',output,'NativeAuthFenceTest']);
 } finally {await rm(output,{recursive:true,force:true});}

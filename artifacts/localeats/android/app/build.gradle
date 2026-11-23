@@ -6,8 +6,12 @@ def audienceConfig = new groovy.json.JsonSlurper().parse(rootProject.file('../..
 android {
     namespace = "com.rocoeats.app"
     compileSdk = rootProject.ext.compileSdkVersion
+    buildFeatures { buildConfig true }
+    if (audience == 'driver') sourceSets.main.java.srcDir('src/driver/java')
     sourceSets.main.manifest.srcFile(audience == 'driver' ? 'src/driver/AndroidManifest.xml' : 'src/main/AndroidManifest.xml')
     defaultConfig {
+        buildConfigField "String", "ROCOEATS_CLERK_KEY", groovy.json.JsonOutput.toJson(System.getenv('VITE_CLERK_PUBLISHABLE_KEY') ?: '')
+        buildConfigField "String", "ROCOEATS_API_ORIGIN", groovy.json.JsonOutput.toJson(System.getenv('VITE_API_ORIGIN') ?: '')
         applicationId audienceConfig.id
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
@@ -56,6 +60,9 @@ android {
         }
         staging {
             initWith release
+            def stagingPublic = new groovy.json.JsonSlurper().parse(rootProject.file('../../../config/native-staging.json'))
+            buildConfigField "String", "ROCOEATS_CLERK_KEY", groovy.json.JsonOutput.toJson(stagingPublic.clerkPublishableKey)
+            buildConfigField "String", "ROCOEATS_API_ORIGIN", groovy.json.JsonOutput.toJson(stagingPublic.apiOrigin)
             applicationIdSuffix ".staging"
             versionNameSuffix "-staging"
             resValue "string", "app_name", "${audienceConfig.name} Staging"
@@ -80,6 +87,12 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
+    // Official API only; no native UI/OAuth/account sharing or custom credential store.
+    if (audience == 'driver') {
+        implementation 'com.clerk:clerk-android-api:1.5.0'
+        implementation 'org.jetbrains.kotlin:kotlin-stdlib:2.4.21'
+        implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0'
+    }
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
