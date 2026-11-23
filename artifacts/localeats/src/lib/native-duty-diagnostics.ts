@@ -1,8 +1,12 @@
+export type NativeDutyRequest={requestId:string;url:string;method:string;headers:Record<string,string>;data?:unknown;id?:string;sequence?:string};
+export type NativeDutyResponse={status:number;data:unknown;nativeAcknowledged?:boolean};
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import type { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
 export type DutyTraceKind='NONE'|'HEARTBEAT'|'GPS'|'AVAILABILITY'|'AUTH';
 export type DutyJsStage='JS_PULSE'|'JS_GPS'|'TOKEN_START'|'TOKEN_READY'|'TOKEN_FAILED'|'JS_HTTP_START'|'JS_HTTP_RETURN'|'JS_HTTP_FAILED'|'JS_BODY_START'|'JS_BODY_READY';
 export const nativeDutyBridge=registerPlugin<BackgroundGeolocationPlugin & {
+ requestDuty(options:NativeDutyRequest):Promise<NativeDutyResponse>;
+ cancelDutyRequest(options:{requestId:string}):Promise<void>;
  acknowledgeDuty(options:{id:string;sequence:string}):Promise<void>;
  recordDutyStage(options:{id:string;stage:DutyJsStage;kind:DutyTraceKind}):Promise<void>;
  getDutyDiagnostics():Promise<unknown>;

@@ -8,6 +8,7 @@ type Dependencies = {
     addWatcher(options: { backgroundTitle: string; backgroundMessage: string; requestPermissions: boolean; stale: boolean; distanceFilter: number; dutyHeartbeat?: boolean }, callback: (fix?: DutyFix, error?: { code?: string }, pulse?: DutyPulse) => void): Promise<string>;
     removeWatcher(options: { id: string }): Promise<void>;
     acknowledgeDuty?: (id: string, sequence: string) => Promise<void>;
+    nativeHeartbeat?: (id:string,sequence:string,signal:AbortSignal)=>Promise<void>;
   };
   permission: () => Promise<boolean>;
   api: <T>(path: string, options: Options) => Promise<T>;
@@ -59,11 +60,18 @@ export function backgroundDutySession(deps: Dependencies) {
     void stop().catch(() => deps.status('Location service could not stop. Disable location permission in device settings and reopen RoCoEats.'));
   };
   async function dutyPulse(pulse: DutyPulse) {
-    if (stopped || !deps.watcher.acknowledgeDuty || !/^[1-9][0-9]{0,18}$/.test(pulse.sequence) || pulse.sequence === acknowledgedSequence) return;
+    if (stopped || !deps.watcher.acknowledgeDuty && !deps.watcher.nativeHeartbeat || !/^[1-9][0-9]{0,18}$/.test(pulse.sequence) || pulse.sequence === acknowledgedSequence) return;
     if (!id) { pendingPulse = pulse; return; }
     if (pulseBusy) return;
     pulseBusy = true;
     try {
+      if(deps.watcher.nativeHeartbeat){
+        const controller=new AbortController();
+        try{await nativeStep('NATIVE_LOCATION_REQUEST_TIMEOUT',()=>deps.watcher.nativeHeartbeat!(id!,pulse.sequence,controller.signal),abort.signal);}
+        finally{controller.abort();}
+        if(!stopped){deps.evidence?.({heartbeatAt:now(),failure:null});acknowledgedSequence=pulse.sequence;}
+        return;
+      }
       const result = await request<{online:boolean}>('/api/driver/heartbeat', {method:'POST', signal:abort.signal});
       if (stopped) return;
       if (result?.online !== true) throw Error('Unverified heartbeat acknowledgement');
@@ -129,7 +137,7 @@ export function backgroundDutySession(deps: Dependencies) {
         if (stopped) return;
         if (!eligible(access)) throw Error('Current driver approval and online availability are required. Reconnect explicitly.');
         await nativeStep('NATIVE_LOCATION_WATCHER_TIMEOUT', async () => {
-          id = await deps.watcher.addWatcher({ backgroundTitle: 'RoCoEats Driver · On duty', backgroundMessage: 'Sharing your driver location. Go offline in RoCoEats to stop.', requestPermissions: true, stale: false, distanceFilter: 0, dutyHeartbeat: !!deps.watcher.acknowledgeDuty }, (fix, error, pulse) => { if (pulse) void dutyPulse(pulse); else void position(fix, error); });
+          id = await deps.watcher.addWatcher({ backgroundTitle: 'RoCoEats Driver · On duty', backgroundMessage: 'Sharing your driver location. Go offline in RoCoEats to stop.', requestPermissions: true, stale: false, distanceFilter: 0, dutyHeartbeat: !!deps.watcher.acknowledgeDuty || !!deps.watcher.nativeHeartbeat }, (fix, error, pulse) => { if (pulse) void dutyPulse(pulse); else void position(fix, error); });
           if (!stopped && pendingPulse) { const pulse = pendingPulse; pendingPulse = undefined; void dutyPulse(pulse); }
           // Native calls cannot necessarily be canceled. A watcher returned after
           // timeout/stop must be removed even though the caller has already left.

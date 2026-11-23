@@ -12,19 +12,102 @@ index 9e65984854cfb3d7bde5d56b0ab25974c8eccf6e..ba0ffa2d899978c4e926775a15ccdb02
  </manifest>
    
 diff --git a/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocation.java b/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocation.java
-index a92fcf9bad0139d203964afb1550ea5ba03ce99b..beb7b1051c1848f928e2366c9816f8d35aef4222 100644
+index a92fcf9bad0139d203964afb1550ea5ba03ce99b..c93824fd0e6615d2445a78026d89ca11cca0e197 100644
 --- a/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocation.java
 +++ b/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocation.java
-@@ -33,6 +33,8 @@ import com.google.android.gms.location.LocationServices;
+@@ -33,6 +33,11 @@ import com.google.android.gms.location.LocationServices;
  import com.google.android.gms.tasks.OnSuccessListener;
  
  import org.json.JSONObject;
 +import com.getcapacitor.plugin.util.DutyTrace;
++import com.getcapacitor.plugin.util.HttpRequestHandler;
++import com.getcapacitor.plugin.util.CapacitorHttpUrlConnection;
++import java.util.concurrent.*;
 +import android.os.SystemClock;
  
  import androidx.localbroadcastmanager.content.LocalBroadcastManager;
  
-@@ -73,7 +75,7 @@ public class BackgroundGeolocation extends Plugin {
+@@ -49,9 +54,78 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+         }
+ )
+ public class BackgroundGeolocation extends Plugin {
+-    private BackgroundGeolocationService.LocalBinder service = null;
++    private volatile BackgroundGeolocationService.LocalBinder service = null;
+     private Boolean stoppedWithoutPermissions = false;
+ 
++    private final ThreadPoolExecutor dutyRequests=new ThreadPoolExecutor(2,2,0,TimeUnit.SECONDS,new ArrayBlockingQueue<Runnable>(4));
++    private final ScheduledExecutorService dutyDeadlines=Executors.newSingleThreadScheduledExecutor();
++    private final ConcurrentHashMap<String,DutyJob> dutyJobs=new ConcurrentHashMap<>();
++    private class DutyJob implements Runnable {
++        final PluginCall call;final String requestId;final DutyTrace.Kind kind;final long owner;
++        final DutyRequestGate gate=new DutyRequestGate(SystemClock.elapsedRealtime());
++        volatile Future<?> task;volatile ScheduledFuture<?> deadline;
++        DutyJob(PluginCall call,String requestId,DutyTrace.Kind kind){this.call=call;this.requestId=requestId;this.kind=kind;this.owner=service==null?0:service.traceOwner(call.getString("id"));}
++        void disconnect(){try{Object value=call.getData().opt("activeCapacitorHttpUrlConnection");if(value instanceof CapacitorHttpUrlConnection)((CapacitorHttpUrlConnection)value).disconnect();}catch(Exception ignored){}}
++        void cancel(String code){
++            if(!gate.cancel())return;
++            if("DUTY_REQUEST_TIMEOUT".equals(code))DutyTrace.record(owner,DutyTrace.Stage.NATIVE_HTTP_TIMEOUT,kind,0,SystemClock.elapsedRealtime());
++            disconnect();if(task!=null)task.cancel(true);if(deadline!=null)deadline.cancel(false);dutyJobs.remove(requestId,this);
++            call.reject("Native duty request did not finish",code);
++        }
++        @Override public void run(){
++            boolean claimed=false;
++            if(!gate.canStart(SystemClock.elapsedRealtime())){cancel("DUTY_REQUEST_TIMEOUT");return;}
++            try {
++                JSObject response=HttpRequestHandler.request(call,null,getBridge());
++                DutyRequestGate.Result completion=gate.complete(SystemClock.elapsedRealtime());
++                if(completion==DutyRequestGate.Result.IGNORED)return;
++                if(completion==DutyRequestGate.Result.TIMEOUT){call.reject("Native duty request timed out","DUTY_REQUEST_TIMEOUT");return;}
++                claimed=true;
++                boolean acknowledged=false;
++                String sequence=call.getString("sequence");
++                if(sequence!=null && response.optInt("status",0)==200){
++                    Object data=response.opt("data");
++                    JSONObject body;
++                    try{body=data instanceof JSONObject?(JSONObject)data:data instanceof String?new JSONObject((String)data):null;}
++                    catch(org.json.JSONException invalid){call.reject("Native heartbeat response was not valid","DUTY_NATIVE_RESPONSE_INVALID");return;}
++                    if(!DutyRequestGate.validHeartbeat(response.optInt("status",0),body==null?null:body.opt("online"))){
++                        DutyTrace.record(owner,DutyTrace.Stage.ACK_REJECTED,kind,200,SystemClock.elapsedRealtime());
++                        call.reject("Native heartbeat response was not valid","DUTY_NATIVE_RESPONSE_INVALID");return;
++                    }
++                    if(!gate.withinDeadline(SystemClock.elapsedRealtime())){call.reject("Native duty request timed out","DUTY_REQUEST_TIMEOUT");return;}
++                    try {acknowledged=service!=null&&service.acknowledgeDuty(call.getString("id"),Long.parseLong(sequence));}catch(NumberFormatException ignored){}
++                    if(!acknowledged){call.reject("Native duty acknowledgement expired","DUTY_ACK_EXPIRED");return;}
++                }
++                // Transport metadata is outside the server JSON; JS cannot infer an
++                // acknowledgement from HTTP200 or a server-supplied lookalike field.
++                response.put("nativeAcknowledged",acknowledged);
++                call.resolve(response);
++            } catch(Exception error){
++                if(!claimed && !gate.cancel())return;
++                call.reject("Native duty transport failed","DUTY_REQUEST_FAILED");
++            } finally {disconnect();if(deadline!=null)deadline.cancel(false);dutyJobs.remove(requestId,this);}
++        }
++    }
++    @PluginMethod
++    public void requestDuty(PluginCall call){
++        String method=call.getString("method","GET"),url=call.getString("url","");
++        DutyTrace.Kind kind=DutyTrace.category(url,method);
++        if(kind!=DutyTrace.Kind.HEARTBEAT && kind!=DutyTrace.Kind.GPS && kind!=DutyTrace.Kind.AVAILABILITY || call.getString("sequence")!=null && kind!=DutyTrace.Kind.HEARTBEAT){
++            call.reject("Unsupported native duty route","DUTY_ROUTE_REJECTED");return;
++        }
++        String requestId=call.getString("requestId","");
++        if(!requestId.matches("[a-f0-9-]{36}")){call.reject("Invalid native request handle","DUTY_REQUEST_INVALID");return;}
++        // Finite native deadlines and no authenticated cross-origin redirect.
++        try{call.getData().put("connectTimeout",5000);call.getData().put("readTimeout",5000);call.getData().put("disableRedirects",true);call.getData().put("responseType","json");}
++        catch(Exception error){call.reject("Invalid duty request","DUTY_REQUEST_INVALID");return;}
++        DutyJob job=new DutyJob(call,requestId,kind);
++        if(dutyJobs.putIfAbsent(requestId,job)!=null){call.reject("Duplicate native request handle","DUTY_REQUEST_INVALID");return;}
++        try{job.deadline=dutyDeadlines.schedule(()->job.cancel("DUTY_REQUEST_TIMEOUT"),DutyRequestGate.TIMEOUT_MS,TimeUnit.MILLISECONDS);job.task=dutyRequests.submit(job);}
++        catch(RejectedExecutionException error){job.cancel("DUTY_REQUEST_BUSY");}
++    }
++    @PluginMethod
++    public void cancelDutyRequest(PluginCall call){DutyJob job=dutyJobs.get(call.getString("requestId",""));if(job!=null)job.cancel("DUTY_REQUEST_CANCELED");call.resolve();}
++
+     private void fetchLastLocation(PluginCall call) {
+         try {
+             LocationServices.getFusedLocationProviderClient(
+@@ -73,7 +147,7 @@ public class BackgroundGeolocation extends Plugin {
      @PluginMethod(returnType = PluginMethod.RETURN_CALLBACK)
      public void addWatcher(final PluginCall call) {
          if (service == null) {
@@ -33,7 +116,7 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..beb7b1051c1848f928e2366c9816f8d3
              return;
          }
          call.setKeepAlive(true);
-@@ -81,11 +83,14 @@ public class BackgroundGeolocation extends Plugin {
+@@ -81,11 +155,14 @@ public class BackgroundGeolocation extends Plugin {
          if (getPermissionState("location") != PermissionState.GRANTED) {
              if (call.getBoolean("requestPermissions", true)) {
                  requestPermissionForAlias("location", call, "locationPermissionsCallback");
@@ -48,7 +131,7 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..beb7b1051c1848f928e2366c9816f8d3
          }
          if (call.getBoolean("stale", false)) {
              fetchLastLocation(call);
-@@ -156,11 +161,12 @@ public class BackgroundGeolocation extends Plugin {
+@@ -156,11 +233,12 @@ public class BackgroundGeolocation extends Plugin {
  
              backgroundNotification = builder.build();
          }
@@ -66,7 +149,7 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..beb7b1051c1848f928e2366c9816f8d3
      }
  
      @PermissionCallback
-@@ -170,15 +176,39 @@ public class BackgroundGeolocation extends Plugin {
+@@ -170,15 +248,39 @@ public class BackgroundGeolocation extends Plugin {
              call.reject("User denied location permission", "NOT_AUTHORIZED");
              return;
          }
@@ -115,7 +198,7 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..beb7b1051c1848f928e2366c9816f8d3
      }
  
      @PluginMethod()
-@@ -253,6 +283,14 @@ public class BackgroundGeolocation extends Plugin {
+@@ -253,6 +355,14 @@ public class BackgroundGeolocation extends Plugin {
              if (call == null) {
                  return;
              }
@@ -130,6 +213,15 @@ index a92fcf9bad0139d203964afb1550ea5ba03ce99b..beb7b1051c1848f928e2366c9816f8d3
              Location location = intent.getParcelableExtra("location");
              if (location != null) {
                  call.resolve(formatLocation(location));
+@@ -342,6 +452,8 @@ public class BackgroundGeolocation extends Plugin {
+         if (service != null) {
+             service.stopService();
+         }
++        for(DutyJob job:dutyJobs.values())job.cancel("DUTY_REQUEST_CANCELED");
++        dutyRequests.shutdownNow();dutyDeadlines.shutdownNow();
+         super.handleOnDestroy();
+     }
+ }
 diff --git a/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocationService.java b/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocationService.java
 index 2c5de9460bdcfe656e7b837d307644bb8dc34a0e..86d049b559ddd8856afe6603d1feec882c5d938a 100644
 --- a/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocationService.java
@@ -505,4 +597,25 @@ index 0000000000000000000000000000000000000000..830c81ac54b78854c81166a7f0109dea
 +        }catch(RuntimeException ignored){}
 +        DutyTrace.power(owner,stage,state,SystemClock.elapsedRealtime());
 +    }
++}
+diff --git a/android/src/main/java/com/equimaps/capacitor_background_geolocation/DutyRequestGate.java b/android/src/main/java/com/equimaps/capacitor_background_geolocation/DutyRequestGate.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..598a66150ee294cfd30caa433c3d8a06dc142580
+--- /dev/null
++++ b/android/src/main/java/com/equimaps/capacitor_background_geolocation/DutyRequestGate.java
+@@ -0,0 +1,15 @@
++package com.equimaps.capacitor_background_geolocation;
++import java.util.concurrent.atomic.AtomicBoolean;
++/** Exactly-one native completion; screen-locked JS timers are not a deadline. */
++public final class DutyRequestGate {
++    public static final long TIMEOUT_MS=15000;
++    public enum Result { ACCEPT, TIMEOUT, IGNORED }
++    private final long started;
++    private final AtomicBoolean terminal=new AtomicBoolean(false);
++    public DutyRequestGate(long started){this.started=started;}
++    public boolean canStart(long now){return !terminal.get()&&withinDeadline(now);}
++    public boolean withinDeadline(long now){return now>=started&&now-started<TIMEOUT_MS;}
++    public Result complete(long now){return !terminal.compareAndSet(false,true)?Result.IGNORED:withinDeadline(now)?Result.ACCEPT:Result.TIMEOUT;}
++    public boolean cancel(){return terminal.compareAndSet(false,true);}
++    public static boolean validHeartbeat(int status,Object online){return status==200&&Boolean.TRUE.equals(online);}
 +}

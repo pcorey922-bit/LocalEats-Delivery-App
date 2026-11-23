@@ -1,3 +1,61 @@
+# November 23 — Driver230 trace confirms stalled synthetic response-body processing
+
+OWNER PHYSICAL EVIDENCE, not a claimed repair acceptance: signed230 on Samsung
+S22 Ultra still disconnected after screen lock. Complete sanitized report reviewed.
+SCREEN_OFF139644; last native ACK_CONFIRMED123182; EXPIRED198031 (74849ms after
+ACK receipt; lease remains anchored to challenge issue, not delayed HTTP receipt).
+Request23 native HTTP200143234 -> JS_BODY_START143247. Request24 native HTTP200151695
+-> JS_HTTP_RETURN151704 / JS_BODY_START151705. No BODY_READY until366723/366724
+(at least215018ms after second body start,168692ms after expiry). JS body markers
+lack request IDs, so do not invent one-to-one delayed-reader pairing. Both readers
+were outstanding; no subsequent ACK occurred. Native/JS pulses163020/163035 and
+183020/183037 continued, as did226 GPS fixes (last native197466/JS197471). Tokens
+14 starts/14 ready; last151444/151452. At expiry validatedWiFi/wakeHeld true;
+interactive/deviceIdle/powerSave false; lowPowerExempt true. Wi-Fi active with mobile
+enabled; no handoff evidence. This is not a demonstrated GPS shutdown or token failure.
+
+CONFIRMED SOURCE/REPRO: Capacitor patched Fetch constructs a synthetic Response from
+already parsed native JSON. customFetch awaits Response.text(); native duty pulseBusy
+is held until that reader finishes. More native pulses cannot start another serialized
+heartbeat. Timers did not release the request slot during the observed lock. Native200
+alone must NOT renew the duty lease. Previous general account-profile body-null fix
+is preserved and is separate from this locked synthetic body-reader scheduling issue.
+
+IMPLEMENTED targeted Android DRIVER background-telemetry correction (commit pending):
+- Direct native JSON RPC for existing heartbeat/availability/GPS routes, no synthetic
+  Fetch Response/Blob/ReadableStream. Auth stays existing Clerk token retrieval plus
+  one fresh-token renewal only on definite401. No stored JWT/refresh credential,
+  role bypass, anonymous request or financial endpoint added. iOS transport unchanged.
+- Native bounded worker validates HTTP200 AND JSON boolean online:true and acknowledges
+  the current live watcher/challenge BEFORE resolving JS. Server body cannot forge
+  top-level native acknowledgement metadata. Native15s total deadline + finite I/O,
+  bounded concurrency/queue, no redirects, cancellation and late-completion fences.
+  Explicit stop/old challenge/expired lease cannot resurrect duty. Server90s unchanged.
+- JS still obtains Clerk credentials and initiates subsequent pulse requests. This is
+  NOT a fully autonomous native Clerk session implementation or proof against every
+  WebView suspension. New evidence of a token/pulse-stage stall would require a secure
+  native session design; do not cache an expiring bearer token or weaken expiry.
+
+VALIDATION:28 focused units PASS; actual JVM lease/trace/request gate PASS including
+strict native body, deadline/cancel/late outcomes and ACK before JS processing.
+Chromium real consent/controller tests PASS with heartbeat Response.text held pending,
+8 native JSON pulses across160 simulated seconds, expiry/reconnect/late fences plus
+existing GPS/push regressions. Native/API bridge simulated; no physical GPS claim.
+Real LOCAL API/PGlite driver role/session/GPS/offline integration PASS; Clerk/native
+coordinates simulated. UI typecheck and production build PASS. Android compilation,
+exact-SHA CI and signed replacement artifact verification still pending.
+No Render/API/schema migration or hosted configuration change required or performed.
+All ordering/financial/provider/geographic safeguards and historical records preserved.
+
+NEXT: finish exact-SHA CI + protected Driver signing; verify artifact source/package/
+version/signer/actual native JSON worker before ONE meaningful Samsung retest. Update
+without uninstalling; same permissions/network/battery conditions, explicit consent,
+wait for heartbeat+GPS receipts, lock3min, inspect Chrome Dispatch BEFORE Driver resume,
+then copy native report BEFORE reconnect/new sharing/force-close; go offline afterward.
+PASS requires continued Dispatch online/fresh accepted GPS and native ACKs through
+screen-off, plus correct explicit-stop notification/sharing cleanup. Physical background
+GPS remains BLOCKED until that evidence; no repeated225/230 or Customer208 auth tests.
+
 # November 22 — Driver230 native diagnostic APK verified; screen-lock fix NOT claimed
 
 FUNCTIONAL SOURCE c816985e240faaea3df92aab0e05d40cb442d3dc on primary branch,

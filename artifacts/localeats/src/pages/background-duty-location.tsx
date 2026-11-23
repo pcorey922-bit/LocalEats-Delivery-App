@@ -1,3 +1,4 @@
+import { nativeDutyHttp } from '../lib/native-duty-http';
 import { driverDutyRequest } from '../lib/driver-duty-transport';
 import { useAuth } from '@clerk/react';
 import { dutyIntent } from '../lib/duty-intent';
@@ -47,6 +48,11 @@ export function BackgroundDutyLocation({ onFatal }: { onFatal: (message: string)
   useEffect(() => {
     let disposed = false, permissionDenied = false;
     let nativeId:string|undefined;
+    const android=Capacitor.getPlatform()==='android';
+    const telemetry=<T,>(path:string,options:Parameters<typeof driverDutyRequest>[3])=>{
+      const kind:DutyTraceKind=path.endsWith('/heartbeat')?'HEARTBEAT':path.endsWith('/availability')?'AVAILABILITY':'GPS';
+      return driverDutyRequest<T>(android?(route,request)=>nativeDutyHttp(watcher,()=>tokenGetter.current(),import.meta.env.VITE_API_ORIGIN??'',route,request):customFetch,()=>tokenGetter.current({skipCache:true}),path,{...options,onStage:stage=>recordDutyStage(nativeId,stage,kind)});
+    };
     const session = backgroundDutySession({ watcher: {
       addWatcher: async (options, callback) => {
         await clearSavedWatcher();
@@ -60,12 +66,9 @@ export function BackgroundDutyLocation({ onFatal }: { onFatal: (message: string)
         catch (error) { await watcher.removeWatcher({ id }); throw error; }
         return id;
       },
-      ...(Capacitor.getPlatform() === 'android' ? {acknowledgeDuty:(id:string,sequence:string)=>watcher.acknowledgeDuty({id,sequence})} : {}),
+      ...(android ? {nativeHeartbeat:async(id:string,sequence:string,signal:AbortSignal)=>{await telemetry('/api/driver/heartbeat',{method:'POST',signal,nativePulse:{id,sequence}});}} : {}),
       removeWatcher: async ({ id }) => { await watcher.removeWatcher({ id }); if (localStorage.getItem(storageKey) === id) localStorage.removeItem(storageKey); },
-    }, api: (path,options)=> {
-      const kind:DutyTraceKind=path.endsWith('/heartbeat')?'HEARTBEAT':path.endsWith('/availability')?'AVAILABILITY':'GPS';
-      return driverDutyRequest(customFetch,()=>tokenGetter.current({skipCache:true}),path,{...options,onStage:stage=>recordDutyStage(nativeId,stage,kind)});
-    },
+    }, api: telemetry,
       evidence: value => { if (!disposed && userId) dutyIntent.record(userId,value); },
       permission: async () => {
         if (Capacitor.getPlatform() !== 'android') return true;

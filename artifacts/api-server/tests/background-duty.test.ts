@@ -203,3 +203,12 @@ test('native heartbeat remains independent of a stalled GPS upload', async () =>
  callback(undefined,undefined,{sequence:'1'});await flush();await flush();assert.equal(acks,1);
  await f.session.stop();delayed.resolve({accepted:true});await flush();
 });
+
+test('Android direct native heartbeat owns ACK, skips legacy body reader and fences stopped sessions',async()=>{
+ let callback:Function=()=>{};const pulses:string[]=[];let legacyAcks=0;const late=deferred<void>();let hold=false;
+ const f=fixture({watcher:{addWatcher:async(options,cb)=>{assert.equal(options.dutyHeartbeat,true);callback=cb;return 'watch-native';},removeWatcher:async()=>{},acknowledgeDuty:async()=>{legacyAcks++;},nativeHeartbeat:async(id,sequence,signal)=>{assert.equal(id,'watch-native');signal.throwIfAborted();pulses.push(sequence);if(hold)await late.promise;}}});
+ await f.session.start();
+ for(const sequence of ['1','2','3']){callback(undefined,undefined,{sequence});await flush();}
+ assert.deepEqual(pulses,['1','2','3']);assert.equal(legacyAcks,0,'Native worker already acknowledged; never duplicate through JS');assert.deepEqual(f.calls,['/api/driver/availability'],'No legacy Fetch heartbeat/body reader');
+ hold=true;callback(undefined,undefined,{sequence:'4'});await flush();await f.session.stop();late.resolve();await flush();callback(undefined,undefined,{sequence:'5'});await flush();assert.deepEqual(pulses,['1','2','3','4']);
+});

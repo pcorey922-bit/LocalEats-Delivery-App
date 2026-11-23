@@ -31,6 +31,9 @@ const reconnect = location.search.includes('reconnect=true');
 qa.dutyAvailable=true;qa.dutyApproved=true;
 if(reconnect) {qa.bgPermission=false;qa.dutyLease=true;qa.dutyLastHeartbeat=Date.now()-121000;}
 dutyIntent.set('driver-fixture', !reconnect);
+// Native RPC fixture gets already-decoded data, independent of WebView body readers.
+const fixtureJson=Response.json.bind(Response);
+Response.json=(data,init)=>{const response=fixtureJson(data,init);Object.defineProperty(response,'nativeFixtureData',{value:data});return response;};
 window.fetch = async (input, options) => {
   const url = String(input);
   if (url === '/api/notification-devices/config') { if(qa.pushConfigDelay) { options?.signal?.addEventListener('abort',()=>{qa.pushConfigReadAborted=true;},{once:true}); await new Promise<void>(resolve=>{qa.finishPushConfig=resolve;}); } return Response.json({ android: qa.pushConfigured, ios: location.search.includes('ios=true') && qa.pushConfigured }); }

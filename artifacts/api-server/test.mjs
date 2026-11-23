@@ -15,6 +15,7 @@ try {
     ["cart-line", "tests/cart-line.test.ts"],
     ["duty-intent", "tests/duty-intent.test.ts"],
     ["background-duty", "tests/background-duty.test.ts"],
+    ["native-duty-http", "tests/native-duty-http.test.ts"],
     ["clerk-proxy", "tests/clerk-proxy.test.ts"],
     ["native-startup", "tests/native-startup.test.ts"],
     ["reversal-evidence", "src/lib/reversal-evidence.test.ts"],

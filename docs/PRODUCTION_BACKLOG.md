@@ -1,3 +1,19 @@
+# November 23 — Evidence-supported Android duty JSON/ACK correction
+
+230 physical trace: native HTTP23/24 both200, JS BODY_START143247/151705 but BODY_READY
+only366723/366724; last nativeACK123182, expiry198031. Native GPS/JS pulses continued.
+Synthetic Fetch body reader held serialized pulse slot; no proven token/GPS/network
+shutdown. Implemented direct native JSON telemetry + native strict body/challenge ACK
+before JS reply, native15s deadline/cancellation/late fencing; Clerk renewal/roles and
+90s expiry preserved. iOS unchanged.28 units, actual Java policy/trace/gate, stalled-body
+Chromium native-bridge regressions, localAPI driver integration/types/build PASS.
+CI/native signed replacement verification pending. No backend deployment needed.
+Physical GPS still BLOCKED: ONE replacement screen-lock/Dispatch/report test after
+artifact verification. JS token acquisition/pulse initiation remain dependencies;
+do not claim a complete native-owned authentication/scheduling migration. Next work
+is driven by new trace stages, not speculative battery/timeout/expiry changes.
+No Render/settings/provider/financial operation, enforcement or ordering activation.
+
 # November 22 — Driver230 diagnostic evidence collection READY, GPS acceptance BLOCKED
 
 c816985e240faaea3df92aab0e05d40cb442d3dc ALL THREE CI SUCCESS:

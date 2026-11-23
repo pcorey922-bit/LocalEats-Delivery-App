@@ -1,5 +1,5 @@
 import type { FetchRequestStage } from '../../../../lib/api-client-react/src/custom-fetch';
-type Options = { method?: string; signal: AbortSignal; body?: string; headers?: HeadersInit; onStage?:(stage:FetchRequestStage)=>void };
+type Options = { method?: string; signal: AbortSignal; body?: string; headers?: HeadersInit; nativePulse?:{id:string;sequence:string}; onStage?:(stage:FetchRequestStage)=>void };
 /** Renew once only after a definite authentication rejection. Never retry unknown
  * network outcomes, permission denial, expired duty, ordering or financial writes.
  * These telemetry endpoints authenticate before their timestamp-deduplicated writes. */
