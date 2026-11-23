@@ -1,3 +1,52 @@
+# November 23 — Driver233 native JSON/ACK repair verified; physical lock test next
+
+FUNCTIONAL SOURCE aac2d9c69943bf349a2cc8e5b7661bd4a045d94f pushed to
+feature/rocoeats-launch-readiness. ALL THREE exact-source CI SUCCESS:
+Validate push45125355615, Validate PR45125360562, Native PR45125360583.
+Broad website/API/container, backup/restore, local payment simulation and browser
+regressions PASS; customer+driver Android debug/release/AAB/staging/lint and iOS
+simulator/unsigned device builds PASS. Simulations/builds are not provider/device proof.
+Signed Driver233 run45125713873 SUCCESS, artifact14796370406:
+RoCoEats-Driver-Android-Staging-Test-APK. ZIP SHA256
+5a1cda76e484427b885feba2cb7def0b38b23385dc00c1e19f251f209166e703.
+APK SHA256849abe5d37afdcb3d7ed3f68f73a508d5198da550daa0fd7583f9fc5ebfb9b0b.
+Verified exact source/identity/digest/version233/private location-only service,
+unchanged protected v2 signer certificate (CI verifier evidence)
+f22e58f4da4e5d64f9ac5d4f0fc8abfe2595e395511552f7fb385205c7d18296,
+actual DEX DutyRequestGate/requestDuty/cancel/strict-native-ACK markers and packaged
+native JSON helper. No signing material exposed. This evidence-only checkpoint has
+its own CI; the functional source/build evidence above is completed, not pending.
+
+OWNER PHONE — ONE NEW TRANSPORT TEST, no repeated230/225/Customer208 auth testing:
+1. Open https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/45125713873
+   -> Artifacts -> RoCoEats-Driver-Android-Staging-Test-APK -> download/extract ->
+   RoCoEats-Driver-Android-Staging-Test.apk -> Update. Do NOT uninstall or change
+   battery/network/permissions/hosted settings for this comparison.
+2. Reconnect/Go online if needed. Explicitly consent and Enable background sharing.
+   Wait until heartbeat acknowledgement AND accepted GPS receipt times advance and
+   Android shows the ongoing notification.
+3. Home -> Chrome Administrator Dispatch; verify fresh online position. Lock3min with
+   Chrome selected. Unlock into Chrome FIRST; capture status/GPS timestamp before
+   resuming Driver (foreground recovery can hide a gap).
+4. Driver -> Read screen-lock diagnostics -> Copy sanitized report BEFORE reconnect,
+   starting another sharing session, signing out or force-close. Capture receipt
+   times and any recovery code. Then Go offline; verify notification/sharing stop.
+PASS requires uninterrupted Dispatch eligibility/fresh accepted GPS + native ACKs
+through screen-off and correct explicit stop. Physical background GPS remains BLOCKED
+until this evidence. The app-level body-reader/serialization defect is fixed/tested;
+the underlying WebView scheduling mechanism was not independently instrumented.
+Clerk token acquisition and pulse request initiation still use JS. If new evidence
+shows those stages stall, securely design native session/renewal before moving them;
+never cache an expiring JWT, extend90s, auto-reconnect or accept HTTP200 without body.
+
+NEXT INDEPENDENT ENGINEERING: no speculative change to this repair before new trace.
+Compare NATIVE_HTTP_RESULT -> ACK_CONFIRMED -> JS_HTTP_RETURN/BODY_READY in233. Native
+ACK now precedes JS reply. If receipts remain fresh, record scoped physical acceptance;
+longer/background GPS, real push and complete delivery-device acceptance remain separate.
+No backend deployment, migration or Render/config/data/provider/financial operation
+was needed or performed. All ordering/payment/payout/retention/municipal gates remain
+unchanged; StripeTEST, historical records, Neon recovery and signing are preserved.
+
 # November 23 — Driver230 trace confirms stalled synthetic response-body processing
 
 OWNER PHYSICAL EVIDENCE, not a claimed repair acceptance: signed230 on Samsung
@@ -21,7 +70,8 @@ heartbeat. Timers did not release the request slot during the observed lock. Nat
 alone must NOT renew the duty lease. Previous general account-profile body-null fix
 is preserved and is separate from this locked synthetic body-reader scheduling issue.
 
-IMPLEMENTED targeted Android DRIVER background-telemetry correction (commit pending):
+IMPLEMENTED targeted Android DRIVER background-telemetry correction:
+aac2d9c69943bf349a2cc8e5b7661bd4a045d94f on primary branch, PR1 unmerged:
 - Direct native JSON RPC for existing heartbeat/availability/GPS routes, no synthetic
   Fetch Response/Blob/ReadableStream. Auth stays existing Clerk token retrieval plus
   one fresh-token renewal only on definite401. No stored JWT/refresh credential,
@@ -43,7 +93,7 @@ Chromium real consent/controller tests PASS with heartbeat Response.text held pe
 existing GPS/push regressions. Native/API bridge simulated; no physical GPS claim.
 Real LOCAL API/PGlite driver role/session/GPS/offline integration PASS; Clerk/native
 coordinates simulated. UI typecheck and production build PASS. Android compilation,
-exact-SHA CI and signed replacement artifact verification still pending.
+exact-SHA CI and signed replacement artifact verification completed (see release evidence above).
 No Render/API/schema migration or hosted configuration change required or performed.
 All ordering/financial/provider/geographic safeguards and historical records preserved.
 

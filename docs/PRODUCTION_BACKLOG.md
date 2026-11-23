@@ -1,3 +1,22 @@
+# November 23 — Driver233 repair release ready for one physical screen-lock retest
+
+Source aac2d9c69943bf349a2cc8e5b7661bd4a045d94f ALL THREE CI SUCCESS:
+45125355615 /45125360562 /45125360583. Signed233 run45125713873 SUCCESS,
+artifact14796370406 RoCoEats-Driver-Android-Staging-Test-APK; source/package/digests/
+version/same protected certificate/private FGS and actual native JSON/ACK code verified.
+Direct Android telemetry JSON removes the observed synthetic Response.text wait;
+native strict heartbeat body/challenge ACK occurs before JS reply. All auth/90s
+expiry/fail-closed safeguards preserved. No backend/Render deployment required.
+28 focused units + actual JVM trace/lease/gate, stalled-body Chromium regression,
+localAPI/PGlite driver integration/types/build and broad CI PASS. Simulated identity/
+GPS/payments and native builds are not real provider/physical acceptance.
+NEXT REQUIRED: one233 Samsung3min lock test, Chrome Dispatch before Driver resume,
+copy diagnostics before reconnect then explicit offline. Physical GPS still BLOCKED.
+Clerk token acquisition and request initiation still JS; no autonomous native-auth
+claim. Diagnose any new failure from its stages; no repeated uninstrumented runs,
+expiry extension or speculative token/session architecture. No unrelated development
+in this repair. All hosted/provider/financial/configuration safeguards unchanged.
+
 # November 23 — Evidence-supported Android duty JSON/ACK correction
 
 230 physical trace: native HTTP23/24 both200, JS BODY_START143247/151705 but BODY_READY
@@ -7,7 +26,7 @@ shutdown. Implemented direct native JSON telemetry + native strict body/challeng
 before JS reply, native15s deadline/cancellation/late fencing; Clerk renewal/roles and
 90s expiry preserved. iOS unchanged.28 units, actual Java policy/trace/gate, stalled-body
 Chromium native-bridge regressions, localAPI driver integration/types/build PASS.
-CI/native signed replacement verification pending. No backend deployment needed.
+CI/native signed replacement verification completed; see release evidence above. No backend deployment needed.
 Physical GPS still BLOCKED: ONE replacement screen-lock/Dispatch/report test after
 artifact verification. JS token acquisition/pulse initiation remain dependencies;
 do not claim a complete native-owned authentication/scheduling migration. Next work
