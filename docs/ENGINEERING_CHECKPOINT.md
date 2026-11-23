@@ -1,3 +1,86 @@
+# November 23 — Driver233 FAILED: Clerk token resolver stalls after native auth200
+
+OWNER physical Samsung evidence supersedes233 acceptance instructions below. Do NOT
+repeat233 or claim background GPS passed. Dispatch fresh02:00:10; after3min lock
+DISCONNECTED/zero online. Driver DEVICE_RECONNECT_REQUIRED / DUTY_ACK_EXPIRED;
+last displayed heartbeat02:00:27, acceptedGPS02:00:10. Full sanitized report reviewed:
+last nativeHB start81052/result20081147/ACK81148, JS return81156/body start81157/
+ready81159. This supports the233 native body/ACK correction working on that request.
+TOKEN_START94492 -> AUTH request17 native start94537/result20096207. Another
+TOKEN_START102052 (after pulse102016/JS102051) waits on the token path; no new auth
+HTTP start. Both TOKEN_READY only390272. Native/JS pulses122016/122029 and
+142016/142027 continue without new HB HTTP. SCREEN_OFF145341; expiry157031
+(75883ms after lastACK, lease anchored to challenge issue), nativeGPS156462 /
+JS156467. Thus the token wait BEGAN BEFORE SCREEN_OFF; do not blame lock alone,
+GPS shutdown, expired credentials, Wi-Fi handoff or battery policy without evidence.
+At expiry Wi-Fi validated/wake held, screen noninteractive; idle/power-save false.
+
+SOURCE FINDING / LIMIT: official Clerk getToken caches an in-flight tokenResolver;
+concurrent callers can share the same unfinished mint. Its native-Fetch refresh path
+awaits Response.json() (or text for allowEmptyBody) before resolving that resource.
+Capacitor still constructs a synthetic Response from already-parsed native auth JSON.
+No app before/after-response hooks override Clerk. Native auth200 + delayed token is
+consistent with that remaining stream dependency, but233 DID NOT instrument the SDK
+body-read boundary. It cannot prove whether the exact delayed continuation was JSON
+reading, an SDK hook or microtask scheduling. No revoked-session/expiry/network error
+was observed. Do NOT claim a fully established internal WebView/Clerk root cause.
+Current public SDK source read anonymously for inspection only (no session/provider
+mutation); API versions can move, so do not assert an unrecorded233 SDK version.
+
+TARGETED SOFTWARE CORRECTION (pending commit/CI): existing pinned Capacitor Android
+patch preloads ONLY configured Clerk session JSON into one-use Fetch readers, avoiding
+synthetic stream scheduling. Native-only metadata selects this path, not provider
+body fields. Original HTTP/cookies/headers/status/error payload and Clerk SDK mint /
+validation/cache/renewal remain unchanged; no token extracted, stored or logged by
+adapter. text/json/clone/bodyUsed/locked/consumed/UTF8/binary readers preserve behavior;
+invalidJSON and401/403 stay failures. Customer Http remains disabled as configured;
+iOS and existing direct telemetry native ACK logic unchanged. Native SDK body-read
+START/READY/FAILED observations now correlate by bounded request/generation nonce,
+with no credentials, URLs or bodies; cannot forge ACK or repopulate old-account trace.
+Late token after abort/native expiry still cannot start another request or renew duty.
+
+VALIDATION:5 actual pinned bridge-reader Node tests +29 focused controller/transport/
+redaction tests PASS; JVM trace/lease/gate PASS. Chromium actual-reader/shared-resolver
+stalled Response.json regression + existing consent/GPS/push/deadline regressions PASS.
+All session/provider/OS-stall behavior simulated; no real Clerk credentials/provider
+calls or physical acceptance. UI types and production build PASS. Broad/native CI
+pending. No new signed APK or physical retest requested: stream correction is NOT
+fully native authentication and must not be presented as the finished GPS solution.
+No backend migration/deploy/config/data/financial/provider operation performed.
+
+SECURE NATIVE AUTH DESIGN / NEXT ENGINEERING (not implemented, not activated):
+- Use official com.clerk:clerk-android-api, not copied WebView cookies/refresh headers,
+  long-lived bearer cache, backend secret in APK or a new custom auth authority.
+  Official APIs support auth.signInWithTicket and auth.getToken:
+  https://clerk.com/docs/android/reference/native-mobile/auth
+  https://clerk.com/docs/android/getting-started/quickstart
+- Reuse existing browser approval + proof-bound /api/mobile/auth/redeem one-use ticket;
+  Driver native SDK consumes it, owns the active session/secure persistence/renewal.
+  Driver UI auth becomes a projection of that same native principal, never two
+  independent UI/background logins or duplicate accounts. Website/Customer auth stays
+  intact. Backend continues verifying Clerk JWT and current profile/driver approval.
+  Existing presence authorization is profile-based (dispatch.ts), not a new local
+  claim; no driver or owner permissions may be inferred from UI/native JWT decoding.
+- Foreground service owns heartbeat scheduling, SDK getToken, authenticated HTTP,
+  strict response ACK and GPS submissions independently of WebView. Attach explicit
+  on-duty consent + principal + generation; native token/request deadlines and75s
+  ACK watchdog must remain below backend90s expiry. Provider/role/session failure,
+  logout, account switch, offline or consent withdrawal stop work and fence all late
+  results. No automatic reconnect or token accepted past SDK/backend validity.
+- First native regression must suspend ALL JS across token renewal (not merely one
+  reader), assert ongoing native receipts, and cover revoke/logout/account switch /
+  cold restart, token/HTTP deadlines, consent and native GPS freshness. Fake SDK/provider
+  tests are separate from real Clerk and Samsung acceptance. No APK until integrated
+  correction passes those tests, builds and CI. Do not layer timeout/retry tweaks.
+- Read-only owner question pending: Clerk development Native applications -> Native
+  API enabled? Driver staging package listed? Do NOT change it. Official native SDK
+  requires this capability; activation/config changes need separate owner approval.
+  No Render deployment currently required by this reader change. SDK compatibility,
+  minSDK/build versions and same-principal UI migration remain implementation work.
+
+All closed ordering/financial/payout/retention/geographic gates, StripeTEST, customer
+acceptance, successful historic order/ledger, signing and Neon recovery preserved.
+
 # November 23 — Driver233 native JSON/ACK repair verified; physical lock test next
 
 FUNCTIONAL SOURCE aac2d9c69943bf349a2cc8e5b7661bd4a045d94f pushed to

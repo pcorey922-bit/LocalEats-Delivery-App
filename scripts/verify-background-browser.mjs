@@ -9,6 +9,12 @@ import assert from 'node:assert/strict';
 const root = fileURLToPath(new URL('../', import.meta.url)), require = createRequire(path.join(root, 'artifacts/api-server/package.json'));
 const { build } = require('esbuild'), { chromium } = require(process.env.PLAYWRIGHT_CORE_PATH || 'playwright-core');
 const target = await mkdtemp(path.join(tmpdir(), 'rocoeats-background-ui-'));
+const nativeRequire=createRequire(path.join(root,'artifacts/localeats/package.json'));
+const nativeBridgeSource=await readFile(path.join(path.dirname(nativeRequire.resolve('@capacitor/android/package.json')),'capacitor/src/main/assets/native-bridge.js'),'utf8');
+const authReaderStart=nativeBridgeSource.indexOf('    function rocoNativeAuthJsonResponse('),authReaderEnd=nativeBridgeSource.indexOf('    // End RoCoEats native Clerk JSON reader.');
+assert.ok(authReaderStart>=0&&authReaderEnd>authReaderStart);
+const authReaderSource=nativeBridgeSource.slice(authReaderStart,authReaderEnd);
+
 const modules = {
   '@clerk/react': `import {useSyncExternalStore} from 'react';const subscribe=cb=>{window.addEventListener('qa-push-account',cb);return()=>window.removeEventListener('qa-push-account',cb)};export const useAuth=()=>{const userId=useSyncExternalStore(subscribe,()=>window.pushUserId||'driver-fixture');return{isLoaded:true,isSignedIn:true,userId,getToken:async()=>"simulated-fixture-token"}};`,
   '@capacitor/core': `export const Capacitor={isNativePlatform:()=>true,getPlatform:()=>location.search.includes('ios=true')?'ios':'android'};export const registerPlugin=()=>({addWatcher:async(options,callback)=>{window.emitFix=fix=>callback(fix);window.emitDutyPulse=sequence=>callback({dutyPulse:true,sequence});window.emitDutyError=code=>callback(undefined,{code});const id='watch-'+(++window.bgStarts);if(window.bgStartDelay)await new Promise(resolve=>{window.finishBgStart=resolve});return id},acknowledgeDuty:async({id,sequence})=>{window.nativeDutyAcks??=[];window.nativeDutyAcks.push({id,sequence});},requestDuty:async request=>{window.dutyNativeRequests=(window.dutyNativeRequests||0)+1;const controller=new AbortController();window.dutyControllers??=new Map();window.dutyControllers.set(request.requestId,controller);try{const r=await window.fetch(new URL(request.url).pathname,{method:request.method,headers:request.headers,body:request.data===undefined?undefined:JSON.stringify(request.data),signal:controller.signal});const data=r.nativeFixtureData;let acknowledged=false;if(request.sequence&&r.status===200&&data?.online===true){window.nativeDutyAcks??=[];window.nativeDutyAcks.push({id:request.id,sequence:request.sequence});acknowledged=true;}return{status:r.status,data,nativeAcknowledged:acknowledged};}finally{window.dutyControllers.delete(request.requestId)}},cancelDutyRequest:async({requestId})=>{window.dutyControllers?.get(requestId)?.abort();},getDutyDiagnostics:async()=>{window.traceReads=(window.traceReads||0)+1;if(window.traceDelay)await new Promise(resolve=>{window.finishTraceRead=resolve});return {schema:1,state:'EXPIRED',active:false,elapsedMs:180000,nativeFixAgeMs:0,token:'DO_NOT_LEAK',events:[{ms:1000,stage:'NATIVE_HTTP_RESULT',kind:'HEARTBEAT',status:200,body:'DO_NOT_LEAK'}],counters:{'NATIVE_HTTP_RESULT.HEARTBEAT':{count:1,lastMs:1000,status:200}},power:{transport:'WIFI',deviceIdle:true,wakeHeld:false,ssid:'DO_NOT_LEAK'}}},recordDutyStage:async event=>{window.traceStages??=[];window.traceStages.push(event.stage)},clearDutyDiagnostics:async()=>{window.traceClears=(window.traceClears||0)+1},removeWatcher:async({id})=>{window.bgRemovals.push(id)}});`,
@@ -25,6 +31,21 @@ let browser;
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 try {
   browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
+  const authReader=await browser.newPage();
+  await authReader.addScriptTag({content:authReaderSource});
+  const authResult=await authReader.evaluate(async()=>{
+    const old=Response.prototype.json;let legacyReady=false,requests=0,pending;const stages=[];
+    Response.prototype.json=()=>new Promise(()=>{});
+    try {
+      void new Response('{}').json().then(()=>{legacyReady=true});
+      const getToken=()=>pending??=(async()=>{requests++;const payload=JSON.stringify({response:{jwt:'simulated-not-a-credential'}});const response=window.rocoNativeAuthJsonResponse(new Response(payload,{status:200,headers:{'content-type':'application/json'}}),payload,stage=>stages.push(stage));return(await response.json()).response.jwt})();
+      const values=await Promise.race([Promise.all([getToken(),getToken()]),new Promise((_,reject)=>setTimeout(()=>reject(Error('Native auth JSON reader stalled')),5000))]);
+      return{sameToken:values[0]===values[1],requests,legacyReady,stages};
+    }finally{Response.prototype.json=old;}
+  });
+  assert.deepEqual(authResult,{sameToken:true,requests:1,legacyReady:false,stages:['JS_BODY_START','JS_BODY_READY']});
+  await authReader.close();
+  console.log('PASS: actual pinned Android JSON reader resolves a Clerk-style shared refresh while Chromium synthetic Response.json is stalled. Session/provider simulated; no credentials, provider calls or native-session acceptance.');
   const diagnostic=await browser.newPage({viewport:{width:393,height:851}});await diagnostic.clock.install();
   await diagnostic.goto(`http://127.0.0.1:${server.address().port}/?reconnect=true`);
   await diagnostic.getByRole('button',{name:'Reconnect on this device',exact:true}).waitFor();

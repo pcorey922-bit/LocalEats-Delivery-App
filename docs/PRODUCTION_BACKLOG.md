@@ -1,3 +1,26 @@
+# November 23 — Driver233 token-refresh failure; native auth is the GPS blocker
+
+Physical233 FAILED. Native HB20081147 -> ACK81148 -> bodyREADY81159 shows previous
+reader fix working. Token starts94492/102052; native Clerk AUTH17 finishes20096207,
+both token resolvers onlyready390272. Stall begins BEFORE screenOff145341; native/JS
+GPS and pulses continue until expiry157031. Exact SDK post-HTTP continuation is not
+proven by233 trace. No revoked-token, battery or network handoff explanation assumed.
+Clerk SDK shares pending tokenResolver and awaits synthetic Fetch.json/text.
+Implemented scoped native-preloaded Clerk JSON readers + request-correlated redacted
+body stages, strict Fetch/error semantics and late-token fencing.5 reader +29 focused
+units/JVM/browser/types/build PASS, CI pending. No new APK/test/deploy/provider calls.
+This removes a reproducible stream dependency, NOT all JS/native authentication risk.
+
+NEXT production blocker: official Clerk Android SDK authoritative Driver session,
+existing proof-bound ticket handoff, same-principal UI projection, native-owned token
+renewal/heartbeat/GPS/ACK/deadlines. Preserve75s/90s/roles/consent/expiry and logout /
+account-generation fences. Test completely paused JS across renewal, revoke/stop /
+restart and failed provider; no cached JWT workaround or parallel UI/native accounts.
+Read-only Native API/package configuration confirmation pending; no setting approval
+requested. SDK compatibility and native/React auth integration remain unimplemented.
+Do not ask another Samsung loop or produce APK until the integrated path is validated.
+Customer208 scoped acceptance remains intact. All hosted/payment/security gates unchanged.
+
 # November 23 — Driver233 repair release ready for one physical screen-lock retest
 
 Source aac2d9c69943bf349a2cc8e5b7661bd4a045d94f ALL THREE CI SUCCESS:

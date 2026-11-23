@@ -37,3 +37,9 @@ test('native timeout and server5xx remain transient without replaying requests',
   let calls=0;await assert.rejects(nativeDutyHttp({requestDuty:async()=>{calls++;throw value;},cancelDutyRequest:async()=>{}},async()=> 'simulated',origin,'/api/driver/heartbeat',options()),error=>error instanceof NativeDutyHttpError && !error.code.startsWith('DUTY_'));assert.equal(calls,1);
  }
 });
+
+test('late Clerk token after native duty expiry cannot initiate heartbeat or fabricate ACK',async()=>{
+ let ready!:(value:string)=>void,calls=0;const controller=new AbortController();
+ const pending=nativeDutyHttp({requestDuty:async()=>{calls++;return{status:200,data:{online:true},nativeAcknowledged:true};},cancelDutyRequest:async()=>{}},()=>new Promise(resolve=>{ready=resolve;}),origin,'/api/driver/heartbeat',{...options(),signal:controller.signal});
+ await new Promise<void>(resolve=>setImmediate(resolve));controller.abort();ready('simulated-late-token');await assert.rejects(pending);assert.equal(calls,0);
+});

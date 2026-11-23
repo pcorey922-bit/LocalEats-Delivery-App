@@ -17,7 +17,7 @@ export function recordDutyStage(id:string|undefined,stage:DutyJsStage,kind:DutyT
  try{void nativeDutyBridge.recordDutyStage({id,stage,kind}).catch(()=>{});}catch{/* Diagnostic support never changes duty execution. */}
 }
 
-const stages=new Set(['START','STOPPED','EXPIRED','PULSE','NATIVE_GPS_FIX','JS_PULSE','JS_GPS','TOKEN_START','TOKEN_READY','TOKEN_FAILED','JS_HTTP_START','JS_HTTP_RETURN','JS_HTTP_FAILED','JS_BODY_START','JS_BODY_READY','NATIVE_HTTP_START','NATIVE_HTTP_RESULT','NATIVE_HTTP_TIMEOUT','NATIVE_HTTP_INTERRUPTED','NATIVE_HTTP_ERROR','ACK_CONFIRMED','ACK_REJECTED','SCREEN_OFF','SCREEN_ON','POWER','NETWORK','EXPIRY_POWER','REPORT_READ']);
+const stages=new Set(['START','STOPPED','EXPIRED','PULSE','NATIVE_GPS_FIX','JS_PULSE','JS_GPS','TOKEN_START','TOKEN_READY','TOKEN_FAILED','JS_HTTP_START','JS_HTTP_RETURN','JS_HTTP_FAILED','JS_BODY_START','JS_BODY_READY','JS_BODY_FAILED','NATIVE_HTTP_START','NATIVE_HTTP_RESULT','NATIVE_HTTP_TIMEOUT','NATIVE_HTTP_INTERRUPTED','NATIVE_HTTP_ERROR','ACK_CONFIRMED','ACK_REJECTED','SCREEN_OFF','SCREEN_ON','POWER','NETWORK','EXPIRY_POWER','REPORT_READ']);
 const kinds=new Set(['NONE','HEARTBEAT','GPS','AVAILABILITY','AUTH']);
 const object=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
 const integer=(v:unknown):v is number=>Number.isSafeInteger(v)&&Number(v)>=0;

@@ -27,6 +27,15 @@ public final class DutyTraceTest {
   check(!DutyTrace.snapshot(92002).toString().contains("DO_NOT_LEAK"),"Power fields strictly sanitized");
   DutyTrace.fix(next,123,92003);check(DutyTrace.snapshot(92004).get("nativeFixAgeMs").equals(123L),"Native fix receipt independent of JavaScript");
   check(DutyTrace.isJsStage(DutyTrace.Stage.JS_PULSE)&&!DutyTrace.isJsStage(DutyTrace.Stage.ACK_CONFIRMED),"JavaScript cannot claim native acknowledgements");
+  DutyTrace.Request auth=DutyTrace.startRequest("https://clever-bobcat-2358.clerk.accounts.dev/v1/client/sessions/opaque/tokens","POST",93000);
+  DutyTrace.authBody(auth.owner(),auth.serial(),DutyTrace.Stage.JS_BODY_START,93001);
+  DutyTrace.authBody(auth.owner(),auth.serial(),DutyTrace.Stage.JS_BODY_READY,93002);
+  check(counters(DutyTrace.snapshot(93003)).containsKey("JS_BODY_READY.AUTH"),"Correlate provider JSON reader without logging credentials");
+  DutyTrace.authBody(auth.owner(),auth.serial(),DutyTrace.Stage.ACK_CONFIRMED,93004);
+  check(!counters(DutyTrace.snapshot(93005)).containsKey("ACK_CONFIRMED.AUTH"),"Body observation cannot claim acknowledgement");
+  check(DutyTrace.category("https://attacker.clerk.accounts.dev/v1/client/sessions/opaque/tokens","POST")==DutyTrace.Kind.NONE,"Only configured Clerk instance gets native reader");
+  DutyTrace.clear();DutyTrace.authBody(auth.owner(),auth.serial(),DutyTrace.Stage.JS_BODY_READY,94000);
+  check(counters(DutyTrace.snapshot(94001)).isEmpty(),"Late old-account body reader cannot repopulate diagnostics");
   DutyTrace.clear();check(counters(DutyTrace.snapshot(99999)).isEmpty()&&DutyTrace.snapshot(99999).get("state").equals("IDLE"),"Sign-out clears local evidence");
   System.out.println("PASS: native trace consent scope, actual HTTP completion after expiry, generation fencing, bounded memory, redaction, native fix timing, clear and source attribution");
  }

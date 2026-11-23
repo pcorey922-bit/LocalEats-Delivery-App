@@ -1,9 +1,110 @@
+diff --git a/capacitor/src/main/assets/native-bridge.js b/capacitor/src/main/assets/native-bridge.js
+index 20a21b4fb6c428d138d94ba0dbb52cc9d5b5ece8..3236d55d61375c9193775c5dd05ad7013c7b334f 100644
+--- a/capacitor/src/main/assets/native-bridge.js
++++ b/capacitor/src/main/assets/native-bridge.js
+@@ -5,6 +5,53 @@
+ var nativeBridge = (function (exports) {
+     'use strict';
+ 
++    // RoCoEats: native Clerk JSON is already fully read. Avoid routing those
++    // bytes through a second WebView stream task while retaining Fetch semantics.
++    // No credential cache, token extraction, verification, or HTTP retry here.
++    function rocoNativeAuthJsonResponse(response, text, trace) {
++        const nativeUsed = Object.getOwnPropertyDescriptor(Response.prototype, 'bodyUsed').get.bind(response);
++        const stream = response.body;
++        let consumed = false, payload = text;
++        const used = () => consumed || nativeUsed();
++        const observe = (stage) => { try { trace(stage); } catch (_) {} };
++        const claim = () => {
++            if (used() || (stream && stream.locked)) throw new TypeError('Body is unusable');
++            consumed = true;
++            const value = payload;
++            payload = undefined;
++            // Disturb the original stream without awaiting its scheduled reader.
++            if (stream) { try { void stream.cancel().catch(() => {}); } catch (_) {} }
++            return value;
++        };
++        const read = async (convert) => {
++            const value = claim();
++            observe('JS_BODY_START');
++            try {
++                const result = convert(value);
++                observe('JS_BODY_READY');
++                return result;
++            } catch (error) { observe('JS_BODY_FAILED'); throw error; }
++        };
++        const methods = {
++            bodyUsed: { get: used },
++            text: { value: () => read(value => value) },
++            json: { value: () => read(value => JSON.parse(value)) },
++            arrayBuffer: { value: () => read(value => new TextEncoder().encode(value).buffer) },
++            blob: { value: () => read(value => new Blob([value], { type: response.headers.get('content-type') || '' })) },
++            formData: { value: () => read(() => { throw new TypeError('JSON is not form data'); }) },
++            clone: { value: () => {
++                if (used() || (stream && stream.locked)) throw new TypeError('Body is unusable');
++                const copy = new Response(payload, { status: response.status, statusText: response.statusText, headers: response.headers });
++                Object.defineProperty(copy, 'url', { value: response.url });
++                return rocoNativeAuthJsonResponse(copy, payload, trace);
++            } },
++        };
++        if (typeof response.bytes === 'function') methods.bytes = { value: () => read(value => new TextEncoder().encode(value)) };
++        Object.defineProperties(response, methods);
++        return response;
++    }
++    // End RoCoEats native Clerk JSON reader.
++
+     var ExceptionCode;
+     (function (ExceptionCode) {
+         /**
+@@ -551,6 +598,15 @@ var nativeBridge = (function (exports) {
+                             Object.defineProperty(response, 'url', {
+                                 value: nativeResponse.url,
+                             });
++                            // Native-only metadata is separate from the provider JSON.
++                            // Scope: trusted Clerk session JSON, never arbitrary Fetch traffic.
++                            if (nativeResponse.rocoeatsAuthJson === true && typeof data === 'string' && contentType && contentType.toLowerCase().startsWith('application/json')) {
++                                const owner = nativeResponse.rocoeatsAuthTrace;
++                                rocoNativeAuthJsonResponse(response, data, stage => {
++                                    if (!owner || !owner.generation || !owner.request) return;
++                                    void cap.nativePromise('CapacitorHttp', 'recordDutyAuthBody', { owner: owner.generation, request: owner.request, stage }).catch(() => {});
++                                });
++                            }
+                             console.timeEnd(tag);
+                             return response;
+                         }
+diff --git a/capacitor/src/main/java/com/getcapacitor/plugin/CapacitorHttp.java b/capacitor/src/main/java/com/getcapacitor/plugin/CapacitorHttp.java
+index 46bc17417ffa51e8c839b6bd375b4fc8cb7fa984..b23641f4b91905fbfa11de4293797e8ca96b11b9 100644
+--- a/capacitor/src/main/java/com/getcapacitor/plugin/CapacitorHttp.java
++++ b/capacitor/src/main/java/com/getcapacitor/plugin/CapacitorHttp.java
+@@ -11,6 +11,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
+ import com.getcapacitor.annotation.Permission;
+ import com.getcapacitor.plugin.util.CapacitorHttpUrlConnection;
+ import com.getcapacitor.plugin.util.HttpRequestHandler;
++import com.getcapacitor.plugin.util.DutyTrace;
+ import java.util.Map;
+ import java.util.concurrent.ConcurrentHashMap;
+ import java.util.concurrent.ExecutorService;
+@@ -87,6 +88,14 @@ public class CapacitorHttp extends Plugin {
+         return pluginConfig.getBoolean("enabled", false);
+     }
+ 
++    @PluginMethod
++    public void recordDutyAuthBody(final PluginCall call) {
++        try {
++            DutyTrace.authBody(call.getLong("owner",0L),call.getLong("request",0L),DutyTrace.Stage.valueOf(call.getString("stage","")),android.os.SystemClock.elapsedRealtime());
++        } catch(IllegalArgumentException ignored) {}
++        call.resolve();
++    }
++
+     @PluginMethod
+     public void request(final PluginCall call) {
+         this.http(call, null);
 diff --git a/capacitor/src/main/java/com/getcapacitor/plugin/util/DutyTrace.java b/capacitor/src/main/java/com/getcapacitor/plugin/util/DutyTrace.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..6ad38243a3b5adc47231755d8105214118ea581b
+index 0000000000000000000000000000000000000000..48e3d5a50189de83d658987dec229f3ca46244e6
 --- /dev/null
 +++ b/capacitor/src/main/java/com/getcapacitor/plugin/util/DutyTrace.java
-@@ -0,0 +1,115 @@
+@@ -0,0 +1,122 @@
 +package com.getcapacitor.plugin.util;
 +
 +import java.net.URI;
@@ -15,7 +116,7 @@ index 0000000000000000000000000000000000000000..6ad38243a3b5adc47231755d81052141
 +    public enum StopReason { NONE, LOCAL_STOP, ACK_EXPIRED, PERMISSION_LOST, LOCATION_REQUEST_FAILED, SERVICE_FAILED }
 +    public enum Stage {
 +        START, STOPPED, EXPIRED, PULSE, NATIVE_GPS_FIX, JS_PULSE, JS_GPS,
-+        TOKEN_START, TOKEN_READY, TOKEN_FAILED, JS_HTTP_START, JS_HTTP_RETURN, JS_HTTP_FAILED, JS_BODY_START, JS_BODY_READY,
++        TOKEN_START, TOKEN_READY, TOKEN_FAILED, JS_HTTP_START, JS_HTTP_RETURN, JS_HTTP_FAILED, JS_BODY_START, JS_BODY_READY, JS_BODY_FAILED,
 +        NATIVE_HTTP_START, NATIVE_HTTP_RESULT, NATIVE_HTTP_TIMEOUT, NATIVE_HTTP_INTERRUPTED,
 +        NATIVE_HTTP_ERROR, ACK_CONFIRMED, ACK_REJECTED, SCREEN_OFF, SCREEN_ON, POWER, NETWORK, EXPIRY_POWER, REPORT_READ
 +    }
@@ -24,6 +125,8 @@ index 0000000000000000000000000000000000000000..6ad38243a3b5adc47231755d81052141
 +        private final Kind kind;
 +        private final long serial;
 +        private Request(long generation, Kind kind,long serial) { this.generation=generation; this.kind=kind;this.serial=serial; }
++        public long owner() { return generation; }
++        public long serial() { return serial; }
 +    }
 +    private static long generation=0, started=0, lastFixEvent=-20000, requestSerial=0;
 +    private static boolean active=false;
@@ -95,7 +198,7 @@ index 0000000000000000000000000000000000000000..6ad38243a3b5adc47231755d81052141
 +                if("GET".equals(method)&&path.equals("/api/driver/availability"))return Kind.AVAILABILITY;
 +                if(path.startsWith("/api/__clerk/")&&path.contains("/client/sessions/"))return Kind.AUTH;
 +            }
-+            if(host.endsWith(".clerk.accounts.dev")&&path.startsWith("/v1/client/sessions/"))return Kind.AUTH;
++            if(host.equals("clever-bobcat-2358.clerk.accounts.dev")&&path.startsWith("/v1/client/sessions/"))return Kind.AUTH;
 +        } catch(Exception ignored) { /* No URL/error text retained. */ }
 +        return Kind.NONE;
 +    }
@@ -110,6 +213,11 @@ index 0000000000000000000000000000000000000000..6ad38243a3b5adc47231755d81052141
 +        if(request.generation==0 || request.generation!=generation || state.equals("IDLE"))return;
 +        record(request.generation,stage,request.kind,status,now);events.getLast().put("request",request.serial);
 +    }
++    public static synchronized void authBody(long owner,long serial,Stage stage,long now) {
++        if(owner!=generation || state.equals("IDLE") || serial<=0 || serial>requestSerial ||
++           !EnumSet.of(Stage.JS_BODY_START,Stage.JS_BODY_READY,Stage.JS_BODY_FAILED).contains(stage))return;
++        record(owner,stage,Kind.AUTH,0,now);events.getLast().put("request",serial);
++    }
 +    public static synchronized Map<String,Object> snapshot(long now) {
 +        Map<String,Object> report=new LinkedHashMap<>();report.put("schema",1);report.put("state",state);report.put("active",active);report.put("stopReason",stopReason.name());
 +        report.put("elapsedMs",state.equals("IDLE")?0:elapsed(now));report.put("nativeFixAgeMs",fixAgeMs);
@@ -120,10 +228,10 @@ index 0000000000000000000000000000000000000000..6ad38243a3b5adc47231755d81052141
 +    }
 +}
 diff --git a/capacitor/src/main/java/com/getcapacitor/plugin/util/HttpRequestHandler.java b/capacitor/src/main/java/com/getcapacitor/plugin/util/HttpRequestHandler.java
-index d92eb9bb44dc0b064312ca43f97a78206a67be21..030c637675cbcf4dd8a18bcdcf98a908b8fc0738 100644
+index d92eb9bb44dc0b064312ca43f97a78206a67be21..e4b897446f931f88eb34e48eb185651790b22b99 100644
 --- a/capacitor/src/main/java/com/getcapacitor/plugin/util/HttpRequestHandler.java
 +++ b/capacitor/src/main/java/com/getcapacitor/plugin/util/HttpRequestHandler.java
-@@ -383,6 +383,24 @@ public class HttpRequestHandler {
+@@ -383,6 +383,29 @@ public class HttpRequestHandler {
       * @throws JSONException thrown when the incoming JSON is malformed
       */
      public static JSObject request(PluginCall call, String httpMethod, Bridge bridge)
@@ -134,6 +242,11 @@ index d92eb9bb44dc0b064312ca43f97a78206a67be21..030c637675cbcf4dd8a18bcdcf98a908
 +        try {
 +            JSObject result=requestUnobserved(call,httpMethod,bridge);
 +            DutyTrace.finish(trace,DutyTrace.Stage.NATIVE_HTTP_RESULT,result.optInt("status",0),android.os.SystemClock.elapsedRealtime());
++            // Reader metadata only: no change to requests, cookies, tokens or body.
++            if(DutyTrace.category(call.getString("url",""),method.toUpperCase(Locale.ROOT))==DutyTrace.Kind.AUTH){
++                result.put("rocoeatsAuthJson",true);
++                result.put("rocoeatsAuthTrace",new JSObject().put("generation",trace.owner()).put("request",trace.serial()));
++            }
 +            return result;
 +        } catch(java.net.SocketTimeoutException error) {
 +            DutyTrace.finish(trace,DutyTrace.Stage.NATIVE_HTTP_TIMEOUT,0,android.os.SystemClock.elapsedRealtime());throw error;
