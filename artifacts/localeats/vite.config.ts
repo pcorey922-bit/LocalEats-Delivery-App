@@ -13,7 +13,7 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invali
 const basePath = process.env.BASE_PATH || '/';
 
 export default defineConfig({
-  define: { 'import.meta.env.VITE_APP_AUDIENCE': JSON.stringify(audience) },
+  define: { 'import.meta.env.VITE_APP_AUDIENCE': JSON.stringify(audience), 'import.meta.env.VITE_NATIVE_DRIVER_AUTH': JSON.stringify(audience === 'driver' ? 'true' : 'false') },
   base: basePath,
   plugins: [
     react(),

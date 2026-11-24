@@ -212,3 +212,14 @@ test('Android direct native heartbeat owns ACK, skips legacy body reader and fen
  assert.deepEqual(pulses,['1','2','3']);assert.equal(legacyAcks,0,'Native worker already acknowledged; never duplicate through JS');assert.deepEqual(f.calls,['/api/driver/availability'],'No legacy Fetch heartbeat/body reader');
  hold=true;callback(undefined,undefined,{sequence:'4'});await flush();await f.session.stop();late.resolve();await flush();callback(undefined,undefined,{sequence:'5'});await flush();assert.deepEqual(pulses,['1','2','3','4']);
 });
+
+test('native-owned mode never retrieves tokens or sends telemetry from JS and restores native receipts',async()=>{
+ let callback:Function=()=>{};const received:unknown[]=[];let legacyAcks=0;
+ const f=fixture({watcher:{nativeOwnedDuty:true,addWatcher:async(options,cb)=>{assert.equal(options.dutyHeartbeat,true);callback=cb;return 'native-owner';},removeWatcher:async()=>{},acknowledgeDuty:async()=>{legacyAcks++;}},evidence:value=>received.push(value)});
+ await f.session.start();callback(undefined,undefined,{sequence:'1'});f.emit();await flush();
+ assert.deepEqual(f.calls,['/api/driver/availability'],'Only foreground setup verifies API; native service owns every duty request');assert.equal(legacyAcks,0);
+ f.session.receipt({active:true,heartbeatAt:1800000,locationAt:1800000,location:true});assert.deepEqual(received.at(-1),{heartbeatAt:1800000,locationAt:1800000,locationFailure:null});
+ f.session.receipt({heartbeatAt:NaN,locationAt:Infinity});assert.equal(received.length,1,'Invalid native receipt cannot fabricate freshness');
+ f.session.receipt({active:false});await flush();assert.equal(f.fatal.length,1);const count=received.length;
+ f.session.receipt({heartbeatAt:1800001});assert.equal(received.length,count,'Stopped session rejects late receipt');
+});

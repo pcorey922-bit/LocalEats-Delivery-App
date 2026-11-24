@@ -1,5 +1,5 @@
 import { useMemo, useSyncExternalStore } from "react";
-import { useAuth } from "@clerk/react";
+import { useAuth } from "../lib/auth";
 import { createCustomerCartRegistry } from "../lib/customer-cart";
 
 // All consumers of an identity share one live store, including the guest cart.

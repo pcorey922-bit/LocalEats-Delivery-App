@@ -1,5 +1,5 @@
 import { accountProfileResponse, accountResponseRead } from '../lib/account-response';
-import { useAuth } from '@clerk/react';
+import { useAuth } from '../lib/auth';
 import { getMyProfile, getGetMyProfileQueryKey, useGetMyProfile } from '@workspace/api-client-react';
 import { accountReadOptions, sessionRead } from '../lib/account-read';
 

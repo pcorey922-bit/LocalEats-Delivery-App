@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/react';
+import { useAuth } from '../lib/auth';
 import { useQuery } from '@tanstack/react-query';
 import { customFetch } from '../../../../lib/api-client-react/src/custom-fetch';
 import { accountReadOptions, retryAccountRead, sessionRead } from '../lib/account-read';

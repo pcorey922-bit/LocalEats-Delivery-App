@@ -104,7 +104,14 @@ public final class NativeClerkSession {
     public String token(boolean force,String expectedPrincipal) throws Exception {
         String userId=principal(),session=sessionId();long owner=fence.generation();
         if(userId==null||expectedPrincipal!=null&&!expectedPrincipal.equals(userId))throw new SecurityException("NATIVE_AUTH_REQUIRED");
-        String token=bounded(nativeCall(continuation->Clerk.INSTANCE.getAuth().getToken(force?new GetTokenOptions(null,true,10L):new GetTokenOptions(),continuation)),8000);
+        String token;
+        try{token=bounded(nativeCall(continuation->Clerk.INSTANCE.getAuth().getToken(force?new GetTokenOptions(null,true,10L):new GetTokenOptions(),continuation)),8000);}
+        catch(Exception error){
+            if(fence.generation()!=owner)throw new SecurityException("NATIVE_AUTH_CHANGED");
+            Throwable cause=error instanceof ExecutionException&&error.getCause()!=null?error.getCause():error;
+            if(cause instanceof AuthFailure&&(((AuthFailure)cause).status==401||((AuthFailure)cause).status==403))revokeLocalIntent();
+            throw error;
+        }
         if(fence.generation()!=owner||!userId.equals(principal())||!session.equals(sessionId())||token==null||token.isEmpty())throw new SecurityException("NATIVE_AUTH_CHANGED");
         return token;
     }

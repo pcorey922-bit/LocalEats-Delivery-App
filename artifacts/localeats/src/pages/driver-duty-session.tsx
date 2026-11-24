@@ -6,7 +6,7 @@ import { useAppForeground } from "../hooks/use-app-foreground";
 import { useCallback, useEffect, useState } from "react";
 import { Capacitor } from '@capacitor/core';
 import { BackgroundDutyLocation } from './background-duty-location';
-import { useAuth } from "@clerk/react";
+import { useAuth,usesNativeClerk } from "../lib/auth";
 import { useDriverAvailability } from '../hooks/use-driver-availability';
 import { accountReadMessage } from '../lib/account-read';
 import { accountStatus } from '../lib/account-entry';
@@ -53,7 +53,7 @@ export function DriverDutySession() {
   }, [userId]);
   useEffect(() => { if (!active) { setBackground(false); setConsent(false); } }, [active]);
   useEffect(() => {
-    if (!active || !foreground) return;
+    if (!active || !foreground || background && usesNativeClerk()) return;
     let disposed = false, inFlight = false;
     const controller = new AbortController();
     const heartbeat = () => {
@@ -81,7 +81,7 @@ export function DriverDutySession() {
       controller.abort();
       clearInterval(timer);
     };
-  }, [active, userId, foreground]);
+  }, [active, userId, foreground, background]);
   if (!active) {
     if (error) return <aside className="roco-alert" role="alert">{error}</aside>;
     if (import.meta.env.VITE_APP_AUDIENCE !== 'driver' || !isSignedIn) return null;

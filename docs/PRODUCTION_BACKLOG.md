@@ -1,3 +1,15 @@
+# November 24 — Native Driver background blocker: integration ready for CI
+
+Recovered interrupted UI migration on unchanged6ce7714/backup. Driver Android native
+Clerk session/ticket/UI and service-owned SDK auth/heartbeat/GPS/ACK now integrated;
+Customer/website/iOS unchanged. Native clocks and requests require no JS callbacks.
+Focused units/JVM/no-JS engine + local UI/API/browser/restart/role/consent/expiry tests,
+full API tests, workspace types and web/API builds PASS. Exact-source Android/iOS CI
+and signed replacement still pending. No hosted deployment/configuration changes.
+Next independent action: exact-SHA CI, protected signed Driver APK source/certificate
+verification; then owner sustained screen-lock test with Dispatch checked first.
+Physical background GPS NOT accepted. Preserve90s expiry, explicit consent and gates.
+
 # November 23 — Native engine layer implemented; Driver activation intentionally OFF
 
 Official SDK bridge d096599 ALL THREE CI PASS. Added native service-owned engine /

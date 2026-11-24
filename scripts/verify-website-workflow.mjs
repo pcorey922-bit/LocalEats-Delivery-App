@@ -4,6 +4,7 @@ import { verifyMenuCategories } from './menu-category-browser-checks.mjs';
 import { verifyGuestService } from './guest-service-browser-checks.mjs';
 import { verifyPublicInformation } from './public-information-browser-checks.mjs';
 import { verifyNativeStartupBootstrap, verifyNativeCustomerStartup } from './native-startup-browser-checks.mjs';
+import {verifyNativeClerkDriver} from './native-clerk-browser-checks.mjs';
 import { verifyDriverApp } from './driver-app-browser-checks.mjs';
 // Real website + API + migrated, disposable PGlite database. Only Clerk and
 // payment provider are simulated. This is NOT a Stripe TEST transaction.
@@ -24,7 +25,7 @@ await mkdir(apiTmp, { recursive: true });
 const backend = await mkdtemp(path.join(apiTmp, 'browser-'));
 let browser, server;
 const pages = [], browserErrors = [];
-const nativeAudience = process.env.ROCOEATS_NATIVE_BOOT_AUDIENCE || ((process.env.ROCOEATS_DRIVER_APP_BROWSER === 'true' || process.env.ROCOEATS_NATIVE_BOOT_BROWSER === 'true') ? 'driver' : 'customer');
+const nativeAudience = process.env.ROCOEATS_NATIVE_BOOT_AUDIENCE || ((process.env.ROCOEATS_NATIVE_CLERK_BROWSER === 'true' || process.env.ROCOEATS_DRIVER_APP_BROWSER === 'true' || process.env.ROCOEATS_NATIVE_BOOT_BROWSER === 'true') ? 'driver' : 'customer');
 assert.ok(['customer','driver'].includes(nativeAudience));
 try {
   // Never inherit hosted credentials, database connections, or ordering windows.
@@ -38,14 +39,23 @@ try {
   await build({
     stdin: { contents: process.env.ROCOEATS_NATIVE_BOOT_BROWSER === 'true' ? `import './src/main.tsx';` : `import React from 'react'; import {createRoot} from 'react-dom/client'; import App from './src/App'; createRoot(document.getElementById('root')).render(<App/>);`, resolveDir: path.join(root, 'artifacts/localeats'), loader: 'tsx' },
     outfile: path.join(web, 'app.js'), bundle: true, platform: 'browser', format: 'esm', jsx: 'automatic', logLevel: 'silent', loader: { '.css': 'empty' },
-    define: { 'import.meta.env.VITE_DEMO_MODE': '"false"', 'import.meta.env.DEV': 'false', 'import.meta.env.VITE_APP_AUDIENCE': JSON.stringify(nativeAudience), 'process.env.NODE_ENV': '"development"', 'import.meta.env.BASE_URL': '"/"', 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': '"fixture"', 'import.meta.env.VITE_CLERK_PROXY_URL': 'undefined', 'import.meta.env.VITE_API_ORIGIN': 'undefined', 'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': 'undefined', 'import.meta.env.VITE_GOOGLE_MAPS_MAP_ID': 'undefined' },
+    define: { 'import.meta.env.VITE_NATIVE_DRIVER_AUTH': JSON.stringify(process.env.ROCOEATS_NATIVE_CLERK_BROWSER === 'true'?'true':'false'), 'import.meta.env.VITE_DEMO_MODE': '"false"', 'import.meta.env.DEV': 'false', 'import.meta.env.VITE_APP_AUDIENCE': JSON.stringify(nativeAudience), 'process.env.NODE_ENV': '"development"', 'import.meta.env.BASE_URL': '"/"', 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': '"fixture"', 'import.meta.env.VITE_CLERK_PROXY_URL': 'undefined', 'import.meta.env.VITE_API_ORIGIN': process.env.ROCOEATS_NATIVE_CLERK_BROWSER === 'true' ? JSON.stringify('https://localeats-delivery-app.onrender.com') : 'undefined', 'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': 'undefined', 'import.meta.env.VITE_GOOGLE_MAPS_MAP_ID': 'undefined' },
     plugins: [{ name: 'test-only-clerk', setup(b) {
       b.onResolve({ filter: /^@\// }, args => b.resolve(path.join(root, 'artifacts/localeats/src', args.path.slice(2)), { kind: args.kind, resolveDir: root, namespace: 'file' }));
       b.onResolve({ filter: /^@capacitor\/core$/ }, () => ({ path: 'core', namespace: 'native-fixture-core' }));
       b.onResolve({ filter: /^\//, namespace: 'native-fixture-core' }, args => ({ path: args.path, namespace: 'file' }));
-      b.onLoad({ filter: /.*/, namespace: 'native-fixture-core' }, () => { const source = path.join(root, 'artifacts/localeats/node_modules/@capacitor/core/dist/index.js'); return { loader: 'js', contents: `export * from ${JSON.stringify(source)}; import {Capacitor as original} from ${JSON.stringify(source)}; export const Capacitor={...original,isNativePlatform:()=>!!window.qaNativeBootstrap,getPlatform:()=>window.qaNativeBootstrap?'android':'web'};` }; });
+      b.onLoad({ filter: /.*/, namespace: 'native-fixture-core' }, () => { const source = path.join(root, 'artifacts/localeats/node_modules/@capacitor/core/dist/index.js'); return { loader: 'js', contents: `export * from ${JSON.stringify(source)}; import {Capacitor as original,registerPlugin as originalRegister} from ${JSON.stringify(source)}; export const Capacitor={...original,isNativePlatform:()=>!!window.qaNativeBootstrap,getPlatform:()=>window.qaNativeBootstrap?'android':'web'};
+        const nativeState=()=>({isLoaded:true,isSignedIn:!!window.qaUserId&&sessionStorage.getItem('qa-native-signed-out')!=='1',...(window.qaUserId?{userId:window.qaUserId,sessionId:'sess_native_fixture',fullName:'Native fixture'}:{})});
+        export const registerPlugin=(name,implementations)=>name==='RoCoEatsNativeClerk'?{
+          getState:async()=>{window.qaNativeSdkReads=(window.qaNativeSdkReads||0)+1;if(window.qaNativeStateFailure)throw Error('Simulated SDK unavailable');return nativeState()},
+          getToken:async()=>({token:'simulated-native-sdk-token'}),
+          signInWithTicket:async()=>{window.qaNativeTicketCalls=(window.qaNativeTicketCalls||0)+1;sessionStorage.removeItem('qa-native-signed-out');return nativeState()},
+          cancelAuthRequest:async()=>{},signOut:async()=>{sessionStorage.setItem('qa-native-signed-out','1');return{isLoaded:true,isSignedIn:false}}
+        }:originalRegister(name,implementations);` }; });
       b.onResolve({filter:/^@capacitor\/geolocation$/},()=>({path:'geolocation',namespace:'native-fixture-geolocation'}));
       b.onLoad({filter:/.*/,namespace:'native-fixture-geolocation'},()=>({loader:'js',contents:`export const Geolocation={watchPosition:async(options,callback)=>{window.qaEmitForegroundFix=position=>callback(position);return 'qa-foreground-watch';},clearWatch:async()=>{}};`}));
+      b.onResolve({filter:/^@capacitor\/browser$/},()=>({path:'browser',namespace:'native-fixture-browser'}));
+      b.onLoad({filter:/.*/,namespace:'native-fixture-browser'},()=>({loader:'js',contents:`export const Browser={open:async({url})=>{window.qaOpenedNativeBrowser=url},close:async()=>{}};`}));
       b.onResolve({ filter: /^@capacitor\/app$/ }, () => ({ path: 'app', namespace: 'native-fixture-app' }));
       b.onLoad({filter:/.*/,namespace:'native-fixture-app'},()=>({loader:'js',contents:`
         export const App={getState:async()=>({isActive:true}),getLaunchUrl:async()=>window.qaNativeLaunchUrl?{url:window.qaNativeLaunchUrl}:undefined,
@@ -56,7 +66,7 @@ try {
         ? 'export const publishableKeyFromHost=(_host,key)=>key;'
         : `import { useSyncExternalStore } from 'react';
            const subscribe=callback=>{window.addEventListener('qa-auth-change',callback);return()=>window.removeEventListener('qa-auth-change',callback)};
-           export const useAuth=()=>{useSyncExternalStore(subscribe,()=>String(window.qaAuthReady)+String(window.qaUserId));return{isLoaded:window.qaAuthReady!==false,isSignedIn:!!window.qaUserId,userId:window.qaUserId,getToken:async(options)=>{if(options?.skipCache){window.qaTokenRefreshes=(window.qaTokenRefreshes||0)+1;if(sessionStorage.getItem('qa-stall-refresh')==='1')return new Promise(()=>{});return 'qa-refreshed-token'}return null}}};
+           export const useAuth=()=>{useSyncExternalStore(subscribe,()=>String(window.qaAuthReady)+String(window.qaUserId));return{isLoaded:window.qaAuthReady!==false,isSignedIn:!!window.qaUserId,userId:window.qaUserId,getToken:async(options)=>{window.qaWebTokenCalls=(window.qaWebTokenCalls||0)+1;if(options?.skipCache){window.qaTokenRefreshes=(window.qaTokenRefreshes||0)+1;if(sessionStorage.getItem('qa-stall-refresh')==='1')return new Promise(()=>{});return 'qa-refreshed-token'}return null}}};
            export const useUser=()=>({isLoaded:true,user:window.qaUserId?{id:window.qaUserId,fullName:'Browser tester'}:null});
            export const ClerkProvider=({children})=>window.qaProviderBlocked?null:children;
            export const SignIn=()=>null, SignUp=()=>null;
@@ -97,7 +107,8 @@ try {
     assert.ok(response.ok, `${method} ${url}: ${response.status} ${await response.clone().text()}`);
     return response.json();
   }
-  if (process.env.ROCOEATS_NATIVE_BOOT_BROWSER === 'true') {
+  if(process.env.ROCOEATS_NATIVE_CLERK_BROWSER==='true'){await verifyNativeClerkDriver({actor,api,origin});}
+  else if (process.env.ROCOEATS_NATIVE_BOOT_BROWSER === 'true') {
     if(nativeAudience==='customer') await verifyNativeCustomerStartup({actor,api,origin});
     else await verifyNativeStartupBootstrap({ actor, origin });
   } else if (process.env.ROCOEATS_DRIVER_APP_BROWSER === 'true') {

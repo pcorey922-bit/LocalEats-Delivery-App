@@ -1,7 +1,7 @@
 import { ImportGuestLink } from "./import-guest-link";
 import { NextGuestOrder } from "./next-guest-order";
 import { type FormEvent, useState } from "react";
-import { useAuth } from "@clerk/react";
+import { useAuth } from "../lib/auth";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import type { Order } from "@workspace/api-client-react";

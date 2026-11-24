@@ -6,7 +6,7 @@ import { useDutyIntent, useDutyStatus, useDutyEvidence } from "../hooks/use-duty
 import { dutyIntent } from "../lib/duty-intent";
 import { NavigationActions } from "./navigation-actions";
 import type { NavigationAddress } from "../lib/navigation";
-import { useAuth } from "@clerk/react";
+import { useAuth } from "../lib/auth";
 import {
   DispatchMap,
   type DispatchDriver,

@@ -1,7 +1,7 @@
 import { nativeStep } from '../lib/native-startup';
 import { useEffect, useRef } from 'react';
 import { useState } from "react";
-import { useAuth } from "@clerk/react";
+import { useAuth } from "../lib/auth";
 import { Capacitor } from "@capacitor/core";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { registerPush, unregisterPush } from "../lib/mobile";

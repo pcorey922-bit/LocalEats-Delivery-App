@@ -4,7 +4,7 @@ import { readNativeRequest } from './native-auth-request';
 import { mobileReturnRoute, mobileCallbackRoute } from "./mobile-return";
 import { readGuestToken } from "./guest-session";
 import { useEffect, useRef } from "react";
-import { useAuth } from "@clerk/react";
+import { useAuth } from "./auth";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { App } from "@capacitor/app";

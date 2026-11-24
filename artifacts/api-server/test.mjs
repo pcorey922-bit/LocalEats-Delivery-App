@@ -16,6 +16,7 @@ try {
     ["duty-intent", "tests/duty-intent.test.ts"],
     ["background-duty", "tests/background-duty.test.ts"],
     ["native-duty-http", "tests/native-duty-http.test.ts"],
+    ["native-clerk-store", "tests/native-clerk-store.test.ts"],
     ["clerk-proxy", "tests/clerk-proxy.test.ts"],
     ["native-startup", "tests/native-startup.test.ts"],
     ["reversal-evidence", "src/lib/reversal-evidence.test.ts"],

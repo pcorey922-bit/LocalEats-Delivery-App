@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useAuth, useUser, SignIn } from "@clerk/react";
+import { SignIn } from "@clerk/react";
+import {useAuth,useUser} from "../lib/auth";
 import { useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";

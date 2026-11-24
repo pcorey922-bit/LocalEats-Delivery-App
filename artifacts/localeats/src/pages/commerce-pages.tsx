@@ -25,7 +25,7 @@ import {
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 import type { Order } from "@workspace/api-client-react";
 import { Capacitor } from "@capacitor/core";
-import { useAuth } from '@clerk/react';
+import { useAuth } from '../lib/auth';
 import { Browser } from "@capacitor/browser";
 const money = (value: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(

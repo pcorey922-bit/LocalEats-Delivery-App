@@ -25,7 +25,8 @@ import { useState } from 'react';
 import { ArrowRight, UserRound, MapPin, ShieldCheck, LogOut, CircleAlert, UtensilsCrossed, RefreshCw } from 'lucide-react';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { QueryClient, QueryClientProvider, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ClerkProvider, SignIn, SignUp, useClerk, useAuth, useUser } from '@clerk/react';
+import { ClerkProvider, SignIn, SignUp } from '@clerk/react';
+import {useClerk,useAuth,useUser,usesNativeClerk,NativeClerkProvider} from './lib/auth';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { setAuthTokenGetter, getGetMyProfileQueryKey, getGetMyDashboardQueryKey, createMyProfile, getMyProfile, useGetMyDashboard, getMyDashboard } from '@workspace/api-client-react';
@@ -397,6 +398,7 @@ function NativeSessionProbe() {
 
 function ClerkRoutes() {
   const [, setLocation] = useLocation();
+  if(usesNativeClerk())return <NativeClerkProvider><NativeSessionProbe/><ApiAuthentication/><MobileLifecycle/><ClerkQueryClientCacheInvalidator/><BackgroundDutyRecovery/><DriverDutySession/><Router/></NativeClerkProvider>;
   if (!clerkPubKey) throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY');
   return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`}
     localization={{ signIn: { start: { title: 'Welcome back', subtitle: 'Sign in to your RoCoEats account' } }, signUp: { start: { title: 'Find your place here', subtitle: 'Create your RoCoEats account' } } }}

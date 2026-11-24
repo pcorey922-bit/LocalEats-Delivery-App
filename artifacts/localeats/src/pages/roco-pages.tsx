@@ -32,7 +32,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { unregisterPush } from '../lib/mobile';
 import { useCommerce, CommerceBanner, OrderActions, CheckoutPanel, RestaurantAvailability } from './commerce-pages';
 import { Link, Redirect, useLocation, useParams, useSearch } from 'wouter';
-import { useAuth, useClerk } from '@clerk/react';
+import { useAuth, useClerk } from '../lib/auth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, ClipboardList, MapPin, Plus, RefreshCw, ShieldCheck, ShoppingBag, Utensils } from 'lucide-react';
 import {

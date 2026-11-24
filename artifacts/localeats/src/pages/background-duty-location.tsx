@@ -1,6 +1,8 @@
+import {nativeStep} from '../lib/native-startup';
 import { nativeDutyHttp } from '../lib/native-duty-http';
 import { driverDutyRequest } from '../lib/driver-duty-transport';
-import { useAuth } from '@clerk/react';
+import { useAuth,usesNativeClerk } from '../lib/auth';
+import {App} from '@capacitor/app';
 import { dutyIntent } from '../lib/duty-intent';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, useRef } from 'react';
@@ -48,15 +50,21 @@ export function BackgroundDutyLocation({ onFatal }: { onFatal: (message: string)
   useEffect(() => {
     let disposed = false, permissionDenied = false;
     let nativeId:string|undefined;
+    const nativeOwned=usesNativeClerk();
     const android=Capacitor.getPlatform()==='android';
     const telemetry=<T,>(path:string,options:Parameters<typeof driverDutyRequest>[3])=>{
       const kind:DutyTraceKind=path.endsWith('/heartbeat')?'HEARTBEAT':path.endsWith('/availability')?'AVAILABILITY':'GPS';
       return driverDutyRequest<T>(android?(route,request)=>nativeDutyHttp(watcher,()=>tokenGetter.current(),import.meta.env.VITE_API_ORIGIN??'',route,request):customFetch,()=>tokenGetter.current({skipCache:true}),path,{...options,onStage:stage=>recordDutyStage(nativeId,stage,kind)});
     };
     const session = backgroundDutySession({ watcher: {
+      nativeOwnedDuty:nativeOwned,
       addWatcher: async (options, callback) => {
         await clearSavedWatcher();
-        const id = await watcher.addWatcher(options, (fix, error) => {
+        const nativeOptions={...options,...(nativeOwned?{nativePrincipal:userId}:{})};
+        const id = await watcher.addWatcher(nativeOptions, (fix, error) => {
+          const control=fix as unknown as {dutyReceipt?:boolean;dutyWarning?:string;heartbeatAt?:number;locationAt?:number;location?:boolean}|undefined;
+          if(control?.dutyReceipt===true){callback(undefined,undefined,undefined,control);return;}
+          if(control?.dutyWarning){callback(undefined,undefined,undefined,{warning:'NATIVE_DUTY_UPDATE_INTERRUPTED',location:control.location===true});return;}
           const pulse = fix as unknown as {dutyPulse?:boolean; sequence?:unknown} | undefined;
           if (pulse?.dutyPulse === true && typeof pulse.sequence === 'string') {recordDutyStage(nativeId,'JS_PULSE','HEARTBEAT');callback(undefined, error, {sequence:pulse.sequence});}
           else {if(fix)recordDutyStage(nativeId,'JS_GPS','GPS');callback(fix && fix.time !== null ? { latitude: fix.latitude, longitude: fix.longitude, accuracy: fix.accuracy, time: fix.time, simulated: fix.simulated } : undefined, error);}
@@ -66,7 +74,7 @@ export function BackgroundDutyLocation({ onFatal }: { onFatal: (message: string)
         catch (error) { await watcher.removeWatcher({ id }); throw error; }
         return id;
       },
-      ...(android ? {nativeHeartbeat:async(id:string,sequence:string,signal:AbortSignal)=>{await telemetry('/api/driver/heartbeat',{method:'POST',signal,nativePulse:{id,sequence}});}} : {}),
+      ...(android && !nativeOwned ? {nativeHeartbeat:async(id:string,sequence:string,signal:AbortSignal)=>{await telemetry('/api/driver/heartbeat',{method:'POST',signal,nativePulse:{id,sequence}});}} : {}),
       removeWatcher: async ({ id }) => { await watcher.removeWatcher({ id }); if (localStorage.getItem(storageKey) === id) localStorage.removeItem(storageKey); },
     }, api: telemetry,
       evidence: value => { if (!disposed && userId) dutyIntent.record(userId,value); },
@@ -84,8 +92,14 @@ export function BackgroundDutyLocation({ onFatal }: { onFatal: (message: string)
       status: value => { if (!disposed) setMessage(value); },
       fatal: value => { if (!disposed) onFatal(value); },
     });
+    const foreground=nativeOwned?App.addListener('appStateChange',value=>{
+      if(value.isActive&&nativeId&&!disposed){
+        const controller=new AbortController();
+        void nativeStep('NATIVE_DUTY_STATE_TIMEOUT',()=>watcher.getNativeDutyState({id:nativeId!}),controller.signal).then(value=>{if(typeof value?.active!=='boolean')throw Error('Native duty state invalid');if(!disposed)session.receipt(value);}).catch(()=>{if(!disposed)session.receipt({active:false});}).finally(()=>controller.abort());
+      }
+    }):null;
     void session.start().catch(() => { if (!disposed && !permissionDenied) onFatal('Background location could not start. Check location and notification permissions, then reconnect explicitly.'); });
-    return () => { disposed = true; void session.stop().catch(() => onFatal('Location service could not stop. Disable location permission in device settings and reopen RoCoEats.')); };
+    return () => { disposed = true;void foreground?.then(handle=>handle.remove()).catch(()=>{}); void session.stop().catch(() => onFatal('Location service could not stop. Disable location permission in device settings and reopen RoCoEats.')); };
   }, [onFatal, client, userId]);
   return <section aria-label="Background driver location"><p role="status">{message}</p><p>Sharing continues while this session remains authorized, including while the app is backgrounded. Authorized participants in your active delivery can also view your shared position. Android shows an ongoing notification; iOS shows its location indicator. Going offline stops sharing. A restart or expired session requires explicit reconnect. Keep your device charged.</p></section>;
 }

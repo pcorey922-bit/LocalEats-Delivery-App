@@ -1,6 +1,7 @@
 import { registerPush } from '../src/lib/mobile';
 // Isolated UI fixture: simulated native bridge and API, never a production route.
 import React from 'react';
+import {NativeClerkProvider,usesNativeClerk} from '../src/lib/auth';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DriverAvailability } from '../src/pages/delivery-tracking';
@@ -83,4 +84,5 @@ window.fetch = async (input, options) => {
 };
 const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 qa.refreshDuty=()=>client.invalidateQueries({queryKey:['driver-availability']});
-createRoot(document.getElementById('root')!).render(<QueryClientProvider client={client}>{location.search.includes('push=true') ? <PushPreferences/> : <><BackgroundDutyRecovery/><DriverAvailability/><DriverDutySession/>{location.search.includes('permissions=true') && <PushPreferences/>}</>}</QueryClientProvider>);
+const contents = <>{location.search.includes('push=true') ? <PushPreferences/> : <><BackgroundDutyRecovery/><DriverAvailability/><DriverDutySession/>{location.search.includes('permissions=true') && <PushPreferences/>}</>}</>;
+createRoot(document.getElementById('root')!).render(<QueryClientProvider client={client}>{usesNativeClerk()?<NativeClerkProvider>{contents}</NativeClerkProvider>:contents}</QueryClientProvider>);

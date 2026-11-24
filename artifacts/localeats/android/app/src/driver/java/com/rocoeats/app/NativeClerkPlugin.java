@@ -17,7 +17,11 @@ public class NativeClerkPlugin extends Plugin {
         getActivity().runOnUiThread(()->{try{session().configure(getActivity());
             synchronized(NativeClerkPlugin.class){if(dutyClient==null)dutyClient=new NativeDutyHttpClient(session(),BuildConfig.ROCOEATS_API_ORIGIN);com.equimaps.capacitor_background_geolocation.NativeDutyRuntime.install(dutyClient);}
             configured.complete(null);}catch(Exception ignored){configured.completeExceptionally(new SecurityException("NATIVE_AUTH_CONFIG_MISSING"));}});
-        try{requests.submit(()->{try{configured.get(12000,TimeUnit.MILLISECONDS);session().awaitInitialized();call.resolve(operation.run());}catch(Exception ignored){call.reject("Native authentication did not complete","NATIVE_AUTH_REQUEST_FAILED");}});}
+        try{requests.submit(()->{try{configured.get(12000,TimeUnit.MILLISECONDS);session().awaitInitialized();call.resolve(operation.run());}catch(Exception error){
+            Throwable cause=error instanceof ExecutionException&&error.getCause()!=null?error.getCause():error;
+            String code=cause instanceof NativeClerkSession.AuthFailure&&(((NativeClerkSession.AuthFailure)cause).status==401||((NativeClerkSession.AuthFailure)cause).status==403)?"NATIVE_AUTH_REQUIRED":cause instanceof SecurityException&&cause.getMessage()!=null&&cause.getMessage().matches("NATIVE_[A-Z_]+")?cause.getMessage():"NATIVE_AUTH_REQUEST_FAILED";
+            call.reject("Native authentication did not complete",code);
+        }});}
         catch(RejectedExecutionException ignored){call.reject("Native authentication unavailable","NATIVE_AUTH_UNAVAILABLE");}
     }
     @PluginMethod public void getState(PluginCall call){if(session().isLocallySignedOut())call.resolve(session().state());else request(call,()->session().state());}

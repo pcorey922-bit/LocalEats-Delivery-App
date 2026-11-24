@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useAuth } from '@clerk/react';
+import { useAuth } from '../lib/auth';
 import { Capacitor } from '@capacitor/core';
 import { nativeDutyBridge, sanitizeDutyDiagnostics } from '../lib/native-duty-diagnostics';
 import { nativeStep } from '../lib/native-startup';

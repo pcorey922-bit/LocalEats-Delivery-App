@@ -1,13 +1,15 @@
 import { nativeStep } from './native-startup';
 export type DutyFix = { latitude: number; longitude: number; accuracy: number; time: number; simulated?: boolean };
 export type DutyPulse = { sequence: string };
+export type DutyReceipt={heartbeatAt?:number;locationAt?:number;location?:boolean;warning?:string;active?:boolean};
 export type DutyEvidence = { heartbeatAt?: number; locationAt?: number; failure?: string | null; locationFailure?: string | null };
 type Options = { method?: 'GET' | 'POST'; body?: string; signal: AbortSignal };
 type Dependencies = {
   watcher: {
-    addWatcher(options: { backgroundTitle: string; backgroundMessage: string; requestPermissions: boolean; stale: boolean; distanceFilter: number; dutyHeartbeat?: boolean }, callback: (fix?: DutyFix, error?: { code?: string }, pulse?: DutyPulse) => void): Promise<string>;
+    addWatcher(options: { backgroundTitle: string; backgroundMessage: string; requestPermissions: boolean; stale: boolean; distanceFilter: number; dutyHeartbeat?: boolean }, callback: (fix?: DutyFix, error?: { code?: string }, pulse?: DutyPulse,receipt?:DutyReceipt) => void): Promise<string>;
     removeWatcher(options: { id: string }): Promise<void>;
     acknowledgeDuty?: (id: string, sequence: string) => Promise<void>;
+    nativeOwnedDuty?:boolean;
     nativeHeartbeat?: (id:string,sequence:string,signal:AbortSignal)=>Promise<void>;
   };
   permission: () => Promise<boolean>;
@@ -59,7 +61,21 @@ export function backgroundDutySession(deps: Dependencies) {
     deps.fatal(message);
     void stop().catch(() => deps.status('Location service could not stop. Disable location permission in device settings and reopen RoCoEats.'));
   };
+  function nativeReceipt(receipt:DutyReceipt){
+    if(stopped||!deps.watcher.nativeOwnedDuty)return;
+    if(receipt.active===false){deps.evidence?.({failure:'DUTY_DEVICE_RECONNECT_REQUIRED'});fail('Native duty is no longer active. Reconnect explicitly.');return;}
+    if(receipt.warning){
+      if(receipt.location)deps.evidence?.({locationFailure:'NATIVE_DUTY_LOCATION_INTERRUPTED'});else deps.evidence?.({failure:'NATIVE_DUTY_HEARTBEAT_INTERRUPTED'});
+      deps.status('Native duty update interrupted. Check receipt times; reconnect if the session expires.');return;
+    }
+    const evidence:DutyEvidence={};
+    for(const key of ['heartbeatAt','locationAt'] as const){const value=receipt[key];if(Number.isSafeInteger(value)&&value!>0&&value!<=now()+30000)evidence[key]=value;}
+    if(receipt.location===true&&evidence.locationAt){evidence.locationFailure=null;deps.status('Background location uploaded to authorized dispatch.');}
+    else if(receipt.location===false&&evidence.heartbeatAt)evidence.failure=null;
+    if(Object.keys(evidence).length)deps.evidence?.(evidence);
+  }
   async function dutyPulse(pulse: DutyPulse) {
+    if(deps.watcher.nativeOwnedDuty)return;
     if (stopped || !deps.watcher.acknowledgeDuty && !deps.watcher.nativeHeartbeat || !/^[1-9][0-9]{0,18}$/.test(pulse.sequence) || pulse.sequence === acknowledgedSequence) return;
     if (!id) { pendingPulse = pulse; return; }
     if (pulseBusy) return;
@@ -91,6 +107,7 @@ export function backgroundDutySession(deps: Dependencies) {
     if (error?.code?.startsWith('DUTY_')) { deps.evidence?.({failure:error.code}); fail('Native background duty stopped because its server acknowledgement or location service was unavailable. Reconnect explicitly.'); return; }
     if (error?.code === 'NOT_AUTHORIZED') { fail('Background location permission is unavailable. Reconnect explicitly after reviewing device permissions.'); return; }
     if (error || !fix) { deps.status('Waiting for a GPS fix. Dispatch may show your location as stale.'); return; }
+    if(deps.watcher.nativeOwnedDuty)return; // Native service owns validation/network/ACK.
     const age = now() - fix.time;
     if (![fix.latitude, fix.longitude, fix.accuracy, fix.time].every(Number.isFinite) ||
         Math.abs(fix.latitude) > 90 || Math.abs(fix.longitude) > 180 || fix.accuracy < 0 || fix.accuracy > 10000 ||
@@ -128,6 +145,7 @@ export function backgroundDutySession(deps: Dependencies) {
     } finally { inFlight = false; }
   }
   return {
+    receipt:nativeReceipt,
     start() {
       starting ??= (async () => {
         if (!await nativeStep('NATIVE_LOCATION_PERMISSION_TIMEOUT', deps.permission, abort.signal)) throw Error('Background location requires device permission and, on Android, a visible notification.');
@@ -137,7 +155,7 @@ export function backgroundDutySession(deps: Dependencies) {
         if (stopped) return;
         if (!eligible(access)) throw Error('Current driver approval and online availability are required. Reconnect explicitly.');
         await nativeStep('NATIVE_LOCATION_WATCHER_TIMEOUT', async () => {
-          id = await deps.watcher.addWatcher({ backgroundTitle: 'RoCoEats Driver · On duty', backgroundMessage: 'Sharing your driver location. Go offline in RoCoEats to stop.', requestPermissions: true, stale: false, distanceFilter: 0, dutyHeartbeat: !!deps.watcher.acknowledgeDuty || !!deps.watcher.nativeHeartbeat }, (fix, error, pulse) => { if (pulse) void dutyPulse(pulse); else void position(fix, error); });
+          id = await deps.watcher.addWatcher({ backgroundTitle: 'RoCoEats Driver · On duty', backgroundMessage: 'Sharing your driver location. Go offline in RoCoEats to stop.', requestPermissions: true, stale: false, distanceFilter: 0, dutyHeartbeat: !!deps.watcher.acknowledgeDuty || !!deps.watcher.nativeHeartbeat || !!deps.watcher.nativeOwnedDuty }, (fix, error, pulse, receipt) => { if(receipt)nativeReceipt(receipt);else if (pulse) void dutyPulse(pulse); else void position(fix, error); });
           if (!stopped && pendingPulse) { const pulse = pendingPulse; pendingPulse = undefined; void dutyPulse(pulse); }
           // Native calls cannot necessarily be canceled. A watcher returned after
           // timeout/stop must be removed even though the caller has already left.

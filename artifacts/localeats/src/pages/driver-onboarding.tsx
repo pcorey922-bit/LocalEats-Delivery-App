@@ -2,7 +2,7 @@ import { useDriverAvailability } from '../hooks/use-driver-availability';
 import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
-import { useAuth } from "@clerk/react";
+import { useAuth } from "../lib/auth";
 type Application = {
   profileId: string;
   phone: string;

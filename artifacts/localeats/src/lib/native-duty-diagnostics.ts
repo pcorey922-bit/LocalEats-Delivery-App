@@ -5,6 +5,7 @@ import type { BackgroundGeolocationPlugin } from '@capacitor-community/backgroun
 export type DutyTraceKind='NONE'|'HEARTBEAT'|'GPS'|'AVAILABILITY'|'AUTH';
 export type DutyJsStage='JS_PULSE'|'JS_GPS'|'TOKEN_START'|'TOKEN_READY'|'TOKEN_FAILED'|'JS_HTTP_START'|'JS_HTTP_RETURN'|'JS_HTTP_FAILED'|'JS_BODY_START'|'JS_BODY_READY';
 export const nativeDutyBridge=registerPlugin<BackgroundGeolocationPlugin & {
+ getNativeDutyState(options:{id:string}):Promise<{active:boolean;heartbeatAt?:number;locationAt?:number}>;
  requestDuty(options:NativeDutyRequest):Promise<NativeDutyResponse>;
  cancelDutyRequest(options:{requestId:string}):Promise<void>;
  acknowledgeDuty(options:{id:string;sequence:string}):Promise<void>;

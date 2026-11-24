@@ -1,6 +1,6 @@
 import { nativeAccountReturn, type JoinRole } from "../lib/account-entry";
 import { useEffect, useRef, useState } from "react";
-import { useAuth, useSignIn } from "@clerk/react";
+import {useAuth,useWebSignIn,usesNativeClerk,nativeClerk} from "../lib/auth";
 import { Browser } from "@capacitor/browser";
 import { Link, useLocation } from "wouter";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
@@ -17,7 +17,7 @@ export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; chec
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const { isLoaded, isSignedIn } = useAuth(),
-    { signIn } = useSignIn(),
+    signIn = useWebSignIn()?.signIn,
     latest = useRef(signIn);
   latest.current = signIn;
   const starting = useRef(false);
@@ -46,11 +46,16 @@ export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; chec
           // silently redeem the same one-use request and demand repeated approval.
           saveNativeRequest({ ...pending, phase: 'activating' });
           nativeStartup.report('TICKET');
-          const result = await nativeStep('NATIVE_TICKET_TIMEOUT', () => latest.current.ticket({ ticket: response.ticket! }), signal);
+          if(usesNativeClerk()){
+            await nativeClerk.activateTicket(response.ticket,pending.id,signal);
+          }else{
+            const signer=latest.current;if(!signer)throw new NativeStepError('NATIVE_TICKET_REJECTED');
+          const result = await nativeStep('NATIVE_TICKET_TIMEOUT', () => signer.ticket({ ticket: response.ticket! }), signal);
           if (result.error) throw new NativeStepError('NATIVE_TICKET_REJECTED');
           nativeStartup.report('ACTIVATING');
           let activationConfirmed = false;
-          const finalized = await nativeStep('NATIVE_ACTIVATION_TIMEOUT', () => latest.current.finalize({ navigate: async ({ session }) => {
+          const finalSigner=latest.current;if(!finalSigner)throw new NativeStepError('NATIVE_ACTIVATION_REJECTED');
+          const finalized = await nativeStep('NATIVE_ACTIVATION_TIMEOUT', () => finalSigner.finalize({ navigate: async ({ session }) => {
             if (session.status !== 'active' || session.currentTask) throw new NativeStepError('NATIVE_SESSION_TASK_REQUIRED');
             activationConfirmed = true;
             // Router navigation happens AFTER Clerk emits its activated session.
@@ -58,6 +63,7 @@ export function NativeSignIn({ role, checkout = false }: { role?: JoinRole; chec
           } }), signal);
           if (finalized.error) throw finalized.error instanceof NativeStepError ? finalized.error : new NativeStepError('NATIVE_ACTIVATION_REJECTED');
           if (!activationConfirmed) throw new NativeStepError('NATIVE_ACTIVATION_UNCONFIRMED');
+          }
           signal.throwIfAborted(); return;
         }
         if (!response.pending) throw new NativeStepError('NATIVE_REDEEM_RESPONSE_INVALID');

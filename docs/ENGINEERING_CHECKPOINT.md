@@ -1,3 +1,43 @@
+# November 24 — Interrupted native Driver migration recovered and integrated
+
+BASE / backup: 6ce7714574cc17b00167ea7423bb25862b5fdefb, both remote branches
+verified. Required Validate push/PR + Native CI succeeded (45137736387,
+45137744687,45137744569; later Validate45141859766 also success). Backup untouched.
+Surviving tracked/untracked changes copied separately to /workspace/recovery-2026-11-24
+before editing. No work discarded or remote history rewritten.
+
+IMPLEMENTED (this commit; CI pending): Driver Android now uses official native Clerk
+session as the single UI/auth authority, existing proof-bound browser ticket handoff,
+native SDK token renewal and secure persistence. No browser credential extraction,
+parallel roles or authorization bypass. MainActivity registers Driver-only plugin;
+Customer/website/iOS retain existing Clerk path. One fresh browser approval may be
+needed to establish native SDK session after updating; no duplicate account needed.
+Native service owns heartbeat/GPS/HTTP/strict ACK independently of WebView. UI only
+projects receipts; read-only resume checks also work before first GPS callback.
+Logout/cancel/account replacement fence late tokens and activation; private query
+cache clears before another identity is published. Old sign-out failure cannot erase
+new ticket identity. SDK rejection revokes local intent. Native duty still requires
+explicit consent/notification permission; restart never silently restarts tracking.
+90-second server expiry and existing native lease/fail-closed policy unchanged.
+
+VALIDATION executed: full pnpm test PASS, workspace typechecks PASS, website/API
+production builds PASS (existing bundle-size warning); 19 background +9 native-store
+focused cases PASS; 5 reader +4 manifest/audience cases PASS; actual JVM lease/trace/
+request/auth fences + native engine4min NO-JS test PASS. Real UI/local disposable API
+native-SDK projection/handoff/restart/role-denial/retry browser PASS; native-owned UI
+no-JS-telemetry/receipt/resume/stop/expiry browser PASS; existing Driver workflow and
+background/push/iOS simulated browser regressions PASS. SDK/provider/OS mocked in
+browser/JVM tests; no real Clerk/provider or physical background acceptance claimed.
+
+NEXT: push this atomic change; wait for ALL exact-SHA Validate and Native CI. Fix any
+real failures. Then build protected signed Driver staging APK, verify source/package/
+certificate and artifact, document one sustained Samsung lock test. No Render update
+or migration needed: native work uses existing authorized telemetry endpoints.
+Physical GPS remains BLOCKED pending replacement/device evidence. Native API already
+enabled, no Android/iOS app registrations; no hosted configuration changed. Retain
+existing proof-bound custom callback, no new SDK hosted OAuth callbacks introduced.
+All hosted ordering/payment/payout/retention/geographic/provider-send gates unchanged.
+
 # November 23 — Native duty engine/transport implemented, UI migration still OFF
 
 SDK FOUNDATION d096599a15eec7db14219bef2c3e80933543e802 ALL THREE CI SUCCESS:

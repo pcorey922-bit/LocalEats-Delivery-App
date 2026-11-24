@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useClerk } from "@clerk/react";
+import { useClerk } from "../lib/auth";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { getGetMyDashboardQueryKey, getGetMyProfileQueryKey } from "@workspace/api-client-react";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";

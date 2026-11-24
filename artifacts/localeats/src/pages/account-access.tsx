@@ -1,7 +1,7 @@
 import { useNativeStartup } from '../components/native-startup-boundary';
 import { accountAccessResponse, accountResponseRead } from '../lib/account-response';
 import { accountReadOptions, accountReadMessage, sessionRead } from '../lib/account-read';
-import { useAuth } from "@clerk/react";
+import { useAuth } from "../lib/auth";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearch } from "wouter";
