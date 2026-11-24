@@ -1,3 +1,44 @@
+# November 24 — Native Driver240 candidate verified; emulator pending
+
+FUNCTIONAL SOURCE83f228015f5725409c4cf1a111cbf57644f11b7e ALL THREE CI SUCCESS:
+Validate push45335478710 / PR45335489494, Native45335489509 (Customer+Driver Android
+and iOS). Integrated10944ba also passed. Native API/HTTP adapters compiled against
+actual pinned Clerk1.5/OkHttp jars locally (6 missing-annotation compiler-stub warnings).
+No JS-dependent critical token/HTTP/ACK path remains in the Android native-owned mode.
+Exact SDK/provider/physical background behavior is NOT established by those tests.
+
+Protected signed Driver240 run45336250932 SUCCESS; artifact14893609422
+RoCoEats-Driver-Android-Staging-Test-APK, packagecom.rocoeats.driver.staging,
+compiled version240 /1.0-staging. SourceAPP_IDENTITY, GitHub ZIPdigest, APK checksum,
+compiled manifest/security policy, existing protected signer and actual DEX native
+ClerkSession/Plugin/SDK/NativeDutyHttpClient/NativeDutyEngine classes verified.
+ZIP SHA25600ec1c53cc615a37543c1620e10bc6c73a144f73f76558056c30e1d78205eee8;
+APK SHA256a84958b4d5e181c5064ad668bbf4a2c9b2ea541936d8bc62741d76c5c4bbd110.
+Protected signerf22e58f4da4e5d64f9ac5d4f0fc8abfe2595e395511552f7fb385205c7d18296.
+Signing/private service/permission/server-secret scans passed; Firebase remains
+unconfigured. Temporary signing material cleanup succeeded. No hosted change.
+Run/artifact: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/45336250932/artifacts/14893609422
+
+Existing signed-out emulator smoke45336747590 IN PROGRESS on these exact signed
+bytes. Do not claim pass until conclusion/evidence reviewed. Physical Samsung GPS
+still BLOCKED. Updated existing docs/ANDROID_STAGING_TEST.md with one five-minute
+screen-lock comparison, Chrome Dispatch BEFORE Driver foreground, diagnostic capture
+before reconnect, stop/offline and restart checks. SDK migration can require one fresh
+browser approval; repeated approval/blank/recovery is a fail. Existing Customer208
+acceptance unchanged. No Render deployment/migration/config action required.
+
+Read-only live native preflight PASS: HTTPS/native protocol/app callback, public Clerk
+match, both native CORS origins, public/private ordering=false, liveCharges=false.
+Initial workspace Node fetch failed; using required proxy resolved it. /livez200 and
+public readiness confirmed. This endpoint does NOT independently expose all payout /
+retention/municipal settings; no new authenticated verification or changed setting.
+
+NEXT: review emulator result/diagnostics; fix actual failures before owner handoff.
+Then owner-only240 physical test using linked procedure. Independently continue
+software-only native acceptance; real push provider configuration/sends, iOS signed
+physical acceptance and authorized financial/provider evidence remain separate blockers.
+All financial records, recovery branch, backup branch, gates and PR1 preserved.
+
 # November 24 — Native activation/logout race closed before signing
 
 Integrated UI/native source10944ba881b45c688ce6784fa7372755b60e9dae pushed; exact CI

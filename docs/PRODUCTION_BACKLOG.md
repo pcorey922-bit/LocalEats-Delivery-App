@@ -1,3 +1,16 @@
+# November 24 — Integrated native Driver240 ready for emulator/physical acceptance
+
+Functional83f228015f5725409c4cf1a111cbf57644f11b7e all3 CI PASS, protected signed
+Driver24045336250932 PASS/artifact14893609422 verified source/package/certificate /
+checksum/native SDK+engine. Existing signed-out emulator45336747590 pending.
+Native auth+renewal/heartbeat/GPS/strict ACK no longer depend on WebView continuations.
+Local UI still requires explicit consent and authoritative role/availability reads;
+90s server expiry intact. No backend deployment needed. Samsung5min lock acceptance
+NOT passed; procedure in ANDROID_STAGING_TEST.md. Customer208 accepted scope preserved.
+Next: inspect emulator evidence, then owner240 lock/Dispatch/receipt/offline/restart.
+Real push/Firebase remains unconfigured, iOS signed physical and provider financial
+acceptance need protected owner access/authorization. No hosted/provider/data changes.
+
 # November 24 — Native Driver background blocker: integration ready for CI
 
 Recovered interrupted UI migration on unchanged6ce7714/backup. Driver Android native

@@ -1,3 +1,37 @@
+## Native-owned Driver candidate — controlled Samsung acceptance
+
+Use only the new exact-source signed artifact listed in the engineering checkpoint;
+old Driver233 is known to fail. This candidate moves Driver authentication and duty
+requests to the official native SDK; Customer208 remains physically accepted for its
+previously tested scope. No Render deployment, migration or hosted setting change
+is required for this native-only candidate.
+
+1. Install as an **update**, keeping the existing app and its data. Do not uninstall
+   or create an account. A single browser approval with the existing owner/driver
+   account may be needed to establish the new native SDK session. Confirm Driver
+   controls and existing permissions. A loop, blank page or recovery code is a fail;
+   record the code and stop instead of repeating authorization.
+2. Reconnect explicitly if requested. Check the background-sharing consent box and
+   tap **Enable background location for this session** while the app is visible.
+   Allow notifications/location if requested. Wait for the ongoing on-duty
+   notification and advancing heartbeat/GPS receipt times. Existing Android
+   “while using” location permission supports the foreground service; do not change
+   battery/network settings for this comparison. This does not enroll Firebase push.
+3. Lock the phone for **five minutes**. Unlock into Samsung Chrome **Dispatch before
+   reopening Driver**. Pass requires available/eligible driver and recent accepted
+   GPS, not merely a notification. Then open Driver and compare receipt times. Native
+   token renewal/HTTP/ACK must continue without foreground JavaScript processing.
+4. If disconnected or receipts stopped, read/copy the sanitized native diagnostic
+   report **before** reconnecting, stopping, signing out, or force-closing. Report
+   visible codes/times only; no credentials. Do not repeat the same failed run.
+5. Stop background sharing, then **Go offline**; verify Dispatch is offline and no
+   fresh location is accepted. Force-close/reopen: sign-in should restore, background
+   sharing stays OFF and reconnect remains explicit. No order, payment, provider
+   send, geocoding lookup or financial operation belongs to this test.
+
+Automated native/JVM/browser builds are prerequisites, not physical acceptance.
+Recheck actual source/signature/version in the checkpoint before downloading.
+
 ## Real push readiness — owner-controlled setup, no credentials in chat
 
 Software preparation does NOT mean actual push works. The signed staging workflow
