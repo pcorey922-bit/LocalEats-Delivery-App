@@ -1,3 +1,13 @@
+## Approved next deployment — November24 (not yet Live)
+
+Owner approved notification corrections **644e038b4532936a6db2e954e34a8bf558166c24**.
+All three required target workflows passed; no new migration/configuration change.
+Existing Render service -> Manual Deploy -> Deploy a specific commit -> exact SHA.
+Do not use a newer documentation commit or enable any gate. Preserve credentials,
+Neon records/recovery, Driver240 GPS and90s expiry. After owner confirms Live, run
+existing23 read-only checks against the fullapprovedSHA; before then do not claim
+deployment or new provider/physical acceptance. No sends/credential changes approved.
+
 ## Current verified staging release — November24
 
 Owner deployed **8aa903bdccbe1da30f7f5fcba8841019c29e5619**. Render Live and exact

@@ -1,3 +1,38 @@
+# November24 —644e038 notification release approved; manual deployment pending
+
+Owner explicitly approved deployment of644e038b4532936a6db2e954e34a8bf558166c24 to
+EXISTING Render staging, without provider sends/credentials/financial activation.
+Exact remote branch membership verified; PR1 remainsOPEN/DRAFT into main. ALL THREE
+required target CI SUCCESS: Validate push45347493848, PR45347500566,
+Native45347500454 (both Android/iOS audiences). Local tree was clean before this
+approval-only documentation update. No runtime code changed in this preparation.
+
+Prerequisites reviewed against last verified live8aa903bdccbe1da30f7f5fcba8841019c29e5619:
+NO changed database migration, Dockerfile, Render blueprint or staging startup scripts;
+NO native Driver SDK/GPS/lease source or background-duty controller change. No new
+migration or signing operation is required. Existing schema0029/recovery infrastructure
+must be preserved. Driver240 physical GPS acceptance and90s expiry remain intact.
+Installed240 need not be replaced for this backend deployment; future native token
+refresh/client Firebase acceptance requires separately prepared configured APKs.
+
+Manual owner action: existing LocalEats-Delivery-App -> Manual Deploy -> Deploy a
+specific commit -> full644e038 SHA above -> wait Deploy succeeded/Live/source644e038.
+Use SPECIFIC commit, not newer documentation HEAD or Deploy latest. Do not edit/save
+Environment, add provider credentials or change any gate. The deployed defaultOFF
+ROCOEATS_PUSH_DELIVERY_ENABLED remains absent/false. No new service/paid resource,
+merge, secret/account/data change, provider send or financial action is approved.
+After Live, owner may read Operations: Provider push sendingdisabled; both push
+providersconfigurationrequired. Do NOT press Verify/Retry/financial controls.
+
+NEXT ENGINEERING ACTION depends on owner Live confirmation: run
+node scripts/verify-staging-http.mjs https://localeats-delivery-app.onrender.com/ 644e038b4532936a6db2e954e34a8bf558166c24
+and inspect full23 check result, exactSHA/health/DB/auth/CSP/HSTS/native contracts /
+public-private ordering/live/payout/retention/municipal gates. Distinguish owner-only
+push-status evidence from anonymous checks. No post-deploy verification performed
+for644e038 yet; last independently verified deployed revision remains8aa903b.
+Protected Firebase/APNs inputs, real sends and physical iOS still require separate
+owner authorization/access. Do not repeat physical GPS or invent unrelated tasks.
+
 # November24 — Consent-bound token rotation and stale provider-result recovery
 
 FCM correction10a90233256d0614b17dd4d640767abc8773e151 ALL THREE CI SUCCESS:

@@ -1,3 +1,14 @@
+# November24 — Approved notification release awaiting owner manual deployment
+
+Deployment targetONLY644e038b4532936a6db2e954e34a8bf558166c24. All3 required CI PASS
+45347493848/45347500566/45347500454; branch verified, PR1 draft/unmerged. No migration,
+Docker/Render startup or native GPS/90s change vs deployed8aa903b. Approval recorded;
+NO deployment performed by agent. Keep Environment/credentials/gates unchanged.
+Next: owner Manual Deploy SPECIFIC644e038 (not later docs HEAD), then independent
+23 read-only checks against fullapprovedSHA after Live confirmation. Existing
+Driver240 acceptance preserved; no APK/GPS retest required for backend release.
+Provider configuration/sends and physical iOS remain separate protected blockers.
+
 # November24 — Token rotation/recovery integration completed; provider acceptance next
 
 Verified staging remains8aa903b/23PASS, pushsendOFF and providersunconfigured per owner;
