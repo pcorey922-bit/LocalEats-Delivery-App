@@ -22,7 +22,7 @@ const qa = window as unknown as {
   dutyHeartbeatDelay?:boolean; finishDutyHeartbeat?:()=>void; dutyHeartbeatAborted?:boolean; dutyHeartbeats?:number;
   directRegisterPush: () => Promise<void>; pushRegistration?: {platform:string;appId:string};
   pushPostDelay?: boolean; finishPushEnrollment?: () => void;
-  pushConfigured: boolean; pushRegistered: boolean; pushDeleteFails: boolean; pushRevocation?: unknown;
+  pushDeliveryEnabled?: boolean; pushConfigured: boolean; pushRegistered: boolean; pushDeleteFails: boolean; pushRevocation?: unknown;
 };
 qa.directRegisterPush=()=>registerPush();
 qa.bgPermission = true; qa.bgStarts = 0; qa.bgRemovals = []; qa.bgUploads = 0; qa.bgDenied = false;
@@ -37,7 +37,7 @@ const fixtureJson=Response.json.bind(Response);
 Response.json=(data,init)=>{const response=fixtureJson(data,init);Object.defineProperty(response,'nativeFixtureData',{value:data});return response;};
 window.fetch = async (input, options) => {
   const url = String(input);
-  if (url === '/api/notification-devices/config') { if(qa.pushConfigDelay) { options?.signal?.addEventListener('abort',()=>{qa.pushConfigReadAborted=true;},{once:true}); await new Promise<void>(resolve=>{qa.finishPushConfig=resolve;}); } return Response.json({ android: qa.pushConfigured, ios: location.search.includes('ios=true') && qa.pushConfigured }); }
+  if (url === '/api/notification-devices/config') { if(qa.pushConfigDelay) { options?.signal?.addEventListener('abort',()=>{qa.pushConfigReadAborted=true;},{once:true}); await new Promise<void>(resolve=>{qa.finishPushConfig=resolve;}); } return Response.json({ deliveryEnabled: qa.pushDeliveryEnabled === true, android: qa.pushConfigured, ios: location.search.includes('ios=true') && qa.pushConfigured }); }
   if (url === '/api/notification-devices') {
     if (options?.method === 'DELETE') {
       qa.pushRevocation = JSON.parse(String(options.body));

@@ -33,6 +33,7 @@ export function pushConfiguration() {
       process.env.APNS_TEAM_ID,
     ),
     testMode: true,
+    deliveryEnabled: process.env.ROCOEATS_PUSH_DELIVERY_ENABLED === "true",
   };
 }
 async function sendApns(token: string, notificationId: string, appId: string, expiresAt?: Date) {
@@ -233,6 +234,9 @@ export async function processPushDelivery(
   // the unknown outcome for audited operator recovery; NEVER send attempt six.
   // Clearing the lease token fences a delayed acknowledgement from the old worker.
   if (await recoverExhaustedClaim()) return true;
+  // Credentials describe capability, never consent to contact a device. Keep
+  // pending attempts intact while disabled; an already-sent ACK still commits.
+  if (config.deliveryEnabled !== true) return false;
   const now = await databaseNow();
   const claimed = await db.transaction(async (tx) => {
     const [row] = await tx

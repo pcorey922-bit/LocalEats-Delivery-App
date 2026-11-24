@@ -1,7 +1,7 @@
 // Bundled only by the local browser runner, with disposable DB and Clerk adapters.
 // Never imported by production entrypoints or exposed as a deployed fixture.
 import app from '../src/app';
-import { db, engine, profilesTable, restaurantsTable, restaurantHoursTable, menuCategoriesTable, menuItemsTable, platformSettingsTable } from './database';
+import { db, engine, profilesTable, restaurantsTable, restaurantHoursTable, menuCategoriesTable, menuItemsTable, platformSettingsTable, notificationsTable } from './database';
 import { testPricing } from '../src/lib/testing/pricing';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -60,4 +60,10 @@ export async function start(root: string) {
       await engine.close();
     },
   };
+}
+
+// Direct disposable fixture only, never an HTTP route or a provider send.
+export async function seedInbox(role:'admin'|'driver'|'customer',title:string) {
+  if(process.env.NODE_ENV!=='test'||process.env.PAYMENT_PROVIDER!=='sandbox'||process.env.TEST_DATABASE_URL||process.env.DATABASE_URL)throw Error('Local inbox fixture only');
+  await db.insert(notificationsTable).values({profileId:ids[role],eventKey:crypto.randomUUID(),title,body:'Local notification integration fixture'});
 }

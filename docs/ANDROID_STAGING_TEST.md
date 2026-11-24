@@ -1,3 +1,7 @@
+Driver240/source83f2280 completed the owner Samsung screen-lock/offline/restart
+procedure on November24. No repeat GPS acceptance test is requested for the
+notification-only changes below; the procedure remains for future justified regressions.
+
 ## Native-owned Driver candidate — controlled Samsung acceptance
 
 Use only the new exact-source signed artifact listed in the engineering checkpoint;
@@ -42,10 +46,12 @@ build. Client files are ignored by git and removed from the runner. Never put a
 Firebase service-account private key in either Android client secret or APK.
 
 When the owner separately approves provider setup (all steps work in phone dashboards):
-1. First approve a verified shared-backend deployment including migration 0029,
-   after its existing backup/restore checks; keep all ordering/live/municipal gates
-   OFF. Existing 6cc staging lacks the newer notification-device/app-identity
-   capability. Do not bypass the main packaging preflight or deploy automatically.
+1. Notification migration0029 was already approved/deployed; do not repeat it.
+   Before adding SERVER push credentials, approve a verified backend release that
+   includes the separate `ROCOEATS_PUSH_DELIVERY_ENABLED` gate. Keep it absent/false.
+   Historical staging76a24ed has configuration-as-activation, so do not add a server
+   key there without separately approving sends. New Operations must report
+   **Provider push sending: disabled**, with all ordering/payment/municipal gates OFF.
 2. In an existing/free Firebase Spark project, register staging Android packages
    `com.rocoeats.app.staging` and `com.rocoeats.driver.staging`. Use the SAME project
    as backend FCM credentials. No billing/card/paid upgrade or new project is created
@@ -62,7 +68,9 @@ When the owner separately approves provider setup (all steps work in phone dashb
 5. After readiness verifies backend capability and closed gates, use the existing
    signer for each audience. Check BUILD_READINESS client flag and exact source;
    compiled resources/configuration still do not prove device receipt.
-6. Only in a separately authorized device exercise: explicit notification consent,
+6. Only after separate owner authorization, enable `ROCOEATS_PUSH_DELIVERY_ENABLED=true`
+   for the controlled device exercise, then return it to false afterward. New sends
+   stop; already-in-progress acknowledgements remain auditable. In that exercise: explicit notification consent,
    enroll current account, confirm its server registration, then verify one existing
    authorized notification in foreground/background/terminated states. No test
    payment/order creation is implied. In-app inbox remains authoritative; never

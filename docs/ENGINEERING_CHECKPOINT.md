@@ -1,3 +1,49 @@
+# November 24 — Push activation separated from credentials; native-session inbox verified
+
+Physical acceptance evidence committed115d0a0c1ffa44e617776e93c6095f10530e0b0a;
+ALL THREE CI SUCCESS45340405054 /45340412361 /45340412360. Driver240 GPS/session
+implementation preserved; no new APK or repeat Samsung GPS test needed.
+
+CONFIRMED SETUP GAP: production push worker previously treated provider credentials
+as permission to send. Added `ROCOEATS_PUSH_DELIVERY_ENABLED`, defaultOFF, exacttrue
+required BEFORE claiming another delivery. Configuration/device enrollment and in-app
+notifications remain independent. Disabled gate preserves attempts/leases; exhausted
+final-claim recovery remains possible without sends, and already-in-progress provider
+acknowledgements still commit. Operations reports credential configuration separately
+from sending status. Old backend status is explicitly unknown, not reported disabled.
+Native push preferences explain sending disabled. No migration/credentials required.
+
+INTEGRATION: existing local browser harness now models multiple App listeners (old
+single-callback mock hid native-session refresh), correct app identity and native
+principal checks. Real local API/DB inbox seeded only in isolated fixture; simulated
+receive refreshes inbox, taps ignore arbitrary payload routes, foreground account
+change clears old private inbox, signed-out taps cannot restore data. No permission
+prompt/enrollment/provider send/hosted write. Native SDK/events still simulated.
+
+VALIDATION: workspace types PASS; web/API production builds PASS (existing bundle-size
+warning); isolated relational suite104PASS/1PostgreSQL-onlySKIP incl gate exact values,
+credentials-without-consent, untouched attempts, gate-off final recovery and retained
+in-flight simulated ACK. All other API unit suites PASS. Initial concurrent full test
+hit120s platform runner cap and browser3s timing assertion under contention; reran
+relational alone29s PASS (240s test-process ceiling, NO app timeout change), then
+background/push browser, native session/inbox browser and native startup browser
+serially PASS. Final native inbox/typecheck rerun PASS. Full real PostgreSQL/native
+CI required on this commit; pending until exact GitHub conclusion.
+
+DOCUMENTATION: .env example defaults gatefalse; existing deployment/phone provider
+setup procedures corrected (0029 already deployed). Historical deployed76a24ed lacks
+this gate: DO NOT add server push credentials until owner approves/deploys new release
+or explicitly authorizes sends. Future provider setup / enabling delivery / actual
+receipt require separate owner-controlled authorization; never secrets in chat.
+Current work changes NO hosted setting/data/gates/providers; accepted240 retained.
+
+NEXT: push, verify all exact-SHA CI; fix failures. Then owner-only prerequisite is an
+approved staging release of this gate BEFORE protected Firebase/APNs setup; keep gate
+OFF until controlled delivery authorization. No other confirmed independently missing
+runtime feature identified in this focused pass. iOS signed physical acceptance,
+provider financial evidence and geographic activation remain separately blocked;
+do not repeat exhausted Geocodio or resolved native auth/GPS investigations.
+
 # November 24 — Driver240 physical Samsung acceptance PASSED (owner evidence)
 
 Owner tested signed Driver240/source83f228015f5725409c4cf1a111cbf57644f11b7e on

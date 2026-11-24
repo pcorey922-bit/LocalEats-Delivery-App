@@ -57,7 +57,7 @@ import {
   pushDeliveriesTable,
 } from "./database";
 import { testPricing } from "../src/lib/testing/pricing";
-import { fanOutPushNotifications, processPushDelivery } from "../src/lib/push";
+import { fanOutPushNotifications, processPushDelivery, pushConfiguration } from "../src/lib/push";
 import { processWebhookInbox } from "../src/lib/webhook-worker";
 import { processPayoutProvisioning } from "../src/lib/payout-onboarding";
 import { executeStripeOperation, processFinancialOperation, reconcileFinancialOperation } from "../src/lib/financial-operations";
@@ -3127,6 +3127,33 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       }
     },
   );
+  await t.test('push credentials do not authorize sends; disabled delivery preserves attempts and late acknowledged outcomes', async()=>{
+    const previousKey=process.env.FIREBASE_SERVICE_ACCOUNT_JSON,previousGate=process.env.ROCOEATS_PUSH_DELIVERY_ENABLED;
+    const [device]=await db.insert(notificationDevicesTable).values({profileId:ids.customer,platform:'android',appId:'com.rocoeats.app.staging',token:'synthetic_push_gate_fixture'}).returning();
+    const [notice]=await db.insert(notificationsTable).values({profileId:ids.customer,eventKey:randomUUID(),title:'Push gate fixture',body:'Synthetic local evidence only'}).returning();
+    const [delivery]=await db.insert(pushDeliveriesTable).values({notificationId:notice.id,deviceId:device.id}).returning();
+    let sends=0;
+    try {
+      process.env.FIREBASE_SERVICE_ACCOUNT_JSON='{"synthetic":true}';delete process.env.ROCOEATS_PUSH_DELIVERY_ENABLED;
+      assert.equal(pushConfiguration().android,true);assert.equal(pushConfiguration().deliveryEnabled,false);
+      for(const flag of [undefined,'false','TRUE','1',' true ']){
+        if(flag===undefined)delete process.env.ROCOEATS_PUSH_DELIVERY_ENABLED;else process.env.ROCOEATS_PUSH_DELIVERY_ENABLED=flag;
+        assert.equal(await processPushDelivery(async()=>{sends++;}),false);
+      }
+      const paused=await db.select().from(pushDeliveriesTable).where(eq(pushDeliveriesTable.id,delivery.id));
+      assert.equal(sends,0);assert.equal(paused[0].state,'pending');assert.equal(paused[0].attempts,0);assert.equal(paused[0].leaseToken,null);
+      process.env.ROCOEATS_PUSH_DELIVERY_ENABLED='true';
+      assert.equal(await processPushDelivery(async()=>{sends++;process.env.ROCOEATS_PUSH_DELIVERY_ENABLED='false';}),true);
+      const completed=await db.select().from(pushDeliveriesTable).where(eq(pushDeliveriesTable.id,delivery.id));
+      assert.equal(sends,1);assert.equal(completed[0].state,'provider_accepted','Disabling must retain an in-flight simulated provider acknowledgement');
+      assert.equal(await processPushDelivery(async()=>{sends++;}),false);assert.equal(sends,1);
+      const health=await api('/notification-devices/config',ids.customer);assert.equal(health.data.deliveryEnabled,false);assert.equal(health.data.android,true);
+    } finally {
+      if(previousKey===undefined)delete process.env.FIREBASE_SERVICE_ACCOUNT_JSON;else process.env.FIREBASE_SERVICE_ACCOUNT_JSON=previousKey;
+      if(previousGate===undefined)delete process.env.ROCOEATS_PUSH_DELIVERY_ENABLED;else process.env.ROCOEATS_PUSH_DELIVERY_ENABLED=previousGate;
+      await db.delete(notificationDevicesTable).where(eq(notificationDevicesTable.id,device.id));
+    }
+  });
   await t.test('customer and driver app push deliveries retain distinct APNs topic identity', async () => {
     const customer = await api('/notification-devices', ids.customer, 'POST', { platform: 'ios', token: 'c'.repeat(64), appId: 'com.rocoeats.app' });
     const driver = await api('/notification-devices', ids.customer, 'POST', { platform: 'ios', token: 'd'.repeat(64), appId: 'com.rocoeats.driver.staging' });
@@ -3136,8 +3163,8 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     await db.insert(pushDeliveriesTable).values([{ notificationId: notice.id, deviceId: customer.data.deviceId }, { notificationId: notice.id, deviceId: driver.data.deviceId }]);
     const seen: string[] = [];
     const send = async (_platform: string, _token: string, id: string, appId?: string) => { assert.equal(id, notice.id); seen.push(appId!); };
-    assert.equal(await processPushDelivery(send, { android: false, ios: true, testMode: true }), true);
-    assert.equal(await processPushDelivery(send, { android: false, ios: true, testMode: true }), true);
+    assert.equal(await processPushDelivery(send, { android: false, ios: true, deliveryEnabled: true, testMode: true }), true);
+    assert.equal(await processPushDelivery(send, { android: false, ios: true, deliveryEnabled: true, testMode: true }), true);
     assert.deepEqual(seen.sort(), ['com.rocoeats.app', 'com.rocoeats.driver.staging']);
     await api('/notification-devices', ids.customer, 'DELETE', { deviceId: customer.data.deviceId });
     await api('/notification-devices', ids.customer, 'DELETE', { deviceId: driver.data.deviceId });
@@ -3185,7 +3212,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
         await processPushDelivery(send, {
           android: true,
           ios: false,
-          testMode: true,
+          deliveryEnabled: true, testMode: true,
         })
       ) {}
       assert.equal(counts.get("push_good_fixture_token"), 1);
@@ -3210,7 +3237,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
         async (_platform, token) => {
           counts.set(token, (counts.get(token) ?? 0) + 1);
         },
-        { android: true, ios: false, testMode: true },
+        { android: true, ios: false, deliveryEnabled: true, testMode: true },
       );
       assert.equal(counts.get("push_good_fixture_token"), 1);
       assert.equal(counts.get("push_retry_fixture_token"), 2);
@@ -3252,7 +3279,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       let release!: () => void, began!: () => void;
       const gate = new Promise<void>((r) => (release = r)),
         started = new Promise<void>((r) => (began = r));
-      const config = { android: true, ios: false, testMode: true as const };
+      const config = { android: true, ios: false, deliveryEnabled: true, testMode: true as const };
       const first = processPushDelivery(async () => {
         began();
         await gate;
@@ -3352,7 +3379,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
           async () => {
             called++;
           },
-          { android: false, ios: false, testMode: true },
+          { android: false, ios: false, deliveryEnabled: true, testMode: true },
         ),
         false,
       );
@@ -3363,7 +3390,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
             called++;
             assert.equal(platform, "android");
           },
-          { android: true, ios: false, testMode: true },
+          { android: true, ios: false, deliveryEnabled: true, testMode: true },
         ),
         true,
       );
@@ -3384,7 +3411,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
             "Reassigned device must not receive old account notification",
           );
         },
-        { android: true, ios: false, testMode: true },
+        { android: true, ios: false, deliveryEnabled: true, testMode: true },
       );
       const [removed] = await db
         .select()
@@ -3429,7 +3456,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
         async () => {
           throw new Error("Provider unavailable fixture");
         },
-        { android: true, ios: false, testMode: true },
+        { android: true, ios: false, deliveryEnabled: true, testMode: true },
       );
       const listing = await api(
         "/admin/push-deliveries?state=failed",
@@ -3469,7 +3496,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       await processPushDelivery(async () => {}, {
         android: true,
         ios: false,
-        testMode: true,
+        deliveryEnabled: true, testMode: true,
       });
       const [saved] = await db
         .select()
@@ -3502,7 +3529,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       await fanOutPushNotifications();
       const [task] = await db.select().from(pushDeliveriesTable).where(eq(pushDeliveriesTable.notificationId, notice.id));
       await db.update(pushDeliveriesTable).set({ attempts: 4 }).where(eq(pushDeliveriesTable.id, task.id));
-      const config = { android: true, ios: false, testMode: true as const };
+      const config = { android: true, ios: false, deliveryEnabled: true, testMode: true as const };
       let release!: () => void, began!: () => void;
       const gate = new Promise<void>(resolve => release = resolve), started = new Promise<void>(resolve => began = resolve);
       let sends = 0;
@@ -3513,8 +3540,8 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
         assert.equal(claimed.attempts, 5);
         assert.equal(await processPushDelivery(async () => { throw Error("Active final claim must not be touched"); }, config), false);
         await db.update(pushDeliveriesTable).set({ leaseExpiresAt: new Date(0) }).where(eq(pushDeliveriesTable.id, task.id));
-        // Recovery must also work with provider configuration unavailable.
-        assert.equal(await processPushDelivery(async () => { sends++; }, { android: false, ios: false, testMode: true }), true);
+        // Recovery must also work with provider configuration unavailable AND delivery disabled.
+        assert.equal(await processPushDelivery(async () => { sends++; }, { android: false, ios: false, deliveryEnabled: false, testMode: true }), true);
         let [saved] = await db.select().from(pushDeliveriesTable).where(eq(pushDeliveriesTable.id, task.id));
         assert.equal(saved.state, "failed");
         assert.equal(saved.attempts, 5);
@@ -3549,7 +3576,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     const [notice]=await db.insert(notificationsTable).values({profileId:owner,eventKey:randomUUID(),title:'Historical notice',body:'Preserve this inbox entry',createdAt:new Date(Date.now()-600000)}).returning();
     await db.insert(notificationDevicesTable).values({profileId:owner,platform:'android',token:'stale_push_fixture_token_only'});
     await fanOutPushNotifications();let sends=0;
-    assert.equal(await processPushDelivery(async()=>{sends++;},{android:true,ios:false,testMode:true}),true);
+    assert.equal(await processPushDelivery(async()=>{sends++;},{android:true,ios:false,deliveryEnabled:true,testMode:true}),true);
     assert.equal(sends,0,'Configuring a provider must not release historical alerts as fresh messages');
     const [delivery]=await db.select().from(pushDeliveriesTable).where(eq(pushDeliveriesTable.notificationId,notice.id));
     assert.equal(delivery.state,'failed');assert.equal(delivery.errorCode,'NOTIFICATION_EXPIRED');assert.equal(delivery.acceptedAt,null);
@@ -3561,7 +3588,7 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     "audited webhook and notification retries are immediately due on database time despite host clock skew",
     async () => {
       const RealDate = Date;
-      const config = { android: true, ios: false, testMode: true as const };
+      const config = { android: true, ios: false, deliveryEnabled: true, testMode: true as const };
       for (const offset of [3600000, -3600000]) {
         const id = `evt_retry_clock_${randomUUID()}`;
         await db.insert(webhookInboxTable).values({ id, eventType: "retry.clock.fixture", state: "dead_letter", attempts: 10, payload: { id, type: "retry.clock.fixture", livemode: false, data: { object: {} } } });

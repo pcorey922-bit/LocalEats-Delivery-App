@@ -55,7 +55,7 @@ export function PushPreferences() {
   const config = useQuery({
     queryKey: ["push-configuration", userId],
     queryFn: ({signal}) => readPushStatus(requestSignal =>
-      customFetch<{ android: boolean; ios: boolean }>(
+      customFetch<{ android: boolean; ios: boolean; deliveryEnabled?: boolean }>(
         "/api/notification-devices/config", {signal:requestSignal},
       ), signal),
     enabled: native && !!userId,
@@ -145,6 +145,7 @@ export function PushPreferences() {
         Refresh notification status
       </button>
       {app.isError && <p role="alert">App identity could not be checked. Refresh notification status before registering this device.</p>}
+      {config.data?.deliveryEnabled === false && <p role="status">Provider sending is disabled. Your in-app inbox remains available.</p>}
       {config.isPending ? (
         <p role="status">Checking push configuration…</p>
       ) : config.isError ? (

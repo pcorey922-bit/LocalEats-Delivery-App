@@ -380,6 +380,7 @@ try {
   await page.screenshot({ path: path.join(target, 'background-consent.png'), fullPage: true });
   console.log('PASS: driver background consent defaults OFF, orphan watcher cleanup, upload, explicit stop/reset, no late upload and revoked-access shutdown. Simulated native bridge/API only; no real GPS, permission or provider operation.');
   await page.goto(`http://127.0.0.1:${server.address().port}/?push=true`);
+  await page.getByText('Provider sending is disabled. Your in-app inbox remains available.',{exact:true}).waitFor();
   await page.getByRole('button', { name: 'Enable mobile push notifications', exact: true }).click();
   await page.getByRole('status').filter({ hasText: 'This device is registered to your current account' }).waitFor();
   assert.deepEqual(await page.evaluate(()=>({id:window.pushChannel.id,importance:window.pushChannel.importance,visibility:window.pushChannel.visibility})),{id:'rocoeats-delivery-updates',importance:4,visibility:0});

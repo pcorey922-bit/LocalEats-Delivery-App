@@ -1,3 +1,22 @@
+# November 24 — Next blocker: protected push setup and real-device acceptance
+
+Driver240 Samsung background GPS/lock/offline/restart is physically accepted;
+115d0a0 documentation all3 CI PASS. Preserve its implementation/90s policy.
+Completed next software prerequisite: defaultOFF ROCOEATS_PUSH_DELIVERY_ENABLED
+separates credentials/enrollment from provider sends, preserves pending attempts and
+in-flight acknowledgements/final-claim recovery. Operations/UI show sending status.
+New native-session inbox integration verifies simulated receive/tap/foreground /
+identity change/sign-out against real LOCAL authorized API; no provider operations.
+104 relational cases pass/1 PG-only skip; API units/types/web+API builds and serial
+background/push/native/startup browser checks PASS. Initial contended deadline failures
+recorded in checkpoint; real PostgreSQL/Android+iOS CI still required on this source.
+No APK update/GPS retest needed. No hosted deployment/configuration changes made.
+Next owner-only afterCI: approve backend staging release BEFORE server push credentials
+(historical76a24ed lacks separate sending gate), then protected provider setup; sends
+remainOFF until separately authorized. Existing phone instructions updated, migration
+0029 must NOT be repeated. Signed physical iOS/real provider financial/geographic
+acceptance remain separate; do not add speculative features or repeat passed basics.
+
 # November 24 — Driver240 physical background GPS acceptance PASSED
 
 OWNER Samsung S22 Ultra evidence: explicit online/background sharing, advancing

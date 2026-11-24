@@ -12,7 +12,7 @@ type Health = {
     component: string;
     lastSuccessAt: string;
   }>;
-  pushConfiguration: { android: boolean; ios: boolean };
+  pushConfiguration: { android: boolean; ios: boolean; deliveryEnabled?: boolean };
   testPayoutsEnabled?: boolean;
   webhookRetentionEnabled?: boolean;
   observedAt: string;
@@ -107,6 +107,7 @@ export function OperationalConsole() {
             Observed {new Date(health.data.observedAt).toLocaleString()}.
             Processed checkout payload retention: {health.data.webhookRetentionEnabled === true ? "enabled" : "disabled"}.
             Test payouts: {health.data.testPayoutsEnabled === true ? "enabled (TEST only)" : "disabled"}.
+            Provider push sending: {health.data.pushConfiguration.deliveryEnabled === true ? "enabled" : health.data.pushConfiguration.deliveryEnabled === false ? "disabled" : "not reported by deployed backend"}.{" "}
             Android push:{" "}
             {health.data.pushConfiguration.android
               ? "configured"

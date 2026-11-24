@@ -147,6 +147,16 @@ The custom scheme is not a substitute for verified universal/app links for OAuth
 
 ### Push configuration
 
+`ROCOEATS_PUSH_DELIVERY_ENABLED` defaults to `false`; only exact `true` permits
+new provider sends. Credentials and device enrollment are separate from delivery
+activation. Keep it absent/false until the owner separately authorizes a controlled
+real-device exercise. Operations reports configuration and sending status separately.
+Disabled delivery does not consume attempts; in-app notifications remain available.
+Acknowledgements for sends already in progress are retained, and expired final
+claims can still recover without another send. No schema migration is required.
+This protection requires deploying the commit containing it BEFORE adding server
+credentials; the historical deployed76a24ed has no separate push-send gate.
+
 - Android: supply the Firebase Android app's `google-services.json` in the native
   app directory and `FIREBASE_SERVICE_ACCOUNT_JSON` in the API environment. The
   service-account identity must have messaging permission for the same project.

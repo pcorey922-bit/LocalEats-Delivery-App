@@ -48,7 +48,7 @@ try {
         const nativeState=()=>({isLoaded:true,isSignedIn:!!window.qaUserId&&sessionStorage.getItem('qa-native-signed-out')!=='1',...(window.qaUserId?{userId:window.qaUserId,sessionId:'sess_native_fixture',fullName:'Native fixture'}:{})});
         export const registerPlugin=(name,implementations)=>name==='RoCoEatsNativeClerk'?{
           getState:async()=>{window.qaNativeSdkReads=(window.qaNativeSdkReads||0)+1;if(window.qaNativeStateFailure)throw Error('Simulated SDK unavailable');return nativeState()},
-          getToken:async()=>({token:'simulated-native-sdk-token'}),
+          getToken:async({expectedPrincipal})=>{if(expectedPrincipal!==window.qaUserId||sessionStorage.getItem('qa-native-signed-out')==='1')throw Error('Simulated native principal changed');return{token:'simulated-native-sdk-token'}},
           signInWithTicket:async()=>{window.qaNativeTicketCalls=(window.qaNativeTicketCalls||0)+1;sessionStorage.removeItem('qa-native-signed-out');return nativeState()},
           cancelAuthRequest:async()=>{},signOut:async()=>{sessionStorage.setItem('qa-native-signed-out','1');return{isLoaded:true,isSignedIn:false}}
         }:originalRegister(name,implementations);` }; });
@@ -58,8 +58,15 @@ try {
       b.onLoad({filter:/.*/,namespace:'native-fixture-browser'},()=>({loader:'js',contents:`export const Browser={open:async({url})=>{window.qaOpenedNativeBrowser=url},close:async()=>{}};`}));
       b.onResolve({ filter: /^@capacitor\/app$/ }, () => ({ path: 'app', namespace: 'native-fixture-app' }));
       b.onLoad({filter:/.*/,namespace:'native-fixture-app'},()=>({loader:'js',contents:`
-        export const App={getState:async()=>({isActive:true}),getLaunchUrl:async()=>window.qaNativeLaunchUrl?{url:window.qaNativeLaunchUrl}:undefined,
-        addListener:async(name,callback)=>{window.qaAppListeners??={};window.qaAppListeners[name]=callback;return{remove:async()=>{if(window.qaAppListeners[name]===callback)delete window.qaAppListeners[name]}}}};`}));
+        export const App={getInfo:async()=>({id:'${nativeAudience==='driver'?'com.rocoeats.driver.staging':'com.rocoeats.app.staging'}'}),getState:async()=>({isActive:true}),getLaunchUrl:async()=>window.qaNativeLaunchUrl?{url:window.qaNativeLaunchUrl}:undefined,
+        addListener:async(name,callback)=>{window.qaAppListeners??={};window.qaAppListenerSets??={};const callbacks=window.qaAppListenerSets[name]??=new Set();callbacks.add(callback);window.qaAppListeners[name]=event=>{for(const listener of [...callbacks])listener(event)};return{remove:async()=>{callbacks.delete(callback);if(!callbacks.size)delete window.qaAppListeners[name]}}}};`}));
+      if(process.env.ROCOEATS_NATIVE_CLERK_BROWSER==='true'){
+        b.onResolve({filter:/^@capacitor\/push-notifications$/},()=>({path:'push',namespace:'native-fixture-push'}));
+        b.onLoad({filter:/.*/,namespace:'native-fixture-push'},()=>({loader:'js',contents:`export const PushNotifications={
+          addListener:async(name,callback)=>{window.qaPushListeners??={};window.qaPushListeners[name]=callback;return{remove:async()=>{if(window.qaPushListeners[name]===callback)delete window.qaPushListeners[name]}}},
+          checkPermissions:async()=>({receive:'prompt'}),requestPermissions:async()=>{window.qaPushPermissionRequests=(window.qaPushPermissionRequests||0)+1;return{receive:'denied'}},
+          register:async()=>{throw Error('Provider registration forbidden in lifecycle fixture')},unregister:async()=>{}};`}));
+      }
       b.onResolve({ filter: /^@clerk\/react\/internal$/ }, () => ({ path: 'internal', namespace: 'clerk-fixture' }));
       b.onResolve({ filter: /^@clerk\/react$/ }, () => ({ path: 'react', namespace: 'clerk-fixture' }));
       b.onLoad({ filter: /.*/, namespace: 'clerk-fixture' }, args => ({ resolveDir: path.join(root, 'artifacts/localeats'), loader: 'js', contents: args.path === 'internal'
@@ -107,7 +114,7 @@ try {
     assert.ok(response.ok, `${method} ${url}: ${response.status} ${await response.clone().text()}`);
     return response.json();
   }
-  if(process.env.ROCOEATS_NATIVE_CLERK_BROWSER==='true'){await verifyNativeClerkDriver({actor,api,origin});}
+  if(process.env.ROCOEATS_NATIVE_CLERK_BROWSER==='true'){await verifyNativeClerkDriver({actor,api,origin,ids,seedInbox:fixture.seedInbox});}
   else if (process.env.ROCOEATS_NATIVE_BOOT_BROWSER === 'true') {
     if(nativeAudience==='customer') await verifyNativeCustomerStartup({actor,api,origin});
     else await verifyNativeStartupBootstrap({ actor, origin });
