@@ -1,3 +1,17 @@
+# November 24 — Driver240 physical background GPS acceptance PASSED
+
+OWNER Samsung S22 Ultra evidence: explicit online/background sharing, advancing
+heartbeat/GPS; approximately5min locked; Chrome Dispatch checked BEFORE Driver resume
+still available/freshGPS1:17:58AM7m/one online. Driver resume HB1:19:03AM/GPS1:19:01AM.
+Offline stopped sharing, Dispatch zero online/no location and on-duty notification
+removed. Close/reopen restored Driver workspace offline with sharing OFF.
+Source83f228015f5725409c4cf1a111cbf57644f11b7e /signed240. This resolves the confirmed
+Android screen-lock continuity blocker for tested scope, not all-device/network or
+full delivery/push/iOS acceptance. Preserve90s expiry/native auth/working GPS.
+Next independently: notification receive/tap/foreground/session integration with local
+simulated provider plus real local API. Actual Firebase/APNs receipt still requires
+protected owner setup/authorization. No deployment or hosted change authorized.
+
 # November 24 — Driver240 emulator accepted; physical background GPS still blocked
 
 Same signed240/source83f2280: actual Android15 signed-out emulator45337189007 PASS

@@ -1,3 +1,37 @@
+# November 24 — Driver240 physical Samsung acceptance PASSED (owner evidence)
+
+Owner tested signed Driver240/source83f228015f5725409c4cf1a111cbf57644f11b7e on
+Samsung Galaxy S22 Ultra. This supersedes historical GPS-blocked/pending headings.
+Observed: went online with explicit background sharing; server heartbeat acknowledgments
+and accepted GPS advanced. Dispatch showed RoCoEats owner available, fresh location,
+one approved driver online. Phone locked approximately5min WITHOUT reopening Driver.
+After unlock, Chrome Dispatch refreshed BEFORE Driver: still available, accepted GPS
+1:17:58AM, accuracy7m (times as owner reported; no timezone inferred). Reopening Driver
+showed heartbeat1:19:03AM and acceptedGPS1:19:01AM. This provides physical evidence of
+native duty continuity across screen lock, not merely foreground recovery.
+Go offline produced Offline/background sharing disabled; Dispatch offline/location
+not sharing/zero online; ongoing on-duty notification disappeared. Close/reopen restored
+Driver workspace OFFLINE and did NOT restart sharing. No new account required.
+
+ACCEPTED SCOPE: Android background GPS/screen-lock continuity, Dispatch visibility,
+offline service/notification cleanup, session restoration and off-duty restart state
+on this device/build/test interval. NOT blanket acceptance of prolonged duty, all
+networks/devices/Android versions, real push, live dispatch offer receipt, full delivery
+on240, iOS or commercial readiness. Preserve working native SDK/engine and90s server
+expiry; do not repeat the resolved WebView authentication investigation.
+
+Prior final checkpoint e1ce898ffbb5fe0529ac2827ffc5ce7991280be1 all3 CI SUCCESS:
+45337863985/45337870880/45337870555. Source83f2280 all3 CI, signing45336250932 and
+same-APK emulator45337189007 passed as recorded below. No new build needed for this
+acceptance documentation. No hosted/data/provider/payment operation performed here.
+
+NEXT ENGINEERING: verify native-session notification receive/tap/foreground/account
+switch integration using existing local browser/API harness (provider/OS simulated),
+without altering accepted runtime unless a defect is reproduced. Real Firebase/APNs
+configuration and actual receipt remain owner-controlled blockers; no sends authorized.
+Signed physical iOS and provider financial/geographic acceptance remain separate.
+Customer208 accepted scope, all gates, recovery infrastructure and backup preserved.
+
 # November 24 — Driver240 signed-out emulator PASS; Samsung action now required
 
 APK source83f228015f5725409c4cf1a111cbf57644f11b7e: ALL THREE required CI PASS,
