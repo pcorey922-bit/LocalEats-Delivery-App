@@ -1,3 +1,11 @@
+# November 24 — Driver240 emulator evidence blocked by killed UI capture
+
+45336747590 failed with uiautomator exit137 before UI assertions; APK install and
+permission defaults passed only. Not a physical/background acceptance result or
+established application defect. Existing harness now bounds/reports failed captures
+and retains final native-crash evidence;14 targeted tests PASS. Rerun SAME signed
+240/source83f2280 with repaired harness; no app rebuild/hosted change needed.
+
 # November 24 — Integrated native Driver240 ready for emulator/physical acceptance
 
 Functional83f228015f5725409c4cf1a111cbf57644f11b7e all3 CI PASS, protected signed

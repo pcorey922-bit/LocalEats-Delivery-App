@@ -126,3 +126,20 @@ def emulator_infrastructure_failure(root):
         if node.get('package') == 'android' and re.search(r'launcher.*(?:isn.t responding|not responding)', node.get('text', ''), re.I):
             return 'system_launcher_unresponsive'
     return None
+
+
+def capture_ui_dump(shell, adb):
+    """A killed/unfinished OS capture is unavailable evidence, never an app pass.
+    The caller's existing bounded wait loop decides when to retry. Do not retain
+    subprocess output: it can contain arbitrary OS/application strings.
+    """
+    import subprocess
+    try:
+        shell('rm', '-f', '/sdcard/rocoeats-qa.xml')
+        shell('uiautomator', 'dump', '--compressed', '/sdcard/rocoeats-qa.xml')
+        raw = adb('exec-out', 'cat', '/sdcard/rocoeats-qa.xml').decode(errors='replace')
+        return raw, None
+    except subprocess.CalledProcessError as error:
+        return '', 'ui_capture_exit_' + str(error.returncode)
+    except subprocess.TimeoutExpired:
+        return '', 'ui_capture_timeout'

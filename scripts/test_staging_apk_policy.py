@@ -4,7 +4,23 @@ import json
 import hashlib
 import tempfile
 from pathlib import Path
-from staging_apk_policy import staging_identity, verify_staging_manifest, smoke_identity, verify_smoke_source, verify_smoke_input, parse_ui_hierarchy, verify_firebase_resources, verify_driver_signed_out_entry, verify_customer_home, native_callback_diagnostics, emulator_infrastructure_failure
+from staging_apk_policy import staging_identity, verify_staging_manifest, smoke_identity, verify_smoke_source, verify_smoke_input, parse_ui_hierarchy, verify_firebase_resources, verify_driver_signed_out_entry, verify_customer_home, native_callback_diagnostics, emulator_infrastructure_failure, capture_ui_dump
+
+class UiCaptureFailureTests(unittest.TestCase):
+    def test_killed_os_capture_is_unavailable_then_next_bounded_attempt_can_recover(self):
+        import subprocess
+        calls=[]
+        def shell(*args):
+            calls.append(args)
+            if args[0]=='uiautomator' and len(calls)==2:raise subprocess.CalledProcessError(137,args,output=b'sensitive arbitrary output')
+        raw,diagnostic=capture_ui_dump(shell,lambda *args:b'<hierarchy><node text="Sign in securely"/></hierarchy>')
+        self.assertEqual((raw,diagnostic),('','ui_capture_exit_137'));self.assertIsNone(parse_ui_hierarchy(raw))
+        raw,diagnostic=capture_ui_dump(shell,lambda *args:b'<hierarchy><node text="Sign in securely"/></hierarchy>')
+        self.assertIsNone(diagnostic);self.assertIsNotNone(parse_ui_hierarchy(raw))
+    def test_timeout_never_becomes_valid_ui_or_retains_subprocess_output(self):
+        import subprocess
+        def shell(*args):raise subprocess.TimeoutExpired(args,30,output=b'sensitive arbitrary output')
+        self.assertEqual(capture_ui_dump(shell,lambda *args:b'<hierarchy/>'),('','ui_capture_timeout'))
 
 class StagingApkPolicyTests(unittest.TestCase):
     def test_customer_default_stays_stable_and_wrong_audience_is_rejected(self):

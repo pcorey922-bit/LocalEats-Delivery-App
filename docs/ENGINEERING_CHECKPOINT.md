@@ -1,3 +1,20 @@
+# November 24 — Driver240 emulator capture interrupted; harness repair
+
+Signed240/source83f2280 remains verified; NO app rebuild needed or performed.
+Emulator45336747590 FAILED after successful installation and default-permission
+checks. Before any UI evidence, uiautomator dump exited137; harness propagated
+CalledProcessError immediately, results.completed=false, no app verdict/crash capture.
+Do NOT describe this as app pass, app defect or established OOM. Evidence artifact
+14894530165 preserved. No account/authentication/location/hosted business write.
+
+Corrected existing harness to treat killed/timed-out OS capture as unavailable within
+its existing bounded wait loop, with sanitized capture evidence and best-effort
+screenshot. Always capture anonymous native-crash boolean even when early UI fails.
+No retry of auth/business operations, softened UI assertions or pass-on-missing-XML.
+14 APK-policy/capture regressions PASS, Python compile PASS. Next rerun same signed
+240 bytes through repaired harness; inspect actual UI/native result before handoff.
+Final source83f2280 all3 CI remains SUCCESS; docs294d4a3 pushed (docs CI separate).
+
 # November 24 — Native Driver240 candidate verified; emulator pending
 
 FUNCTIONAL SOURCE83f228015f5725409c4cf1a111cbf57644f11b7e ALL THREE CI SUCCESS:

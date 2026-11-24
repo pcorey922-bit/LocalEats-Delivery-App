@@ -3,7 +3,7 @@ No accounts, auth tickets, guest capabilities, orders or payments are supplied.
 ADB is used only on this disposable CI emulator, never the owner's phone.
 """
 import json,os,pathlib,re,subprocess,time,xml.etree.ElementTree as ET
-from staging_apk_policy import verify_smoke_input, parse_ui_hierarchy, verify_driver_signed_out_entry, verify_customer_home, native_callback_diagnostics, emulator_infrastructure_failure
+from staging_apk_policy import verify_smoke_input, parse_ui_hierarchy, verify_driver_signed_out_entry, verify_customer_home, native_callback_diagnostics, emulator_infrastructure_failure, capture_ui_dump
 audience=os.environ.get('ROCOEATS_SMOKE_AUDIENCE', 'customer')
 app=verify_smoke_input('smoke-input',audience,os.environ['ROCOEATS_SMOKE_SOURCE'])
 package=app['package']
@@ -21,13 +21,12 @@ def adb(*args,timeout=30):
  return subprocess.check_output([os.environ['ROCOEATS_QA_ADB'],'-e',*args],timeout=timeout,stderr=subprocess.STDOUT)
 def shell(*args,timeout=30):return adb('shell',*args,timeout=timeout).decode(errors='replace')
 def snapshot(name):
- shell('rm','-f','/sdcard/rocoeats-qa.xml')
- capture=shell('uiautomator','dump','--compressed','/sdcard/rocoeats-qa.xml')
- xml=adb('exec-out','cat','/sdcard/rocoeats-qa.xml').decode(errors='replace')
+ xml,capture=capture_ui_dump(shell,adb)
  root=parse_ui_hierarchy(xml)
- (output/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'))
+ try:(output/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'))
+ except subprocess.SubprocessError:pass
  if root is None:
-  (output/(name+'.capture.txt')).write_text(capture+'\n'+xml)
+  (output/(name+'.capture.txt')).open('a').write((capture or 'ui_capture_invalid_xml')+'\n')
  else:
   (output/(name+'.xml')).write_text(xml)
  return root
@@ -152,6 +151,10 @@ except AssertionError as failure:
   diagnose_customer_callback()
  raise
 finally:
+ try:
+  logs=adb('logcat','-d','-s','AndroidRuntime:E').decode(errors='replace')
+  callback_diagnostics['finalNativeCrashObserved']=native_callback_diagnostics('',logs,package,scheme)['nativeCrashObserved']
+ except subprocess.SubprocessError:callback_diagnostics['finalCrashEvidenceUnavailable']=True
  report={'completed':completed,'runtimePermissions':runtime_permissions,'callbackDiagnostics':callback_diagnostics,'infrastructureFailure':infrastructure_failure,'package':package,'source':app['source'],'audience':audience,'businessWritesPerformed':False,'emulator':True,'physicalSamsung':False,'playProtectVerified':False,'authenticatedSignInVerified':False,'paymentTested':False,'checks':results}
  (output/'results.json').write_text(json.dumps(report,indent=2))
 print(json.dumps({'passed':len(results),'emulator':True,'physicalDeviceVerified':False}))
