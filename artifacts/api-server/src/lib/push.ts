@@ -297,6 +297,7 @@ export async function processPushDelivery(
   if (!claimed) return false;
   let state = "provider_accepted",
     errorCode: string | null = null;
+  let attemptedToken:string|null=null;
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     // Recheck device ownership after claim, before external I/O. Payloads carry
@@ -320,6 +321,7 @@ export async function processPushDelivery(
     } else {
       const expiresAt = notificationPushDeadline(claimed.notification.createdAt);
       pushLifetime(expiresAt, (await databaseNow()).getTime());
+      attemptedToken=current.token;
       await Promise.race([
         send(current.platform, current.token, claimed.notification.id, current.appId, expiresAt),
         new Promise<never>((_, reject) => {
@@ -350,6 +352,10 @@ export async function processPushDelivery(
       .from(notificationsTable)
       .where(eq(notificationsTable.id, claimed.notification.id))
       .for("update");
+    if(state==='invalid_token'&&attemptedToken){
+      const [latest]=await tx.select({token:notificationDevicesTable.token}).from(notificationDevicesTable).where(and(eq(notificationDevicesTable.id,claimed.delivery.deviceId),eq(notificationDevicesTable.profileId,claimed.notification.profileId))).for('update').limit(1);
+      if(latest&&latest.token!==attemptedToken){state=claimed.delivery.attempts>=4?'failed':'pending';errorCode='DEVICE_TOKEN_REFRESHED';}
+    }
     const [updated] = await tx
       .update(deliveries)
       .set({
@@ -377,6 +383,7 @@ export async function processPushDelivery(
         .where(
           and(
             eq(notificationDevicesTable.id, claimed.delivery.deviceId),
+            eq(notificationDevicesTable.token, attemptedToken!),
             eq(
               notificationDevicesTable.profileId,
               claimed.notification.profileId,

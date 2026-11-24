@@ -1,3 +1,50 @@
+# November24 — Consent-bound token rotation and stale provider-result recovery
+
+FCM correction10a90233256d0614b17dd4d640767abc8773e151 ALL THREE CI SUCCESS:
+45344927146 /45344933446 /45344933525. Staging remains verified8aa903b; NO further
+release/configuration/provider/financial operation authorized or performed.
+
+CONFIRMED GAP: pinned Capacitor Android onNewToken emits registration events, but
+existing registration listeners were removed after enrollment; no ongoing refresh
+handler existed. Added foreground/current-event recovery for EXISTING enrollments
+only. Requires explicit persisted consent in this client, current signed-in account,
+server ownership proof, matching app/platform, granted permission, provider capability
+and tokenRefreshVersion1. No prompt, auto-POST/enrollment, account/app transfer or new
+credential. Legacy/unknown consent must explicitly Enable; opt-out is persistent and
+immediately fences in-flight callbacks, including storage quota failure. Native errors
+are actionable; positive canonical-ID ACK alone updates saved evidence. One-use manual
+enrollment retains its existing behavior and cancels competing refresh work.
+
+Server PUT existing-device endpoint preserves canonical ID and locks ownership, fails
+404 for unknown/deleted/other account,409 for app change/token conflict, validates
+platform/token and never resurrects opted-out enrollment. Worker now preserves a new
+token when an old in-flight send reports invalid token; retries only within existing
+five-attempt policy, never deletes the new registration or fabricates acceptance.
+No schema migration. Device config has additive version capability; older backends
+safely skip automatic refresh. Driver240 native GPS/auth/90s implementation unchanged.
+This is foreground/event recovery; not proof of continuous background token upload
+or real provider receipt while locked/terminated. Actual devices/providers remain
+unverified until protected setup and controlled acceptance.
+
+VALIDATION:9 pure controller cases PASS (Android/APNs, no consent/permission/config,
+identity/opt-out/cancellation/timeout/late events, strict receipts, latest-event batching
+and native errors). Local relational suite106PASS/1PG-onlySKIP, including wrong actor /
+app/conflict/deleted ID and stale invalid-token ACK at attempts1 and5. Initial full
+API run caught a TEST fixture actor typo (undefined otherCustomer ->401); corrected
+to existing authenticated ids.other, preserving security checks; isolated relational
+rerun passed. Other API units/8 FCM tests PASS. Workspace types, website/API builds,
+existing background/push browsers PASS. Real local authorized API/native-SDK-mocked
+browser PASS: stable rotation ID, persistent opt-out, explicit re-enrollment, error
+recovery, quota-failure native/server opt-out and no late refresh. No provider sends.
+Full real PostgreSQL/native exact-source CI pending this commit.
+
+Next: commit/push and verify CI; then only approved releases/provider inputs should
+advance actual notification acceptance. Existing PRIVATE_TEST_DELIVERY.md now prepares
+an orderless/nonfinancial general-support alert exercise (separate send/record approval
+required), distinguishing inbox/polling, provider ACK and actual device receipt.
+Do not repeat accepted Driver240/Customer208 basics. Real FCM/APNs, signed physical
+iOS, financial provider evidence and geographic activation remain protected blockers.
+
 # November 24 — Push safeguard staging independently verified; FCM receipt/redirect repair
 
 Owner deployed8aa903bdccbe1da30f7f5fcba8841019c29e5619, Render Live/source8aa903b.

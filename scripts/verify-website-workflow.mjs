@@ -63,9 +63,9 @@ try {
       if(process.env.ROCOEATS_NATIVE_CLERK_BROWSER==='true'){
         b.onResolve({filter:/^@capacitor\/push-notifications$/},()=>({path:'push',namespace:'native-fixture-push'}));
         b.onLoad({filter:/.*/,namespace:'native-fixture-push'},()=>({loader:'js',contents:`export const PushNotifications={
-          addListener:async(name,callback)=>{window.qaPushListeners??={};window.qaPushListeners[name]=callback;return{remove:async()=>{if(window.qaPushListeners[name]===callback)delete window.qaPushListeners[name]}}},
-          checkPermissions:async()=>({receive:'prompt'}),requestPermissions:async()=>{window.qaPushPermissionRequests=(window.qaPushPermissionRequests||0)+1;return{receive:'denied'}},
-          register:async()=>{throw Error('Provider registration forbidden in lifecycle fixture')},unregister:async()=>{}};`}));
+          addListener:async(name,callback)=>{window.qaPushListeners??={};window.qaPushListenerSets??={};const listeners=window.qaPushListenerSets[name]??=new Set();listeners.add(callback);window.qaPushListeners[name]=event=>{for(const cb of [...listeners])cb(event)};return{remove:async()=>{listeners.delete(callback);if(!listeners.size)delete window.qaPushListeners[name]}}},
+          checkPermissions:async()=>({receive:window.qaPushPermissionGranted?'granted':'prompt'}),requestPermissions:async()=>{window.qaPushPermissionRequests=(window.qaPushPermissionRequests||0)+1;return{receive:window.qaPushPermissionGranted?'granted':'denied'}},
+          createChannel:async()=>{},register:async()=>{if(!window.qaAllowNativeRegister)throw Error('Provider registration forbidden in lifecycle fixture');window.qaRegisterCalls=(window.qaRegisterCalls||0)+1;window.qaPushListeners.registration({value:window.qaNativePushToken})},unregister:async()=>{window.qaUnregisterCalls=(window.qaUnregisterCalls||0)+1}};`}));
       }
       b.onResolve({ filter: /^@clerk\/react\/internal$/ }, () => ({ path: 'internal', namespace: 'clerk-fixture' }));
       b.onResolve({ filter: /^@clerk\/react$/ }, () => ({ path: 'react', namespace: 'clerk-fixture' }));

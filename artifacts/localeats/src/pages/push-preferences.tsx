@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { useState } from "react";
 import { useAuth } from "../lib/auth";
 import { Capacitor } from "@capacitor/core";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { registerPush, unregisterPush } from "../lib/mobile";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 import { accountStatus } from "../lib/account-entry";
@@ -35,6 +35,7 @@ function hasLegacyRegistration() {
   }
 }
 export function PushPreferences() {
+  const client=useQueryClient();
   const { userId } = useAuth();
   const enrollment = useRef<AbortController | null>(null);
   const native = Capacitor.isNativePlatform(),
@@ -52,6 +53,7 @@ export function PushPreferences() {
     enabled: native && !!userId,
     retry: false,
   });
+  const refreshStatus=useQuery<{unconfirmed:boolean}>({queryKey:['push-token-refresh',userId],queryFn:async()=>({unconfirmed:false}),enabled:false});
   const config = useQuery({
     queryKey: ["push-configuration", userId],
     queryFn: ({signal}) => readPushStatus(requestSignal =>
@@ -77,6 +79,7 @@ export function PushPreferences() {
       return registerPush({signal:enrollment.current.signal});
     },
     onSuccess: async () => {
+      client.setQueryData(['push-token-refresh',userId],{unconfirmed:false});
       const id = savedDevice();
       setDeviceId(id);
       if (id === deviceId) await status.refetch();
@@ -144,6 +147,7 @@ export function PushPreferences() {
       >
         Refresh notification status
       </button>
+      {refreshStatus.data?.unconfirmed && <p role="alert">Device token update is unconfirmed. Refresh notification status or enable notifications again while signed in.</p>}
       {app.isError && <p role="alert">App identity could not be checked. Refresh notification status before registering this device.</p>}
       {config.data?.deliveryEnabled === false && <p role="status">Provider sending is disabled. Your in-app inbox remains available.</p>}
       {config.isPending ? (

@@ -1,15 +1,48 @@
-## Current approved staging release — November 19
+## Current verified staging release — November24
 
-Owner approved **d2e79f73ad942c2ddd189714a8f755c909f8ad49**, including migration
-0029, after existing backup/recovery review. All three functional-source CI workflows
-passed. This approval does NOT open an ordering window, configure providers or
-permit financial operations. Before owner Manual Deploy, Operations -> Service
-health and recovery should show both Android/iOS push **configuration required**;
-if either is configured, report first without editing secrets. Verify existing
-backup/restore point, then follow existing specific-commit Render procedure below
-with approved SHA and unchanged settings. No deployment has been performed by agent.
-On Live, report source/status for read-only verification; no audit-writing Stripe
-connection verification, sends, retries, reconciliation or payments are authorized.
+Owner deployed **8aa903bdccbe1da30f7f5fcba8841019c29e5619**. Render Live and exact
+revision independently verified;23 read-only checks passed. Owner authenticated
+Operations confirms provider push sendingdisabled, Android/iOS configurationrequired,
+payoutsdisabled and retentiondisabled. Public/private ordering, live charges and
+municipal enforcement remainOFF. Migration0029 was already approved/deployed; no
+repeat migration or new hosted setting is authorized. Later repository corrections
+are NOT deployed and need separate release approval.
+
+## Notification-only acceptance preparation (NOT authorized to run yet)
+
+This can use the existing general support workflow without a payment/new order or
+changing the completed delivery. It still creates nonfinancial support/notification
+records and performs provider sends, so requires separate explicit owner approval.
+
+1. After approved backend release, configure protected provider credentials with
+   `ROCOEATS_PUSH_DELIVERY_ENABLED` absent/false. Never put keys in chat. Use the
+   existing phone instructions in ANDROID_STAGING_TEST.md; no paid service is needed
+   for Android FCM. Build matching Firebase-client APKs only after protected client
+   JSON is supplied. iOS additionally requires owner Apple signing/team/provisioning
+   and a physical iOS device; unsigned builds/simulator results do not prove APNs.
+2. Explicitly enroll only approved test-account/app installations. For current
+   shared owner identity, Customer and Driver apps may register separately. Confirm
+   account/app ownership and notification permission; existing Android on-duty
+   notification permission alone is not push enrollment. New token recovery requires
+   explicit current-client consent; legacy registrations need explicit Enable again.
+3. Only when separately approved, open the controlled sending window. Keep ALL
+   ordering/payment/payout/municipal gates closed. Driver workspace -> **Get support**
+   (general section, not an existing delivery) -> subject "Push acceptance TEST" ->
+   message "Controlled notification check only; no financial action requested." ->
+   **Send support request**. Its admin-recipient notification can reach the enrolled
+   owner Driver/Customer apps without an order, refund or reconciliation operation.
+4. Record separately: saved in-app notification, provider-accepted outbox receipt,
+   actual background/lock-screen OS notification and tap into the authenticated
+   current-account inbox. A visible foreground inbox item alone can be polling and
+   is NOT provider-delivery proof. Exercise task dismissal only where OS permits;
+   Android explicit Force stop blocks push until relaunch and is not equivalent to
+   backgrounding. Do not retry alerts older than the existing five-minute lifetime
+   or modify timestamps/allowance to manufacture acceptance.
+5. Disable provider sending afterward, verify Operations reportsdisabled, and opt
+   out of test device registrations as agreed. Retain support/outbox evidence; do
+   not delete records to hide failed/unknown delivery. No financial action belongs
+   to this test. Offers/order-specific push and each other recipient role require
+   their own authorized acceptance; a general support alert does not prove them.
 
 # Real private TEST delivery acceptance
 

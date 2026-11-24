@@ -419,7 +419,7 @@ router.get("/admin/deletion-requests", requireAuth, async (req, res) => {
 });
 router.get("/notification-devices/config", requireAuth, async (req, res) => {
   if (!(await getActiveProfile(req, res))) return;
-  res.json(pushConfiguration());
+  res.json({...pushConfiguration(),tokenRefreshVersion:1});
 });
 router.get('/notification-devices/:deviceId', requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);
@@ -457,6 +457,72 @@ router.post("/notification-devices", requireAuth, async (req, res) => {
       set: { profileId: profile.id, platform: input.platform, appId: input.appId },
     }).returning({ id: notificationDevicesTable.id });
   res.status(201).json({ registered: true, deviceId: device.id });
+});
+// Refresh an existing enrollment; never create one or transfer account/app ownership.
+router.put("/notification-devices/:deviceId", requireAuth, async (req, res) => {
+  const profile = await getActiveProfile(req, res);
+  if (!profile) return;
+  const id = z.string().uuid().parse(req.params.deviceId);
+  const input = z
+    .object({
+      platform: z.enum(["android", "ios"]),
+      appId: z.enum(nativePushAppIds),
+      token: z
+        .string()
+        .trim()
+        .min(16)
+        .max(4096)
+        .regex(/^[A-Za-z0-9_:\-]+$/),
+    })
+    .strict()
+    .parse(req.body);
+  if (input.platform === "ios" && !/^[a-f0-9]{64}$/i.test(input.token))
+    throw new CommerceError(400, "Invalid APNs device token");
+  try {
+    await db.transaction(async (tx) => {
+      const [device] = await tx
+        .select()
+        .from(notificationDevicesTable)
+        .where(
+          and(
+            eq(notificationDevicesTable.id, id),
+            eq(notificationDevicesTable.profileId, profile.id),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      if (!device)
+        throw new CommerceError(
+          404,
+          "Device registration is not available for this account",
+        );
+      if (device.platform !== input.platform || device.appId !== input.appId)
+        throw new CommerceError(
+          409,
+          "Device application identity changed; enroll explicitly",
+        );
+      await tx
+        .update(notificationDevicesTable)
+        .set({ token: input.token })
+        .where(
+          and(
+            eq(notificationDevicesTable.id, id),
+            eq(notificationDevicesTable.profileId, profile.id),
+          ),
+        );
+    });
+  } catch (error) {
+    const code =
+      (error as { code?: string; cause?: { code?: string } })?.code ??
+      (error as { cause?: { code?: string } })?.cause?.code;
+    if (code === "23505")
+      throw new CommerceError(
+        409,
+        "Device token conflicts with another registration; enroll explicitly",
+      );
+    throw error;
+  }
+  res.json({ registered: true, deviceId: id });
 });
 router.delete("/notification-devices", requireAuth, async (req, res) => {
   const profile = await getActiveProfile(req, res);

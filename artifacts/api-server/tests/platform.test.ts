@@ -3127,6 +3127,37 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       }
     },
   );
+  await t.test('token refresh preserves enrollment identity and cannot create, transfer or resurrect another registration',async()=>{
+    const created=await api('/notification-devices',ids.customer,'POST',{platform:'android',appId:'com.rocoeats.app.staging',token:'old_refresh_token_fixture'});
+    const id=created.data.deviceId,path='/notification-devices/'+id;
+    const body={platform:'android',appId:'com.rocoeats.app.staging',token:'new_refresh_token_fixture'};
+    assert.equal((await api(path,ids.other,'PUT',body)).status,404);
+    assert.equal((await api(path,ids.customer,'PUT',{...body,appId:'com.rocoeats.driver.staging'})).status,409);
+    assert.equal((await api(path,ids.customer,'PUT',{...body,token:'bad'})).status,400);
+    const updated=await api(path,ids.customer,'PUT',body);assert.equal(updated.status,200);assert.equal(updated.data.deviceId,id);
+    assert.equal((await api('/notification-devices',ids.customer,'POST',body)).data.deviceId,id,'Refresh must reuse the canonical device');
+    const conflict=await api('/notification-devices',ids.other,'POST',{...body,token:'conflicting_refresh_fixture'});
+    assert.equal((await api(path,ids.customer,'PUT',{...body,token:'conflicting_refresh_fixture'})).status,409);
+    await api('/notification-devices',ids.customer,'DELETE',{deviceId:id});
+    assert.equal((await api(path,ids.customer,'PUT',body)).status,404,'Late token refresh cannot undo opt-out');
+    await api('/notification-devices',ids.other,'DELETE',{deviceId:conflict.data.deviceId});
+  });
+  await t.test('old invalid-token acknowledgement cannot delete a rotated registration and retries only within attempt policy',async()=>{
+    for(const attempts of [0,4]){
+    const owner=randomUUID();await db.insert(profilesTable).values({id:owner,clerkUserId:owner,role:'customer',displayName:'Synthetic token rotation'});
+    const [device]=await db.insert(notificationDevicesTable).values({profileId:owner,platform:'android',appId:'com.rocoeats.app.staging',token:'old_inflight_rotation_fixture_'+attempts}).returning();
+    const [notice]=await db.insert(notificationsTable).values({profileId:owner,eventKey:randomUUID(),title:'Token rotation fixture',body:'Synthetic local fixture'}).returning();
+    const [task]=await db.insert(pushDeliveriesTable).values({notificationId:notice.id,deviceId:device.id,attempts}).returning();
+    let began!:()=>void,release!:()=>void;const started=new Promise<void>(resolve=>began=resolve),pending=new Promise<void>(resolve=>release=resolve);
+    const send=processPushDelivery(async()=>{began();await pending;throw Object.assign(new Error('Synthetic old token rejected'),{code:'messaging/registration-token-not-registered'});},{android:true,ios:false,deliveryEnabled:true,testMode:true});
+    await started;
+    try{assert.equal((await api('/notification-devices/'+device.id,owner,'PUT',{platform:'android',appId:'com.rocoeats.app.staging',token:'new_inflight_rotation_fixture_'+attempts})).status,200);}finally{release();}
+    await send;
+    const [saved]=await db.select().from(notificationDevicesTable).where(eq(notificationDevicesTable.id,device.id));assert.equal(saved.token,'new_inflight_rotation_fixture_'+attempts);
+    const [receipt]=await db.select().from(pushDeliveriesTable).where(eq(pushDeliveriesTable.id,task.id));assert.equal(receipt.state,attempts===4?'failed':'pending');assert.equal(receipt.errorCode,'DEVICE_TOKEN_REFRESHED');assert.equal(receipt.attempts,attempts+1);
+    await db.delete(notificationDevicesTable).where(eq(notificationDevicesTable.id,device.id));
+    }
+  });
   await t.test('push credentials do not authorize sends; disabled delivery preserves attempts and late acknowledged outcomes', async()=>{
     const previousKey=process.env.FIREBASE_SERVICE_ACCOUNT_JSON,previousGate=process.env.ROCOEATS_PUSH_DELIVERY_ENABLED;
     const [device]=await db.insert(notificationDevicesTable).values({profileId:ids.customer,platform:'android',appId:'com.rocoeats.app.staging',token:'synthetic_push_gate_fixture'}).returning();

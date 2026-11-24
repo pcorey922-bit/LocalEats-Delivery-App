@@ -1,3 +1,21 @@
+# November24 — Token rotation/recovery integration completed; provider acceptance next
+
+Verified staging remains8aa903b/23PASS, pushsendOFF and providersunconfigured per owner;
+no additional deployment.10a9023 FCM sender correction all3 CI PASS, not deployed.
+Completed missing ongoing registration refresh: explicit current-client consent +
+server-owned current-account/app enrollment only; no auto creation/transfers/prompts.
+Stable-ID PUT, cancellation/persistent opt-out/storage failure protection, native error
+recovery and latest-token serialization. Old invalid-token callbacks preserve rotated
+registrations, retries retain five-attempt cap. No migration or Driver GPS/90s change.
+9 controller units +106 relational cases PASS/1PG-onlyskip; types/web+API builds and
+local native-session/browser/background regressions PASS. Initial wrong TEST actor
+corrected without weakening authorization. Exact new-source real PostgreSQL/native CI
+still required. Provider events simulated; real receipt/background token renewal NOT
+claimed. Next protected actions: approved backend release of corrections and protected
+Firebase/APNs setup, then separately authorized notification-only support exercise.
+Procedure prepared in PRIVATE_TEST_DELIVERY.md; no order/payment/historical financial
+record change is required. iOS signed physical/device inputs remain owner-controlled.
+
 # November 24 —8aa903b staging verified; FCM provider evidence strengthened
 
 Existing23 read-only checksPASS/exactdeployed8aa903bdccbe1da30f7f5fcba8841019c29e5619;

@@ -38,6 +38,39 @@ export async function verifyNativeClerkDriver({actor,api,origin,ids,seedInbox}){
  await inbox.getByRole('button',{name:'Sign in or create account in browser',exact:true}).waitFor();
  assert.equal(await inbox.getByRole('heading',{name:'Driver private inbox fixture',exact:true}).count(),0,'A delayed tap cannot restore a signed-out inbox');
  assert.equal(await inbox.evaluate(()=>window.qaPushPermissionRequests||0),0,'Receiving/tapping never requests permission or enrolls a device');
+
+ const rotation=await native('admin'),original='old_rotation_fixture_token',rotated='new_rotation_fixture_token';
+ const device=await api('admin','/notification-devices','POST',{platform:'android',appId:'com.rocoeats.driver.staging',token:original});
+ await rotation.context().addInitScript(({id,token})=>{localStorage.setItem('rocoeats-push-device-id',id);localStorage.setItem('rocoeats-push-token',token);localStorage.setItem('rocoeats-push-consent','true');window.qaPushPermissionGranted=true;window.qaAllowNativeRegister=true;window.qaNativePushToken=token},{id:device.deviceId,token:original});
+ await rotation.route('**/api/notification-devices/config',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({android:true,ios:false,deliveryEnabled:false,tokenRefreshVersion:1})}));
+ let updates=0;rotation.on('request',request=>{if(request.method()==='PUT'&&request.url().includes('/notification-devices/'))updates++});
+ const firstRefresh=rotation.waitForResponse(response=>response.url().endsWith('/notification-devices/'+device.deviceId)&&response.request().method()==='PUT'&&response.status()===200);
+ await rotation.goto(origin+'/notifications');await firstRefresh;
+ const refreshed=rotation.waitForResponse(response=>response.url().endsWith('/notification-devices/'+device.deviceId)&&response.request().method()==='PUT'&&response.request().postDataJSON().token===rotated&&response.status()===200);
+ await rotation.evaluate(value=>{window.qaNativePushToken=value;window.qaPushListeners.registration({value})},rotated);await refreshed;
+ assert.equal((await api('admin','/notification-devices','POST',{platform:'android',appId:'com.rocoeats.driver.staging',token:rotated})).deviceId,device.deviceId,'Rotation preserves the same server enrollment');
+ await rotation.getByRole('button',{name:'Disable push for this device',exact:true}).click();await rotation.getByRole('status').filter({hasText:'Push registration removed'}).waitFor();
+ assert.equal(await rotation.evaluate(()=>window.qaPushPermissionRequests||0),0,'Existing-consent rotation cannot prompt for permission');
+ const stopped=updates,registrations=await rotation.evaluate(()=>window.qaRegisterCalls);
+ await rotation.evaluate(()=>{window.qaPushListeners.registration({value:'late_rotation_fixture_token'});window.qaAppListeners.appStateChange({isActive:true})});
+ assert.equal(await rotation.evaluate(()=>localStorage.getItem('rocoeats-push-opted-out')),'true');assert.equal(await rotation.evaluate(()=>localStorage.getItem('rocoeats-push-consent')),null);
+ assert.equal(updates,stopped);assert.equal(await rotation.evaluate(()=>window.qaRegisterCalls),registrations,'Explicit opt-out cannot be undone by foreground recovery');
+ await rotation.getByRole('button',{name:'Enable mobile push notifications',exact:true}).click();await rotation.getByRole('status').filter({hasText:'This device is registered to your current account'}).waitFor();
+ assert.equal(await rotation.evaluate(()=>localStorage.getItem('rocoeats-push-opted-out')),null);assert.equal(await rotation.evaluate(()=>localStorage.getItem('rocoeats-push-consent')),'true');
+
+ await rotation.evaluate(()=>window.qaPushListeners.registrationError({error:'synthetic provider error'}));
+ const refreshError=rotation.getByRole('alert').filter({hasText:'Device token update is unconfirmed'});await refreshError.waitFor();
+ const repaired=rotation.waitForResponse(response=>response.request().method()==='PUT'&&response.url().includes('/notification-devices/')&&response.status()===200);
+ await rotation.evaluate(()=>{window.qaNativePushToken='recovered_rotation_fixture_token';window.qaPushListeners.registration({value:window.qaNativePushToken})});await repaired;await refreshError.waitFor({state:'hidden'});
+
+ await rotation.evaluate(()=>{window.qaOriginalStorageSet=Storage.prototype.setItem;Storage.prototype.setItem=function(key,value){if(key==='rocoeats-push-opted-out')throw new DOMException('Synthetic quota failure','QuotaExceededError');return window.qaOriginalStorageSet.call(this,key,value)}});
+ const removals=await rotation.evaluate(()=>window.qaUnregisterCalls||0);await rotation.getByRole('button',{name:'Disable push for this device',exact:true}).click();await rotation.waitForFunction(count=>(window.qaUnregisterCalls||0)>count,removals);
+ assert.equal(await rotation.evaluate(()=>localStorage.getItem('rocoeats-push-consent')),null,'Quota failure must still remove existing consent');
+ const noWrites=updates,noRegister=await rotation.evaluate(()=>window.qaRegisterCalls);
+ await rotation.evaluate(()=>{window.qaPushListeners.registration({value:'quota_late_token_fixture'});window.qaAppListeners.appStateChange({isActive:true});Storage.prototype.setItem=window.qaOriginalStorageSet});
+ assert.equal(updates,noWrites);assert.equal(await rotation.evaluate(()=>window.qaRegisterCalls),noRegister);
+ await rotation.getByRole('button',{name:'Disable push for this device',exact:true}).click();await rotation.getByRole('status').filter({hasText:'Push registration removed'}).waitFor();
+ console.log('PASS: simulated provider token rotation refreshes the actual authorized local enrollment without replacing its ID; opt-out blocks late events/foreground registration; only explicit re-enrollment restores consent. No provider sends.');
  console.log('PASS: native-session notification receive/tap and simultaneous foreground listeners refresh the real local account-scoped inbox, ignore payload routes, clear old identity data and preserve sign-out. Native events/SDK mocked; no provider registration, sends or hosted writes.');
  console.log('PASS: native SDK principal drives Driver/admin workspace and account/navigation/restart without Web Clerk; real local API denies wrong/unapproved role; native restore failure is actionable/retryable; existing handoff consumes one simulated native ticket. SDK/OS/provider simulated, no hosted/provider operation.');
 }

@@ -17,6 +17,7 @@ try {
     ["background-duty", "tests/background-duty.test.ts"],
     ["native-duty-http", "tests/native-duty-http.test.ts"],
     ["native-clerk-store", "tests/native-clerk-store.test.ts"],
+    ["push-token-refresh", "tests/push-token-refresh.test.ts"],
     ["clerk-proxy", "tests/clerk-proxy.test.ts"],
     ["native-startup", "tests/native-startup.test.ts"],
     ["reversal-evidence", "src/lib/reversal-evidence.test.ts"],

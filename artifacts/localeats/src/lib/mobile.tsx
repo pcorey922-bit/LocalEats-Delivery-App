@@ -1,3 +1,4 @@
+import {createPushTokenRefresh} from './push-token-refresh';
 import { nativeStep } from './native-startup';
 import pushPolicy from '../../../../config/native-push-policy.json';
 import { readNativeRequest } from './native-auth-request';
@@ -15,12 +16,16 @@ import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 type PushEnrollment = { signal?: AbortSignal; promise: Promise<void>; cancel: () => void };
 let registration: PushEnrollment | null = null;
 let registrationGeneration = 0;
+let cancelTokenRefresh:()=>void=()=>{};
+const optedOutKey='rocoeats-push-opted-out';
+let optedOutInMemory=false;
 export function cancelPushRegistration() { registration?.cancel(); }
 export function registerPush(options: { signal?: AbortSignal } = {}): Promise<void> {
   if (!Capacitor.isNativePlatform()) return Promise.reject(new Error('Mobile push enrollment requires the Android or iOS app. In-app notifications remain available.'));
   if (options.signal?.aborted) return Promise.reject(options.signal.reason);
   if (registration?.signal === options.signal && registration) return registration.promise;
   registration?.cancel();
+  cancelTokenRefresh();
   registrationGeneration++;
   const controller = new AbortController(), signal = controller.signal;
   const cancel = () => controller.abort(new Error('Push registration canceled because the account or screen changed. Retry while signed in.'));
@@ -75,9 +80,12 @@ export function registerPush(options: { signal?: AbortSignal } = {}): Promise<vo
           });
           signal.throwIfAborted();
           localStorage.setItem('rocoeats-push-token',token.value);
+          localStorage.removeItem(optedOutKey);
+          localStorage.setItem('rocoeats-push-consent','true');
           if (result.deviceId) localStorage.setItem('rocoeats-push-device-id',result.deviceId);
           else localStorage.removeItem('rocoeats-push-device-id');
           if (localStorage.getItem('rocoeats-push-pending-token')===token.value) localStorage.removeItem('rocoeats-push-pending-token');
+          optedOutInMemory=false;
           resolveToken();
         })().catch(rejectToken);
       }));
@@ -99,14 +107,16 @@ export function registerPush(options: { signal?: AbortSignal } = {}): Promise<vo
   return promise;
 }
 export async function unregisterPush() {
+  // Cancel first; storage errors must not prevent native/server opt-out attempts.
+  optedOutInMemory=true;
+  cancelTokenRefresh();
   cancelPushRegistration();
-  const token = localStorage.getItem("rocoeats-push-token");
-  const deviceId = localStorage.getItem('rocoeats-push-device-id');
-  const pendingToken = localStorage.getItem('rocoeats-push-pending-token');
-  // A device that was never enrolled may have no Firebase app configuration.
-  if (!token && !deviceId && !pendingToken) return;
-  const generation = ++registrationGeneration;
-  let failure: unknown;
+  let failure:unknown;
+  let token:string|null=null,deviceId:string|null=null,pendingToken:string|null=null;
+  try{localStorage.removeItem('rocoeats-push-consent');localStorage.setItem(optedOutKey,'true');}catch(error){failure=error;}
+  try{token=localStorage.getItem('rocoeats-push-token');deviceId=localStorage.getItem('rocoeats-push-device-id');pendingToken=localStorage.getItem('rocoeats-push-pending-token');}catch(error){failure??=error;}
+  if(!token&&!deviceId&&!pendingToken&&!failure)return;
+  const generation=++registrationGeneration;
   async function bounded<T>(operation: (signal: AbortSignal) => Promise<T>) {
     const controller = new AbortController();
     try { return await nativeStep('NATIVE_PUSH_REMOVAL_TIMEOUT', () => operation(controller.signal), controller.signal); }
@@ -135,8 +145,9 @@ export async function unregisterPush() {
   if (failure) throw failure;
 }
 export function MobileLifecycle() {
-  const {isSignedIn}=useAuth();
+  const {isSignedIn,userId}=useAuth();
   const signedIn=useRef(isSignedIn);signedIn.current=isSignedIn;
+  const principal=useRef(userId);principal.current=userId;
   const [, navigate] = useLocation();
   const client = useQueryClient();
   useEffect(() => {
@@ -155,9 +166,91 @@ export function MobileLifecycle() {
         // Permission/configuration and actual push receipt are reported separately.
       }
     };
+    const refresh =
+      Capacitor.getPlatform() === "android" || Capacitor.getPlatform() === "ios"
+        ? createPushTokenRefresh({
+            active: () =>
+              !disposed &&
+              signedIn.current === true &&
+              !!userId &&
+              principal.current === userId,
+            manual: () => registration !== null,
+            saved: () => {
+              try {
+                return {
+                  id: localStorage.getItem("rocoeats-push-device-id"),
+                  optedOut:
+                    optedOutInMemory || localStorage.getItem(optedOutKey) === "true" ||
+                    localStorage.getItem("rocoeats-push-consent") !== "true",
+                };
+              } catch {
+                return { id: null, optedOut: true };
+              }
+            },
+            platform: Capacitor.getPlatform() === "ios" ? "ios" : "android",
+            permission: async () =>
+              (await PushNotifications.checkPermissions()).receive === "granted",
+            appId: async () => {
+              const id = (await App.getInfo()).id;
+              const base =
+                import.meta.env.VITE_APP_AUDIENCE === "driver"
+                  ? "com.rocoeats.driver"
+                  : "com.rocoeats.app";
+              if (id !== base && id !== base + ".staging")
+                throw Error("Unexpected native app");
+              return id;
+            },
+            configured: async (signal) => {
+              const config = await customFetch<{
+                android: boolean;
+                ios: boolean;
+                tokenRefreshVersion?: number;
+              }>("/api/notification-devices/config", { signal });
+              return (
+                config.tokenRefreshVersion === 1 &&
+                (Capacitor.getPlatform() === "ios"
+                  ? config.ios === true
+                  : config.android === true)
+              );
+            },
+            lookup: (id, signal) =>
+              customFetch("/api/notification-devices/" + id, { signal }),
+            rotate: (id, token, appId, signal) =>
+              customFetch("/api/notification-devices/" + id, {
+                method: "PUT",
+                signal,
+                body: JSON.stringify({
+                  token,
+                  appId,
+                  platform: Capacitor.getPlatform() === "ios" ? "ios" : "android",
+                }),
+              }),
+            register: () => PushNotifications.register(),
+            save: (token) => localStorage.setItem("rocoeats-push-token", token),
+            changed: (failed) => {
+              client.setQueryData(["push-token-refresh", userId], {
+                unconfirmed: failed,
+              });
+              void client.invalidateQueries({
+                queryKey: ["push-device-registration", userId],
+              });
+            },
+          })
+        : null;
+    const cancel = () => refresh?.cancel();
+    cancelTokenRefresh = cancel;
+    if (refresh) {
+      void retain(PushNotifications.addListener('registrationError',()=>refresh.failed()));
+      void retain(
+        PushNotifications.addListener("registration", (token) =>
+          refresh.receive(token.value),
+        ),
+      );
+      void refresh.recover();
+    }
     void retain(
       App.addListener("appStateChange", (state) => {
-        if (state.isActive) void client.invalidateQueries();
+        if (state.isActive){void client.invalidateQueries();void refresh?.recover();}
       }),
     );
     const returnToApp=async(raw:string)=>{
@@ -184,9 +277,9 @@ export function MobileLifecycle() {
       }),
     );
     return () => {
-      disposed = true;
+      disposed = true;refresh?.stop();if(cancelTokenRefresh===cancel)cancelTokenRefresh=()=>{};
       for (const handle of handles) void handle.remove();
     };
-  }, [client, navigate]);
+  }, [client, navigate, userId]);
   return null;
 }
