@@ -1,3 +1,34 @@
+# November 24 — Push safeguard staging independently verified; FCM receipt/redirect repair
+
+Owner deployed8aa903bdccbe1da30f7f5fcba8841019c29e5619, Render Live/source8aa903b.
+Independent existing23 read-only HTTP checks PASS at2026-11-24T06:55:53Z: exactSHA,
+DB/auth/pricing/webhook/worker readiness, correct Render client identity, native CORS /
+contracts, CSP/HSTS, Clerk proxy origin protection, public/private orderingOFF,
+liveChargesOFF, testPayoutsOFF, retentionOFF, municipal enforcementOFF. No failures /
+unverified safeguards reported by that verifier. Saved sanitized report in
+ docs/verification/STAGING_HTTP_2026-11-24.json. Anonymous checks do NOT prove private
+accounts or a provider transaction. Owner separately observed authenticated Operations:
+provider push sendingDISABLED, Android/iOS configurationrequired, payoutsDISABLED,
+processed checkout retentionDISABLED, public orderingOFF/TEST MODE. No repeat of those
+owner checks requested. No hosted settings/data/credentials/financial operation.
+
+NEXT SOFTWARE CORRECTION (this commit, not deployed): reproduced two FCM unit failures:
+fixed-host OAuth/message requests omitted redirect:error, and a2xx receipt containing
+only projects/<project>/messages/ incorrectly counted as provider acceptance. Added
+strict redirect refusal on BOTH stages, reject already-redirected injected responses,
+and require a nonempty same-project message resource ID without extra path/query /
+fragment/whitespace. No raw provider errors/credentials logged. Standard FCM IDs incl
+colon/percent remain valid.8 focused tests PASS, including actual Node Fetch against
+LOCAL307 mock server proving no request reaches redirect target. Synthetic generated
+RSA/test credentials only; zero Google/provider lookups/sends. Types/API build required
+before push; exact-source CI pending at this save. Driver240 native/GPS/90s unchanged.
+
+NEXT independent investigation: existing SDK token-rotation registration lifecycle;
+check whether refreshed tokens reach server outside the explicit enrollment window.
+Do not alter accepted GPS, enable sends or create hosted records. Provider setup/
+physical notification receipt and signed iOS still require protected owner inputs.
+Before real sends, deploy any verified sender correction only with separate approval.
+
 # November 24 — Push activation separated from credentials; native-session inbox verified
 
 Physical acceptance evidence committed115d0a0c1ffa44e617776e93c6095f10530e0b0a;

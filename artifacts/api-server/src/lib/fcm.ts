@@ -46,6 +46,7 @@ export function createFcmSender(raw: string, transport: typeof fetch = fetch) {
           );
         const response = await transport(tokenUrl, {
           method: "POST",
+          redirect: "error",
           headers: { "content-type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({
             grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
@@ -53,7 +54,7 @@ export function createFcmSender(raw: string, transport: typeof fetch = fetch) {
           }),
           signal: AbortSignal.timeout(10000),
         });
-        if (!response.ok) throw new Error("Firebase authorization unavailable");
+        if (!response.ok || response.redirected) throw new Error("Firebase authorization unavailable");
         const body = (await response.json()) as {
           access_token?: unknown;
           expires_in?: unknown;
@@ -85,6 +86,7 @@ export function createFcmSender(raw: string, transport: typeof fetch = fetch) {
       `https://fcm.googleapis.com/v1/projects/${project}/messages:send`,
       {
         method: "POST",
+        redirect: "error",
         headers: {
           authorization: `Bearer ${bearer}`,
           "content-type": "application/json",
@@ -110,6 +112,7 @@ export function createFcmSender(raw: string, transport: typeof fetch = fetch) {
         signal: AbortSignal.timeout(10000),
       },
     );
+    if (response.redirected) throw new Error("FCM acknowledgement unavailable");
     if (!response.ok) {
       if (response.status === 401) cached = null;
       let unregistered = false;
@@ -129,9 +132,12 @@ export function createFcmSender(raw: string, transport: typeof fetch = fetch) {
       });
     }
     const body = (await response.json()) as { name?: unknown };
+    const prefix = `projects/${project}/messages/`;
     if (
       typeof body.name !== "string" ||
-      !body.name.startsWith(`projects/${project}/messages/`)
+      !body.name.startsWith(prefix) ||
+      body.name.length === prefix.length ||
+      /[\s/?#]/.test(body.name.slice(prefix.length))
     )
       throw new Error("Invalid FCM acknowledgement");
   };

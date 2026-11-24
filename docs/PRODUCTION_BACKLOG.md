@@ -1,3 +1,15 @@
+# November 24 —8aa903b staging verified; FCM provider evidence strengthened
+
+Existing23 read-only checksPASS/exactdeployed8aa903bdccbe1da30f7f5fcba8841019c29e5619;
+sanitized report committed. Owner Operations confirms pushsendOFF, Android/iOS still
+unconfigured, payouts/retentionOFF; public/private ordering/live/municipalOFF verified.
+Driver240 physical GPS acceptance/90s preserved; no new GPS test or APK required.
+Reproduced/fixed fixed-host redirect policy and incomplete FCM receipt acceptance;
+8 synthetic/local HTTP regressions PASS, no real provider calls. Not deployed.
+Next inspect actual SDK token-refresh lifecycle outside explicit registration before
+adding more provider tooling. Protected credentials/actual push/signed physical iOS
+remain owner-controlled; no sends or further deployment authorized.
+
 # November 24 — Next blocker: protected push setup and real-device acceptance
 
 Driver240 Samsung background GPS/lock/offline/restart is physically accepted;

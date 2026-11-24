@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { generateKeyPairSync, verify } from "node:crypto";
 import { createFcmSender } from "./fcm";
+import { createServer } from "node:http";
 const keys = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const credentials = JSON.stringify({
   type: "service_account",
@@ -143,4 +144,50 @@ test('FCM uses remaining original lifetime and sends nothing if OAuth consumes t
     const slow=createFcmSender(credentials,async()=>{clock+=4000;return Response.json({access_token:'fixture',expires_in:3600});});
     await assert.rejects(slow('token_fixture','old',new Date(clock+3000)),error=>(error as {code:string}).code==='notification/expired');
   } finally {Date.now=realNow;}
+});
+
+
+test('FCM fixes OAuth and message requests to their original endpoints without redirects',async()=>{
+  const calls:string[]=[];
+  const sender=createFcmSender(credentials,async(input,init)=>{
+    calls.push(String(input));assert.equal(init?.redirect,'error','Signed OAuth assertions and message requests must never follow redirects');
+    return String(input).includes('oauth2')?Response.json({access_token:'synthetic_access',expires_in:3600}):Response.json({name:'projects/rocoeats-test/messages/0:1500415314455276%31bd1c9631bd1c96'});
+  });
+  await sender('synthetic_device','synthetic_notice');assert.equal(calls.length,2);
+});
+test('FCM requires a complete same-project message resource before accepting delivery evidence',async()=>{
+  for(const name of ['projects/rocoeats-test/messages/','projects/rocoeats-test/messages/ ', 'projects/rocoeats-test/messages/id/extra','projects/rocoeats-test/messages/id?query','projects/rocoeats-test/messages/id#fragment','projects/other-project/messages/id']){
+    const sender=createFcmSender(credentials,async input=>String(input).includes('oauth2')?Response.json({access_token:'synthetic_access',expires_in:3600}):Response.json({name}));
+    await assert.rejects(sender('synthetic_device','synthetic_notice'),/Invalid FCM acknowledgement/,'Malformed receipt cannot mark provider acceptance');
+  }
+});
+
+test('real Fetch refuses simulated OAuth and message307 redirects without forwarding credentials',async()=>{
+  let redirectedRequests=0,redirectStage='oauth';
+  const server=createServer((request,response)=>{
+    request.resume();
+    if(request.url==='/redirect-target'){redirectedRequests++;response.writeHead(200,{'content-type':'application/json'});response.end('{}');return;}
+    if(request.url==='/'+redirectStage){response.writeHead(307,{location:'/redirect-target'});response.end();return;}
+    response.writeHead(200,{'content-type':'application/json'});
+    response.end(JSON.stringify(request.url==='/oauth'?{access_token:'synthetic_access',expires_in:3600}:{name:'projects/rocoeats-test/messages/synthetic-receipt'}));
+  });
+  await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+  try {
+    const origin='http://127.0.0.1:'+(server.address() as {port:number}).port;
+    for(const stage of ['oauth','message']){
+      redirectStage=stage;
+      const sender=createFcmSender(credentials,(input,init)=>fetch(origin+(String(input).includes('oauth2')?'/oauth':'/message'),init));
+      await assert.rejects(sender('synthetic_device','synthetic_notice'));
+    }
+    assert.equal(redirectedRequests,0,'Neither signed OAuth assertions nor message credentials may reach a redirect target');
+  } finally {server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
+});
+test('FCM rejects redirected responses even if an injected transport ignores redirect policy',async()=>{
+  for(const stage of ['oauth','message']){
+    const sender=createFcmSender(credentials,async input=>{
+      const auth=String(input).includes('oauth2');const response=Response.json(auth?{access_token:'synthetic_access',expires_in:3600}:{name:'projects/rocoeats-test/messages/synthetic-receipt'});
+      if((auth?'oauth':'message')===stage)Object.defineProperty(response,'redirected',{value:true});return response;
+    });
+    await assert.rejects(sender('synthetic_device','synthetic_notice'),stage==='oauth'?/Firebase authorization unavailable/:/FCM acknowledgement unavailable/);
+  }
 });
