@@ -1,3 +1,43 @@
+# November 24 — Driver240 signed-out emulator PASS; Samsung action now required
+
+APK source83f228015f5725409c4cf1a111cbf57644f11b7e: ALL THREE required CI PASS,
+protected signing45336250932 PASS. Exact signed240 bytes tested after harness repair
+6a3e517cc2fb85132eb008b2f4ded0d6c4a0a68b: emulator45337189007 SUCCESS,
+evidence14894525928 reviewed (results.completed=true,10 passed checks, no native
+crash, no business writes, no authenticated account). Signed-out Driver entry screenshot
+reviewed; actual APK bundle native-auth gate is Android-native-only with migration ON.
+Safe cold/malformed/authority-bearing deep links, navigation, force-stop/relaunch and
+permission defaults verified. First attempt45336747590 exit137 remains a FAILED
+capture attempt; repaired harness retry used SAME APK and retained capture evidence.
+No app rebuild or pass-on-missing-UI workaround. Harness14 regression tests PASS;
+required push Validate45337170293 PASS; PR Validate45337177119 and native45337177350
+still running at this evidence save. Check final GitHub conclusions on resume.
+
+DOWNLOAD: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/45336250932/artifacts/14893609422
+Artifact RoCoEats-Driver-Android-Staging-Test-APK; install extracted
+RoCoEats-Driver-Android-Staging-Test.apk as update, version240. Existing signature /
+com.rocoeats.driver.staging unchanged. Full checksums/source evidence below.
+No Render deployment/configuration/migration needed or performed. Backup remote still
+6ce7714574cc17b00167ea7423bb25862b5fdefb; working branch only was modified.
+
+OWNER NEXT: exact five-step procedure at TOP of docs/ANDROID_STAGING_TEST.md. One
+browser approval may be needed for new native SDK session; preserve same account.
+Reconnect, explicitly consent/enable background, wait advancing receipts/notification,
+lock5min, inspect Chrome Dispatch BEFORE reopening Driver, then receipts. On failure
+copy native diagnostic BEFORE reconnect/stop. Finally stop background, Go offline,
+verify Dispatch then force-close/reopen (auth should restore; sharing stays OFF).
+No ordering, payment, geocoding/provider notification send or hosted change needed.
+Authenticated native-SDK renewal and physical background GPS remain UNVERIFIED;
+never infer them from signed-out emulator or simulated SDK/HTTP/JS-absent tests.
+
+NEXT INDEPENDENT TASK: finish outstanding exact-SHA CI. Functional Android repair and
+signed-out integration are complete; any new physical finding must drive the next
+correction. Real notification-provider setup/sends, signed physical iOS acceptance,
+provider financial/reconciliation evidence and municipal activation remain protected
+owner-controlled acceptance items, not permission to change configuration now.
+Do not repeat Customer208 acceptance, exhausted Geocodio diagnostic or old Driver233.
+Do not start speculative GPS/refactoring work while waiting for actual240 evidence.
+
 # November 24 — Driver240 emulator capture interrupted; harness repair
 
 Signed240/source83f2280 remains verified; NO app rebuild needed or performed.

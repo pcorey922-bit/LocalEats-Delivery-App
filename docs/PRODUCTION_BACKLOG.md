@@ -1,3 +1,16 @@
+# November 24 — Driver240 emulator accepted; physical background GPS still blocked
+
+Same signed240/source83f2280: actual Android15 signed-out emulator45337189007 PASS
+10 checks, no native crash/no business writes; report/screenshots inspected. Harness
+6a3e517 bounded capture repair avoids immediate exit137 abort without weakening
+assertions. APK source requiredCI/signing all PASS; harness push CI PASS, PR/native
+CI still running at save. No app rebuild after signing. Native SDK login/renewal /
+background physical acceptance NOT verified. Next owner five-minute screen-lock test
+is documented atop ANDROID_STAGING_TEST.md; no Render deployment/configuration change.
+Finish outstanding CI, then use actual device evidence for next correction. Customer208
+accepted scope preserved. Real push/signed iOS/provider financial/geographic activation
+remain separate protected acceptance blockers. Do not invent unrelated new features.
+
 # November 24 — Driver240 emulator evidence blocked by killed UI capture
 
 45336747590 failed with uiautomator exit137 before UI assertions; APK install and
