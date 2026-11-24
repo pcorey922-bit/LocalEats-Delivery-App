@@ -1,3 +1,77 @@
+# USAGE RESET HANDOFF — November24: STOP after saving this checkpoint
+
+Owner requested preservation ONLY; do not begin Firebase implementation/setup now.
+Remote/local were clean and matchedd96e6df50f1a495ae47535f5a2d59a551b5078fd before
+this documentation update. ALL THREE d96 CI SUCCESS45350118218 /45350127472 /
+45350127463. No unfinished runtime changes/worktree work to recover. Functional
+source644e038b4532936a6db2e954e34a8bf558166c24 already pushed, ALL THREE targetCI
+passed, OWNER DEPLOYED and independently verified23/23 at2026-11-24T07:39:49Z.
+Evidence: docs/verification/STAGING_HTTP_2026-11-24_644e038.json. Earlier evidence
+preserved. Do NOT redeploy, rerun those checks or repeat Driver240/Customer208
+acceptance without a new reason. Driver240 Samsung5min screen-lock/GPS/offline /
+restart accepted; native implementation/90s unchanged. No replacement APK built.
+
+RESUME EXACTLY HERE after reset:
+1. Fetch current remote branch, read this head/checkpoint and inspect status once.
+   Preserve any newer work. Verify new documentation CI once if still pending;
+   the functional/deployed644 source CI is already SUCCESS. PR1 remains draft.
+2. FIRST OWNER-ONLY STEP: request explicit protected Firebase setup authorization.
+   Current deployment approval does NOT authorize account/project creation, hosted
+   credentials, server redeployment, sends or test support records. Never ask for
+   secret values in chat. User works Samsung Chrome only; no laptop/terminal.
+3. After scoped approval, owner opens Firebase Console with existing Google account;
+   reuse existing appropriate project or create FREE Spark project ONLY if approved.
+   No card, billing, paid upgrade, Analytics/Firestore/Storage requirement or expense.
+   Project Settings -> General -> Add app -> Android, separately register
+   com.rocoeats.app.staging and com.rocoeats.driver.staging in SAME project.
+   Download each matching google-services.json; do not change Clerk identities or
+   Android signing. Existing pinned staging signer must remain unchanged.
+4. Owner privately enters complete matching CLIENT JSON into GitHub repo -> Settings
+   -> Secrets and variables -> Actions -> repository secrets:
+   ROCOEATS_FIREBASE_CUSTOMER_ANDROID_CONFIG_JSON and
+   ROCOEATS_FIREBASE_DRIVER_ANDROID_CONFIG_JSON. Ordinary JSON, not base64. Never
+   upload server service-account/private key into either client secret, Git, chat or
+   an APK. Engineering can check secret NAME presence/build reports, not read values.
+5. With approved protected inputs, use existing prepare-firebase-android.mjs /
+   verify-native-push-config.mjs and native-validation.yml targetstaging per audience.
+   Verify exact build source/CI/package/client resources/digests/existing certificate.
+   Do not rebuild unconfigured APKs merely to consume time. Keep installed Driver240
+   until meaningful configured updates are ready; no GPS retest requested.
+6. SERVER INPUT is another protected owner action: Firebase Project Settings ->
+   Service accounts -> private service-account key for SAME project with required
+   FCM send permission; only after authorization. Full SERVER JSON belongs ONLY in
+   Render protected FIREBASE_SERVICE_ACCOUNT_JSON. Keep
+   ROCOEATS_PUSH_DELIVERY_ENABLED absent/false. No key/token contents in chat/logs/Git.
+   Adding Render credentials and any environment-triggered deployment require separate
+   approval. Review Render save choices first; do not let Save-and-deploy accidentally
+   deploy newer docs HEAD. Pin the explicitly approved full source when redeploying.
+   This has NOT been performed; do not infer provider connection from configuration.
+7. After protected setup, verify closed gates/current source and distinguish valid
+   client resources, server config, enrollment, provider ACK and actual device receipt.
+   Native enrollment itself is a hosted record change: obtain appropriate scoped test
+   approval before owner performs it. New token recovery needs explicit current-app
+   consent; it must not auto-enroll another account or override opt-out.
+8. Real sends remain separately unauthorized. Only after explicit controlled-window
+   AND nonfinancial test-record approval follow existing PRIVATE_TEST_DELIVERY.md
+   notification-only orderless Support exercise. No new order/payment/refund/
+   reconciliation. Five-minute alert lifetime stays enforced; no timestamp resets.
+   Android Force stop blocks push until relaunch, unlike ordinary background/task
+   dismissal. Disable sends afterward, confirm gateOFF and preserve evidence.
+
+DEFERRED/OWNER-ONLY: actual FCM receipt; APNs sandbox credentials, Apple signing/team/
+provisioning and physical iOS device. Do not purchase memberships/services, publish,
+merge PR1 or change signing. Financial provider acceptance and geographic activation
+remain separate. No need to invent more runtime refinements while protected inputs
+are missing; existing notification software corrections and tests are completed.
+
+SAFETY STATE: public/private orderingOFF, live charges/payoutsOFF, retentionOFF,
+municipalOFF, StripeTEST. Owner authenticated Operations confirms pushsendOFF and
+both providersconfigurationrequired. No new credentials/configuration, provider
+call/send, financial operation, deployment, database change or native/GPS modification
+in this checkpoint. Stop after documentation is committed/pushed; no redundant tests
+for this documentation-only handoff. Final documentation CI may run independently;
+report pending honestly rather than waiting/polling through remaining usage.
+
 # November24 —644e038 staging VERIFIED; protected Firebase setup is next owner action
 
 Owner manually deployed644e038b4532936a6db2e954e34a8bf558166c24, Render Deploy

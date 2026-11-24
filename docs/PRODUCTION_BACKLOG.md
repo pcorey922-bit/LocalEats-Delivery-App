@@ -1,3 +1,25 @@
+# USAGE RESET HANDOFF — November24
+
+STOP after committing/pushing documentation; owner requested no new substantial work.
+All runtime corrections already committed:644e038b4532936a6db2e954e34a8bf558166c24,
+all3 functionalCI PASS, deployed/verified23/23. Previous documentationd96e6df all3 CI
+PASS. Working tree clean before this save; no unfinished runtime work to reconstruct.
+Driver240 physical GPS/lock/offline/restart and90s preserved; Customer208 acceptance
+preserved. No new APK/GPS retest or duplicate deployment needed.
+
+EXACT NEXT: after reset, fetch/read checkpoint once, then obtain owner authorization
+for protected FREE Firebase Spark setup; no provider credentials or sends authorized
+now. Engineering checkpoint has numbered phone-only project/app-registration ->
+protected per-audience GitHub CLIENT JSON -> configured signed APK verification ->
+separately approved Render SERVER JSON/redeployment -> separately authorized enrollment
+and notification-only send exercise. Never secrets in chat/Git/client APKs; never
+Save-and-deploy the wrong source. Keep sendingOFF throughout setup. No paid services.
+Real push/iOS physical/provider-financial/geographic activation remain external
+acceptance blockers; no speculative runtime features needed before protected inputs.
+All ordering/live/payout/retention/municipal gatesOFF, StripeTEST. Do not deploy,
+configure credentials, send notifications, alter records or merge/publish on resume
+without the required explicit authorization. Preserve backup/recovery/signing/data.
+
 # November24 —644e038 deployment verified; notification provider setup blocked on owner
 
 Exactdeployed644e038b4532936a6db2e954e34a8bf558166c24 /23read-only checksPASS
