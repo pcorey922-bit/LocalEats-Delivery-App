@@ -7,6 +7,10 @@ public final class NativeAuthFence {
     public synchronized long generation(){return generation;}
     public synchronized long begin(String requestId){pending=requestId;return ++generation;}
     public synchronized boolean current(long owner,String requestId){return owner==generation&&requestId!=null&&requestId.equals(pending);}
+    public synchronized boolean commit(long owner,String requestId,Runnable action){
+        if(!current(owner,requestId))return false;
+        action.run();return true;
+    }
     public synchronized boolean cancel(String requestId){
         if(requestId==null||!requestId.equals(pending))return false;
         revoke();return true;

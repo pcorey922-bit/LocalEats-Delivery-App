@@ -1,3 +1,15 @@
+# November 24 — Native activation/logout race closed before signing
+
+Integrated UI/native source10944ba881b45c688ce6784fa7372755b60e9dae pushed; exact CI
+running at this checkpoint. Final focused review found a check/commit race in local
+native logout intent. NativeAuthFence now atomically commits current activation;
+begin/cancel/revoke use the same monitor. Logout provider calls serialize with ticket
+activation, and a queued older logout cannot revoke a newer explicit sign-in.
+JVM regression covers canceled/current activation commit; native lease/trace/gate/
+engine tests PASS. Actual SDK1.5/OkHttp Java API compile PASS (compiler stubs, not device).
+No permission/authentication/90s-policy/hosted setting change. Next ALL exact-source
+CI then protected signed Driver artifact verification; physical GPS still BLOCKED.
+
 # November 24 — Interrupted native Driver migration recovered and integrated
 
 BASE / backup: 6ce7714574cc17b00167ea7423bb25862b5fdefb, both remote branches

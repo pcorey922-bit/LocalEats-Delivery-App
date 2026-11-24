@@ -11,6 +11,9 @@ public final class NativeAuthFenceTest {
   long resumed=fence.begin("request-c"),tokenGeneration=fence.generation();fence.revoke();
   check(fence.generation()!=tokenGeneration&&!fence.current(resumed,"request-c"),"Logout invalidates in-flight token and ticket work");
   check(!fence.cancel(null)&&!fence.current(fence.generation(),null),"No anonymous operation can grant local intent");
+  final boolean[] committed={false};
+  check(!fence.commit(resumed,"request-c",()->committed[0]=true)&&!committed[0],"Canceled activation cannot clear persistent logout intent");
+  long latest=fence.begin("request-d");check(fence.commit(latest,"request-d",()->committed[0]=true)&&committed[0],"Only current activation commits local intent atomically");
   System.out.println("PASS: native auth supersession/cancellation/logout fences; old callbacks cannot activate or cancel a newer session");
  }
 }

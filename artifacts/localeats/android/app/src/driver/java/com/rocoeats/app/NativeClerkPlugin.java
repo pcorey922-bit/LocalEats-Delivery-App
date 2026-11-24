@@ -36,8 +36,8 @@ public class NativeClerkPlugin extends Plugin {
     @PluginMethod public void cancelAuthRequest(PluginCall call){session().cancelSignIn(call.getString("requestId"));call.resolve();}
     @PluginMethod public void signOut(PluginCall call){
         getContext().stopService(new Intent(getContext(),com.equimaps.capacitor_background_geolocation.BackgroundGeolocationService.class));
-        session().revokeLocalIntent();
-        request(call,()->{session().signOut();return session().state();});
+        long owner=session().revokeLocalIntent();
+        request(call,()->{session().signOut(owner);return session().state();});
     }
     @Override protected void handleOnDestroy(){requests.shutdownNow();super.handleOnDestroy();}
 }

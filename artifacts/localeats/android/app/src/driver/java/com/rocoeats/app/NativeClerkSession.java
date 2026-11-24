@@ -116,13 +116,13 @@ public final class NativeClerkSession {
         return token;
     }
     public long beginSignIn(String requestId) {
-        long owner=fence.begin(requestId);
-        intent.edit().putBoolean("explicit-sign-out",true).commit();return owner;
+        synchronized(fence){long owner=fence.begin(requestId);
+        intent.edit().putBoolean("explicit-sign-out",true).commit();return owner;}
     }
     public void cancelSignIn(String requestId) {
-        if(fence.cancel(requestId))intent.edit().putBoolean("explicit-sign-out",true).commit();
+        synchronized(fence){if(fence.cancel(requestId))intent.edit().putBoolean("explicit-sign-out",true).commit();}
     }
-    public void revokeLocalIntent(){fence.revoke();intent.edit().putBoolean("explicit-sign-out",true).commit();}
+    public long revokeLocalIntent(){synchronized(fence){fence.revoke();intent.edit().putBoolean("explicit-sign-out",true).commit();return fence.generation();}}
     private void checkSignIn(long owner,String requestId,long deadline) throws Exception {
         if(!fence.current(owner,requestId)||Thread.currentThread().isInterrupted())throw new CancellationException("Native sign-in canceled");
         if(android.os.SystemClock.elapsedRealtime()>=deadline)throw new TimeoutException("NATIVE_TICKET_TIMEOUT");
@@ -137,14 +137,14 @@ public final class NativeClerkSession {
         Session activated=bounded(nativeCall(continuation->Clerk.INSTANCE.getAuth().setActive(signIn.getCreatedSessionId(),null,continuation)),Math.max(1,deadline-android.os.SystemClock.elapsedRealtime()));
         checkSignIn(owner,requestId,deadline);
         if(fence.generation()!=owner||activated.getStatus()!=Session.SessionStatus.ACTIVE||activated.getCurrentTask()!=null||!activated.getTasks().isEmpty())throw new SecurityException("NATIVE_SESSION_TASK_REQUIRED");
-        intent.edit().putBoolean("explicit-sign-out",false).commit();
+        if(!fence.commit(owner,requestId,()->intent.edit().putBoolean("explicit-sign-out",false).commit()))throw new CancellationException("Native sign-in canceled");
         if(principal()==null)throw new SecurityException("NATIVE_ACTIVATION_UNCONFIRMED");
         return state();
     }
-    public void signOut() throws Exception {
+    public synchronized void signOut(long owner) throws Exception {
         // Persistent noncredential intent prevents an offline/failed provider sign-out
         // from silently restoring the old SDK session after process restart.
-        revokeLocalIntent();
+        if(fence.generation()!=owner)return; // A queued old logout cannot revoke a newer explicit login.
         bounded(NativeClerkSession.<kotlin.Unit>nativeCall(continuation->Clerk.INSTANCE.getAuth().signOut(null,continuation)),8000);
     }
 }
