@@ -1,3 +1,19 @@
+# November24 —644e038 deployment verified; notification provider setup blocked on owner
+
+Exactdeployed644e038b4532936a6db2e954e34a8bf558166c24 /23read-only checksPASS
+2026-11-24T07:39:49Z; sanitized report saved, all3 targetCI PASS. Owner authenticated
+Operations at2:37AM confirms pushsendOFF, both providersunconfigured, payouts /
+retentionOFF, public orderingOFF/TEST MODE. Anonymous verification also confirms
+private ordering/live/municipalOFF. No private-account/provider transaction claimed.
+Driver240 physical GPS/90s preserved; NO GPS retest or APK replacement requested.
+Next owner-only: authorize protected free Firebase setup, keeping sendsOFF; then
+privately configure matching GitHub client JSON/Render server JSON per existing
+phone procedure. No credentials/settings changed here. No repeated deployment or
+migration needed;644e038 already Live. Builds/real notification exercise follow only
+after protected inputs and separate send/record authorization. Signed physical iOS
+still needs owner Apple signing/device inputs. No new independent runtime defect
+identified; do not add speculative features or rerun accepted GPS/customer tests.
+
 # November24 — Approved notification release awaiting owner manual deployment
 
 Deployment targetONLY644e038b4532936a6db2e954e34a8bf558166c24. All3 required CI PASS

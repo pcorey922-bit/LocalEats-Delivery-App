@@ -46,12 +46,11 @@ build. Client files are ignored by git and removed from the runner. Never put a
 Firebase service-account private key in either Android client secret or APK.
 
 When the owner separately approves provider setup (all steps work in phone dashboards):
-1. Notification migration0029 was already approved/deployed; do not repeat it.
-   Before adding SERVER push credentials, approve a verified backend release that
-   includes the separate `ROCOEATS_PUSH_DELIVERY_ENABLED` gate. Keep it absent/false.
-   Historical staging76a24ed has configuration-as-activation, so do not add a server
-   key there without separately approving sends. New Operations must report
-   **Provider push sending: disabled**, with all ordering/payment/municipal gates OFF.
+1. Backend **644e038b4532936a6db2e954e34a8bf558166c24** is already Live and
+   independently verified23/23. Migration0029 was already deployed. No duplicate
+   deployment/migration or GPS test is needed. Owner confirmed provider sendingOFF
+   and both providersunconfigured. Keep `ROCOEATS_PUSH_DELIVERY_ENABLED` absent/false.
+   **Credential setup still needs separate owner authorization; it has not begun.**
 2. In an existing/free Firebase Spark project, register staging Android packages
    `com.rocoeats.app.staging` and `com.rocoeats.driver.staging`. Use the SAME project
    as backend FCM credentials. No billing/card/paid upgrade or new project is created

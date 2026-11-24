@@ -1,14 +1,14 @@
-## Approved next deployment — November24 (not yet Live)
+## Current verified deployment — November24
 
-Owner approved notification corrections **644e038b4532936a6db2e954e34a8bf558166c24**.
-All three required target workflows passed; no new migration/configuration change.
-Existing Render service -> Manual Deploy -> Deploy a specific commit -> exact SHA.
-Do not use a newer documentation commit or enable any gate. Preserve credentials,
-Neon records/recovery, Driver240 GPS and90s expiry. After owner confirms Live, run
-existing23 read-only checks against the fullapprovedSHA; before then do not claim
-deployment or new provider/physical acceptance. No sends/credential changes approved.
+Owner deployed **644e038b4532936a6db2e954e34a8bf558166c24**. Render Live/source644e038;
+all23 independent read-only checks passed at07:39:49Z. Owner authenticated Operations
+confirms provider sendsOFF, Android/iOS configurationrequired, payouts/retentionOFF,
+public orderingOFF/TEST MODE. Private ordering/live/municipal gates also verifiedOFF.
+No additional deployment or GPS test is requested. Protected provider credentials,
+real sends/test records and signed physical iOS still require separate authorization.
+See engineering checkpoint and preserved sanitized verification report for evidence.
 
-## Current verified staging release — November24
+## Earlier verified staging release — November24
 
 Owner deployed **8aa903bdccbe1da30f7f5fcba8841019c29e5619**. Render Live and exact
 revision independently verified;23 read-only checks passed. Owner authenticated
@@ -24,7 +24,7 @@ This can use the existing general support workflow without a payment/new order o
 changing the completed delivery. It still creates nonfinancial support/notification
 records and performs provider sends, so requires separate explicit owner approval.
 
-1. After approved backend release, configure protected provider credentials with
+1. After separate credential-setup approval (backend644e038 is already verified), configure protected provider credentials with
    `ROCOEATS_PUSH_DELIVERY_ENABLED` absent/false. Never put keys in chat. Use the
    existing phone instructions in ANDROID_STAGING_TEST.md; no paid service is needed
    for Android FCM. Build matching Firebase-client APKs only after protected client

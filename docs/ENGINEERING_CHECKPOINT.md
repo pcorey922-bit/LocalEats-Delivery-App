@@ -1,3 +1,44 @@
+# November24 —644e038 staging VERIFIED; protected Firebase setup is next owner action
+
+Owner manually deployed644e038b4532936a6db2e954e34a8bf558166c24, Render Deploy
+succeeded/Live/source644e038. Independent existing23 read-only checks PASS at
+2026-11-24T07:39:49.060Z: exactSHA, database/auth/pricing/webhook/worker ready, CSP/HSTS,
+Clerk proxy origin protection, protected401 routes, native contracts/CORS, trusted
+Render client identity. Public/private orderingOFF, liveChargesOFF, testPayoutsOFF,
+checkout retentionOFF, municipal enforcementOFF. No failures/unverified safeguards in
+that verifier. Sanitized evidence saved as
+ docs/verification/STAGING_HTTP_2026-11-24_644e038.json; earlier8aa report retained.
+Exact-source CI all3 SUCCESS45347493848 /45347500566 /45347500454. PR1 draft/unmerged.
+
+OWNER-OBSERVED authenticated Operations evidence, Nov24 at2:37AM (timezone not
+specified): provider push sendingDISABLED; Android pushconfigurationrequired;
+iOS pushconfigurationrequired; test payoutsDISABLED; checkout payload retention
+DISABLED; public orderingOFF/TEST MODE. The anonymous suite does NOT independently
+inspect private provider credentials, enrolled devices or owner records. No new
+owner check requested. No provider/financial transaction, retry, audit-writing verify
+or hosted change performed by agent. Deployment performed by owner only.
+
+Software-only notification readiness already completed/tested: disabled send gate,
+strict FCM redirects/receipts, consent/account/app-bound stable-ID token refresh,
+opt-out/timeout/error recovery and stale-provider-result fences. Current accepted
+Driver240 GPS/native auth and90s expiry preserved. No new APK or GPS test requested.
+Do not invent more runtime changes or repeat passed suites without a new defect.
+
+NEXT OWNER ACTION: separately authorize protected ANDROID Firebase setup with
+provider sendingOFF. Phone-only existing procedure in ANDROID_STAGING_TEST.md now
+starts from VERIFIED deployed644e038 (no repeated deployment/migration required).
+Use existing/free Spark project only; no billing/card/paid services. Owner privately
+supplies matching customer/driver CLIENT JSON through their named GitHub Actions
+secrets; SERVER service-account JSON belongs only in Render protected Environment.
+No credential changes are currently authorized; never request/paste keys in chat.
+After authorization and protected inputs, engineering validates source/configuration,
+builds matching signed staging APKs and prepares the existing notification-only
+support exercise. Actual sends/test support records remain separately unauthorized.
+Signed physical iOS needs owner Apple signing/team/provisioning/device access; no
+membership/publishing/paid-service change authorized. Financial provider acceptance
+and geographic activation remain separate protected work. No current independent
+runtime notification defect established after these corrections.
+
 # November24 —644e038 notification release approved; manual deployment pending
 
 Owner explicitly approved deployment of644e038b4532936a6db2e954e34a8bf558166c24 to
