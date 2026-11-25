@@ -1,3 +1,27 @@
+# November 25 — FCM server requirements verified; planning-only boundary
+
+Owner approved server credential setup PLANNING, not key/account/IAM/API creation,
+Render secret entry/save/deployment or sends. Read source fcm.ts/push.ts and official
+Google FCM v1/IAM docs. One SERVER JSON for rocoeats-3bd55 serves both Android apps;
+FIREBASE_SERVICE_ACCOUNT_JSON requires service_account/project/email/RSA private key.
+Recommend dedicated staging sender with roles/firebasecloudmessaging.admin (send
+permission cloudmessaging.messages.create), no Owner/Editor/broad Firebase Admin.
+Operations configured flag only checks credential presence; not provider acceptance.
+Exact protected procedure and references added to docs/PRIVATE_TEST_DELIVERY.md.
+
+Next owner action VIEW ONLY: Firebase project settings -> Cloud Messaging -> report
+V1 Enabled/Disabled/Not shown; Service accounts -> inspect whether dedicated FCM-only
+sender exists. No keys/JSON/account identifiers in chat; no Generate key or IAM/API
+changes. Later account/key creation AND Render entry/deployment require explicit
+approval. Push OFF and all financial/ordering/retention/municipal safeguards unchanged.
+No runtime edits/tests/provider requests; documentation diff validation only. Configured
+Customer257/Driver258 build evidence preserved; physical acceptance of these versions
+not established by builds. Driver240 GPS/90s and Customer208 tested scope preserved.
+Remote clean9cb3de4 matched at resume; its three CI still running at the one inspection.
+Next independent engineering action after owner read-only result: finalize least-
+privilege setup instructions for actual existing account/API state, before requesting
+protected creation/Render approval. Do not rebuild APKs/repeat accepted GPS tests.
+
 # November 25 — Firebase client-configured signed APKs verified
 
 Owner confirmed both protected repository CLIENT secrets saved. Secret metadata listing

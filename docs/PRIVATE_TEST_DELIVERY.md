@@ -18,6 +18,65 @@ municipal enforcement remainOFF. Migration0029 was already approved/deployed; no
 repeat migration or new hosted setting is authorized. Later repository corrections
 are NOT deployed and need separate release approval.
 
+## Protected Android FCM server setup plan — November 25 (NOT authorized to execute)
+
+Owner approved requirements/procedure planning only. No credential creation, IAM/API
+changes, Render environment save/deploy, enrollment or provider send is authorized.
+Configured Customer v257 and Driver v258 artifacts already exist; do not rebuild them.
+Their build/static verification is separate from physical acceptance and FCM delivery.
+
+Requirements confirmed against `artifacts/api-server/src/lib/fcm.ts`:
+- One complete SERVER service-account JSON in protected Render variable
+  `FIREBASE_SERVICE_ACCOUNT_JSON`; not either Android google-services.json, a legacy
+  FCM server key, an OAuth token or a filename/base64 string. Both Android apps use it.
+- Expected project: `rocoeats-3bd55`. Required parser fields: `type=service_account`,
+  `project_id`, `client_email` ending `.iam.gserviceaccount.com`, and RSA `private_key`.
+  Use Google's unmodified downloaded JSON; preserve escaped newlines inside strings.
+- Firebase Cloud Messaging HTTP v1 API must be enabled in that same project.
+  Prefer a dedicated staging sender account, e.g. `rocoeats-staging-fcm`, with
+  Firebase Cloud Messaging API Admin (`roles/firebasecloudmessaging.admin`) only.
+  Required send permission is `cloudmessaging.messages.create`. Do not grant Owner,
+  Editor, broad Firebase Admin, service-agent roles or unrelated database permissions.
+- Backend signs short-lived OAuth assertions with scope
+  `https://www.googleapis.com/auth/firebase.messaging` and uses fixed Google OAuth/
+  FCM HTTPS origins. Credential URL fields cannot redirect it to another host.
+  No native SDK/auth/GPS/90-second-expiry change is needed; no migration is required.
+
+Next owner action NOW (Samsung, view only): Firebase Console -> RoCoEats -> gear ->
+Project settings. Confirm project ID `rocoeats-3bd55` and Spark. Open Cloud Messaging
+and read Firebase Cloud Messaging API (V1) status. Then open Service accounts, and if
+needed its Manage service account permissions link to Google Cloud, inspect existing
+accounts and their roles. Report only V1 Enabled/Disabled/Not shown and whether a
+ dedicated FCM-only sender exists. Do not enable APIs, create accounts/keys, assign
+roles, press Generate new private key, or add billing. No key/JSON/account IDs needed.
+
+Future protected sequence, ONLY after separate explicit authorization:
+1. Approve any needed dedicated sender/IAM/API changes and JSON key creation. Use
+   Google Cloud IAM & Admin -> Service Accounts -> selected dedicated sender -> Keys
+   -> Add key -> Create new key -> JSON. Keep the download private on the owner's
+   device; never upload it to chat, GitHub/client secrets, an APK or public JSON tools.
+   If Google blocks key creation, stop; do not weaken organization security policy.
+2. Separately approve existing Render service credential entry and deployment with an
+   exact verified source SHA. Privately enter full JSON in Environment, preserving
+   all other values. Keep `ROCOEATS_PUSH_DELIVERY_ENABLED` absent/false. Review Save
+   choices first: Save/rebuild/redeploy behavior must be checked in the current Render
+   dialog; do not assume it preserves the deployed revision or deploy latest HEAD.
+   Do not click any Save/Deploy option under the present planning-only approval.
+3. After approved deployment, verify SHA/health/closed gates. Operations Android push
+   configured is only Boolean credential presence in `pushConfiguration()`, NOT
+   parsing/IAM/provider acceptance. Do not press any send/verify button without a
+   separately authorized provider operation. Actual receipt requires scoped enrollment
+   and one controlled notification test, as described below, with ordering closed.
+4. After verified secure storage, remove unnecessary local copies using the owner's
+   normal secure file handling. Never delete/revoke the active provider key as routine
+   test cleanup; revocation/rotation is a separate coordinated protected action.
+
+Official references reviewed November 25, 2026:
+https://firebase.google.com/docs/cloud-messaging/send/v1-api
+https://firebase.google.com/docs/projects/iam/roles-predefined-product
+https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages.send
+FCM preparation requires no Blaze upgrade, paid messaging service or billing change.
+
 ## Notification-only acceptance preparation (NOT authorized to run yet)
 
 This can use the existing general support workflow without a payment/new order or

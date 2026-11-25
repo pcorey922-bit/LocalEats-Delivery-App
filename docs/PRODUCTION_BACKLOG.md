@@ -1,3 +1,14 @@
+# November 25 — Protected FCM server plan prepared; owner view-only prerequisite
+
+One same-project server RSA service-account JSON needed, dedicated FCM API Admin
+role preferred. No credential creation, provider calls, IAM/API or Render changes
+performed/authorized. Existing Operations configured indicator proves presence only.
+Procedure/approval boundaries: docs/PRIVATE_TEST_DELIVERY.md, protected server plan.
+Next: owner reports V1 API status and whether dedicated FCM-only sender exists,
+view only; no Generate key/role changes. Then obtain scoped creation and Render
+approval. Client APK257/258 already verified; no rebuild/GPS retest necessary.
+Push/ordering/live finances/payouts/retention/municipal gates remain OFF; Spark.
+
 # November 25 — Firebase Android client packaging complete; server setup blocked
 
 Owner saved both CLIENT secrets. Protected signed builds from
