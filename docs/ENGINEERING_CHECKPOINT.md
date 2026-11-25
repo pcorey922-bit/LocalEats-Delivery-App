@@ -1,3 +1,33 @@
+# November25 — Limited-usage Firebase packaging objective completed
+
+Resumed clean00b5a58aab36b67cc306c0c9e49e86cd60b93030; remote matched. Previous
+checkpoint Validate push/PR PASS45351622742/45351629117; Native45351629085 FAILED
+customer dependency resolution (Maven Central HTTP429, no compilation failure).
+Inspected exact job138299220269; retried ONLY failed job once. Retry pending at save;
+do not claim success or repeatedly rerun known transport failures. No runtime rollback.
+
+SMALL CHANGE: existing prepare-firebase-android packaging CLI now compares BOTH
+provided Customer/Driver configs before writing any file. Requires same Firebase
+project ID AND project number because both apps share one existing server sender.
+Independent/absent audience setup preserved; different valid app API keys permitted.
+Strict existing package/secret validation unchanged, no values logged.8 targeted
+Firebase/native-config tests PASS, including real CLI in isolated temporary workspace
+rejecting mismatch with no client file/CI metadata written. Scripts typecheck PASS;
+diff whitespace PASS. Current exact-source CI must finish before release readiness.
+No APK/new service/account/provider lookup/credentials/Render/signing/GPS change.
+
+NEXT OWNER-ONLY ACTION remains protected Firebase Spark setup authorization per
+numbered November24 handoff below. User authorized safe repository preparation, NOT
+external account actions/hosted credentials/sends. Keep gateOFF. After approval,
+phone Firebase Console -> approved FREE Spark project -> add exact staging Android
+packages -> private per-audience GitHub CLIENT JSON. SERVER JSON remains Render-only
+and needs separate approval/environment-deployment review. Never keys in chat.
+Check actual Spark plan/backend service-account project separately: this offline
+client-pair comparison does NOT establish billing plan or provider acceptance.
+Preserve644e038 verified23/23 staging and Driver240 physical GPS/90s. No repeated
+GPS or healthy staging checks needed. Prudent limited-usage stop after CI/checkpoint;
+do not start another multi-stage change. CI pending is not a pass.
+
 # USAGE RESET HANDOFF — November24: STOP after saving this checkpoint
 
 Owner requested preservation ONLY; do not begin Firebase implementation/setup now.

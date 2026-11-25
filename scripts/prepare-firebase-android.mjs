@@ -32,6 +32,17 @@ export function firebaseAndroidSecret(environment, audience) {
   if (!['customer','driver'].includes(audience)) throw invalid();
   return environment[audience === 'driver' ? 'ROCOEATS_FIREBASE_DRIVER_ANDROID_CONFIG_JSON' : 'ROCOEATS_FIREBASE_CUSTOMER_ANDROID_CONFIG_JSON'];
 }
+// Both apps share the existing server sender. Compare only when BOTH inputs
+// are supplied; a missing audience never falls back to the other audience.
+export function verifyFirebaseAndroidProjects(environment) {
+  const customerRaw=firebaseAndroidSecret(environment,'customer');
+  const driverRaw=firebaseAndroidSecret(environment,'driver');
+  if(!customerRaw||!driverRaw)return false;
+  const customer=firebaseAndroidClient(customerRaw,'customer');
+  const driver=firebaseAndroidClient(driverRaw,'driver');
+  if(customer.project_info.project_id!==driver.project_info.project_id||customer.project_info.project_number!==driver.project_info.project_number)throw invalid();
+  return true;
+}
 export async function prepareFirebaseAndroid(raw, audience, output) {
   const config = firebaseAndroidClient(raw,audience);
   let exists = true;
@@ -44,6 +55,7 @@ export async function prepareFirebaseAndroid(raw, audience, output) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     const audience = process.env.ROCOEATS_NATIVE_AUDIENCE ?? 'customer';
+    verifyFirebaseAndroidProjects(process.env);
     const configured = await prepareFirebaseAndroid(firebaseAndroidSecret(process.env,audience),audience,new URL('../artifacts/localeats/android/app/google-services.json',import.meta.url));
     if (process.env.GITHUB_ENV) await appendFile(process.env.GITHUB_ENV,`ROCOEATS_FIREBASE_ANDROID_CONFIGURED=${configured}\n`);
     console.log(`Android Firebase client configured: ${configured}. Provider delivery remains unverified.`);

@@ -1,3 +1,16 @@
+# November25 — Protected Firebase client pairing before packaging
+
+Completed one bounded repository improvement: compare both provided staging client
+projects (ID+number) before writing google-services.json/CI metadata. Missing audience
+still optional, distinct app API keys allowed, no credential values logged.8 targeted
+tests +scripts types PASS; exact-source CI pending. No runtime/GPS/hosted change.
+Old00b5 checkpoint native job failed on Maven429, failed-job-only retry started once;
+Validate jobs passed. Record actual retry conclusion, no endless transport reruns.
+Next owner-only: explicit free Spark setup/Android app registration/protected CLIENT
+secrets authorization; SERVER Render key/setup/redeployment and actual sends still
+separately protected. No accounts/keys/services created, no APK built, no sends.
+Source644e038 remains deployed/verified23PASS; Driver240 physical GPS/90s preserved.
+
 # USAGE RESET HANDOFF — November24
 
 STOP after committing/pushing documentation; owner requested no new substantial work.

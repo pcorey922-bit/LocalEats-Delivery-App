@@ -55,6 +55,10 @@ When the owner separately approves provider setup (all steps work in phone dashb
    `com.rocoeats.app.staging` and `com.rocoeats.driver.staging`. Use the SAME project
    as backend FCM credentials. No billing/card/paid upgrade or new project is created
    by engineering. Download the matching google-services.json for each app.
+   Packaging now checks project ID AND project number agree when both protected
+   client inputs are supplied, before writing client files. App API keys may differ.
+   This offline check does not verify Spark billing status or server credentials;
+   owner must keep the project on Spark and select the same backend project.
 3. GitHub repository -> Settings -> Secrets and variables -> Actions -> New repository
    secret. Put each downloaded CLIENT JSON privately in its matching field:
    `ROCOEATS_FIREBASE_CUSTOMER_ANDROID_CONFIG_JSON` or
