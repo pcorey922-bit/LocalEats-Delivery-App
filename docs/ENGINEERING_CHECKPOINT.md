@@ -1,3 +1,34 @@
+# November25 — Owner confirms Firebase project/Spark; Android registration is next
+
+OWNER-OBSERVED: RoCoEats Firebase project successfully created; Spark No-cost$0/month
+verified in Console, no billing account/payment method. No Android/iOS app registrations,
+provider credentials or sends configured at that report. Agent made no external changes.
+This supersedes earlier "no project"/awaiting project confirmation instructions.
+
+Repo resumed clean6d719a4577848056cd71bc9c5e67d2680e995268, remote matched. Functional
+5b4a2bf client-pair safeguard already has8 targeted tests/types/all3 CI PASS. No new
+runtime defect or independently useful build is established before actual client
+configuration exists. Do not rerun passing GPS/staging tests or build unconfigured APKs.
+
+NEXT OWNER ACTION (Samsung): Firebase RoCoEats -> gear Project settings -> General ->
+Your apps -> Add app -> Android. Registercom.rocoeats.app.staging, nicknameRoCoEats
+Customer Staging; SHA certificate field optional for FCM, leave blank. Download its
+google-services.json and keep privately identified as customer file. Continue wizard
+without installing/editing SDK code on phone. Repeat IN SAME PROJECT for
+com.rocoeats.driver.staging, nicknameRoCoEats Driver Staging; keep its JSON separately
+as driver file. Report only both registered/downloaded; do not paste/upload JSON here.
+These client registrations do not configure Render or authorize sends. iOS apps,
+App Check enforcement, Firebase Auth and billing upgrades are not part of this step.
+
+Then guide protected per-audience GitHub CLIENT JSON steps from saved handoff; no
+SERVER service-account keys in client secrets/APKs. Render SERVER credentials and
+any deployment still need specific approval. Keep push deliveryOFF; device enrollment,
+support test records and actual sends need scoped approval. No keys in chat. Native
+Driver240 physical GPS/90s and Customer208 acceptance preserved; deployed644e038
+last verified23/23, all other ordering/financial/retention/municipal gatesOFF/StripeTEST.
+This turn only records evidence and exact phone action. Stop at genuine owner-console
+blocker; do not start another speculative code task within limited weekly usage.
+
 # November25 — Verified limited-usage checkpoint; owner Spark project confirmation next
 
 Functional packaging safeguard5b4a2bf8fe38d4f777d2d4f54314ea3bfbc9a74a ALL THREE CI

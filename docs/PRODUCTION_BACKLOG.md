@@ -1,3 +1,14 @@
+# November25 — Spark project created; protected app configuration still missing
+
+Owner confirms RoCoEats project exists on Spark$0, no billing/card; no apps/keys/sends.
+Next owner-console step: Project settings/General/Add Android apps with exact
+com.rocoeats.app.staging and com.rocoeats.driver.staging, SAME project, download and
+privately distinguish both client JSONs. No SDK coding/installs needed on phone;
+no JSON/keys in chat. Protected GitHub client inputs follow; Render server keys /
+deployment/sends remain separately protected. No new code/APK/GPS retest needed now.
+Existing client-pair validation/tests/CI verified. Driver240 GPS/90s/deployed644e038
+and all closed gates preserved; no agent external account/settings changes.
+
 # November25 — Small Firebase safeguard verified; owner project action next
 
 5b4a2bf8fe38d4f777d2d4f54314ea3bfbc9a74a all3 CI PASS
