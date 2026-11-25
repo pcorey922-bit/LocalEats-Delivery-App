@@ -1,3 +1,16 @@
+# November25 — Firebase Android registration done; protected client input pending
+
+Owner reports projectrocoeats-3bd55/Spark, both exact Customer/Driver staging apps
+registered and separate client JSONs downloaded. Do not repeat project/app setup.
+Next owner-only: save complete matching CLIENT JSON privately into GitHub repository
+Actions secrets ROCOEATS_FIREBASE_CUSTOMER_ANDROID_CONFIG_JSON and
+ROCOEATS_FIREBASE_DRIVER_ANDROID_CONFIG_JSON. No file/key contents in chat/Git;
+no server private key in client secrets/APKs. Report only names saved.
+Existing validated builder/pair checker can then prepare configured signed APKs;
+metadata inspection only, no secret reads/logging. Do not build before protected
+inputs exist. No Render/server credentials/sends/financial/ordering changes authorized.
+Keep Spark/gatesOFF and accepted Driver240 GPS/90s; no GPS retest needed.
+
 # November25 — Spark project created; protected app configuration still missing
 
 Owner confirms RoCoEats project exists on Spark$0, no billing/card; no apps/keys/sends.

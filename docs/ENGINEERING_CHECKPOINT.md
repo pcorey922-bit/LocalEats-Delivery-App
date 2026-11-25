@@ -1,3 +1,31 @@
+# November25 — Both Firebase Android apps registered; protected client secrets next
+
+OWNER CONFIRMED: existing projectrocoeats-3bd55 (RoCoEats), Spark No-cost; both apps
+registered:com.rocoeats.app.staging (Customer),com.rocoeats.driver.staging (Driver).
+Separate google-services.json files downloaded to owner's Samsung. Agent has not
+received/read any file or key. No Server credentials, sends or hosted changes made.
+This supersedes pending Android-registration instructions below; do NOT repeat them.
+
+Next owner-only step: GitHub pcorey922-bit/LocalEats-Delivery-App -> Settings ->
+Secrets and variables -> Actions -> New repository secret. Privately copy COMPLETE
+Customer CLIENT JSON into ROCOEATS_FIREBASE_CUSTOMER_ANDROID_CONFIG_JSON; complete
+Driver CLIENT JSON into ROCOEATS_FIREBASE_DRIVER_ANDROID_CONFIG_JSON. Raw JSON,
+not filename/base64. Check package/project locally before choosing each file. Never
+paste/upload contents in chat or commit files. SERVER service-account JSON does NOT
+belong in these secrets; do not generate server private keys/change signing secrets.
+Report only both secret names saved. If phone cannot view/copy JSON privately, ask
+for safe phone-only help; do not use public JSON viewers or chat uploads.
+
+Then engineering may inspect secret NAME presence only, run existing strict pairing /
+package validation in protected runner and prepare configured signed staging APKs
+with exact-source CI/certificate/resource verification. Do not produce another
+unconfigured APK or claim provider/device receipt from compilation. No source change
+needed now; current validated preparation already exists. Keep Spark, no card/Blaze.
+Render SERVER credentials, environment deployments, native enrollment/test records
+and actual sends still need specific authorization. GateOFF and all financial/
+ordering/retention/municipal safeguards preserved. Driver240 GPS/90s unchanged; no
+GPS retest. Current step is owner-console/secret-input blocked, preserve limited usage.
+
 # November25 — Owner confirms Firebase project/Spark; Android registration is next
 
 OWNER-OBSERVED: RoCoEats Firebase project successfully created; Spark No-cost$0/month
