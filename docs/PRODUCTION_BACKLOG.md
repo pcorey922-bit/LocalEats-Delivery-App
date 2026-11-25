@@ -1,3 +1,20 @@
+# November 25 — Firebase Android client packaging complete; server setup blocked
+
+Owner saved both CLIENT secrets. Protected signed builds from
+ d6da55caa16720ca9ae618629c4521914786520a passed: Customer v257/run45572507792,
+Driver v258/run45572513366. All three exact-source CI passed. Artifact digests,
+source/package/version/certificate, compiled Firebase project rocoeats-3bd55 and
+manifest policy independently verified; Driver native lease regressions passed.
+No raw config/keys committed or printed. No APK launch, enrollment, provider sends,
+Render/config changes or financial operations performed. Client configured does not
+mean provider/device delivery accepted. Accepted Driver240 GPS/90s preserved.
+
+Next owner-only approval: protected SERVER Firebase/Render credentials setup with
+push gate OFF, then separately scoped enrollment and controlled notification receipt
+acceptance. No server key in client secrets/APKs/chat/Git; no billing/Blaze. Existing
+configured APKs ready; do not rebuild or repeat accepted GPS tests without cause.
+No backend deployment needed for this packaging checkpoint. Preserve limited usage.
+
 # November25 — Firebase Android registration done; protected client input pending
 
 Owner reports projectrocoeats-3bd55/Spark, both exact Customer/Driver staging apps

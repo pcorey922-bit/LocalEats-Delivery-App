@@ -1,3 +1,44 @@
+# November 25 — Firebase client-configured signed APKs verified
+
+Owner confirmed both protected repository CLIENT secrets saved. Secret metadata listing
+was unavailable (GitHub integration 403); no values were read through GitHub/chat.
+The existing protected runner instead successfully validated both client JSONs, same
+project/number and exact audience packages before packaging. Owner-confirmed project
+rocoeats-3bd55 remains Spark; no server credentials or hosted settings changed.
+
+Exact source: d6da55caa16720ca9ae618629c4521914786520a. All three required source CI
+runs succeeded: 45571097802 (push Validate), 45571105737 (PR Validate), 45571105688
+(native compile). Signed staging workflow_dispatch builds both SUCCESS:
+- Customer v257: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/45572507792
+  Artifact RoCoEats-Android-Staging-Test-APK (15002014876).
+- Driver v258: https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/45572513366
+  Artifact RoCoEats-Driver-Android-Staging-Test-APK (15002144004).
+
+Both build/Android lint/native preflight/package checks passed. Driver native ACK lease
+regressions passed. Temporary signing/client configuration cleanup succeeded. Independent
+static artifact checks passed: GitHub ZIP digest, APK SHA256, exact source/package,
+compiled version, manifest security policy, existing pinned signing certificate and
+compiled rocoeats-3bd55 resources. BUILD_READINESS reports Firebase client resources
+configured and verified True; Driver APK contains native duty/Clerk implementation.
+No APK was launched, no device enrolled, no provider lookup/send or financial operation
+performed. Actual FCM delivery is NOT verified. Client keys/config were not printed or
+committed. Both APKs use existing package/certificate for updates; no uninstall needed.
+Driver240's physical GPS/90-second expiry acceptance remains valid, not repeated; new
+builds are statically/build verified, not physically accepted. No runtime source change.
+
+NEXT PROTECTED OWNER STEP: separately approve Firebase SERVER setup in existing Render
+with push gate still OFF. Only then guide Firebase Project settings -> Service accounts
+-> protected server-key creation for SAME project, private Render
+FIREBASE_SERVICE_ACCOUNT_JSON entry, and explicitly approved deployment sequence.
+Never put server JSON in either client secret/APK/chat/Git. Do not perform this step
+under client-build authorization. Keep ROCOEATS_PUSH_DELIVERY_ENABLED absent/false.
+Device enrollment, nonfinancial notification test records and real sends require scoped
+approval AFTER server setup and closed-gate verification. No new GPS test requested.
+All ordering/live-charge/payout/retention/municipal safeguards unchanged; Stripe TEST.
+Render remains 644e038; these packaging/docs changes require no backend deployment.
+Stop at this protected boundary to preserve limited weekly usage. Next engineering
+session can use these exact configured artifacts, not rebuild them unnecessarily.
+
 # November25 — Both Firebase Android apps registered; protected client secrets next
 
 OWNER CONFIRMED: existing projectrocoeats-3bd55 (RoCoEats), Spark No-cost; both apps
