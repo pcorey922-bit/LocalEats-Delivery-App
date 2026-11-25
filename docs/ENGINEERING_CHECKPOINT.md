@@ -1,3 +1,17 @@
+# November 25 — Owner confirms FCM HTTP V1 enabled
+
+OWNER-OBSERVED: Firebase Cloud Messaging API (V1) ENABLED in rocoeats-3bd55.
+No settings changed or credentials generated. API enablement prerequisite is met;
+this is not credential/provider-send/device-delivery acceptance. Do not recheck it.
+Next owner action is VIEW ONLY: Google Cloud IAM for the same project; determine
+whether a dedicated service account has Firebase Cloud Messaging API Admin
+(roles/firebasecloudmessaging.admin), without broad Owner/Editor/Firebase Admin roles.
+Report only whether such an account exists; no emails/IDs/keys needed. Do not create
+accounts/keys, change roles, enter Render values, deploy or send. Subsequent account/
+key creation and Render setup require separate approval. Existing APKs, physical
+acceptance scope, Driver GPS/90s and all closed safeguards preserved. Documentation
+only; diff check, no redundant runtime tests. Resumed clean at abc3fe2; remote matched.
+
 # November 25 — FCM server requirements verified; planning-only boundary
 
 Owner approved server credential setup PLANNING, not key/account/IAM/API creation,

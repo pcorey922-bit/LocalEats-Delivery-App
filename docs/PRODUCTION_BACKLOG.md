@@ -1,3 +1,10 @@
+# November 25 — FCM V1 prerequisite confirmed
+
+Owner viewed rocoeats-3bd55: FCM HTTP V1 ENABLED; no changes/credentials generated.
+Next: read-only IAM check for dedicated FCM API Admin service account. Creation,
+keys, Render entry/deployment and sends remain separately approval-gated. No APK
+rebuild, accepted GPS retest or repeated API-status check needed. All safeguards kept.
+
 # November 25 — Protected FCM server plan prepared; owner view-only prerequisite
 
 One same-project server RSA service-account JSON needed, dedicated FCM API Admin
