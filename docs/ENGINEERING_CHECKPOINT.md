@@ -1,3 +1,35 @@
+# November25 — Verified limited-usage checkpoint; owner Spark project confirmation next
+
+Functional packaging safeguard5b4a2bf8fe38d4f777d2d4f54314ea3bfbc9a74a ALL THREE CI
+SUCCESS45567474700 /45567486014 /45567486041.8 targeted Firebase/native-config tests
+and scripts typecheck PASS. Prior00b5a58 native45351629085 recovered SUCCESS on ONE
+failed-job-only retry after Maven429; its two Validate runs already passed. No
+supply-chain/workflow workaround or native/GPS change introduced.
+
+Owner viewed Firebase Console on Samsung: NO existing RoCoEats project ("Get started
+by setting up a Firebase project"); no plan/project/credentials changed at that check.
+Owner approved necessary Spark setup PLANNING and requested exact phone creation
+steps. Delivered: Create project -> RoCoEats -> keep generated project ID -> optional
+Analytics/AI OFF -> no billing/card/Blaze -> Create -> confirm Spark/Free. STOP if a
+payment/billing step is required. Await owner's project-created/Spark confirmation;
+do not assume creation occurred. Agent created no account/project/app/key.
+
+NEXT OWNER ACTION: create/confirm free project following those steps; report only
+ready/Spark (no keys). After that, guide exact Android package registration and
+protected CLIENT JSON steps in existing November24 handoff, with authorization
+boundaries preserved. Do not touch Render/provider SERVER JSON or redeploy until
+separately approved. Sending staysOFF; actual device enrollment/test support records
+and sends still need scoped approval. Free-plan/backend-project/provider receipt are
+NOT established by the offline client comparison. No configured APK can be built
+until real protected client inputs are supplied; do not build another unconfigured
+APK or repeat accepted GPS/customer tests.
+
+This final update is documentation-only. Working tree was clean after functional
+commit. New documentation CI may run independently; functional source CI above is
+verified. No hosted/provider/financial operation, billing, credentials, deployment,
+merge/publish or GPS/90s modification. Preserve644e038 verified staging and accepted
+Driver240. Prudent limited-weekly-usage stopping point; resume from this checkpoint.
+
 # November25 — Limited-usage Firebase packaging objective completed
 
 Resumed clean00b5a58aab36b67cc306c0c9e49e86cd60b93030; remote matched. Previous

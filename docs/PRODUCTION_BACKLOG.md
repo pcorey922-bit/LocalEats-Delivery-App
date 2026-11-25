@@ -1,3 +1,16 @@
+# November25 — Small Firebase safeguard verified; owner project action next
+
+5b4a2bf8fe38d4f777d2d4f54314ea3bfbc9a74a all3 CI PASS
+45567474700/45567486014/45567486041;8 targeted tests/scripts types PASS. Old00b5
+native Maven429 recovered with one failed-job retry; no runtime/CI security relaxation.
+Owner reports NO Firebase project and approved setup planning. Phone-only Create
+RoCoEats/free Spark instructions delivered; project creation NOT yet confirmed.
+Next: owner confirms project exists/Spark before Android registrations/private client
+JSON setup. No keys in chat, billing/card/Blaze, Render keys/deployments or sends.
+Stop at this verified limited-usage checkpoint. Deployed644e038 and Driver240 GPS/90s
+preserved. Configured builds/real push/iOS require protected inputs and authorization;
+do not invent new features, repeat healthy staging/GPS checks or poll passing CI.
+
 # November25 — Protected Firebase client pairing before packaging
 
 Completed one bounded repository improvement: compare both provided staging client
