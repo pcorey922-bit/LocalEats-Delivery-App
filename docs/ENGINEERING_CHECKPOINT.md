@@ -1,3 +1,30 @@
+# November 25 — Existing Firebase Admin SDK identity reviewed
+
+OWNER-OBSERVED IAM in rocoeats-3bd55: Firebase Admin SDK service account has
+Firebase Admin SDK Administrator Service Agent and Service Account Token Creator;
+no separately listed Firebase Cloud Messaging API Admin role. Personal owner has
+Owner (Legacy). View only; no accounts, roles, permissions or credentials changed.
+Do not repeat this check. FCM HTTP V1 already confirmed ENABLED.
+
+Assessment: absence of a named FCM role does NOT prove absence of inherited/broader
+send permission. Existing account may be technically usable, but effective FCM
+permission/key/provider acceptance is unverified. Its broad SDK/token privileges make
+it a poor credential to export to Render for messaging alone. Leave its roles and
+owner access intact. Prefer dedicated rocoeats-staging-fcm in the SAME project with
+only Firebase Cloud Messaging API Admin (roles/firebasecloudmessaging.admin), no
+Token Creator, service-agent role, Owner/Editor or broad Firebase Admin. Existing
+backend signs with its own RSA key; Token Creator is not needed for this plan.
+
+NEXT OWNER APPROVAL: create dedicated sender and grant that one project role ONLY.
+Creation/IAM changes are not yet authorized; provide Samsung steps after approval.
+No key generation, Render entry/deployment, enrollment or provider sends included.
+Key creation/storage and any Render save/deploy remain separate protected actions.
+No credentials generated/read/transmitted, provider calls or runtime changes. All
+closed gates, Spark, APKs and accepted GPS/90s preserved. Documentation diff checked;
+no redundant tests needed. Remote matched clean b15d7a6 at resume.
+Reference: https://docs.cloud.google.com/iam/docs/roles-permissions/firebase
+and https://firebase.google.com/docs/projects/iam/roles-predefined-product
+
 # November 25 — Owner confirms FCM HTTP V1 enabled
 
 OWNER-OBSERVED: Firebase Cloud Messaging API (V1) ENABLED in rocoeats-3bd55.

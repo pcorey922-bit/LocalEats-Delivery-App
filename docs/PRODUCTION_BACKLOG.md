@@ -1,3 +1,13 @@
+# November 25 — Dedicated FCM sender is next protected approval
+
+Owner found existing SDK account with SDK Administrator Service Agent + Token Creator;
+no separately listed FCM API Admin. Broad/inherited permissions may still permit FCM,
+but that is not provider-verified and exporting a broad credential is not recommended.
+Leave existing SDK/owner roles intact. Request approval to create dedicated staging
+sender with only roles/firebasecloudmessaging.admin. No keys/Render/deploy/sends under
+that approval. API V1 enabled; no further view-only IAM/API checks needed. All gates,
+Spark, Android build evidence and Driver GPS/90s preserved. No runtime changes.
+
 # November 25 — FCM V1 prerequisite confirmed
 
 Owner viewed rocoeats-3bd55: FCM HTTP V1 ENABLED; no changes/credentials generated.

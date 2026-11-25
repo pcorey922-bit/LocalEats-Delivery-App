@@ -50,6 +50,14 @@ accounts and their roles. Report only V1 Enabled/Disabled/Not shown and whether 
  dedicated FCM-only sender exists. Do not enable APIs, create accounts/keys, assign
 roles, press Generate new private key, or add billing. No key/JSON/account IDs needed.
 
+Owner IAM result (November 25): existing SDK account has Firebase Admin SDK
+Administrator Service Agent and Service Account Token Creator; personal owner has
+Owner (Legacy). No separately listed FCM API Admin. Do not infer effective send denial
+from a missing role label. Prefer a dedicated FCM-only sender over exporting this broad
+SDK credential; do not remove its roles or alter owner access. Next approval should
+cover only dedicated account creation and the FCM API Admin project role, with keys,
+Render changes/deployment and provider sends excluded. No Token Creator grant needed.
+
 Future protected sequence, ONLY after separate explicit authorization:
 1. Approve any needed dedicated sender/IAM/API changes and JSON key creation. Use
    Google Cloud IAM & Admin -> Service Accounts -> selected dedicated sender -> Keys
