@@ -58,6 +58,11 @@ SDK credential; do not remove its roles or alter owner access. Next approval sho
 cover only dedicated account creation and the FCM API Admin project role, with keys,
 Render changes/deployment and provider sends excluded. No Token Creator grant needed.
 
+Completed owner milestone (November 25): dedicated `rocoeats-staging-fcm` now exists
+in `rocoeats-3bd55` with ONLY `roles/firebasecloudmessaging.admin`. No keys generated.
+The earlier account/role creation approval is fulfilled; it does not authorize keys,
+Render entry/deployment or provider sends. Skip account creation in future steps.
+
 Future protected sequence, ONLY after separate explicit authorization:
 1. Approve any needed dedicated sender/IAM/API changes and JSON key creation. Use
    Google Cloud IAM & Admin -> Service Accounts -> selected dedicated sender -> Keys

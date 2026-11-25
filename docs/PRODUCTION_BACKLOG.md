@@ -1,3 +1,12 @@
+# November 25 — Dedicated FCM sender milestone complete
+
+Owner confirms rocoeats-staging-fcm created in rocoeats-3bd55 with ONLY
+roles/firebasecloudmessaging.admin. No keys/credentials, hosted changes/deploys or
+sends. Account/role setup is complete; do not repeat it. Next: separate explicit
+approval for key generation/download and protected Render entry/deployment before
+any such action. Push remains OFF, Spark and all other safeguards/accepted Android
+GPS/90s preserved. Provider authentication/delivery still unverified.
+
 # November 25 — Dedicated FCM sender is next protected approval
 
 Owner found existing SDK account with SDK Administrator Service Agent + Token Creator;

@@ -1,3 +1,23 @@
+# November 25 — Dedicated staging FCM account created (owner confirmed)
+
+Owner completed the explicitly approved account/role setup in rocoeats-3bd55:
+rocoeats-staging-fcm exists with single assigned role Firebase Cloud Messaging API
+Admin (roles/firebasecloudmessaging.admin). No additional roles assigned, no keys or
+credentials generated. No Render configuration changes/deployments or sends made.
+This is owner-observed IAM evidence, not independent provider authentication/receipt.
+FCM V1 previously confirmed enabled; Spark preserved. Existing SDK/owner IAM unchanged.
+
+Next protected boundary: separate explicit owner approval is required BEFORE any
+service-account key generation/download, followed by separately approved Render
+credential entry/deployment. Do not create/read/request keys in chat, enable sends,
+enroll devices or initiate provider/financial operations. Existing procedure remains
+in docs/PRIVATE_TEST_DELIVERY.md; account creation instructions are now completed.
+Push delivery OFF; ordering/live charges/payouts/retention/municipal safeguards unchanged.
+Customer257/Driver258 artifacts preserved, along with existing physical acceptance
+scope, Driver240 GPS and 90-second server expiry. No runtime code changes/tests;
+documentation diff check only. Resumed clean fde974c; remote matched. Stop at this
+approval boundary; do not repeat account/API checks or rebuild verified APKs.
+
 # November 25 — Existing Firebase Admin SDK identity reviewed
 
 OWNER-OBSERVED IAM in rocoeats-3bd55: Firebase Admin SDK service account has
