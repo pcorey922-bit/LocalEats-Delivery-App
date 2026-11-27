@@ -1,3 +1,36 @@
+## Owner-only Firebase OAuth diagnostic release — implementation only, November 27
+
+GET/POST /api/admin/firebase-oauth and Operations -> Firebase OAuth authentication
+are implemented in repository, NOT yet deployed. No production/Google execution is
+authorized. Implementation/test approval does not authorize release or pressing Verify.
+The feature uses the existing credential; no new variable, migration, key or APK needed.
+
+After exact-source CI and separate deployment approval, owner Samsung sequence:
+1. Render existing LocalEats-Delivery-App -> Manual Deploy -> Deploy a specific commit
+   -> full verified diagnostic implementation SHA (engineering must supply it after CI).
+   Do not deploy latest docs HEAD, edit env values or enable push. Rollback target is
+   retained successful ff73741bb7a5e3ffcb0985b02d2355bb1fd99f48; no DB reversal.
+2. Wait Live; engineering verifies exactSHA/23 read-only checks. Owner opens Operations
+   -> Service health and recovery. Require Provider push sendingdisabled and other
+   closed gates. Loading/Refresh OAuth status uses GET only and never contacts Google.
+3. STOP unless a one-time OAuth-only run is separately approved. With run authorization,
+   check the explicit OAuth-only consent box and tap Verify Google OAuth only ONCE.
+   Do not use any other Verify/Retry/send button. No private values enter this form.
+4. Expected success label: Google OAuth authenticated; FCM permissions and device
+   delivery remain unverified. Report only that label/code/time; never tokens/keys.
+   The diagnostic calls Google OAuth only, not FCM messages:send, and discards its token.
+5. Failed/lost response: do not repeat automatically. Refresh OAuth status (GET) to
+   recover sanitized audit outcome. Ten-minute durable cooldown prevents duplicates;
+   an unconfirmed started run stays unconfirmed, never manufacture provider acceptance.
+   Further manual execution needs agreed authorization. Push stays OFF throughout.
+
+Server access: active admin + configured owner (ordinary admins excluded), private
+staging/closed ordering/payouts/retention/municipal and StripeTEST guards. Identity is
+bound to dedicated staging account/project. Global DB-clock cooldown committed before
+OAuth. Sanitized audit start/outcome only; no token/key/JWT/provider body persistence.
+HTTP/body processing10s bound, fixed Google origin, redirects forbidden. OAuth proof is
+NOT effective FCM project permission, matching device enrollment or notification receipt.
+
 ## November 27 — Approved FCM release successfully deployed
 
 Render Live ff73741bb7a5e3ffcb0985b02d2355bb1fd99f48 confirmed by owner and exact SHA

@@ -181,6 +181,26 @@ try {
   assert.equal(await reconciliation.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   await reconciliation.close();
   console.log('Reconciliation UI PASS: pending/missing evidence remains unreconciled, invalid evidence stays blocked, manual retry reaches verified fees without automatic resubmission (simulated provider/API).');
+  for (const lost of [false,true]) {
+    const oauth=await browser.newPage({viewport:{width:390,height:844}});
+    await oauth.goto(origin+'/?firebaseOAuth=true'+(lost?'&lostOAuth=true':''));
+    const panel=oauth.getByRole('region',{name:'Firebase OAuth authentication'});
+    const button=panel.getByRole('button',{name:'Verify Google OAuth only',exact:true});
+    await button.waitFor();assert.equal(await button.isDisabled(),true);
+    assert.equal(await panel.locator('input[type="password"],input[type="text"],textarea').count(),0,'No credential form');
+    assert.equal(await oauth.evaluate(()=>window.qaOAuthCalls),0);
+    await panel.getByRole('button',{name:'Refresh OAuth status'}).click();
+    assert.equal(await oauth.evaluate(()=>window.qaOAuthCalls),0,'Status refresh cannot authenticate');
+    await panel.getByRole('checkbox').check();await button.click();
+    await panel.getByText('Google OAuth authenticated. FCM permissions and device delivery remain unverified.',{exact:false}).waitFor();
+    if(lost)await panel.getByRole('alert').filter({hasText:'No automatic retry'}).waitFor();
+    assert.equal(await oauth.evaluate(()=>window.qaOAuthCalls),1,'Lost response must recover from status without automatic POST');
+    assert.equal(await button.isDisabled(),true);
+    assert.equal(await panel.getByRole('checkbox').isChecked(),false);
+    assert.equal(await oauth.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    await oauth.close();
+  }
+  console.log('OAuth-only UI PASS: explicit owner confirmation, no credential inputs, GET-only refresh and lost-response recovery without automatic execution (simulated OAuth/API).');
   const cartSync = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await cartSync.goto(origin + '/?cartSync=true');
   await cartSync.getByRole('button', { name: 'Add fries menu', exact: true }).click();

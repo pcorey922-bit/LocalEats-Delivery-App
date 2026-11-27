@@ -1,3 +1,46 @@
+# November 27 — Owner-only Firebase OAuth diagnostic implemented; NOT deployed/run
+
+Owner approved repository implementation/tests only; no Google execution, deployment,
+credential/IAM/billing changes or sends. Resumed clean e893ee8 matching remote.
+Implemented GET/POST /api/admin/firebase-oauth and Operations component. Server requires
+active admin AND server-configured owner, rechecks under profile lock before allowance.
+POST strict confirmOAuthOnly:true, no custom query/credential/URL/project inputs. Requires
+private staging, public/private ordering OFF, push OFF, payouts/retention OFF, provisional
+postal mode and Stripe TEST key/mode. Exact approved project/account identity bound to
+rocoeats-3bd55 / dedicated rocoeats-staging-fcm; broader SDK account rejected locally.
+
+Existing FCM fixed-origin OAuth exchange shared without invoking send path. Diagnostic
+calls only https://oauth2.googleapis.com/token with firebase.messaging scope, rejects
+redirects, bounds HTTP AND body processing to10s, sanitizes all provider/parser errors.
+No token/JWT/key returned/logged/persisted; token reference dropped, diagnostic does not
+populate send-path cache. Production sender keeps existing scoped cache behavior.
+
+Existing request_limits table enforces global one-per10min on DB clock across replicas/
+restarts; allowance + sanitized audit-start commit BEFORE external call. Result audit
+contains bool/constant code only; status GET recovers completed/unconfirmed outcomes
+without OAuth. No migration/new env flag, no network transaction held under DB lock.
+UI visible to superAdministrator only; explicit checkbox/button; no credential field,
+no automatic POST/retry/refocus execution. Lost response uses GET recovery; no duplicate
+OAuth. Existing notification/financial/device records untouched by diagnostic.
+
+Validation: full API280 PASS/1 PostgreSQL-only SKIP/0 failures, including new relational
+owner/nonowner/inactive/gate/input/concurrency/rate/audit/privacy tests. FCM13 unit tests
+PASS with synthetic keys/mock OAuth and local redirect servers; verifies exact scope/
+identity, wrong account, errors, HTTP/body stalls, no FCM message calls or token cache.
+API/UI typechecks and production builds PASS; existing vendor/bundle warnings only.
+Browser suite PASS including390px OAuth confirmation/no-key-input/GET-refresh/lost-
+response scenarios and existing account/CSP/signup/checkout/session regressions, mocked
+Clerk/API only. No live-provider acceptance. Native/GPS/90s/signing source unchanged;
+no new APK needed. No hosted data/settings touched. Exact new-source CI pending push.
+
+Next: commit/push, verify all3 exact-source CI, record full SHA. Then STOP for separate
+owner deployment approval. Existing Render manual exact-commit release only after
+approval; no env changes/migrations. Verify23 read-only checks after owner Live; Operations
+GET diagnostics ready does NOT call Google. One explicit OAuth-only run needs separate
+owner authorization (may include sanitized audit entry); push gate remains OFF. Google
+OAuth success proves credential acceptance only, NOT FCM permission or physical receipt.
+Current deployedff73741 remains verified23/23; accepted Android/GPS behavior preserved.
+
 # November 27 — FCM credential-validation release deployed and verified
 
 OWNER: Render deployment succeeded/Live, approved exact source

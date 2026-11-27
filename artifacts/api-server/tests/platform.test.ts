@@ -21,6 +21,7 @@ import {
   mobileAuthFlowsTable,
   telephoneConfirmationsTable,
   profilesTable,
+  requestLimitsTable,
   restaurantsTable,
   menuCategoriesTable,
   menuItemsTable,
@@ -356,6 +357,54 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       const result=await reconcileFinancialOperation(job.id,admin);assert.ok(result);
       const [saved]=await db.select().from(payoutsTable).where(eq(payoutsTable.id,payout.id));assert.equal(saved.status,'reversed');assert.equal(saved.providerReversalId,valid.id);assert.equal(calls,2);
     }finally{resource.createReversal=originalCreate;resource.listReversals=originalList;await db.update(financialOperationsTable).set({state:'cancelled'}).where(eq(financialOperationsTable.id,job.id));}
+  });
+  await t.test('Firebase OAuth diagnostic is owner-only, manual, closed-gate, durable-limited and never sends messages or stores credentials',async()=>{
+    const prior={...process.env},originalFetch=globalThis.fetch,path='/admin/firebase-oauth',bucket='firebase-oauth-diagnostic-v1';
+    let calls=0,fail=false;
+    const accessToken='private_synthetic_oauth_token_do_not_persist';
+    const keys=generateKeyPairSync('rsa',{modulusLength:2048});
+    const raw=JSON.stringify({type:'service_account',project_id:'rocoeats-3bd55',client_email:'rocoeats-staging-fcm@rocoeats-3bd55.iam.gserviceaccount.com',private_key:keys.privateKey.export({type:'pkcs8',format:'pem'})});
+    const financialBefore=await db.select().from(financialOperationsTable),notificationsBefore=await db.select().from(notificationsTable);
+    try{
+      Object.assign(process.env,{LOCALEATS_ADMIN_CLERK_USER_IDS:ids.admin,ROCOEATS_PRIVATE_STAGING:'true',ROCOEATS_STAGING_TESTER_CLERK_USER_IDS:[ids.customer,ids.driver,ids.restaurant].join(','),ROCOEATS_ORDERING_ENABLED:'false',ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED:'false',ROCOEATS_PUSH_DELIVERY_ENABLED:'false',ROCOEATS_TEST_PAYOUTS_ENABLED:'false',ROCOEATS_WEBHOOK_RETENTION_ENABLED:'false',ROCOEATS_DELIVERY_AREA_MODE:'provisional_postal',PAYMENT_PROVIDER:'stripe_test',STRIPE_SECRET_KEY:'sk_test_fixture',FIREBASE_SERVICE_ACCOUNT_JSON:raw});
+      globalThis.fetch=async(input,init)=>{
+        const url=String(input);
+        if(url.startsWith(origin+'/'))return originalFetch(input,init);
+        assert.equal(url,'https://oauth2.googleapis.com/token','Diagnostic must never reach a message endpoint or arbitrary URL');
+        assert.equal(init?.redirect,'error');calls++;
+        await new Promise(resolve=>setTimeout(resolve,5));
+        return fail?Response.json({error:accessToken},{status:401}):Response.json({access_token:accessToken,expires_in:3600});
+      };
+      assert.equal((await api(path,null)).status,401);
+      assert.equal((await api(path,null,'POST',{confirmOAuthOnly:true})).status,401);
+      for(const user of [ids.customer,ids.driver,ids.restaurant]){
+        assert.equal((await api(path,user)).status,403);assert.equal((await api(path,user,'POST',{confirmOAuthOnly:true})).status,403);
+      }
+      process.env.LOCALEATS_ADMIN_CLERK_USER_IDS='';
+      assert.equal((await api(path,ids.admin)).status,403);assert.equal((await api(path,ids.admin,'POST',{confirmOAuthOnly:true})).status,403);
+      process.env.LOCALEATS_ADMIN_CLERK_USER_IDS=ids.admin;
+      await db.update(profilesTable).set({isActive:false}).where(eq(profilesTable.id,ids.admin));
+      assert.equal((await api(path,ids.admin,'POST',{confirmOAuthOnly:true})).status,403);
+      await db.update(profilesTable).set({isActive:true}).where(eq(profilesTable.id,ids.admin));
+      for(const [name,value]of Object.entries({ROCOEATS_PRIVATE_STAGING:'false',ROCOEATS_ORDERING_ENABLED:'true',ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED:'true',ROCOEATS_PUSH_DELIVERY_ENABLED:'true',ROCOEATS_TEST_PAYOUTS_ENABLED:'true',ROCOEATS_WEBHOOK_RETENTION_ENABLED:'true',ROCOEATS_DELIVERY_AREA_MODE:'municipal',PAYMENT_PROVIDER:'sandbox',STRIPE_SECRET_KEY:'sk_live_fixture',FIREBASE_SERVICE_ACCOUNT_JSON:'{}'})){
+        const before=process.env[name];process.env[name]=value;assert.equal((await api(path,ids.admin,'POST',{confirmOAuthOnly:true})).status,409,name);process.env[name]=before;
+      }
+      for(const body of [{},{confirmOAuthOnly:false},{confirmOAuthOnly:true,url:'https://untrusted.invalid'},{confirmOAuthOnly:true,credential:'sensitive_fixture'}])assert.equal((await api(path,ids.admin,'POST',body)).status,400);
+      assert.equal((await api(path+'?target=other',ids.admin,'POST',{confirmOAuthOnly:true})).status,400);
+      const status=await originalFetch(origin+'/api'+path,{headers:{'x-test-user':ids.admin}});
+      assert.equal(status.headers.get('cache-control'),'no-store');assert.equal((await status.json()).ready,true);assert.equal(calls,0,'GET and rejected requests never contact Google');
+      const responses=await Promise.all([api(path,ids.admin,'POST',{confirmOAuthOnly:true}),api(path,ids.admin,'POST',{confirmOAuthOnly:true})]);
+      assert.deepEqual(responses.map(r=>r.status).sort(),[200,429]);assert.equal(calls,1);
+      const success=responses.find(r=>r.status===200)!.data;assert.equal(success.authenticated,true);assert.equal(success.notificationSent,false);assert.equal(success.fcmPermissionVerified,false);
+      const stored=await api(path,ids.admin);assert.equal(stored.data.ready,false);assert.equal(stored.data.lastRun.authenticated,true);assert.equal(calls,1,'Status refresh never repeats OAuth');
+      const audit=await db.select().from(auditLogsTable).where(eq(auditLogsTable.resourceId,bucket));
+      assert.equal(audit.filter(r=>r.action==='firebase.oauth_started').length,1);assert.equal(audit.filter(r=>r.action==='firebase.oauth_completed').length,1);
+      for(const marker of [accessToken,'PRIVATE KEY','client_email','private_key'])assert.equal(JSON.stringify({success,stored,audit}).includes(marker),false);
+      await db.update(requestLimitsTable).set({expiresAt:sql`clock_timestamp()-interval '1 second'`}).where(eq(requestLimitsTable.bucketKey,bucket));
+      fail=true;const failed=await api(path,ids.admin,'POST',{confirmOAuthOnly:true});assert.equal(failed.status,200);assert.equal(failed.data.authenticated,false);assert.equal(failed.data.code,'GOOGLE_OAUTH_UNAVAILABLE');assert.equal(calls,2);assert.equal(JSON.stringify(failed.data).includes(accessToken),false);
+      assert.equal((await api(path,ids.admin,'POST',{confirmOAuthOnly:true})).status,429);assert.equal(calls,2);
+      assert.deepEqual(await db.select().from(financialOperationsTable),financialBefore);assert.deepEqual(await db.select().from(notificationsTable),notificationsBefore);
+    }finally{globalThis.fetch=originalFetch;process.env=prior;await db.update(profilesTable).set({isActive:true}).where(eq(profilesTable.id,ids.admin));await db.delete(requestLimitsTable).where(eq(requestLimitsTable.bucketKey,bucket));}
   });
   await t.test("public geocoding is owner-only, explicit, closed-gate and durable single-use across concurrent calls", async () => {
     const names = ["LOCALEATS_ADMIN_CLERK_USER_IDS", "ROCOEATS_PRIVATE_STAGING", "ROCOEATS_STAGING_TESTER_CLERK_USER_IDS", "ROCOEATS_ORDERING_ENABLED", "ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED", "PAYMENT_PROVIDER", "STRIPE_SECRET_KEY", "ROCOEATS_DELIVERY_AREA_MODE", "GEOCODIO_API_KEY", "ROCOEATS_GEOCODIO_PUBLIC_TEST_ENABLED"];

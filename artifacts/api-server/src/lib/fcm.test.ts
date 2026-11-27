@@ -2,7 +2,7 @@ import pushPolicy from '../../../../config/native-push-policy.json';
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { generateKeyPairSync, verify } from "node:crypto";
-import { createFcmSender, fcmCredentialStatus } from "./fcm";
+import { createFcmSender, fcmCredentialStatus, firebaseOAuthDiagnosticReady, verifyFirebaseOAuth } from "./fcm";
 import { createServer } from "node:http";
 const keys = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const credentials = JSON.stringify({
@@ -11,6 +11,127 @@ const credentials = JSON.stringify({
   client_email: "sender@rocoeats-test.iam.gserviceaccount.com",
   private_key: keys.privateKey.export({ type: "pkcs8", format: "pem" }),
   token_uri: "https://untrusted.invalid/token",
+});
+const diagnosticCredentials = JSON.stringify({
+  ...JSON.parse(credentials),
+  project_id: "rocoeats-3bd55",
+  client_email: "rocoeats-staging-fcm@rocoeats-3bd55.iam.gserviceaccount.com",
+});
+test("OAuth-only diagnostic authenticates the dedicated identity without a message endpoint, token return or token cache", async () => {
+  let calls = 0;
+  const transport: typeof fetch = async (input, init) => {
+    calls++;
+    assert.equal(String(input), "https://oauth2.googleapis.com/token");
+    assert.equal(init?.redirect, "error");
+    const parts = (init!.body as URLSearchParams).get("assertion")!.split(".");
+    const claims = JSON.parse(Buffer.from(parts[1], "base64url").toString());
+    assert.equal(
+      claims.iss,
+      "rocoeats-staging-fcm@rocoeats-3bd55.iam.gserviceaccount.com",
+    );
+    assert.equal(
+      claims.scope,
+      "https://www.googleapis.com/auth/firebase.messaging",
+    );
+    assert.equal(claims.aud, "https://oauth2.googleapis.com/token");
+    assert.equal(claims.exp - claims.iat, 3600);
+    assert.ok(
+      verify(
+        "RSA-SHA256",
+        Buffer.from(parts.slice(0, 2).join(".")),
+        keys.publicKey,
+        Buffer.from(parts[2], "base64url"),
+      ),
+    );
+    return Response.json({
+      access_token: "never_return_this_synthetic_access",
+      expires_in: 3600,
+    });
+  };
+  for (let i = 0; i < 2; i++)
+    assert.deepEqual(
+      await verifyFirebaseOAuth(diagnosticCredentials, transport),
+      { authenticated: true, code: "GOOGLE_OAUTH_AUTHENTICATED" },
+    );
+  assert.equal(calls, 2, "Diagnostic token is not cached for another run");
+});
+test("OAuth-only diagnostic rejects malformed or different service accounts before network I/O", async () => {
+  let calls = 0;
+  const transport: typeof fetch = async () => {
+    calls++;
+    throw Error("Must not be invoked");
+  };
+  for (const raw of [
+    undefined,
+    "null",
+    "bad_sensitive_json",
+    credentials,
+    JSON.stringify({
+      ...JSON.parse(diagnosticCredentials),
+      client_email: "firebase-adminsdk@rocoeats-3bd55.iam.gserviceaccount.com",
+    }),
+    JSON.stringify({
+      ...JSON.parse(diagnosticCredentials),
+      private_key: "private_key_marker",
+    }),
+  ]) {
+    assert.equal(firebaseOAuthDiagnosticReady(raw), false);
+    assert.deepEqual(await verifyFirebaseOAuth(raw, transport), {
+      authenticated: false,
+      code: "CREDENTIAL_UNAVAILABLE",
+    });
+  }
+  assert.equal(calls, 0);
+});
+test("OAuth-only failures and malformed provider responses never expose tokens, provider bodies or exception text", async () => {
+  const secret = "sensitive_provider_payload_fixture";
+  for (const transport of [
+    async () => {
+      throw Error(secret);
+    },
+    async () => Response.json({ error: secret }, { status: 401 }),
+    async () => new Response(secret),
+    async () => Response.json({ access_token: secret, expires_in: 99999 }),
+    async () => Response.json({ access_token: { secret }, expires_in: 3600 }),
+    async () => {
+      const r = Response.json({ access_token: secret, expires_in: 3600 });
+      Object.defineProperty(r, "redirected", { value: true });
+      return r;
+    },
+  ])
+    assert.deepEqual(
+      await verifyFirebaseOAuth(diagnosticCredentials, transport),
+      { authenticated: false, code: "GOOGLE_OAUTH_UNAVAILABLE" },
+    );
+});
+test("OAuth-only HTTP and body stalls reach a bounded failure without message sending", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  for (const stage of ["http", "body"]) {
+    let calls = 0,
+      signal: AbortSignal | undefined;
+    const pending = verifyFirebaseOAuth(
+      diagnosticCredentials,
+      async (input, init) => {
+        assert.equal(String(input), "https://oauth2.googleapis.com/token");
+        calls++;
+        signal = init!.signal!;
+        if (stage === "http") return new Promise<Response>(() => {});
+        const r = Response.json({});
+        Object.defineProperty(r, "json", {
+          value: () => new Promise(() => {}),
+        });
+        return r;
+      },
+    );
+    await Promise.resolve();
+    t.mock.timers.tick(10001);
+    assert.deepEqual(await pending, {
+      authenticated: false,
+      code: "GOOGLE_OAUTH_UNAVAILABLE",
+    });
+    assert.equal(signal?.aborted, true);
+    assert.equal(calls, 1);
+  }
 });
 test('FCM readiness validates credentials locally and returns only sanitized status', (t) => {
   const outbound = t.mock.method(globalThis, 'fetch', async () => { throw new Error('Readiness must never contact a provider'); });

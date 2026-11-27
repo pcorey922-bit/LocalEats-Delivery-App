@@ -1,3 +1,14 @@
+# November 27 — OAuth-only owner diagnostic code ready for CI
+
+Implemented existing Operations owner-only manual OAuth check, exact dedicated identity,
+closed-gate guards, DB-clock10min allowance/audit, no token exposure/cache or FCM sending,
+10s HTTP/body bound and GET-only lost-response recovery. No migration/env/native change.
+API280 PASS+1 PG-only skip, FCM13 PASS, types/builds/browser PASS, simulated providers.
+Next: exact-SHA CI then owner-approved deployment and separately approved OAuth execution.
+No Google call/deploy/enrollment/send/financial operation performed. FCM permissions,
+physical Android receipt, APNs/iOS signing remain unverified/protected. Preserve accepted
+Android/GPS/90s. Do not repeat accepted tests or configure credentials again.
+
 # November 27 — ff73741 staging verification complete
 
 Owner confirms Live and pushOFF/Android locallyvalid/iOS missing/retentionOFF/payoutsOFF.

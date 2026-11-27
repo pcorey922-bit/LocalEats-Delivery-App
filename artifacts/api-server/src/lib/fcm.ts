@@ -1,5 +1,5 @@
-import { pushLifetime } from './push-expiry';
-import pushPolicy from '../../../../config/native-push-policy.json';
+import { pushLifetime } from "./push-expiry";
+import pushPolicy from "../../../../config/native-push-policy.json";
 import { createHash, createPrivateKey, sign } from "node:crypto";
 const tokenUrl = "https://oauth2.googleapis.com/token";
 const scope = "https://www.googleapis.com/auth/firebase.messaging";
@@ -9,9 +9,13 @@ function parseCredentials(raw: string) {
   try {
     const credentials: unknown = JSON.parse(raw);
     if (
-      !credentials || typeof credentials !== 'object' || Array.isArray(credentials) ||
-      !("type" in credentials) || !("project_id" in credentials) ||
-      !("client_email" in credentials) || !("private_key" in credentials) ||
+      !credentials ||
+      typeof credentials !== "object" ||
+      Array.isArray(credentials) ||
+      !("type" in credentials) ||
+      !("project_id" in credentials) ||
+      !("client_email" in credentials) ||
+      !("private_key" in credentials) ||
       credentials.type !== "service_account" ||
       typeof credentials.project_id !== "string" ||
       !/^[a-z][a-z0-9-]{4,61}[a-z0-9]$/.test(credentials.project_id) ||
@@ -23,52 +27,69 @@ function parseCredentials(raw: string) {
     const key = createPrivateKey(credentials.private_key);
     if (key.asymmetricKeyType !== "rsa")
       throw new Error("Firebase signing key must be RSA");
-    return { key, email: credentials.client_email, project: credentials.project_id };
+    return {
+      key,
+      email: credentials.client_email,
+      project: credentials.project_id,
+    };
   } catch {
     throw new Error("Invalid Firebase service account configuration");
   }
 }
 
-export type FcmCredentialStatus = 'missing' | 'invalid' | 'locally_valid';
-let inspectedHash = '', inspectedStatus: FcmCredentialStatus = 'missing';
+export type FcmCredentialStatus = "missing" | "invalid" | "locally_valid";
+let inspectedHash = "",
+  inspectedStatus: FcmCredentialStatus = "missing";
 // Local parsing only: no OAuth, network request, IAM check or send authorization.
-export function fcmCredentialStatus(raw: string | undefined): FcmCredentialStatus {
-  if (!raw) return 'missing';
-  const hash = createHash('sha256').update(raw).digest('hex');
+export function fcmCredentialStatus(
+  raw: string | undefined,
+): FcmCredentialStatus {
+  if (!raw) return "missing";
+  const hash = createHash("sha256").update(raw).digest("hex");
   if (hash !== inspectedHash) {
-    try { parseCredentials(raw); inspectedStatus = 'locally_valid'; }
-    catch { inspectedStatus = 'invalid'; }
+    try {
+      parseCredentials(raw);
+      inspectedStatus = "locally_valid";
+    } catch {
+      inspectedStatus = "invalid";
+    }
     inspectedHash = hash;
   }
   return inspectedStatus;
 }
 
-// Only Google's fixed OAuth/FCM origins are used, regardless of credential JSON.
-export function createFcmSender(raw: string, transport: typeof fetch = fetch) {
-  const { key, email, project } = parseCredentials(raw);
-  let cached: Access | null = null,
-    pending: Promise<Access> | null = null;
-  async function accessToken() {
-    if (cached && cached.expiresAt > Date.now() + 60000) return cached.value;
-    if (!pending)
-      pending = (async () => {
-        const now = Math.floor(Date.now() / 1000);
-        const header = Buffer.from(
-          JSON.stringify({ alg: "RS256", typ: "JWT" }),
-        ).toString("base64url");
-        const claims = Buffer.from(
-          JSON.stringify({
-            iss: email,
-            scope,
-            aud: tokenUrl,
-            iat: now,
-            exp: now + 3600,
-          }),
-        ).toString("base64url");
-        const data = `${header}.${claims}`,
-          signature = sign("RSA-SHA256", Buffer.from(data), key).toString(
-            "base64url",
-          );
+async function requestAccessToken(
+  { key, email }: ReturnType<typeof parseCredentials>,
+  transport: typeof fetch,
+): Promise<Access> {
+  const now = Math.floor(Date.now() / 1000);
+  const header = Buffer.from(
+    JSON.stringify({ alg: "RS256", typ: "JWT" }),
+  ).toString("base64url");
+  const claims = Buffer.from(
+    JSON.stringify({
+      iss: email,
+      scope,
+      aud: tokenUrl,
+      iat: now,
+      exp: now + 3600,
+    }),
+  ).toString("base64url");
+  const data = `${header}.${claims}`,
+    signature = sign("RSA-SHA256", Buffer.from(data), key).toString(
+      "base64url",
+    );
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error("Firebase authorization unavailable"));
+    }, 10000);
+  });
+  try {
+    return await Promise.race([
+      (async () => {
         const response = await transport(tokenUrl, {
           method: "POST",
           redirect: "error",
@@ -77,9 +98,10 @@ export function createFcmSender(raw: string, transport: typeof fetch = fetch) {
             grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
             assertion: `${data}.${signature}`,
           }),
-          signal: AbortSignal.timeout(10000),
+          signal: controller.signal,
         });
-        if (!response.ok || response.redirected) throw new Error("Firebase authorization unavailable");
+        if (!response.ok || response.redirected)
+          throw new Error("Firebase authorization unavailable");
         const body = (await response.json()) as {
           access_token?: unknown;
           expires_in?: unknown;
@@ -96,6 +118,62 @@ export function createFcmSender(raw: string, transport: typeof fetch = fetch) {
           value: body.access_token,
           expiresAt: Date.now() + body.expires_in * 1000,
         };
+      })(),
+      deadline,
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const diagnosticIdentity = {
+  project: "rocoeats-3bd55",
+  email: "rocoeats-staging-fcm@rocoeats-3bd55.iam.gserviceaccount.com",
+};
+export function firebaseOAuthDiagnosticReady(raw: string | undefined): boolean {
+  if (!raw) return false;
+  try {
+    const parsed = parseCredentials(raw);
+    return (
+      parsed.project === diagnosticIdentity.project &&
+      parsed.email === diagnosticIdentity.email
+    );
+  } catch {
+    return false;
+  }
+}
+
+// Intentionally does not call createFcmSender or populate its token cache.
+// Never returns provider payloads, JWT assertions, credentials or access tokens.
+export async function verifyFirebaseOAuth(
+  raw: string | undefined,
+  transport: typeof fetch = fetch,
+) {
+  if (!firebaseOAuthDiagnosticReady(raw))
+    return { authenticated: false, code: "CREDENTIAL_UNAVAILABLE" } as const;
+  let access: Access | undefined;
+  try {
+    access = await requestAccessToken(parseCredentials(raw!), transport);
+    return { authenticated: true, code: "GOOGLE_OAUTH_AUTHENTICATED" } as const;
+  } catch {
+    return { authenticated: false, code: "GOOGLE_OAUTH_UNAVAILABLE" } as const;
+  } finally {
+    // Drop our reference immediately; no diagnostic token is cached or persisted.
+    if (access) access.value = "";
+    access = undefined;
+  }
+}
+
+// Only Google's fixed OAuth/FCM origins are used, regardless of credential JSON.
+export function createFcmSender(raw: string, transport: typeof fetch = fetch) {
+  const { key, email, project } = parseCredentials(raw);
+  let cached: Access | null = null,
+    pending: Promise<Access> | null = null;
+  async function accessToken() {
+    if (cached && cached.expiresAt > Date.now() + 60000) return cached.value;
+    if (!pending)
+      pending = (async () => {
+        return requestAccessToken({ key, email, project }, transport);
       })();
     try {
       cached = await pending;
@@ -127,10 +205,13 @@ export function createFcmSender(raw: string, transport: typeof fetch = fetch) {
             android: {
               // These messages always include a visible notification. Normal
               // priority may wait for a Doze maintenance window and miss offers.
-              priority: 'HIGH',
+              priority: "HIGH",
               collapse_key: notificationId,
               ttl: `${lifetime.ttlSeconds}s`,
-              notification: { tag: notificationId, channel_id: pushPolicy.androidChannel.id },
+              notification: {
+                tag: notificationId,
+                channel_id: pushPolicy.androidChannel.id,
+              },
             },
           },
         }),
@@ -169,7 +250,11 @@ export function createFcmSender(raw: string, transport: typeof fetch = fetch) {
 }
 let sender: ReturnType<typeof createFcmSender> | undefined,
   configurationHash = "";
-export async function sendFcm(token: string, notificationId: string, expiresAt?: Date) {
+export async function sendFcm(
+  token: string,
+  notificationId: string,
+  expiresAt?: Date,
+) {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!raw) throw new Error("Firebase configuration required");
   const hash = createHash("sha256").update(raw).digest("hex");
