@@ -1,3 +1,20 @@
+## November 27 — Approved FCM release successfully deployed
+
+Render Live ff73741bb7a5e3ffcb0985b02d2355bb1fd99f48 confirmed by owner and exact SHA
+independently verified.23 read-only checks PASS at07:40:19.980Z; evidence file
+verification/STAGING_HTTP_2026-11-27_ff73741.json. Owner Operations confirms pushOFF,
+Android locallyvalid/providerunverified, iOS configurationrequired, retention/payoutsOFF.
+No Verify/Retry/send used. Public/private ordering/live/municipal gates independentlyOFF.
+The earlier one-release instructions below are COMPLETED; do not deploy again.
+
+Local JSON/RSA validity is not Google OAuth acceptance. There is no deployed OAuth-only
+button; never use message sending/retry or Stripe verification as a substitute. Next
+safe preparation is a tested configured-owner-only manual OAuth diagnostic that keeps
+the access token server-side only, discards it and reports sanitized outcome without
+calling FCM messages:send. Deployment and actual OAuth execution need separate explicit
+approval after the concrete implementation is reviewable. OAuth success will not prove
+project permissions or device receipt. No owner action or provider call is requested now.
+
 ## One approved FCM staging release — November 27 (not deployed)
 
 Candidate FULL SHA: `ff73741bb7a5e3ffcb0985b02d2355bb1fd99f48`.

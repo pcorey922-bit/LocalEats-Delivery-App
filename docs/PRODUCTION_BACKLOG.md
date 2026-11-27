@@ -1,3 +1,16 @@
+# November 27 — ff73741 staging verification complete
+
+Owner confirms Live and pushOFF/Android locallyvalid/iOS missing/retentionOFF/payoutsOFF.
+Independent23 read-only checks PASS with exactff73741 SHA, DB/auth/headers/native
+readiness and closed ordering/financial/municipal gates. Sanitized report preserved.
+Do not repeat this deployment/preflight or accepted GPS tests without regression.
+FCM local validity is NOT Google authentication/send permission/physical receipt.
+Next independent task: implement/test manual configured-owner-only OAuth diagnostic
+without FCM message endpoint, exposed tokens or automatic calls. Only then request
+separate exact-release/one-time OAuth-check approval. No provider check has run; no
+new deployment, secrets/IAM/billing, sends/enrollment or financial changes authorized.
+Existing Android/GPS/90s and all gates preserved; no immediate owner phone action.
+
 # November 27 — FCM release ready; deployment blocked on owner session
 
 Exact approved candidate ff73741bb7a5e3ffcb0985b02d2355bb1fd99f48 all3 CI SUCCESS;

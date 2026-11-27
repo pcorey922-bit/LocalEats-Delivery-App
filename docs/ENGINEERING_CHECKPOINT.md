@@ -1,3 +1,48 @@
+# November 27 — FCM credential-validation release deployed and verified
+
+OWNER: Render deployment succeeded/Live, approved exact source
+ff73741bb7a5e3ffcb0985b02d2355bb1fd99f48. Authenticated Operations labels observed:
+Provider push sendingdisabled; Android credentials locally valid/provider delivery
+unverified; iOS sandbox configurationrequired; checkout retentiondisabled; test
+payoutsdisabled. Owner pressed no Verify/Retry/send controls. These protected labels
+are OWNER-OBSERVED, not agent private-session inspection. No credential received.
+
+INDEPENDENT: existing23 GET/OPTIONS staging checks ALL PASS at
+2026-11-27T07:40:19.980Z; exact deployed SHA matches. DB/auth configuration/pricing/
+webhook/workers/native contracts/security headers/proxy checks ready. Public/private
+ordering, live charges, test payouts, retention and municipal enforcement OFF. Evidence:
+docs/verification/STAGING_HTTP_2026-11-27_ff73741.json. No provider transactions or
+private-session/physical workflow acceptance claimed. Existing providerConfigured
+readiness flag refers to Stripe, not Firebase authentication. No redeployment made.
+
+LOCAL Firebase validation is now owner-observed on hosted code: JSON/schema/RSA key
+can be parsed. Google OAuth credential acceptance, effective FCM project permissions,
+provider receipt and actual Android OS notification delivery remain UNVERIFIED.
+Code inspection confirms no separate deployed OAuth-only owner diagnostic; the current
+OAuth exchange is inside the send path. Do not invoke send just to test credentials.
+Do not instruct use of Stripe Verify, notification Retry or an invented UI button.
+
+Safest next ENGINEERING step: prepare/test an owner-only manual OAuth-only diagnostic
+in existing Operations architecture, returning sanitized success/error/time only,
+never a token/key/JWT/provider body. Use existing fixed Google OAuth URL and narrow
+firebase.messaging scope; no message endpoint, enrollment, financial write or gate
+activation. Require active server-configured owner, strict session authorization,
+private staging and closed gates, bounded timeout/rate limit, no automatic GET/load/
+retry execution. Record sanitized audit outcome if implemented. OAuth success would
+prove Google authenticates the key, NOT FCM send permission/project match/device receipt.
+Any later FCM validate_only API check is a DIFFERENT separately authorized provider
+operation, and still not device receipt; do not use fabricated tokens as acceptance.
+References: https://firebase.google.com/docs/cloud-messaging/send/v1-api and
+https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages/send.
+
+Next OWNER ACTION after concrete diagnostic implementation/tests: separate approval
+for its exact-SHA deployment and explicit one-time OAuth-only execution. Current
+approval does not permit another deploy, provider call, key/Render/IAM/billing change,
+push enablement or financial operation. No action needed on phone in this turn.
+This turn changes documentation/evidence only; no runtime edits/tests or repeated
+accepted GPS tests. Customer257/Driver258 artifacts and Driver GPS/90s preserved.
+Resumed clean678ba0d matching remote. Stop after recording read-only release results.
+
 # November 27 — Controlled FCM release preflight passed; owner Render action required
 
 Owner authorizes ONE existing staging-service deployment to apply saved server JSON;
