@@ -1,3 +1,28 @@
+# November 27 — Owner readiness confirmed; ready for separate OAuth-only approval
+
+Resolves protected-status conditions recorded at287d387. Owner reports exact
+GET /api/admin/firebase-oauth response from authenticated Samsung Chrome after a428852:
+{"ready":true,"retryAfter":null,"lastRun":null}
+Owner confirms no OAuth verification executed and no Firebase notification sent.
+Owner-observed evidence (not agent-authenticated inspection) preserved in
+verification/OAUTH_OWNER_STATUS_2026-11-27_a428852.json; exact observation time not given.
+
+Checked DEPLOYED a428852 code: ready requires safeguardsClosed(), approved dedicated
+credential identity/local validity and no cooldown. safeguardsClosed explicitly requires
+ROCOEATS_PUSH_DELIVERY_ENABLED !== 'true'; actual sender gate enables ONLY exact 'true'.
+Thus owner-observed readytrue also demonstrates push sendingdisabled at observation,
+with public/private orderingOFF, payouts/retentionOFF, provisional area mode and Stripe
+TEST. No repeat Operations label check is necessary absent changed/new contrary evidence.
+retryAfternull/lastRunnull show no allowance or prior diagnostic audit recorded. Owner
+reports no execution/sends; do not turn this into an independent Google-history claim.
+
+Combined with independently verified exactSHA/23 read-only checks and live anonymous
+401 protections from287d387, status is READY FOR SEPARATE approval of ONE OAuth-only
+execution. Approval has NOT been granted; do not run it, check consent or press Verify.
+Google authentication, effective FCM permission and physical receipt remain UNVERIFIED.
+No deployment/config/key/IAM/billing/financial/native/GPS/90s changes or new tests needed;
+documentation diff check only. Stop awaiting explicit one-time OAuth authorization.
+
 # November 27 — OAuth diagnostic deployed; public checks pass, owner status pending
 
 OWNER reports approved manual Render deployment Live, sourcea428852, Nov27 03:14:59EST

@@ -1,3 +1,16 @@
+## November 27 — Final owner readiness confirmed; execution still forbidden
+
+Owner supplied authenticated GET status on approved deployeda428852:
+{"ready":true,"retryAfter":null,"lastRun":null}. Code inspection of exact deployed
+revision confirms readytrue requires push deliveryOFF as well as other closed gates
+and approved dedicated credential. This resolves the pending owner status/label check;
+do not ask to repeat Operations solely for the same fact. No run/cooldown is recorded.
+Owner states no OAuth executed/no notification sent. Agent made no provider call.
+System is READY for separate explicit authorization of ONE OAuth-only check. Do not
+check consent or press Verify until that authorization. Google acceptance is still
+unverified; readiness is local validation, not OAuth, FCM permission or device delivery.
+Previous read-only23/23 and401 evidence remains valid; no new release/config change.
+
 ## November 27 — OAuth diagnostic deployment completed, execution forbidden
 
 Owner Render Live/sourcea428852 and exact full SHA independently confirmed.23 read-only
