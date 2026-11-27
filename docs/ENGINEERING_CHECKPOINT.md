@@ -1,3 +1,18 @@
+# November 27 — One dedicated FCM key downloaded (owner confirmed)
+
+Under explicit single-key generation/download approval, owner reports exactly ONE
+JSON key created for rocoeats-staging-fcm in rocoeats-3bd55 and securely retained on
+Samsung. No key/file/ID/contents supplied to agent, chat or Git; no independent key
+validation/provider acceptance claimed. Do not generate another key or request upload.
+No Render entry/save/deploy, IAM/billing changes, enrollment or sends authorized.
+STOP: await separate explicit protected Render configuration/deployment authorization.
+Keep key private locally; preserve push OFF, all ordering/financial/retention/municipal
+gates, Spark, Android artifacts and accepted Driver GPS/90s. No hosted action performed.
+Resumed clean remote2a06d02; all3 exact-SHA CI now SUCCESS. Functional4ed3aae also
+all3 CI SUCCESS. This update is documentation-only, diff checked; no redundant tests.
+Next stage must specify existing Render service, FIREBASE_SERVICE_ACCOUNT_JSON,
+approved full source and safe save/deployment sequence; never key contents in chat.
+
 # November 27 — FCM auth options reviewed; local credential readiness corrected
 
 Recovered clean remote/HEAD586d923fb8ce2ce131b0e3198e9303ed08be04fe. All three exact

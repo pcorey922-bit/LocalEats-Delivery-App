@@ -1,3 +1,10 @@
+# November 27 — Single FCM credential generation milestone complete
+
+Owner confirms one dedicated sender JSON key created/downloaded privately on Samsung.
+No file/key read or shared with agent. Do not repeat generation. Next protected boundary
+is separate Render credential-entry/deployment approval; no sends/enrollment included.
+All gates/Android/GPS/90s preserved. Existing2a06d02 and functional4ed3aae all3 CI PASS.
+
 # November 27 — Server auth choice and genuine readiness defect
 
 - Render managed keyless GCP OIDC is documented for Pro workspace+, not assumed from

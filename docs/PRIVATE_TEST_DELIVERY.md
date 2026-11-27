@@ -18,6 +18,14 @@ municipal enforcement remainOFF. Migration0029 was already approved/deployed; no
 repeat migration or new hosted setting is authorized. Later repository corrections
 are NOT deployed and need separate release approval.
 
+## Latest credential milestone — November 27
+
+Owner explicitly approved and confirms exactly one dedicated rocoeats-staging-fcm
+JSON key generated/downloaded and retained privately on Samsung. Do NOT repeat the
+conditional key-generation steps below. Agent has not received/read the file or key.
+Render entry/save/deployment, enrollment and sends remain unauthorized pending separate
+explicit approval. No provider acceptance is established by downloading a credential.
+
 ## FCM server authentication decision — November 27 (planning only)
 
 Current official Render documentation supports managed Google Cloud OIDC, but requires
