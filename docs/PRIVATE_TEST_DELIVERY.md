@@ -18,6 +18,21 @@ municipal enforcement remainOFF. Migration0029 was already approved/deployed; no
 repeat migration or new hosted setting is authorized. Later repository corrections
 are NOT deployed and need separate release approval.
 
+## Render storage-only approval — November 27 (owner action pending)
+
+Only FIREBASE_SERVICE_ACCOUNT_JSON entry in existing LocalEats-Delivery-App service
+is approved. Render docs confirm the exact Save only option stores without deploying;
+it does not apply to the current running service until a later deploy. Inspect save
+dropdown before entering data; do not use Save and deploy or Save, rebuild, and deploy.
+If Save only is absent/ambiguous, stop without saving. Do not edit environment groups,
+other variables, create keys, restart, deploy or enable sends. Paste full original JSON
+privately into Value (not .env import), preserving escaped newlines, no outer quotes,
+base64, filename or client configuration. Use only an already available trusted local
+viewer; if phone cannot copy privately, stop rather than uploading to a public tool.
+Clear clipboard/history after saving without removing the sole retained local key.
+Owner reports only storage success and no deployment; do not request screenshots or
+contents. This approval does not yet authorize activation or read-back of the key.
+
 ## Latest credential milestone — November 27
 
 Owner explicitly approved and confirms exactly one dedicated rocoeats-staging-fcm

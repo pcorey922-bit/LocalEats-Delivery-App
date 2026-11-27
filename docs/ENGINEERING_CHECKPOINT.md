@@ -1,3 +1,19 @@
+# November 27 — Protected Render storage-only step approved, not completed
+
+Owner authorizes storing the ONE existing dedicated sender JSON in existing Render
+service variable FIREBASE_SERVICE_ACCOUNT_JSON only. No other variable, deployment,
+restart, new key, IAM/billing change or provider send authorized. Source fcm.ts expects
+complete raw service_account JSON with project/email/RSA private key, not filename,
+base64, client JSON or an outer quoted JSON string. Never receive contents in chat.
+Render official environment docs confirm Save only stores without deploy; running
+service will not use the value until a later deployment. Owner must inspect dropdown
+BEFORE entry and select exact Save only; if unavailable/unclear, STOP without saving.
+No Render access/change performed by agent; storage completion awaits owner report.
+Next stage after owner confirms Save only: separately approved exact-SHA deployment
+and read-only verification, with push OFF. No credential/provider acceptance claimed.
+Existing build/GPS/90s and all safeguards unchanged; no runtime edits/tests needed.
+Reference: https://render.com/docs/configure-environment-variables (Nov27 reviewed).
+
 # November 27 — One dedicated FCM key downloaded (owner confirmed)
 
 Under explicit single-key generation/download approval, owner reports exactly ONE
