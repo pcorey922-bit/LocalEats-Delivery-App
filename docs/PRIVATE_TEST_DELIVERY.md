@@ -1,3 +1,19 @@
+## November 27 — OAuth diagnostic deployment completed, execution forbidden
+
+Owner Render Live/sourcea428852 and exact full SHA independently confirmed.23 read-only
+checks PASS at08:18:03.799Z; anonymous diagnostic/Operations/device-config GETs401.
+The earlier diagnostic deployment procedure is COMPLETED; do not deploy again.
+
+Pending owner VIEW ONLY: Operations Provider push sending label; in SAME Samsung Chrome
+session open https://localeats-delivery-app.onrender.com/api/admin/firebase-oauth and
+report only ready/retryAfter/lastRun. No credentials/private identity fields returned.
+Expected before first execution: true/null/null and provider pushdisabled. If different,
+stop/report without consent/Verify/Retry or modifying settings. Agent cannot access
+protected owner status or prove historical provider absence from public GETs.
+After that confirmation, separate one-time OAuth-only approval is still required.
+No Google or FCM call has been made by this read-only verification. Google acceptance,
+FCM permission and physical notification receipt remain distinct/unverified stages.
+
 ## November 27 — OAuth diagnostic deployment approved, execution NOT approved
 
 One exact a4288526b668d71db0c519e621f543484e3afb11 existing-service deploy approved.

@@ -1,3 +1,14 @@
+# November 27 — OAuth release live, authenticated readiness check pending
+
+Exact deployeda4288526b668d71db0c519e621f543484e3afb11 independently confirmed;23
+read-only checks PASS and3 protected GETs deny anonymous access401. All public safety
+gates closed. No diagnostic/provider/financial operation executed by this verification.
+Owner-only Operations push label + sanitized diagnostic GET ready/retryAfter/lastRun
+requested; expected unusedready true/null/null. Do not approve/run until confirmed;
+no historical provider or protected audit claim from anonymous evidence. Next action
+is owner view only, followed by separate one-time OAuth authorization if ready. No new
+deploy/credentials/native/GPS/90s changes or accepted-device retesting required.
+
 # November 27 — OAuth diagnostic release authorized; not deployed yet
 
 Exact a4288526b668d71db0c519e621f543484e3afb11 all3 CI reconfirmed success. Current

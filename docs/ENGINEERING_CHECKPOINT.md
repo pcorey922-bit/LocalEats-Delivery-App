@@ -1,3 +1,37 @@
+# November 27 — OAuth diagnostic deployed; public checks pass, owner status pending
+
+OWNER reports approved manual Render deployment Live, sourcea428852, Nov27 03:14:59EST
+(08:14:59Z). INDEPENDENT exactSHA confirmed a4288526b668d71db0c519e621f543484e3afb11.
+Existing23 GET/OPTIONS-only checks ALL PASS at08:18:03.799Z. DB/auth configuration/
+pricing/webhooks/workers/security/native/proxy checks ready. Public/private ordering,
+live charges, payouts, retention and municipal enforcement OFF. Sanitized evidence:
+docs/verification/STAGING_HTTP_2026-11-27_a428852.json.
+
+Additional live GET-only access checks at08:18:42.005Z: /api/admin/firebase-oauth,
+/api/admin/operational-health and /api/notification-devices/config all401 without
+credentials. Evidence docs/verification/OAUTH_ACCESS_2026-11-27_a428852.json. Source
+owner/admin/active-profile restrictions and negative-role/concurrency/privacy tests
+previously passed all3 exact-source CI; hosted nonowner-authenticated role tests not
+performed without sessions. No diagnostic POST, Google request, notification/send,
+financial transaction, config change, deployment or GPS change by agent this turn.
+
+PROTECTED LIVE EVIDENCE STILL PENDING: current pushOFF flag and last diagnostic/audit
+outcome require owner's authenticated GET. Asked owner to view Operations push label
+and open same-browser /api/admin/firebase-oauth, report ready/retryAfter/lastRun only.
+No keys/cookies/session IDs requested. GET does not OAuth or write audit/allowance.
+Expected unused-ready status: readytrue, retryAfternull, lastRunnull. If unavailable,
+not ready, prior run/cooldown or pushenabled, STOP and investigate; do not auto-execute.
+Do not claim no historical provider sends or no prior OAuth execution from anonymous
+checks alone. Agent executed none; source has no automatic OAuth execution path.
+
+Status: public release verification PASS; readiness for separate one-time OAuth
+approval is CONDITIONAL on protected owner status above. No execution authorized.
+Even a ready result proves local credentials/identity/closed gates only, not Google
+OAuth acceptance, effective FCM permissions or physical delivery. No button/checkbox
+interaction before separate approval. Current deployment needs no additional release
+or native rebuild. Accepted Android/GPS/90s, credentials/IAM and safeguards preserved.
+Resumed clean a30c867 matching remote; documentation/evidence-only checkpoint.
+
 # November 27 — Exact OAuth release approved; manual owner deployment required
 
 Owner authorizes ONE deployment of a4288526b668d71db0c519e621f543484e3afb11 to
