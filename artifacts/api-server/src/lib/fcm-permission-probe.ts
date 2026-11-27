@@ -1,5 +1,5 @@
-// Offline preparation only. Nothing imports this into a route or worker.
-// A future owner-only validation route needs separate review/deploy/execution approval.
+// Fixed non-delivering request for the separate owner-only validation path.
+// Deployment and real execution require separate approval; never used by a worker.
 // validate_only still calls FCM messages:send, which OAuth-only approval forbids.
 export function prepareFcmPermissionProbe() {
   if (arguments.length !== 0) {

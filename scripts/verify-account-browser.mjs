@@ -201,6 +201,18 @@ try {
     await oauth.close();
   }
   console.log('OAuth-only UI PASS: explicit owner confirmation, no credential inputs, GET-only refresh and lost-response recovery without automatic execution (simulated OAuth/API).');
+  for(const lost of [false,true]){
+    const page=await browser.newPage({viewport:{width:390,height:844}});await page.goto(origin+'/?fcmValidation=true'+(lost?'&lostFcm=true':''));
+    const panel=page.getByRole('region',{name:'FCM permission validation'}),button=panel.getByRole('button',{name:'Validate FCM permission only',exact:true});
+    await button.waitFor();assert.equal(await button.isDisabled(),true);assert.equal(await panel.locator('input[type="text"],input[type="password"],textarea').count(),0);
+    await panel.getByRole('button',{name:'Refresh FCM validation status'}).click();assert.equal(await page.evaluate(()=>window.qaFcmValidationCalls),0);
+    await panel.getByRole('checkbox').check();await button.click();await panel.getByText('FCM permission validated without delivery.',{exact:false}).waitFor();
+    if(lost)await panel.getByRole('alert').filter({hasText:'No automatic retry'}).waitFor();
+    assert.equal(await page.evaluate(()=>window.qaFcmValidationCalls),1);assert.equal(await button.isDisabled(),true);assert.equal(await panel.getByRole('checkbox').isChecked(),false);
+    await panel.getByRole('button',{name:'Refresh FCM validation status'}).click();assert.equal(await page.evaluate(()=>window.qaFcmValidationCalls),1);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.close();
+  }
+  console.log('FCM validation UI PASS: explicit consent, permanent allowance, no token/target form, GET-only lost-response recovery and no repeated validation (simulated provider/API).');
   const cartSync = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await cartSync.goto(origin + '/?cartSync=true');
   await cartSync.getByRole('button', { name: 'Add fries menu', exact: true }).click();

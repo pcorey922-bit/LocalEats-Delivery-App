@@ -1,3 +1,16 @@
+# November 27 — Owner-only FCM permission diagnostic ready for CI, NOT live
+
+New separate owner-only validation route/UI forces fixed-topic validate_only:true,
+never device delivery, consumes durable one-shot allowance before network and exposes
+only sanitized report/audit. Existing OAuth-only path preserved. New run would make
+fresh OAuth +1 FCM validation call, requires separate explicit authorization; none made.
+API286 PASS+1 PG-only skip; FCM16+builder2 PASS, types/build/browser PASS. Exact new CI
+pending. No migration/env/APK/native/GPS/credential changes. Next: verify CI, present
+exact SHA for owner deployment; after read-only release verification ask separately
+for one validation-only execution. Failed/unknown allowance cannot automatically reset.
+After permission acceptance only, separately approve one staging-device enrollment and
+recipient-scoped actual receipt test. Push/public ordering/live finances/municipal stayOFF.
+
 # November 27 — Real OAuth authentication accepted; FCM permission not yet accepted
 
 Owner live OAuth success Nov27 03:28:48EST, durable GET refresh same result, pushOFF,

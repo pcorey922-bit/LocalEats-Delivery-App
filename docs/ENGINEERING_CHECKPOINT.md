@@ -1,3 +1,49 @@
+# November 27 — Separate validation-only FCM permission diagnostic implemented
+
+Real Google OAuth success remains owner-observed evidence at08:28:48Z; previous
+single OAuth-only approval consumed. No further real provider calls by agent. Implemented
+separate GET/POST /api/admin/fcm-permission-validation + owner Operations component,
+NOT deployed. Original OAuth-only endpoint still never calls FCM;16 unit tests preserve
+that contract. Public/provider delivery gate stays OFF; no credentials/IAM/native edits.
+
+New path uses fixed-project/topic immutable validate_only:true payload, no device token,
+notification, caller override or fallback to delivery. One fresh scoped OAuth request
+plus one FCM messages:send VALIDATION request (each10s bounded). Tokens stay server-
+transient, not cached/returned/logged/persisted; sanitized status only. Exact same
+approved dedicated identity, configured-owner+active-admin authorization, closed
+staging/ordering/push/payout/retention/municipal+StripeTEST guards. Strict input allows
+only confirmValidationOnly:true. GET readiness/history is local/read-only/no provider.
+
+Existing platform_settings table holds durable GLOBAL one-shot v1 allowance committed
+with audit-start BEFORE provider I/O. No expiry/reset endpoint/automatic retry; failures,
+crashes or lost responses consume allowance. Sanitized report/audit persist; GET recovers
+completed/unconfirmed outcome. No DB transaction held over network. Owner UI explicit
+checkbox/button, no token/target inputs, no automatic POST/retry. FCM HTTP200 only with
+valid SAME-project acknowledgement grants permissionValidated;403/400/redirect/missing
+or different-project evidence never accepted. This is dry-run permission proof, not
+physical device receipt. No migration/new env flag/APK rebuild required.
+
+Local tests: API286 PASS/1 PostgreSQL-only SKIP/0 fail, including dedicated relational
+owner/role/guards/input/concurrency/one-shot/error/audit/privacy and unchanged financial/
+notification records. FCM16 PASS + fixed-builder2 PASS; HTTP/body timeout/no-fallback,
+no token cache and OAuth-only non-FCM boundary covered. API/UI types and production
+builds PASS; browser suite PASS, new permission explicit-consent/permanent allowance/
+GET-only lost-response/no horizontal overflow cases, simulated providers only.
+Exact new-source CI pending push; do not claim live FCM permission acceptance.
+
+Next: commit/push and verify exact-SHA all3 CI, then STOP at separate owner deployment
+and provider-execution approvals. Future call approval must explicitly include fresh
+OAuth + one FCM messages:send with validate_only:true (not a notification). Keep provider
+pushOFF even during permission validation. Prior deployeda428852/23-read-only evidence
+unchanged, no new hosting action. After approved deployment, only read readiness until
+execution approval. Rollback target is retained a428852; one-shot/audit records are not
+reset by rollback/redeploy. Later stages: separately authorized one configured staging
+app/device enrollment, then recipient-scoped real notification/OS receipt test with
+outbox safeguards reviewed; do not globally open worker sending merely for validation.
+No owner phone action before new exact-source release approval. GPS/90s/signing and
+all financial/public-ordering/geographic safeguards preserved. Work includes previous
+f3b8c59 offline-builder commit; live diagnostic UI does not exist until approved deploy.
+
 # November 27 — Real Google OAuth success confirmed by owner; permission stage next
 
 Owner executed the ONE separately approved OAuth-only check on deployeda4288526b668d71db0c519e621f543484e3afb11.

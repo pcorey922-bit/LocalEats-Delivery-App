@@ -406,6 +406,44 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       assert.deepEqual(await db.select().from(financialOperationsTable),financialBefore);assert.deepEqual(await db.select().from(notificationsTable),notificationsBefore);
     }finally{globalThis.fetch=originalFetch;process.env=prior;await db.update(profilesTable).set({isActive:true}).where(eq(profilesTable.id,ids.admin));await db.delete(requestLimitsTable).where(eq(requestLimitsTable.bucketKey,bucket));}
   });
+  await t.test('FCM permission validation is owner-only, permanently one-shot and validation-only with no notification/financial writes',async()=>{
+    const prior={...process.env},originalFetch=globalThis.fetch,path='/admin/fcm-permission-validation',settingKey='fcm_permission_validation_v1';
+    const secret='synthetic_permission_token_private',privateKey=generateKeyPairSync('rsa',{modulusLength:2048}).privateKey.export({type:'pkcs8',format:'pem'});
+    let auth=0,validations=0,fail=false;
+    const financialBefore=await db.select().from(financialOperationsTable),noticesBefore=await db.select().from(notificationsTable);
+    try{
+      Object.assign(process.env,{LOCALEATS_ADMIN_CLERK_USER_IDS:ids.admin,ROCOEATS_PRIVATE_STAGING:'true',ROCOEATS_STAGING_TESTER_CLERK_USER_IDS:[ids.customer,ids.restaurant,ids.driver].join(','),ROCOEATS_ORDERING_ENABLED:'false',ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED:'false',ROCOEATS_PUSH_DELIVERY_ENABLED:'false',ROCOEATS_TEST_PAYOUTS_ENABLED:'false',ROCOEATS_WEBHOOK_RETENTION_ENABLED:'false',ROCOEATS_DELIVERY_AREA_MODE:'provisional_postal',PAYMENT_PROVIDER:'stripe_test',STRIPE_SECRET_KEY:'sk_test_fixture',FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify({type:'service_account',project_id:'rocoeats-3bd55',client_email:'rocoeats-staging-fcm@rocoeats-3bd55.iam.gserviceaccount.com',private_key:privateKey})});
+      globalThis.fetch=async(input,init)=>{
+        const url=String(input);if(url.startsWith(origin+'/'))return originalFetch(input,init);
+        assert.equal(init?.redirect,'error');
+        if(url==='https://oauth2.googleapis.com/token'){auth++;return Response.json({access_token:secret,expires_in:3600});}
+        assert.equal(url,'https://fcm.googleapis.com/v1/projects/rocoeats-3bd55/messages:send');
+        const body=JSON.parse(String(init?.body));assert.equal(body.validate_only,true);assert.deepEqual(body.message,{topic:'rocoeats-staging-permission-probe',data:{rocoeatsProbe:'permission-validation-only'}});validations++;
+        await new Promise(resolve=>setTimeout(resolve,5));return fail?Response.json({error:secret},{status:403}):Response.json({name:'projects/rocoeats-3bd55/messages/fake_message_id'});
+      };
+      assert.equal((await api(path,null)).status,401);assert.equal((await api(path,null,'POST',{confirmValidationOnly:true})).status,401);
+      for(const user of [ids.customer,ids.driver,ids.restaurant])assert.equal((await api(path,user,'POST',{confirmValidationOnly:true})).status,403);
+      process.env.LOCALEATS_ADMIN_CLERK_USER_IDS='';assert.equal((await api(path,ids.admin,'POST',{confirmValidationOnly:true})).status,403);process.env.LOCALEATS_ADMIN_CLERK_USER_IDS=ids.admin;
+      for(const [key,value]of Object.entries({ROCOEATS_PUSH_DELIVERY_ENABLED:'true',ROCOEATS_ORDERING_ENABLED:'true',ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED:'true',ROCOEATS_TEST_PAYOUTS_ENABLED:'true',ROCOEATS_WEBHOOK_RETENTION_ENABLED:'true',ROCOEATS_DELIVERY_AREA_MODE:'municipal',PAYMENT_PROVIDER:'sandbox',FIREBASE_SERVICE_ACCOUNT_JSON:'{}'})){
+        const old=process.env[key];process.env[key]=value;assert.equal((await api(path,ids.admin,'POST',{confirmValidationOnly:true})).status,409,key);process.env[key]=old;
+      }
+      for(const body of [{},{confirmValidationOnly:false},{confirmValidationOnly:true,validate_only:false},{confirmValidationOnly:true,token:'private_device_fixture'},{confirmValidationOnly:true,topic:'other'}])assert.equal((await api(path,ids.admin,'POST',body)).status,400);
+      assert.equal((await api(path+'?target=other',ids.admin,'POST',{confirmValidationOnly:true})).status,400);
+      const ready=await api(path,ids.admin);assert.equal(ready.data.ready,true);assert.equal(ready.data.allowanceUsed,false);assert.equal(auth,0);assert.equal(validations,0);
+      const responses=await Promise.all([api(path,ids.admin,'POST',{confirmValidationOnly:true}),api(path,ids.admin,'POST',{confirmValidationOnly:true})]);assert.deepEqual(responses.map(r=>r.status).sort(),[200,409]);
+      const result=responses.find(r=>r.status===200)!.data;assert.equal(result.permissionValidated,true);assert.equal(result.validationOnly,true);assert.equal(result.notificationSent,false);assert.equal(result.deviceDeliveryVerified,false);assert.equal(auth,1);assert.equal(validations,1);
+      const status=await api(path,ids.admin);assert.equal(status.data.ready,false);assert.equal(status.data.run.report.permissionValidated,true);assert.equal(status.data.allowanceUsed,true);
+      assert.equal((await api(path,ids.admin,'POST',{confirmValidationOnly:true})).status,409);assert.equal(validations,1);
+      const audit=await db.select().from(auditLogsTable).where(eq(auditLogsTable.resourceId,settingKey));assert.equal(audit.filter(a=>a.action==='fcm.permission_validation_started').length,1);
+      const [saved]=await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.settingKey,settingKey));
+      for(const marker of [secret,'PRIVATE KEY','client_email','private_key'])assert.equal(JSON.stringify({result,status,audit,saved}).includes(marker),false);
+      // New isolated local fixture for a failed first attempt; never a hosted reset.
+      await db.delete(platformSettingsTable).where(eq(platformSettingsTable.settingKey,settingKey));fail=true;
+      const failed=await api(path,ids.admin,'POST',{confirmValidationOnly:true});assert.equal(failed.data.permissionValidated,false);assert.equal(JSON.stringify(failed.data).includes(secret),false);
+      assert.equal((await api(path,ids.admin,'POST',{confirmValidationOnly:true})).status,409);assert.equal(auth,2);assert.equal(validations,2);
+      assert.deepEqual(await db.select().from(financialOperationsTable),financialBefore);assert.deepEqual(await db.select().from(notificationsTable),noticesBefore);
+    }finally{globalThis.fetch=originalFetch;process.env=prior;await db.delete(platformSettingsTable).where(eq(platformSettingsTable.settingKey,settingKey));}
+  });
   await t.test("public geocoding is owner-only, explicit, closed-gate and durable single-use across concurrent calls", async () => {
     const names = ["LOCALEATS_ADMIN_CLERK_USER_IDS", "ROCOEATS_PRIVATE_STAGING", "ROCOEATS_STAGING_TESTER_CLERK_USER_IDS", "ROCOEATS_ORDERING_ENABLED", "ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED", "PAYMENT_PROVIDER", "STRIPE_SECRET_KEY", "ROCOEATS_DELIVERY_AREA_MODE", "GEOCODIO_API_KEY", "ROCOEATS_GEOCODIO_PUBLIC_TEST_ENABLED"];
     const prior = Object.fromEntries(names.map(name => [name, process.env[name]]));

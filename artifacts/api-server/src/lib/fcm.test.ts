@@ -2,7 +2,7 @@ import pushPolicy from '../../../../config/native-push-policy.json';
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { generateKeyPairSync, verify } from "node:crypto";
-import { createFcmSender, fcmCredentialStatus, firebaseOAuthDiagnosticReady, verifyFirebaseOAuth } from "./fcm";
+import { createFcmSender, fcmCredentialStatus, firebaseOAuthDiagnosticReady, verifyFirebaseOAuth, validateFcmPermission } from "./fcm";
 import { createServer } from "node:http";
 const keys = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const credentials = JSON.stringify({
@@ -16,6 +16,40 @@ const diagnosticCredentials = JSON.stringify({
   ...JSON.parse(credentials),
   project_id: "rocoeats-3bd55",
   client_email: "rocoeats-staging-fcm@rocoeats-3bd55.iam.gserviceaccount.com",
+});
+test('FCM permission validation uses one scoped OAuth and one immutable dry-run, never caches or exposes tokens',async()=>{
+  const calls:string[]=[];
+  const result=await validateFcmPermission(diagnosticCredentials,async(input,init)=>{
+    calls.push(String(input));assert.equal(init?.redirect,'error');
+    if(String(input)==='https://oauth2.googleapis.com/token')return Response.json({access_token:'never_expose_validation_token',expires_in:3600});
+    assert.equal(String(input),'https://fcm.googleapis.com/v1/projects/rocoeats-3bd55/messages:send');
+    assert.equal(new Headers(init?.headers).get('authorization'),'Bearer never_expose_validation_token');
+    const body=JSON.parse(String(init?.body));assert.equal(body.validate_only,true);assert.equal(body.message.topic,'rocoeats-staging-permission-probe');assert.equal('token' in body.message,false);
+    return Response.json({name:'projects/rocoeats-3bd55/messages/fake_message_id'});
+  });
+  assert.deepEqual(result,{authenticated:true,permissionValidated:true,code:'FCM_PERMISSION_VALIDATED'});assert.equal(calls.length,2);assert.equal(JSON.stringify(result).includes('token'),false);
+});
+test('FCM validation errors, wrong projects and malformed acknowledgements never become permission acceptance',async()=>{
+  for(const mode of ['oauth','forbidden','invalid','missing','wrong-project','redirect']){
+    let calls=0;
+    const result=await validateFcmPermission(diagnosticCredentials,async input=>{
+      calls++;
+      if(String(input).includes('oauth2'))return mode==='oauth'?Response.json({error:'secret_fixture'},{status:401}):Response.json({access_token:'secret_fixture',expires_in:3600});
+      if(mode==='forbidden'||mode==='invalid')return Response.json({error:'secret_fixture'},{status:mode==='forbidden'?403:400});
+      const response=Response.json(mode==='missing'?{}:{name:mode==='wrong-project'?'projects/other/messages/fake':'projects/rocoeats-3bd55/messages/fake'});
+      if(mode==='redirect')Object.defineProperty(response,'redirected',{value:true});return response;
+    });
+    assert.equal(result.permissionValidated,false);assert.equal(result.authenticated,mode!=='oauth');assert.equal(calls,mode==='oauth'?1:2);assert.equal(JSON.stringify(result).includes('secret_fixture'),false);
+  }
+});
+test('FCM validation body timeout is bounded without falling back to sending',async(t)=>{
+  t.mock.timers.enable({apis:['setTimeout']});let messages=0;
+  const pending=validateFcmPermission(diagnosticCredentials,async(input,init)=>{
+    if(String(input).includes('oauth2'))return Response.json({access_token:'fixture_access',expires_in:3600});
+    messages++;assert.equal(JSON.parse(String(init?.body)).validate_only,true);const r=Response.json({});Object.defineProperty(r,'json',{value:()=>new Promise(()=>{})});return r;
+  });
+  for(let n=0;n<30&&messages===0;n++)await Promise.resolve();
+  assert.equal(messages,1);t.mock.timers.tick(10001);assert.equal((await pending).permissionValidated,false);assert.equal(messages,1);
 });
 test("OAuth-only diagnostic authenticates the dedicated identity without a message endpoint, token return or token cache", async () => {
   let calls = 0;

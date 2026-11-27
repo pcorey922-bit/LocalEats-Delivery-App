@@ -1,6 +1,7 @@
 import { pushLifetime } from "./push-expiry";
 import pushPolicy from "../../../../config/native-push-policy.json";
 import { createHash, createPrivateKey, sign } from "node:crypto";
+import { prepareFcmPermissionProbe } from "./fcm-permission-probe";
 const tokenUrl = "https://oauth2.googleapis.com/token";
 const scope = "https://www.googleapis.com/auth/firebase.messaging";
 type Access = { value: string; expiresAt: number };
@@ -165,6 +166,79 @@ export async function verifyFirebaseOAuth(
 }
 
 // Only Google's fixed OAuth/FCM origins are used, regardless of credential JSON.
+// Separate from verifyFirebaseOAuth: requires separate approval even though it
+// cannot deliver a message. Never invoke the normal cached sending function.
+export async function validateFcmPermission(
+  raw: string | undefined,
+  transport: typeof fetch = fetch,
+) {
+  if (!firebaseOAuthDiagnosticReady(raw))
+    return {
+      authenticated: false,
+      permissionValidated: false,
+      code: "CREDENTIAL_UNAVAILABLE",
+    } as const;
+  let access: Access | undefined;
+  let authenticated = false;
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    access = await requestAccessToken(parseCredentials(raw!), transport);
+    authenticated = true;
+    const probe = prepareFcmPermissionProbe();
+    // Defense at the actual network boundary, independent of UI/request inputs.
+    if (JSON.parse(probe.body).validate_only !== true)
+      throw Error("Validation-only required");
+    const deadline = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(Error("Validation unavailable"));
+      }, 10000);
+    });
+    await Promise.race([
+      (async () => {
+        const response = await transport(probe.url, {
+          method: probe.method,
+          redirect: probe.redirect,
+          body: probe.body,
+          headers: {
+            authorization: `Bearer ${access!.value}`,
+            "content-type": "application/json",
+          },
+          signal: controller.signal,
+        });
+        if (response.status !== 200 || response.redirected)
+          throw Error("Validation unavailable");
+        const body = (await response.json()) as { name?: unknown };
+        const prefix = "projects/rocoeats-3bd55/messages/";
+        if (
+          typeof body?.name !== "string" ||
+          !body.name.startsWith(prefix) ||
+          !body.name.slice(prefix.length) ||
+          /[\s/?#]/.test(body.name.slice(prefix.length))
+        )
+          throw Error("Validation unavailable");
+      })(),
+      deadline,
+    ]);
+    return {
+      authenticated: true,
+      permissionValidated: true,
+      code: "FCM_PERMISSION_VALIDATED",
+    } as const;
+  } catch {
+    return {
+      authenticated,
+      permissionValidated: false,
+      code: "FCM_PERMISSION_UNVERIFIED",
+    } as const;
+  } finally {
+    clearTimeout(timer);
+    if (access) access.value = "";
+    access = undefined;
+  }
+}
+
 export function createFcmSender(raw: string, transport: typeof fetch = fetch) {
   const { key, email, project } = parseCredentials(raw);
   let cached: Access | null = null,

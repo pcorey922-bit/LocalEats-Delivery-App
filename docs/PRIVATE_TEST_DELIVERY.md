@@ -1,3 +1,35 @@
+## FCM validation-only permission diagnostic — prepared, NOT deployed/authorized
+
+Separate owner-only endpoint /api/admin/fcm-permission-validation and Operations panel
+are implemented/tested in repository; exact-SHA CI must pass before a release request.
+The earlier OAuth-only approval is consumed and DOES NOT cover this new operation.
+Actual execution requires separate authorization for ONE fresh OAuth token request
+and ONE FCM messages:send request with literal validate_only:true. No delivery occurs;
+no device enrollment/token is needed because target is fixed staging validation topic.
+Official semantics: https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages/send
+
+After separately approved exact-commit release (no env/migration/APK changes):
+1. Engineering verifies23 read-only checks and owner uses Samsung Chrome staging
+   Operations. Inspect Provider push sendingdisabled and validation readiness only.
+   Loading/Refresh FCM validation status is GET-only and does not contact Google.
+2. STOP until new provider-execution approval. Do NOT repeat Verify Google OAuth only.
+3. With explicit validation-only approval, locate FCM permission validation — no delivery,
+   check its consent box, then tap Validate FCM permission only ONCE. It never opens
+   the global worker gate, permits a device target or falls back to real sending.
+4. Report only sanitized result. Expected success: FCM permission validated without
+   delivery. Device registration and actual notification receipt remain unverified.
+5. Any failure/lost response: STOP. Refresh FCM validation status GET may recover report;
+   allowance is permanently used after start, no reset/retry button. Unknown stays
+   unconfirmed; do not change credentials/IAM or reset records to obtain a pass.
+
+The new route requires active configured owner, dedicated identity and closed safety
+gates; one-shot allowance/audit commits before I/O. Token never logged/cached/persisted/
+returned. Only same-project valid HTTP200 FCM acknowledgement grants permission evidence.
+Normal sending worker and existing OAuth-only code are not used for validation. Rollback
+target is prior a428852; database allowance/audits survive release rollback intentionally.
+Further one-device registration/actual OS delivery requires its own approval and review
+of recipient restriction/outbox before any provider send window. No current sends allowed.
+
 ## November 27 — One authorized Google OAuth execution COMPLETED successfully
 
 Owner reported exact success label at03:28:48EST/08:28:48Z; cooldown until03:38:48EST,

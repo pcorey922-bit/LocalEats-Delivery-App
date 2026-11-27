@@ -2,6 +2,7 @@ import { type FormEvent, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
 import { FirebaseOAuthDiagnostic } from './firebase-oauth';
+import { FcmPermissionValidation } from './fcm-permission';
 type Group = { state: string; count: number; oldest?: string | null };
 type Health = {
   financial: Group[];
@@ -91,6 +92,7 @@ export function OperationalConsole() {
     <section className="roco-card">
       <h2>Service health and recovery</h2>
       <FirebaseOAuthDiagnostic />
+      <FcmPermissionValidation />
       <p>
         Queue status refreshes every 15 seconds. Retries retain the original
         event or device delivery. Review the cause before retrying.

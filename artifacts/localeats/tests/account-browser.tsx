@@ -1,3 +1,4 @@
+import { FcmPermissionValidation } from '../src/pages/fcm-permission';
 import { FirebaseOAuthDiagnostic } from '../src/pages/firebase-oauth';
 import { NativeStartupBoundary } from '../src/components/native-startup-boundary';
 import { nativeStartup } from '../src/lib/native-startup';
@@ -56,6 +57,8 @@ declare global {
     qaGeoReady: boolean;
     qaGeoCalls: number;
     qaOAuthCalls: number;
+    qaFcmValidationCalls: number;
+    qaFcmValidationRun: null | Record<string, unknown>;
     qaOAuthRun: null | Record<string, unknown>;
     qaGeoRun: null | Record<string, unknown>;
     qaWrites: unknown[];
@@ -92,6 +95,8 @@ window.qaEvidenceState = 'pending';
 window.qaGeoReady = false;
 window.qaGeoCalls = 0;
 window.qaOAuthCalls = 0;
+window.qaFcmValidationCalls = 0;
+window.qaFcmValidationRun = null;
 window.qaOAuthRun = null;
 window.qaGeoRun = null;
 window.qaEvidenceAttempts = 0;
@@ -154,6 +159,16 @@ window.qaStaff = {
   accessVersion: "v1",
 };
 window.fetch = async (url, options = {}) => {
+  if(String(url)==='/api/admin/fcm-permission-validation'){
+    if(options.method==='POST'){
+      window.qaFcmValidationCalls++;if(String(options.body)!==JSON.stringify({confirmValidationOnly:true}))throw Error('Unexpected validation input');
+      window.qaFcmValidationRun={state:'completed',report:{authenticated:true,permissionValidated:true,code:'FCM_PERMISSION_VALIDATED'}};
+      if(location.search.includes('lostFcm=true'))throw new TypeError('Simulated lost validation result');
+      return Response.json({...window.qaFcmValidationRun.report as object,validationOnly:true,notificationSent:false,deviceDeliveryVerified:false});
+    }
+    return Response.json({ready:window.qaFcmValidationRun===null,allowanceUsed:window.qaFcmValidationRun!==null,run:window.qaFcmValidationRun});
+  }
+
   if (String(url) === '/api/admin/firebase-oauth') {
     if (options.method === 'POST') {
       window.qaOAuthCalls++;
@@ -451,7 +466,7 @@ createRoot(document.getElementById("root")!).render(
     client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
   >
     <p>SIMULATED authentication and API: component QA only</p>
-    {location.search.includes('firebaseOAuth=true') ? <FirebaseOAuthDiagnostic/> : location.search.includes('checkoutCsp=true') ? <CheckoutPanel orderId="fixture-csp"/> : location.search.includes('reconciliation=true') ? <PaymentReconciliation orderId="fixture-reconciliation"/> : location.search.includes('cartSync=true') ? <React.StrictMode><CartProbe name="menu"/><CartProbe name="checkout"/></React.StrictMode> : location.search.includes("native=true") ? (
+    {location.search.includes('fcmValidation=true') ? <FcmPermissionValidation/> : location.search.includes('firebaseOAuth=true') ? <FirebaseOAuthDiagnostic/> : location.search.includes('checkoutCsp=true') ? <CheckoutPanel orderId="fixture-csp"/> : location.search.includes('reconciliation=true') ? <PaymentReconciliation orderId="fixture-reconciliation"/> : location.search.includes('cartSync=true') ? <React.StrictMode><CartProbe name="menu"/><CartProbe name="checkout"/></React.StrictMode> : location.search.includes("native=true") ? (
       <NativeStartupBoundary enabled><NativeSignIn role={location.search.includes("join=restaurant") ? "restaurant" : undefined} /></NativeStartupBoundary>
     ) : location.search.includes("importGuest=true") ? (
       <ImportGuestLink />

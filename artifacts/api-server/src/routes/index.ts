@@ -1,5 +1,6 @@
 import mobileAuthRouter from "./mobile-auth";
 import firebaseOAuthRouter from './firebase-oauth';
+import fcmPermissionRouter from './fcm-permission';
 import guestContactRouter from "./guest-contact";
 import telephoneConfirmationRouter from "./telephone-confirmation";
 import guestSessionsRouter from "./guest-sessions";
@@ -32,6 +33,7 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(firebaseOAuthRouter);
+router.use(fcmPermissionRouter);
 router.use(mobileAuthRouter);
 router.use(guestSessionsRouter);
 router.use(guestContactRouter);
