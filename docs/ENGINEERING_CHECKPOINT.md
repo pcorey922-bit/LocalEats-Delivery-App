@@ -1,3 +1,24 @@
+# November 27 — Permission diagnostic code CI verified; live permission not tested
+
+Functional e2652709a9d7a531ee8e711fc67d6c609fb9648b ALL THREE CI SUCCESS:
+45968198861(PR Validate),45968187677(push Validate),45968198855(native Android/iOS).
+Prior f3b8c59 offline/evidence commit all3 SUCCESS too. Current hosting unchangeda428852;
+no new Google calls/sends/deploy/config changes. OAuth authentication is CONFIRMED by
+owner at08:28:48Z; live FCM permission/device delivery remain UNVERIFIED. Safe preparation
+local API286 PASS+1 PG-only skip, FCM16+builder2 PASS, types/builds/browser PASS.
+
+Next OWNER APPROVAL is one existing Render deployment of EXACT functionale265270 SHA,
+not newer docs HEAD, with unchanged credentials/flags and no migrations/APK rebuild.
+After Live, verify23 read-only checks + owner GET permission readiness; do not execute.
+A later separate execution approval must explicitly cover fresh OAuth +one validate_only
+FCM request (no delivery). One-shot allowance cannot expire/reset/retry automatically;
+failure/unconfirmed stops review. Existing OAuth-only approval is consumed and not reused.
+Rollback target retained a428852; DB audit/one-shot state not reversed by rollback.
+No current phone action until deployment approval. Next actual-device stage requires
+separate one-app/device enrollment/recipient-scoped send authorization and outbox review.
+Do not open global sending, enroll a device, or repeat accepted GPS tests now.
+This follow-up is documentation only; its CI is separate from functional source above.
+
 # November 27 — Separate validation-only FCM permission diagnostic implemented
 
 Real Google OAuth success remains owner-observed evidence at08:28:48Z; previous
@@ -29,9 +50,9 @@ notification records. FCM16 PASS + fixed-builder2 PASS; HTTP/body timeout/no-fal
 no token cache and OAuth-only non-FCM boundary covered. API/UI types and production
 builds PASS; browser suite PASS, new permission explicit-consent/permanent allowance/
 GET-only lost-response/no horizontal overflow cases, simulated providers only.
-Exact new-source CI pending push; do not claim live FCM permission acceptance.
+Exact functional-source CI now passed (see top entry); live FCM permission is not yet verified.
 
-Next: commit/push and verify exact-SHA all3 CI, then STOP at separate owner deployment
+Next: STOP at separate owner deployment
 and provider-execution approvals. Future call approval must explicitly include fresh
 OAuth + one FCM messages:send with validate_only:true (not a notification). Keep provider
 pushOFF even during permission validation. Prior deployeda428852/23-read-only evidence

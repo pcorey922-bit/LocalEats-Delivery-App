@@ -1,3 +1,12 @@
+# November 27 — Ready for separately approved permission-diagnostic release
+
+Functional e2652709a9d7a531ee8e711fc67d6c609fb9648b all3 CI SUCCESS
+45968198861/45968187677/45968198855. Owner OAuth success evidence preserved; no live
+FCM permission request or delivery performed. No hosting/env/IAM/native/GPS changes.
+Next: approve exact existing-service deployment, verify read-only, then separately
+approve fresh OAuth+one FCM validate_only request. Later device enrollment/actual
+receipt requires its own approval. No new migrations/variables/APKs required.
+
 # November 27 — Owner-only FCM permission diagnostic ready for CI, NOT live
 
 New separate owner-only validation route/UI forces fixed-topic validate_only:true,

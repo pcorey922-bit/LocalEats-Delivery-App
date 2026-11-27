@@ -1,14 +1,21 @@
-## FCM validation-only permission diagnostic — prepared, NOT deployed/authorized
+## FCM validation-only permission diagnostic — CI verified, NOT deployed/authorized
 
 Separate owner-only endpoint /api/admin/fcm-permission-validation and Operations panel
-are implemented/tested in repository; exact-SHA CI must pass before a release request.
+are implemented/tested; exact functional source
+`e2652709a9d7a531ee8e711fc67d6c609fb9648b` passed all3 CI.
+A separate deployment approval is still required; do not deploy newer docs HEAD.
 The earlier OAuth-only approval is consumed and DOES NOT cover this new operation.
 Actual execution requires separate authorization for ONE fresh OAuth token request
 and ONE FCM messages:send request with literal validate_only:true. No delivery occurs;
 no device enrollment/token is needed because target is fixed staging validation topic.
 Official semantics: https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages/send
 
-After separately approved exact-commit release (no env/migration/APK changes):
+After owner approves deployment: existing Render LocalEats-Delivery-App -> Manual
+Deploy -> Deploy a specific commit -> e2652709a9d7a531ee8e711fc67d6c609fb9648b.
+Preserve variables/gates. No migration/APK change. Retained a428852 is rollback target.
+This is a future approved action, not permission to deploy now.
+
+After separately approved exact-commit release:
 1. Engineering verifies23 read-only checks and owner uses Samsung Chrome staging
    Operations. Inspect Provider push sendingdisabled and validation readiness only.
    Loading/Refresh FCM validation status is GET-only and does not contact Google.
