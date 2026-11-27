@@ -1,3 +1,12 @@
+# November 27 — FCM validation exact release authorized, not deployed
+
+Target e2652709a9d7a531ee8e711fc67d6c609fb9648b all3 CI reconfirmed; currenta428852
+fresh23 preflight PASS. Payload/strict inputs/durable unique one-shot reviewed; no new
+migration/env/key/native change. No Render connection; owner must confirma428852 rollback
+availability and pushOFF, then manual exact-source deploy. Agent cannot confirm retained
+artifact via public API. After Live, read-only verification only; consent/actual provider
+requests still require separate approval. No financial/provider operation performed.
+
 # November 27 — Ready for separately approved permission-diagnostic release
 
 Functional e2652709a9d7a531ee8e711fc67d6c609fb9648b all3 CI SUCCESS

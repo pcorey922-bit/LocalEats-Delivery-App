@@ -1,3 +1,22 @@
+## November 27 — FCM validation deployment approved, execution NOT approved
+
+ONE exact e2652709a9d7a531ee8e711fc67d6c609fb9648b release to existing service is
+approved. All3 source CI pass; livea428852 preflight23/23 PASS. No direct Render access.
+1. Owner Chrome Operations -> confirm Provider push sendingdisabled/all gatesclosed.
+2. Render existing LocalEats-Delivery-App -> Deploys -> confirm successfula428852 retained
+   rollback availability. Agent cannot inspect retention; if not confirmed, stop/report.
+3. Manual Deploy -> Deploy a specific commit -> FULL e2652709a9d7a531ee8e711fc67d6c609fb9648b.
+   No latest docs HEAD, env edit/restart/new credentials/APK rebuild. Deploy once.
+4. After Live, report actual SHA. Engineering runs23 read-only checks expectede265270;
+   owner may GET https://localeats-delivery-app.onrender.com/api/admin/fcm-permission-validation
+   in same signed-in Chrome. Expected readytrue, allowanceUsedfalse, runnull. Reading
+   status never contacts Google/FCM. Report only sanitized fields and pushdisabled label.
+5. STOP. Leave consent unchecked; do not press Verify Google OAuth only, Validate FCM
+   permission only, Retry or send. New provider-execution approval is still required.
+Rollback procedure only: retaineda428852 deploy -> Rollback (target build/env snapshot,
+not DB restoration). Do not automatically execute extra deploy/rollback under this
+one-release approval. One-shot/audit database state cannot reset through rollback.
+
 ## FCM validation-only permission diagnostic — CI verified, NOT deployed/authorized
 
 Separate owner-only endpoint /api/admin/fcm-permission-validation and Operations panel

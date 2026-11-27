@@ -1,3 +1,31 @@
+# November 27 — Exact FCM validation release approved; owner deployment pending
+
+Owner approves ONE existing Render deploy of e2652709a9d7a531ee8e711fc67d6c609fb9648b,
+NOT provider execution/env/IAM/credential/billing changes or APK builds. All3 exact CI
+reconfirmed SUCCESS45968198861/45968187677/45968198855. Newer docs HEAD is NOT target.
+Source review confirms fixed validate_only:true, no target overrides/fallback, unique
+platform_settings key committed before provider I/O, conflict rejection, no expiry or
+reset path; retries/concurrency/restarts cannot recreate its durable allowance. Tests
+already passed; no repeat accepted native/provider tests. No migrations/env/key changes.
+
+Live preflight23/23 PASS at2026-11-27T08:57:35.838Z, deployed STILL exacta4288526b668d71db0c519e621f543484e3afb11.
+DB/auth/security/native/proxy ready, ordering/live/payout/retention/municipal gatesOFF.
+Evidence verification/STAGING_HTTP_2026-11-27_a428852_FCM_PREFLIGHT.json. PushOFF last
+owner-observed with successful OAuth; no new settings changed. Confirm label before
+manual deploy. No direct Render deployment/session capability; NO DEPLOYMENT PERFORMED.
+Rollback artifact availability for a428852 is owner-dashboard-only UNVERIFIED here;
+owner must confirm retained successful deploy/rollback availability, otherwise stop.
+
+Owner manual target: existing LocalEats-Delivery-App -> Manual Deploy -> Deploy a
+specific commit -> FULL e2652709a9d7a531ee8e711fc67d6c609fb9648b. No latest commit,
+restart, environment edit or cache clear. After Live/source report, verify23 checks
+expectinge265270 plus unauthenticated GET denial. Owner Chrome can inspect protected
+GET /api/admin/fcm-permission-validation, expected readytrue/allowanceUsedfalse/runnull,
+provider pushdisabled. Do NOT tick consent or press either diagnostic Verify/Validate.
+Execution remains separately unauthorized (would entail fresh OAuth+one FCM dry run).
+Current Google OAuth success remains confirmed owner evidence; FCM permissions/receipt
+unverified. GPS/90s/Android signing/records preserved. Stop at owner Render-session step.
+
 # November 27 — Permission diagnostic code CI verified; live permission not tested
 
 Functional e2652709a9d7a531ee8e711fc67d6c609fb9648b ALL THREE CI SUCCESS:
