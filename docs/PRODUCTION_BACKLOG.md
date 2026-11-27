@@ -1,3 +1,15 @@
+# November 27 — FCM release ready; deployment blocked on owner session
+
+Exact approved candidate ff73741bb7a5e3ffcb0985b02d2355bb1fd99f48 all3 CI SUCCESS;
+credential-validation fix included, no migrations/startup/native changes. Live644e038
+preflight23/23 PASS, closed public/private ordering/live/payout/retention/municipal gates.
+Push OFF requires authenticated owner view (public API does not expose flag); requested.
+No Render connection/session available; no deployment performed. Manual exact-commit
+procedure/rollback preserved in PRIVATE_TEST_DELIVERY.md; do not deploy newer docs HEAD.
+After owner Live report, verify23 checks expectedff73741 and sanitized Operations local
+credential/push gate labels, no sends/Verify/Retry. FCM provider auth remains unverified;
+credential storage/local parsing does not prove it. Android/GPS/90s unchanged.
+
 # November 27 — Protected FCM storage complete; deployment not authorized
 
 Owner confirms FIREBASE_SERVICE_ACCOUNT_JSON saved with Save only, no deployment.

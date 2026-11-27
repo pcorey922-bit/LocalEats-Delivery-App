@@ -1,3 +1,38 @@
+## One approved FCM staging release — November 27 (not deployed)
+
+Candidate FULL SHA: `ff73741bb7a5e3ffcb0985b02d2355bb1fd99f48`.
+All three exact-source CI workflows SUCCESS; credential-validation fix included, no
+migration/startup/native changes. Newer documentation commits are NOT release targets.
+Agent has no Render deployment capability. Pre-release live644e038 read-only23/23 PASS;
+post-release verification cannot be claimed until owner actually deploys and reports Live.
+
+Samsung procedure within existing one-deployment authorization:
+1. View Administrator -> Operations -> Service health and recovery. Require Provider
+   push sending: disabled. No Verify/Retry/send buttons. If not disabled, STOP/report;
+   no environment changes are authorized. Confirm other known closed gates remain closed.
+2. Render -> EXISTING LocalEats-Delivery-App. Confirm branch feature/rocoeats-launch-
+   readiness and current successful644e038 release. In Deploys, confirm its retained
+   rollback artifact is available. Do not change environment, build/start settings,
+   plans or databases. If rollback unavailable, stop/report before deploying.
+3. Manual Deploy -> Deploy a specific commit. Paste the FULL ff73741 SHA above;
+   verify selected source, then deploy once. Do not use Deploy latest commit,
+   restart, clear-cache rebuild or save environment variables again.
+4. Wait for Live/succeeded. Report source SHA/status only; no credential/log dump.
+   View Operations and report Android push local-credential label plus Provider push
+   sendingdisabled. Expected newer code label: credentials locally valid; provider
+   delivery unverified. If invalid/missing, STOP/report without edits or test sends.
+5. Engineering then runs the existing23 read-only suite with expected FULL ff73741.
+   Check exact SHA, health/DB/auth/native contracts/headers and closed gates. This
+   does not test a private user's authenticated workflow or actual FCM authentication.
+   No sends, enrollment, financial operation, or second deploy is implied.
+
+Rollback plan (procedure only): Deploys -> prior successful644e038 release -> Rollback
+-> confirm target. Uses retained build and target service-specific environment snapshot;
+current saved settings persist for future standard deploys. Does not restore DB data.
+Do not deploy old SHA with current configuration as a substitute. Do not automatically
+execute another deployment/rollback if scope is unclear; report the failure first.
+Official reference: https://render.com/docs/rollbacks (reviewed November27).
+
 ## Current verified deployment — November24
 
 Owner deployed **644e038b4532936a6db2e954e34a8bf558166c24**. Render Live/source644e038;

@@ -1,3 +1,48 @@
+# November 27 — Controlled FCM release preflight passed; owner Render action required
+
+Owner authorizes ONE existing staging-service deployment to apply saved server JSON;
+no sends, other environment/IAM/billing/key changes, financial operations or app release.
+Frozen deployment candidate: ff73741bb7a5e3ffcb0985b02d2355bb1fd99f48, verified remote
+HEAD at preflight. All3 exact-SHA CI SUCCESS45958115214(native)/45958115212(PR Validate)/
+45958109416(push Validate). Functional4ed3aae credential validation is an ancestor;
+subsequent commits through candidate are docs-only. No new migrations, Dockerfile or
+startup changes vs current644e038; existing Android/GPS/90s contracts unchanged.
+
+Live read-only verifier:23/23 PASS, observed2026-11-27T07:26:21.405Z, deployed still
+644e038b4532936a6db2e954e34a8bf558166c24. DB/auth/pricing/worker/webhook/native/CSP/HSTS/
+proxy readiness PASS; public/private ordering, live charges, payouts, retention and
+municipal enforcement OFF. Sanitized evidence:
+docs/verification/STAGING_HTTP_2026-11-27_644e038_PREFLIGHT.json.
+This is PRE-deployment evidence, not release verification. Public providerConfigured
+refers to Stripe setup, NOT FCM authentication. Public readiness does not expose push
+sending; authenticated owner confirmation requested, no reply at checkpoint. Prior
+owner says OFF/only JSON saved; do not present this as independently observed live gate.
+
+Deployment NOT performed: no Render connector, CLI or authenticated dashboard capability
+available. No credential workarounds attempted. Exact Samsung procedure saved at top
+of PRIVATE_TEST_DELIVERY.md. Owner must view Operations provider push sendingdisabled
+before using Manual Deploy -> Deploy a specific commit -> FULL ff73741 SHA. If gate
+not disabled, checks fail or rollback artifact absent, stop/report; do not edit settings.
+Do NOT deploy newer checkpoint/documentation HEAD or restart/Save-and-deploy instead.
+After owner reports Live, rerun23 read-only checks EXPECTING ff73741 and ask only for
+sanitized Operations androidCredentialStatus/Provider push sending labels. No Verify,
+Retry or send. Local credential validity is not Google OAuth/IAM/provider acceptance.
+
+Rollback PROCEDURE identified, not executed/automatically authorized: existing service
+Deploys -> retained successful644e038 deployment -> Rollback -> confirm exact target.
+Render reuses target build/service-specific env snapshot for that rollback; current
+saved settings are not overwritten and future standard deploys reuse current settings.
+Database records are not rolled back; no DB restore/migration reversal needed here.
+Old-SHA fresh deployment is NOT equivalent to rollback of environment snapshot. Confirm
+retained artifact in owner dashboard before release; if absent stop/report, no rebuild
+workaround with current credential. No additional deployment under this one-release
+approval without confirming scope. Reference https://render.com/docs/rollbacks.
+
+Credential storage is owner-confirmed only, not read by agent; active FCM status and
+Google authentication unverified pending release/approved diagnostics. No native APK
+rebuild/GPS retest requested. This checkpoint changes docs/evidence only; deployment
+remains pinned to ff73741, not this newer docs commit. Stop at owner-session boundary.
+
 # November 27 — FCM credential stored with Save only (owner confirmed)
 
 Owner reports FIREBASE_SERVICE_ACCOUNT_JSON saved in existing Render staging service
