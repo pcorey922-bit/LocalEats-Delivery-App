@@ -1,3 +1,13 @@
+# November 27 — e265270 deployed; protected unused-ready check pending
+
+Exact e2652709a9d7a531ee8e711fc67d6c609fb9648b live; independent23 readonly checks
+PASS, both diagnostic/Operations GETs deny anonymous401. No diagnostic/provider call
+performed; owner confirms neither action executed during deployment. Public gatesclosed.
+Next: owner GET ready/allowanceUsed/run (expectedtrue/false/null) proves current pushOFF
+and unused slot without execution. Then separate approval for one OAuth+FCM validate_only
+run; no actual permission/receipt acceptance yet. Prior real OAuth success retained.
+No new code/deploy/env/native/GPS changes or repeated accepted tests needed.
+
 # November 27 — FCM validation exact release authorized, not deployed
 
 Target e2652709a9d7a531ee8e711fc67d6c609fb9648b all3 CI reconfirmed; currenta428852

@@ -1,0 +1,22 @@
+{
+  "observedAt": "2026-11-27T09:22:12.977Z",
+  "requests": "Unauthenticated GET only; no diagnostic POST, OAuth or FCM requests",
+  "checks": [
+    {
+      "path": "/api/admin/fcm-permission-validation",
+      "status": 401,
+      "unauthenticatedAccessDenied": true
+    },
+    {
+      "path": "/api/admin/firebase-oauth",
+      "status": 401,
+      "unauthenticatedAccessDenied": true
+    },
+    {
+      "path": "/api/admin/operational-health",
+      "status": 401,
+      "unauthenticatedAccessDenied": true
+    }
+  ],
+  "passed": true
+}

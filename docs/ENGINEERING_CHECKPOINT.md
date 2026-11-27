@@ -1,3 +1,36 @@
+# November 27 — FCM validation release Live; public checks passed, owner status pending
+
+OWNER reports approved Render deployment succeeded/Live, displayed e265270; neither
+diagnostic executed during this release, no consent boxes checked. Previous approved
+Google OAuth success at08:28:48Z remains historical real owner-observed evidence.
+INDEPENDENT exact deployedSHA e2652709a9d7a531ee8e711fc67d6c609fb9648b confirmed;
+existing23 GET/OPTIONS-only checks ALL PASS at2026-11-27T09:22:15.741Z. DB/auth config/
+pricing/webhooks/workers/security/native/proxy ready; public/private ordering/live
+charges/payouts/retention/municipal gatesOFF. Evidence:
+verification/STAGING_HTTP_2026-11-27_e265270.json.
+
+Additional GET-only protection checks09:22:12.977Z: FCM permission endpoint, OAuth
+endpoint and Operations health all401 unauthenticated. Evidence:
+verification/FCM_VALIDATION_ACCESS_2026-11-27_e265270.json. Owner-role restrictions also
+previously automated-tested on exact source. No provider call, diagnostic POST, hosted
+change, deployment, financial transaction, Android rebuild or GPS alteration by agent.
+
+Protected CURRENT pushOFF/readiness/one-shot state still needs owner-authenticated
+status. Requested same-Samsung-Chrome GET /api/admin/fcm-permission-validation,
+report ready/allowanceUsed/run only. Expected true/false/null; GET does not execute
+OAuth/FCM or consume allowance. readytrue includes closed push/other gates + approved
+local credential identity, so no redundant Operations label needed if that is supplied.
+Do not mark authenticated readiness or unused durable slot independently verified from
+anonymousGET; owner reports no execution, protected status pending at this checkpoint.
+If different/unavailable, stop/investigate without retrying or editing settings.
+
+Public deployment verification PASS. Readiness for separate one-time provider validation
+approval is conditional on protected status above. Actual FCM permission/device delivery
+UNVERIFIED; old OAuth-only approval consumed, new OAuth+FCM validation execution NOT
+approved. Keep both consent boxes unchecked, never press diagnostic/Retry/send controls.
+No new release or variables needed. Android/GPS90s/signing/credentials/IAM and safeguards
+preserved. Resumed clean bf38359 matching remote. Documentation/evidence only.
+
 # November 27 — Exact FCM validation release approved; owner deployment pending
 
 Owner approves ONE existing Render deploy of e2652709a9d7a531ee8e711fc67d6c609fb9648b,

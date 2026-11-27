@@ -1,3 +1,20 @@
+## November 27 — FCM validation release DEPLOYED; execution remains unauthorized
+
+Owner Render Live/sourcee265270 and exact full SHA independently confirmed.23 read-only
+checks PASS at09:22:15.741Z. Both diagnostics + Operations deny anonymous GET401.
+Earlier deployment instructions are COMPLETED; do not deploy again. Neither diagnostic
+executed during release per owner; no consent boxes checked. Agent used GET/OPTIONS only.
+
+Pending owner VIEW ONLY, same signed-in Samsung Chrome:
+https://localeats-delivery-app.onrender.com/api/admin/fcm-permission-validation
+Report ready/allowanceUsed/run, expected true/false/null. readytrue also requires push
+sendingOFF and all diagnostic safeguards; no repeated label check is needed if confirmed.
+This GET neither makes a provider request nor consumes the permanent one-shot allowance.
+If not expected, stop/report; no new consent, Verify, Validate, Retry, reset or env edit.
+After unused-ready confirmation, separate explicit approval is STILL required for fresh
+OAuth +one FCM validation-only request. Prior successful OAuth approval is consumed;
+FCM permission/device delivery remain unverified. No immediate credential/GPS changes.
+
 ## November 27 — FCM validation deployment approved, execution NOT approved
 
 ONE exact e2652709a9d7a531ee8e711fc67d6c609fb9648b release to existing service is
