@@ -1,3 +1,26 @@
+# November 27 — FCM handoff resolved; independent support recovery work active
+
+Owner supplied exact authenticated FCM readiness at approximately04:23EST/09:23Z:
+{"ready":true,"allowanceUsed":false,"run":null}. Evidence saved in
+verification/FCM_READY_OWNER_2026-11-27_e265270.json, owner-observed not agent-session.
+Deployed e265270 remains verified23/23. Readytrue confirms closed push/other safeguards
+and dedicated local identity, unused durable slot. Do not request this evidence again.
+NO execution authorized: new OAuth+FCM validation request pair remains blocked pending
+explicit approval. Google OAuth historical success confirmed; FCM permission/receipt
+not verified. No consents checked/provider calls made. Preserve GPS90s/native artifacts.
+
+Resumed clean remote8bd64b9db1869773059dff5944404e725f652948; all3 CI SUCCESS
+45973307572/45973307562/45973299685. PR1 OPEN/DRAFT, branch relationships preserved.
+Read checkpoint/backlog/source once. Most core commerce/workspace workflows implemented
+and simulation-tested; provider/device/production-hosting/geographic acceptance remains
+external, not a reason to rebuild them. Confirmed independent defect in support:
+request authority cached before transaction allowed revoked account writes. Four focused
+before-fix cases returned201/200 after suspension/demotion. Reused existing no-key-update
+transaction profile locks; new authoritative role checks before opening/reply/decision.
+Focused regression now5/5 PASS, with no case/message/audit/notification changes on denial.
+Admin support timestamp now uses database time. Full API291 PASS/1 PostgreSQL-only skip/0 failures; API types/build PASS. Exact
+source CI pending push. Next package is support browser request timeout/idempotency/recovery. No hosted changes.
+
 # November 27 — FCM validation release Live; public checks passed, owner status pending
 
 OWNER reports approved Render deployment succeeded/Live, displayed e265270; neither

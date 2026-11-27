@@ -1,3 +1,26 @@
+# November 27 — FCM owner evidence resolved; support authority fixed
+
+Owner readiness04:23EST: readytrue/allowanceUsedfalse/runnull; saved as owner evidence.
+Do not request it again; OAuth+FCM permission execution remains NOT authorized.
+Independent confirmed defect fixed: suspended members and demoted administrators
+could open/reply/resolve support after request authorization but before transaction.
+Reproduced four incorrect201/200 responses; transaction-lock rechecks now reject all
+without case/message/audit/notification writes. Focused5 PASS; fullAPI291 PASS+1 PG-only
+skip, API types/build PASS. No migration/deploy/provider/native/GPS change.
+
+Current launch status (repository evidence, not new live acceptance):
+- Commerce/customer/restaurant/dispatch/financial controls: implemented, automated-
+  tested; prior one real StripeTEST delivery verified, broader provider scenarios pending.
+- Customer sign-in/navigation/session and Driver screen-lock GPS: accepted physical
+  scope preserved. Background push and signed physical iOS remain external acceptance.
+- FCM OAuth: real owner-confirmed success. Permission check ready/unused, execution
+  approval blocked; delivery enrollment/send still separately protected.
+- Geographic boundary model/tests implemented; unresolved independent provider ground
+  truth/office-unit evidence and activation approval remain. No new lookups/enforcement.
+- Confirmed actionable support UI gap: unbounded requests and weak lost-response draft
+  recovery. Next work: bounded operations, immutable retry payloads and idempotent admin
+  decisions, then move to next independent core defect. No rebuilding completed flows.
+
 # November 27 — e265270 deployed; protected unused-ready check pending
 
 Exact e2652709a9d7a531ee8e711fc67d6c609fb9648b live; independent23 readonly checks

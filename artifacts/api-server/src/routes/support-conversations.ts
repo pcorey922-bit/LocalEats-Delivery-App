@@ -1,3 +1,4 @@
+import { requireLockedActiveProfile } from '../lib/transaction-access';
 import { requireCustomerAuth } from "../lib/guest-access";
 import { Router } from "express";
 import { and, desc, eq, lt } from "drizzle-orm";
@@ -71,12 +72,13 @@ router.post("/support/cases/:id/messages", requireCustomerAuth, async (req, res)
       .strict()
       .parse(req.body);
   const result = await db.transaction(async (tx) => {
+    const actor = await requireLockedActiveProfile(tx, p.id);
     const [entry] = await tx
       .select()
       .from(supportCasesTable)
       .where(eq(supportCasesTable.id, id))
       .for("update");
-    if (!entry || (p.role !== "admin" && entry.createdBy !== p.id))
+    if (!entry || (actor.role !== "admin" && entry.createdBy !== actor.id))
       throw new CommerceError(404, "Support case not found");
     const [existing] = await tx
       .select()
@@ -85,7 +87,7 @@ router.post("/support/cases/:id/messages", requireCustomerAuth, async (req, res)
     if (existing) {
       if (
         existing.caseId !== id ||
-        existing.authorProfileId !== p.id ||
+        existing.authorProfileId !== actor.id ||
         existing.kind !== "reply" ||
         existing.body !== input.message ||
         existing.caseVersion !== input.version + 1
@@ -106,8 +108,8 @@ router.post("/support/cases/:id/messages", requireCustomerAuth, async (req, res)
       .values({
         id: input.id,
         caseId: id,
-        authorProfileId: p.id,
-        authorRole: p.role,
+        authorProfileId: actor.id,
+        authorRole: actor.role,
         kind: "reply",
         body: input.message,
         caseVersion: version,
@@ -129,7 +131,7 @@ router.post("/support/cases/:id/messages", requireCustomerAuth, async (req, res)
       })
       .where(eq(supportCasesTable.id, id));
     const recipients =
-      p.role === "admin"
+      actor.role === "admin"
         ? [{ id: entry.createdBy }]
         : await tx
             .select({ id: profilesTable.id })
@@ -141,7 +143,7 @@ router.post("/support/cases/:id/messages", requireCustomerAuth, async (req, res)
               ),
             );
     for (const recipient of recipients)
-      if (recipient.id !== p.id)
+      if (recipient.id !== actor.id)
         await tx
           .insert(notificationsTable)
           .values({
@@ -152,7 +154,7 @@ router.post("/support/cases/:id/messages", requireCustomerAuth, async (req, res)
             body: "Open support to review a new message. Operational and payment actions require their separate authorized controls.",
           })
           .onConflictDoNothing();
-    await audit(tx, p.id, "support.replied", id, {
+    await audit(tx, actor.id, "support.replied", id, {
       messageId: input.id,
       version,
       reopened: entry.status === "resolved",

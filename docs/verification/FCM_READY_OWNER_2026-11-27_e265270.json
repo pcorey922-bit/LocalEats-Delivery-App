@@ -1,0 +1,14 @@
+{
+  "evidenceSource": "Owner-observed authenticated Samsung Chrome GET",
+  "deployedRevision": "e2652709a9d7a531ee8e711fc67d6c609fb9648b",
+  "observedAtApproximateOwnerLocal": "2026-11-27 04:23 EST",
+  "observedAtApproximateUtc": "2026-11-27T09:23Z",
+  "response": {
+    "ready": true,
+    "allowanceUsed": false,
+    "run": null
+  },
+  "diagnosticExecuted": false,
+  "consentChecked": false,
+  "providerExecutionAuthorized": false
+}

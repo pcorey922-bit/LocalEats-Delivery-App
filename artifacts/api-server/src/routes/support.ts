@@ -1,3 +1,5 @@
+import { requireLockedActiveProfile, requireLockedAdministrator } from '../lib/transaction-access';
+import { databaseNow } from '../lib/database-clock';
 import { requireCustomerAuth } from "../lib/guest-access";
 import { Router } from "express";
 import { z } from "zod";
@@ -54,6 +56,7 @@ router.post("/support/cases", requireCustomerAuth, async (req, res) => {
   const v = parsed.data;
   const hash = createHash("sha256").update(JSON.stringify(v)).digest("hex");
   const result = await db.transaction(async (tx) => {
+    const actor = await requireLockedActiveProfile(tx, p.id);
     if (v.orderId) {
       const [order] = await tx
         .select()
@@ -69,16 +72,16 @@ router.post("/support/cases", requireCustomerAuth, async (req, res) => {
         .from(deliveriesTable)
         .where(eq(deliveriesTable.orderId, order.id));
       if (
-        p.role !== "admin" &&
-        order.customerProfileId !== p.id &&
-        restaurant?.ownerProfileId !== p.id &&
-        delivery?.driverProfileId !== p.id
+        actor.role !== "admin" &&
+        order.customerProfileId !== actor.id &&
+        restaurant?.ownerProfileId !== actor.id &&
+        delivery?.driverProfileId !== actor.id
       )
         throw new CommerceError(404, "Order not found");
     }
     const [saved] = await tx
       .insert(supportCasesTable)
-      .values({ ...v, createdBy: p.id, requestHash: hash })
+      .values({ ...v, createdBy: actor.id, requestHash: hash })
       .onConflictDoNothing()
       .returning();
     if (!saved) {
@@ -86,14 +89,14 @@ router.post("/support/cases", requireCustomerAuth, async (req, res) => {
         .select()
         .from(supportCasesTable)
         .where(eq(supportCasesTable.id, v.id));
-      if (existing?.createdBy !== p.id || existing.requestHash !== hash)
+      if (existing?.createdBy !== actor.id || existing.requestHash !== hash)
         throw new CommerceError(
           409,
           "Support request ID conflicts with another request",
         );
       return { row: existing, replayed: true };
     }
-    await audit(tx, p.id, "support.opened", v.id, {
+    await audit(tx, actor.id, "support.opened", v.id, {
       category: v.category,
       orderId: v.orderId ?? null,
     });
@@ -149,6 +152,7 @@ router.patch("/admin/support/cases/:id", requireAuth, async (req, res) => {
     return;
   }
   const row = await db.transaction(async (tx) => {
+    await requireLockedAdministrator(tx, p.id);
     const [current] = await tx
       .select()
       .from(supportCasesTable)
@@ -164,7 +168,7 @@ router.patch("/admin/support/cases/:id", requireAuth, async (req, res) => {
         resolution: v.data.resolution,
         reviewedBy: p.id,
         version: current.version + 1,
-        updatedAt: new Date(),
+        updatedAt: await databaseNow(tx),
       })
       .where(eq(supportCasesTable.id, id))
       .returning();

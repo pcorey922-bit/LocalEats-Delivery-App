@@ -4667,3 +4667,31 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
   });
 
 });
+
+// Top-level so recovery regressions can run without replaying the commerce suite.
+test('support mutations recheck revoked account authority at their transaction boundary', async t => {
+  for (const scenario of [
+    { name: 'open by suspended requester', actor: ids.customer, patch: {isActive:false}, method:'POST', endpoint:'open', expected:403 },
+    { name: 'reply by suspended requester', actor: ids.customer, patch: {isActive:false}, method:'POST', endpoint:'reply', expected:403 },
+    { name: 'reply by demoted administrator to another member case', actor: ids.admin, patch: {role:'driver' as const}, method:'POST', endpoint:'reply', expected:404 },
+    { name: 'decision by demoted administrator', actor: ids.admin, patch: {role:'driver' as const}, method:'PATCH', endpoint:'decision', expected:403 },
+  ]) await t.test(scenario.name, async()=>{
+    const id=randomUUID();
+    assert.equal((await api('/support/cases',ids.customer,'POST',{id,category:'account',subject:'Authority recovery fixture',message:'Isolated local support authority regression'})).status,201);
+    const snapshot=async()=>({cases:await db.select().from(supportCasesTable),messages:await db.select().from(supportMessagesTable),audits:await db.select().from(auditLogsTable),notifications:await db.select().from(notificationsTable)});
+    const before=await snapshot(),[actor]=await db.select().from(profilesTable).where(eq(profilesTable.id,scenario.actor));
+    const original=db.transaction.bind(db);let release!:()=>void,entered!:()=>void,paused=false;
+    const gate=new Promise<void>(resolve=>release=resolve),started=new Promise<void>(resolve=>entered=resolve);
+    (db as any).transaction=async(...args:any[])=>{if(!paused){paused=true;entered();await gate;}return (original as any)(...args);};
+    const path=scenario.endpoint==='open'?'/support/cases':scenario.endpoint==='reply'?`/support/cases/${id}/messages`:`/admin/support/cases/${id}`;
+    const body=scenario.endpoint==='open'?{id:randomUUID(),category:'account',subject:'Revoked opening fixture',message:'Must not save after requester revocation'}:scenario.endpoint==='reply'?{id:randomUUID(),version:1,message:'Must not save after reply authority revocation'}:{version:1,status:'resolved',resolution:'Must not resolve after administrator revocation'};
+    const pending=api(path,scenario.actor,scenario.method,body);
+    try{
+      await started;await db.update(profilesTable).set(scenario.patch).where(eq(profilesTable.id,actor.id));
+      (db as any).transaction=original;release();
+      const response=await pending;
+      assert.equal(response.status,scenario.expected,JSON.stringify(response.data));
+      assert.deepEqual(await snapshot(),before,'Revoked support mutation must not change case, message, audit or notification state');
+    }finally{(db as any).transaction=original;release();await pending;await db.update(profilesTable).set({isActive:actor.isActive,role:actor.role}).where(eq(profilesTable.id,actor.id));}
+  });
+});
