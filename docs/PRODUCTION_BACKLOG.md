@@ -1,3 +1,12 @@
+# November 27 — OAuth diagnostic implementation verified, not deployed
+
+Exact functional a4288526b668d71db0c519e621f543484e3afb11 all3 CI SUCCESS
+45961710895/45961705271/45961710899. Existing Render releaseff73741 unchanged.
+Next owner-only approval: deploy exact functional source with unchanged env/gates;
+then23 read-only checks and owner Chrome readiness inspection. Separate authorization
+required before one OAuth-only execution/audit. No sends, Google calls, native/GPS or
+credential changes occurred. No APK rebuild required; actual FCM/APNs receipt pending.
+
 # November 27 — OAuth-only owner diagnostic code ready for CI
 
 Implemented existing Operations owner-only manual OAuth check, exact dedicated identity,

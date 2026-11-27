@@ -1,16 +1,19 @@
-## Owner-only Firebase OAuth diagnostic release — implementation only, November 27
+## Owner-only Firebase OAuth diagnostic release — CI verified, November 27
 
 GET/POST /api/admin/firebase-oauth and Operations -> Firebase OAuth authentication
 are implemented in repository, NOT yet deployed. No production/Google execution is
 authorized. Implementation/test approval does not authorize release or pressing Verify.
 The feature uses the existing credential; no new variable, migration, key or APK needed.
+Exact implementation a4288526b668d71db0c519e621f543484e3afb11 passed all3 CI.
+Deploy that source only after separate approval, not any newer documentation HEAD.
 
 After exact-source CI and separate deployment approval, owner Samsung sequence:
 1. Render existing LocalEats-Delivery-App -> Manual Deploy -> Deploy a specific commit
-   -> full verified diagnostic implementation SHA (engineering must supply it after CI).
+   -> `a4288526b668d71db0c519e621f543484e3afb11`.
    Do not deploy latest docs HEAD, edit env values or enable push. Rollback target is
    retained successful ff73741bb7a5e3ffcb0985b02d2355bb1fd99f48; no DB reversal.
-2. Wait Live; engineering verifies exactSHA/23 read-only checks. Owner opens Operations
+2. Wait Live; engineering verifies exactSHA/23 read-only checks. Owner uses Samsung Chrome
+   on https://localeats-delivery-app.onrender.com/ and opens Operations
    -> Service health and recovery. Require Provider push sendingdisabled and other
    closed gates. Loading/Refresh OAuth status uses GET only and never contacts Google.
 3. STOP unless a one-time OAuth-only run is separately approved. With run authorization,

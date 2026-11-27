@@ -1,3 +1,23 @@
+# November 27 — OAuth diagnostic exact-source CI passed; approval boundary
+
+Implementation a4288526b668d71db0c519e621f543484e3afb11 pushed to approved branch.
+ALL THREE CI SUCCESS45961710895(PR Validate),45961705271(push Validate),45961710899
+(native Android/iOS Customer+Driver). No deploy or real Google/provider execution.
+Local280 PASS/1 PG-only skip, FCM13 PASS, types/builds/browser PASS; actual provider
+acceptance still unverified. Reviewed code uses OAuth-only helper, no message call,
+owner/profile/closed-gate/identity checks, DB-clock cooldown/audit, no token retention.
+No migrations/env/signing/GPS/90s changes. Native compile is not physical acceptance.
+
+DEPLOYMENT TARGET is FULL a4288526b668d71db0c519e621f543484e3afb11, NOT newer docs
+HEAD. Next owner approval is exact-commit existing Render release, keeping all variables
+and gates unchanged. Rollback target retained ff73741. After approved release, verify
+exactSHA/23 read-only checks; owner uses Samsung CHROME on hosted staging Operations,
+not installed older native APKs. Readiness/Refresh OAuth status does not contact Google.
+STOP before pressing Verify Google OAuth only until separate one-time execution approval.
+That run creates sanitized audit records and one OAuth request, no notifications/FCM send.
+No immediate phone test requested or accepted GPS retest needed. This follow-up is docs
+only; its CI is separate from the verified functional source above. Working tree kept clean.
+
 # November 27 — Owner-only Firebase OAuth diagnostic implemented; NOT deployed/run
 
 Owner approved repository implementation/tests only; no Google execution, deployment,
@@ -31,10 +51,9 @@ API/UI typechecks and production builds PASS; existing vendor/bundle warnings on
 Browser suite PASS including390px OAuth confirmation/no-key-input/GET-refresh/lost-
 response scenarios and existing account/CSP/signup/checkout/session regressions, mocked
 Clerk/API only. No live-provider acceptance. Native/GPS/90s/signing source unchanged;
-no new APK needed. No hosted data/settings touched. Exact new-source CI pending push.
+no new APK needed. No hosted data/settings touched. Exact-source CI now passed; see verified release entry above.
 
-Next: commit/push, verify all3 exact-source CI, record full SHA. Then STOP for separate
-owner deployment approval. Existing Render manual exact-commit release only after
+Next: STOP for separate owner deployment approval of the verified source above. Existing Render manual exact-commit release only after
 approval; no env changes/migrations. Verify23 read-only checks after owner Live; Operations
 GET diagnostics ready does NOT call Google. One explicit OAuth-only run needs separate
 owner authorization (may include sanitized audit entry); push gate remains OFF. Google
