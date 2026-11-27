@@ -1,3 +1,18 @@
+# November 27 — FCM credential stored with Save only (owner confirmed)
+
+Owner reports FIREBASE_SERVICE_ACCOUNT_JSON saved in existing Render staging service
+using Save only; no deployment started. Storage-only approval is fulfilled. Agent has
+not received/read credential/file/contents or independently inspected protected Render.
+Do not repeat key generation or credential entry. Running process has not applied this
+saved value; provider authentication/IAM/receipt remain unverified. No sends performed.
+NEXT BOUNDARY: separate explicit approval for an exact-SHA staging deployment, then
+read-only source/health/local-credential/closed-gate checks. Do not restart, deploy,
+change other settings, enroll devices or send under the storage-only authorization.
+All push/ordering/live-charge/payout/retention/municipal safeguards unchanged; Stripe
+TEST. Existing Android artifacts and accepted Driver GPS/90s preserved. No code change;
+documentation diff checked. Resumed clean087c0cd matching remote. Stop awaiting release
+authorization; never ask owner to share the key in chat or a screenshot.
+
 # November 27 — Protected Render storage-only step approved, not completed
 
 Owner authorizes storing the ONE existing dedicated sender JSON in existing Render

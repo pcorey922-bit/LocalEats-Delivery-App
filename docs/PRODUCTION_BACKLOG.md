@@ -1,3 +1,11 @@
+# November 27 — Protected FCM storage complete; deployment not authorized
+
+Owner confirms FIREBASE_SERVICE_ACCOUNT_JSON saved with Save only, no deployment.
+Do not repeat key generation/entry. Saved credential is not applied to running service;
+provider authentication/delivery is unverified. Next requires separate exact-SHA staging
+deployment approval and read-only verification; no sends/enrollment included. All gates,
+Android artifacts and accepted GPS/90s unchanged. Agent has not read the credential.
+
 # November 27 — Single FCM credential generation milestone complete
 
 Owner confirms one dedicated sender JSON key created/downloaded privately on Samsung.

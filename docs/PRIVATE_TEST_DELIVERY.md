@@ -18,7 +18,13 @@ municipal enforcement remainOFF. Migration0029 was already approved/deployed; no
 repeat migration or new hosted setting is authorized. Later repository corrections
 are NOT deployed and need separate release approval.
 
-## Render storage-only approval — November 27 (owner action pending)
+## Render storage-only approval — November 27 (owner confirmed complete)
+
+Owner reports Save only succeeded and no deployment started. Do not repeat entry.
+The saved value is not yet applied to the running service. Separate explicit exact-SHA
+deployment approval is required before activation/read-only runtime checks. No key
+read-back, provider authentication, enrollment or delivery acceptance has occurred.
+The following instructions are retained as history, not a request to repeat them.
 
 Only FIREBASE_SERVICE_ACCOUNT_JSON entry in existing LocalEats-Delivery-App service
 is approved. Render docs confirm the exact Save only option stores without deploying;
