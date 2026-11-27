@@ -4,23 +4,48 @@ import { createHash, createPrivateKey, sign } from "node:crypto";
 const tokenUrl = "https://oauth2.googleapis.com/token";
 const scope = "https://www.googleapis.com/auth/firebase.messaging";
 type Access = { value: string; expiresAt: number };
+function parseCredentials(raw: string) {
+  // Never propagate JSON/OpenSSL errors: they may include credential fragments.
+  try {
+    const credentials: unknown = JSON.parse(raw);
+    if (
+      !credentials || typeof credentials !== 'object' || Array.isArray(credentials) ||
+      !("type" in credentials) || !("project_id" in credentials) ||
+      !("client_email" in credentials) || !("private_key" in credentials) ||
+      credentials.type !== "service_account" ||
+      typeof credentials.project_id !== "string" ||
+      !/^[a-z][a-z0-9-]{4,61}[a-z0-9]$/.test(credentials.project_id) ||
+      typeof credentials.client_email !== "string" ||
+      !credentials.client_email.endsWith(".iam.gserviceaccount.com") ||
+      typeof credentials.private_key !== "string"
+    )
+      throw new Error("Invalid Firebase service account configuration");
+    const key = createPrivateKey(credentials.private_key);
+    if (key.asymmetricKeyType !== "rsa")
+      throw new Error("Firebase signing key must be RSA");
+    return { key, email: credentials.client_email, project: credentials.project_id };
+  } catch {
+    throw new Error("Invalid Firebase service account configuration");
+  }
+}
+
+export type FcmCredentialStatus = 'missing' | 'invalid' | 'locally_valid';
+let inspectedHash = '', inspectedStatus: FcmCredentialStatus = 'missing';
+// Local parsing only: no OAuth, network request, IAM check or send authorization.
+export function fcmCredentialStatus(raw: string | undefined): FcmCredentialStatus {
+  if (!raw) return 'missing';
+  const hash = createHash('sha256').update(raw).digest('hex');
+  if (hash !== inspectedHash) {
+    try { parseCredentials(raw); inspectedStatus = 'locally_valid'; }
+    catch { inspectedStatus = 'invalid'; }
+    inspectedHash = hash;
+  }
+  return inspectedStatus;
+}
+
 // Only Google's fixed OAuth/FCM origins are used, regardless of credential JSON.
 export function createFcmSender(raw: string, transport: typeof fetch = fetch) {
-  const credentials = JSON.parse(raw) as Record<string, unknown>;
-  if (
-    credentials.type !== "service_account" ||
-    typeof credentials.project_id !== "string" ||
-    !/^[a-z][a-z0-9-]{4,61}[a-z0-9]$/.test(credentials.project_id) ||
-    typeof credentials.client_email !== "string" ||
-    !credentials.client_email.endsWith(".iam.gserviceaccount.com") ||
-    typeof credentials.private_key !== "string"
-  )
-    throw new Error("Invalid Firebase service account configuration");
-  const key = createPrivateKey(credentials.private_key);
-  if (key.asymmetricKeyType !== "rsa")
-    throw new Error("Firebase signing key must be RSA");
-  const email = credentials.client_email,
-    project = credentials.project_id;
+  const { key, email, project } = parseCredentials(raw);
   let cached: Access | null = null,
     pending: Promise<Access> | null = null;
   async function accessToken() {

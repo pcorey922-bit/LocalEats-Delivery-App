@@ -2,7 +2,7 @@ import { notificationPushDeadline, pushLifetime, PushExpiredError } from './push
 import { databaseNow } from "./database-clock";
 import { createPrivateKey, sign, randomUUID } from "node:crypto";
 import { connect } from "node:http2";
-import { sendFcm } from "./fcm";
+import { sendFcm, fcmCredentialStatus } from "./fcm";
 import {
   and,
   eq,
@@ -25,8 +25,10 @@ import {
 import { logger } from "./logger";
 import { nativePushTopic } from './native-push-app';
 export function pushConfiguration() {
+  const androidCredentialStatus = fcmCredentialStatus(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
   return {
-    android: Boolean(process.env.FIREBASE_SERVICE_ACCOUNT_JSON),
+    android: androidCredentialStatus === 'locally_valid',
+    androidCredentialStatus,
     ios: Boolean(
       process.env.APNS_PRIVATE_KEY &&
       process.env.APNS_KEY_ID &&
@@ -146,7 +148,7 @@ export async function fanOutPushNotifications() {
     return batch.length;
   });
 }
-type PushConfiguration = ReturnType<typeof pushConfiguration>;
+type PushConfiguration = Pick<ReturnType<typeof pushConfiguration>, 'android' | 'ios' | 'deliveryEnabled' | 'testMode'>;
 type PushSender = (
   platform: string,
   token: string,

@@ -12,7 +12,7 @@ type Health = {
     component: string;
     lastSuccessAt: string;
   }>;
-  pushConfiguration: { android: boolean; ios: boolean; deliveryEnabled?: boolean };
+  pushConfiguration: { android: boolean; ios: boolean; deliveryEnabled?: boolean; androidCredentialStatus?: 'missing' | 'invalid' | 'locally_valid' };
   testPayoutsEnabled?: boolean;
   webhookRetentionEnabled?: boolean;
   observedAt: string;
@@ -109,9 +109,13 @@ export function OperationalConsole() {
             Test payouts: {health.data.testPayoutsEnabled === true ? "enabled (TEST only)" : "disabled"}.
             Provider push sending: {health.data.pushConfiguration.deliveryEnabled === true ? "enabled" : health.data.pushConfiguration.deliveryEnabled === false ? "disabled" : "not reported by deployed backend"}.{" "}
             Android push:{" "}
-            {health.data.pushConfiguration.android
-              ? "configured"
-              : "configuration required"}
+            {health.data.pushConfiguration.androidCredentialStatus === 'invalid'
+              ? "credential configuration invalid"
+              : health.data.pushConfiguration.androidCredentialStatus === 'locally_valid'
+                ? "credentials locally valid; provider delivery unverified"
+                : health.data.pushConfiguration.android
+                  ? "configured; credential validation not reported by deployed backend"
+                  : "configuration required"}
             ; iOS sandbox push:{" "}
             {health.data.pushConfiguration.ios
               ? "configured"

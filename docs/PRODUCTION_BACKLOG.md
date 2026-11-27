@@ -1,3 +1,18 @@
+# November 27 — Server auth choice and genuine readiness defect
+
+- Render managed keyless GCP OIDC is documented for Pro workspace+, not assumed from
+  Free service type. Owner view-only workspace-plan confirmation is next; no upgrade.
+- FCM readiness now rejects malformed/wrong-type/non-RSA configuration locally rather
+  than reporting any nonempty JSON configured. Sanitized status; no network. Operations
+  separates local validity from provider acceptance. Default-OFF gate preserved.
+- FCM9/API275 PASS+1 PG-only skip; API/UI types and production builds PASS; existing
+  mocked browser regressions PASS. Exact-source CI pending at initial checkpoint.
+- No hosted/IAM/key/send changes, native rebuild or accepted GPS retest. Future backend
+  deployment separately approval-gated. Conditional owner key procedure and keyless
+  prerequisites documented in PRIVATE_TEST_DELIVERY.md; no credential generation yet.
+- Real FCM/APNs, signed physical iOS, configured APK push receipt and financial-provider
+  acceptance remain protected/external blockers; simulations do not satisfy them.
+
 # November 25 — Dedicated FCM sender milestone complete
 
 Owner confirms rocoeats-staging-fcm created in rocoeats-3bd55 with ONLY

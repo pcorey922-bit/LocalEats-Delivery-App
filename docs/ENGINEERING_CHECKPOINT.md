@@ -1,3 +1,49 @@
+# November 27 — FCM auth options reviewed; local credential readiness corrected
+
+Recovered clean remote/HEAD586d923fb8ce2ce131b0e3198e9303ed08be04fe. All three exact
+CI runs SUCCESS45578085479 /45578085298 /45578075878. No unfinished work found in
+active tree. Firebase owner evidence preserved: V1 enabled, dedicated
+rocoeats-staging-fcm has ONLY FCM API Admin, no server key/Render changes/sends.
+Customer257/Driver258 configured signed artifacts preserved; no rebuild or GPS retest.
+
+Official Render docs reviewed: managed GCP OIDC requires Pro WORKSPACE or higher.
+Free service instance does not establish workspace plan. Keyless WIF is preferable
+if already available, but requires scoped trust/IAM/API/Render changes plus backend
+ADC support (currently absent). No upgrade/billing or auth infrastructure changes
+made. Current supported alternative: single dedicated sender RSA key, later exchanged
+for short-lived scoped OAuth tokens; private key remains long-lived/revocable and must
+not enter chat/Git/client APKs. Exact Samsung conditional procedure, key risks and
+approval boundaries in docs/PRIVATE_TEST_DELIVERY.md, November27 auth decision.
+NEXT OWNER ACTION: VIEW ONLY Render workspace Settings/Billing; report workspace
+plan name (Hobby/Pro/other), not service instance type. No plan change/upgrade needed.
+Do not generate keys until this decision and explicit key approval. Render entry/
+deployment, enrollment and sends remain separate approvals. No further IAM/V1 checks.
+
+Confirmed software defect: Android configured was true for any nonempty credential,
+even malformed JSON. Fixed shared FCM parsing with generic sanitized errors; readiness
+checks JSON/type/project/email/RSA locally and exposes only missing/invalid/locally_valid
+status. Cached by credential hash; changes/removal invalidate visible readiness. No
+OAuth/network call from inspection. Operations distinguishes local validity from real
+provider acceptance, with old-backend compatibility. Invalid config is not eligible
+for Android worker claims. Send gate remains exacttrue/defaultOFF; simulated in-flight
+ACK preservation and pending-attempt protection still pass. No authorization changes.
+
+Validation: FCM9 tests PASS (synthetic RSA/EC, malformed/null/array/client JSON,
+no-network guarantee, rotation/removal, OAuth/cache/redirect/expiry/ACK safeguards).
+Full local API suite275 PASS/1 PostgreSQL-only SKIP, zero failures; includes relational
+push gate/token/worker/ledger/role regressions. Initial restricted run hit sandbox
+localhost EPERM; permitted local-server rerun passed, no production/provider access.
+API/UI typechecks and both production builds PASS (existing nonblocking vendor/
+bundle warnings). Existing browser account/signup/homepage/CSP/session/checkout-race
+regressions PASS with local mocked Clerk/API; not provider/physical acceptance.
+Exact new commit CI pending until pushed; record actual results before claiming pass.
+No migrations or native source/signing changes. Backend/UI fix requires separately
+approved Render deployment to take effect; no deployment done/requested as automatic.
+All public/private ordering, push sends, live charges/payouts, retention, municipal
+safeguards unchanged/closed; Stripe TEST. Driver240 GPS and server90s unchanged.
+Next engineering action: verify pushed exact-SHA CI, then use owner's workspace-plan
+result to choose supported auth path. No server credentials to request in chat.
+
 # November 25 — Dedicated staging FCM account created (owner confirmed)
 
 Owner completed the explicitly approved account/role setup in rocoeats-3bd55:

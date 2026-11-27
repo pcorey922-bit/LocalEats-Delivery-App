@@ -18,6 +18,61 @@ municipal enforcement remainOFF. Migration0029 was already approved/deployed; no
 repeat migration or new hosted setting is authorized. Later repository corrections
 are NOT deployed and need separate release approval.
 
+## FCM server authentication decision — November 27 (planning only)
+
+Current official Render documentation supports managed Google Cloud OIDC, but requires
+**Pro workspace or higher**: https://render.com/docs/oidc (reviewed November 27).
+A Free service instance does not prove the workspace plan. No upgrade/billing change
+is authorized. Next Samsung step is VIEW ONLY: Render -> workspace -> Settings or
+Billing -> read workspace plan (not service instance type). Report plan name only;
+do not change a plan, add billing, enter variables or deploy. This supersedes any
+instruction to generate a service-account key immediately.
+
+If Pro or higher already exists: prefer short-lived managed OIDC + Google Workload
+Identity Federation, scoped to the exact staging service subject and Render workspace
+issuer, not an entire pool/workspace wildcard. Reuse dedicated sender, permitting only
+that federated principal to impersonate it via service-account-scoped Workload Identity
+User; keep its existing project FCM role. Requires separately approved pool/provider,
+API/IAM/environment changes and verified ADC backend implementation before deployment.
+Render sets GOOGLE_APPLICATION_CREDENTIALS after approved GCP provider configuration;
+our current FCM sender does NOT support that credential format/ADC. Merely setting
+GCP_WORKLOAD_IDENTITY_PROVIDER or supplying external_account JSON will not work.
+No speculative ADC integration or Google API/IAM changes have been made. Official
+reference: https://docs.cloud.google.com/iam/docs/workload-identity-federation
+
+If workspace does not include OIDC and owner declines paid changes: the supported
+existing approach is one exportable RSA key for ONLY rocoeats-staging-fcm. Google
+OAuth access tokens last at most one hour in the implementation, but the private key
+is long-lived until expiry/revocation; token lifetime does not remove that risk. Key
+compromise could allow out-of-app FCM sends despite our application's OFF gate.
+Keep it solely in protected Render server environment, never chat/GitHub/APKs. Do
+not distribute short-lived tokens through scheduled GitHub workflows, use personal
+OAuth refresh tokens, or add a public token broker as a keyless workaround.
+
+Conditional Samsung key procedure, NOT authorized now:
+1. Obtain explicit approval for creating/downloading one dedicated sender JSON key.
+   Render entry/deployment and real sends remain separately approval-gated.
+2. Google Cloud -> rocoeats-3bd55 -> IAM & Admin -> Service Accounts ->
+   rocoeats-staging-fcm. Confirm identity and only FCM API Admin project role.
+3. Keys -> Add key -> Create new key -> JSON -> Create. Download directly to the
+   owner's device; do not email/share/upload or open in public JSON tools. If blocked
+   by organization policy, stop; do not disable security controls or upgrade billing.
+4. Keep the full unmodified JSON private. Locally confirm type service_account and
+   project_id rocoeats-3bd55 without sharing contents. Do not use the broader Firebase
+   Admin SDK account. No keys belong in either protected Android CLIENT secret.
+5. STOP after download and report only completion. Do not paste a key into chat or
+   Render until protected Render entry/deployment is separately approved for an exact
+   verified source. Preserve JSON newline escapes when that later handoff is approved.
+6. After approved handoff, verify closed gates and local credential diagnostics.
+   Local validity does not prove project compatibility, IAM, revocation state, Google
+   authentication or notification receipt. No send/verify action is implied.
+
+Repository correction prepared November 27: new backend locally validates JSON fields
+and RSA key before reporting Android configured. It exposes only missing/invalid/
+locally_valid status, never raw values or JSON/OpenSSL errors, and performs no network
+request. Existing deployed644e038 still reports presence only until separately approved
+deployment. No migration required; Customer257/Driver258 APKs need no rebuild.
+
 ## Protected Android FCM server setup plan — November 25 (NOT authorized to execute)
 
 Owner approved requirements/procedure planning only. No credential creation, IAM/API

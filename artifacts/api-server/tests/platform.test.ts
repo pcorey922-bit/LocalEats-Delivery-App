@@ -10,7 +10,7 @@ import { pruneDriverLocations } from "../src/lib/duty-location";
 import assert from "node:assert/strict";
 import { before, after, test } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
-import { randomUUID,createHash } from "node:crypto";
+import { randomUUID,createHash,generateKeyPairSync } from "node:crypto";
 import Stripe from "stripe";
 import { eq, sql, inArray, and } from "drizzle-orm";
 import app from "../src/app";
@@ -3166,6 +3166,14 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     let sends=0;
     try {
       process.env.FIREBASE_SERVICE_ACCOUNT_JSON='{"synthetic":true}';delete process.env.ROCOEATS_PUSH_DELIVERY_ENABLED;
+      assert.equal(pushConfiguration().android,false);assert.equal(pushConfiguration().androidCredentialStatus,'invalid');
+      const invalidHealth=await api('/notification-devices/config',ids.customer);
+      assert.equal(invalidHealth.data.android,false);assert.equal(invalidHealth.data.androidCredentialStatus,'invalid');
+      assert.equal(JSON.stringify(invalidHealth.data).includes('synthetic'),false,'No credential fragments in diagnostics');
+      process.env.ROCOEATS_PUSH_DELIVERY_ENABLED='true';
+      assert.equal(await processPushDelivery(async()=>{sends++;}),false,'Invalid local credentials cannot claim a delivery even with the send gate enabled');
+      delete process.env.ROCOEATS_PUSH_DELIVERY_ENABLED;
+      process.env.FIREBASE_SERVICE_ACCOUNT_JSON=JSON.stringify({type:'service_account',project_id:'rocoeats-test',client_email:'sender@rocoeats-test.iam.gserviceaccount.com',private_key:generateKeyPairSync('rsa',{modulusLength:2048}).privateKey.export({type:'pkcs8',format:'pem'})});
       assert.equal(pushConfiguration().android,true);assert.equal(pushConfiguration().deliveryEnabled,false);
       for(const flag of [undefined,'false','TRUE','1',' true ']){
         if(flag===undefined)delete process.env.ROCOEATS_PUSH_DELIVERY_ENABLED;else process.env.ROCOEATS_PUSH_DELIVERY_ENABLED=flag;

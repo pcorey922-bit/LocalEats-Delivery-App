@@ -2,7 +2,7 @@ import pushPolicy from '../../../../config/native-push-policy.json';
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { generateKeyPairSync, verify } from "node:crypto";
-import { createFcmSender } from "./fcm";
+import { createFcmSender, fcmCredentialStatus } from "./fcm";
 import { createServer } from "node:http";
 const keys = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const credentials = JSON.stringify({
@@ -11,6 +11,28 @@ const credentials = JSON.stringify({
   client_email: "sender@rocoeats-test.iam.gserviceaccount.com",
   private_key: keys.privateKey.export({ type: "pkcs8", format: "pem" }),
   token_uri: "https://untrusted.invalid/token",
+});
+test('FCM readiness validates credentials locally and returns only sanitized status', (t) => {
+  const outbound = t.mock.method(globalThis, 'fetch', async () => { throw new Error('Readiness must never contact a provider'); });
+  assert.equal(fcmCredentialStatus(undefined), 'missing');
+  assert.equal(fcmCredentialStatus(''), 'missing');
+  const ec = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  for (const raw of ['sensitive_fixture_not_json', 'null', '[]', '{}',
+    JSON.stringify({ ...JSON.parse(credentials), type: 'external_account' }),
+    JSON.stringify({ ...JSON.parse(credentials), project_id: '../invalid' }),
+    JSON.stringify({ ...JSON.parse(credentials), client_email: 'not-a-service-account' }),
+    JSON.stringify({ ...JSON.parse(credentials), private_key: 'sensitive_fixture_not_a_key' }),
+    JSON.stringify({ ...JSON.parse(credentials), private_key: ec.privateKey.export({ type: 'pkcs8', format: 'pem' }) }),
+  ]) {
+    assert.equal(fcmCredentialStatus(raw), 'invalid');
+    assert.throws(() => createFcmSender(raw), { message: 'Invalid Firebase service account configuration' });
+  }
+  assert.equal(fcmCredentialStatus(credentials), 'locally_valid');
+  assert.equal(fcmCredentialStatus(credentials), 'locally_valid', 'Repeated inspection uses cached local validation');
+  assert.equal(fcmCredentialStatus('null'), 'invalid', 'Credential replacement invalidates readiness');
+  assert.equal(fcmCredentialStatus(undefined), 'missing', 'Removal never retains configured status');
+  assert.equal(fcmCredentialStatus(credentials), 'locally_valid');
+  assert.equal(outbound.mock.callCount(), 0, 'Credential inspection cannot authenticate or send');
 });
 test("FCM signs scoped OAuth assertions and shares cached access across concurrent sends", async () => {
   let authorizations = 0,
