@@ -1,3 +1,36 @@
+# November 27 — Exact OAuth release approved; manual owner deployment required
+
+Owner authorizes ONE deployment of a4288526b668d71db0c519e621f543484e3afb11 to
+existing Render staging only. NOT OAuth execution, env/key/IAM/billing changes, sends,
+APKs or financial operations. All3 exact-source CI reconfirmed SUCCESS:
+45961710895 /45961705271 /45961710899. Target is still a428852, not newer docs HEAD.
+No migrations/Dockerfile/startup changes vs currentff73741; GPS/90s/signing untouched.
+
+Fresh23 read-only checks PASS at2026-11-27T08:04:59.671Z, actual deployed SHA STILL
+ff73741bb7a5e3ffcb0985b02d2355bb1fd99f48. DB/auth configuration/security/native checks
+ready; public/private ordering/live charges/payouts/retention/municipal gates OFF.
+Evidence docs/verification/STAGING_HTTP_2026-11-27_ff73741_OAUTH_PREFLIGHT.json.
+Push OFF last OWNER-OBSERVED on current release; public readiness does not expose it.
+No Render deployment connection/CLI/browser capability available. No deployment done.
+Rollback artifact availability cannot be independently verified through public endpoints;
+owner must inspect successfulff73741 Deploys entry before proceeding. Do not claim it
+confirmed merely because ff73741 is Live. If missing or push notdisabled, STOP/report.
+
+Owner Samsung: existing LocalEats-Delivery-App -> confirm rollback entry/gates -> Manual
+Deploy -> Deploy a specific commit -> FULL a4288526b668d71db0c519e621f543484e3afb11.
+No latest-HEAD/restart/env edit/cache clear. Wait Live and report actual source. Then
+engineering verifies23 checks expecting a428852, and owner Chrome reads Operations
+local-credential/send labels plus OAuth readiness. Do not tick OAuth consent or press
+Verify Google OAuth only, other Verify, Retry or any send. GET readiness/Refresh OAuth
+status is provider-free. Provider authentication remains UNVERIFIED until separately
+approved manual OAuth execution. No credential supplied/read by agent. Rollback plan:
+retained successfulff73741 -> Rollback (target build/env snapshot, DB unchanged), not
+fresh old-SHA deployment with current config; execution scope must be confirmed if needed.
+
+This update only records approval/preflight/manual handoff. Existing deployments,
+Android artifacts/accepted GPS/90s and all gates unchanged. Stop at owner Render-session
+boundary; do not create credential workarounds or request secret/session contents.
+
 # November 27 — OAuth diagnostic exact-source CI passed; approval boundary
 
 Implementation a4288526b668d71db0c519e621f543484e3afb11 pushed to approved branch.

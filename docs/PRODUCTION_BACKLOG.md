@@ -1,3 +1,12 @@
+# November 27 — OAuth diagnostic release authorized; not deployed yet
+
+Exact a4288526b668d71db0c519e621f543484e3afb11 all3 CI reconfirmed success. Current
+hostedff73741 passed fresh23 read-only checks; evidence saved. Owner must confirm
+ff73741 rollback control and pushOFF before manual exact-source deploy (no direct
+Render access). Rollback availability not independently verified. After Live, verify23
+checks expecteda428852; inspect readiness only. OAuth consent/Verify execution remains
+separately forbidden. No migrations/env/native/GPS/signing changes or APK rebuild.
+
 # November 27 — OAuth diagnostic implementation verified, not deployed
 
 Exact functional a4288526b668d71db0c519e621f543484e3afb11 all3 CI SUCCESS

@@ -1,3 +1,27 @@
+## November 27 — OAuth diagnostic deployment approved, execution NOT approved
+
+One exact a4288526b668d71db0c519e621f543484e3afb11 existing-service deploy approved.
+All3 source CI reconfirmed success. Currentff73741 passes23 read-only checks. No direct
+Render capability; owner must perform manual deployment. The detailed procedure below
+now has deployment approval, but still NO authorization to execute the OAuth diagnostic.
+
+Samsung checklist:
+1. Operations -> require Provider push sendingdisabled and existing closed gates.
+2. Render -> existing LocalEats-Delivery-App -> Deploys -> confirm successful
+   ff73741bb7a5e3ffcb0985b02d2355bb1fd99f48 retained rollback option. Do NOT click it.
+   If unavailable, STOP/report before deploying. Agent cannot inspect this dashboard.
+3. Manual Deploy -> Deploy a specific commit -> full a4288526b668d71db0c519e621f543484e3afb11.
+   Deploy once. No latest-commit selection, env changes, restart, new keys or APK rebuild.
+4. After Live, report source SHA/status; owner Chrome Operations can read local-credential,
+   push-send and OAuth readiness labels. Do NOT check OAuth consent or press Verify.
+5. Engineering verifies23 checks expectinga428852, preserving closed safeguards. STOP
+   pending separate actual Google-execution authorization. Readiness is not OAuth proof.
+
+Rollback identified: retained successfulff73741 -> Rollback -> confirm exact prior
+release. Reuses target build/service-specific environment snapshot, not DB restore;
+current saved settings persist for later standard deploys. Availability is owner-only
+unverified until step2. This is not an instruction to execute an extra rollback now.
+
 ## Owner-only Firebase OAuth diagnostic release — CI verified, November 27
 
 GET/POST /api/admin/firebase-oauth and Operations -> Firebase OAuth authentication
