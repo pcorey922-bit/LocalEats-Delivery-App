@@ -1,0 +1,16 @@
+{
+  "evidenceSource": "Owner-observed live owner Operations diagnostic; agent did not execute Google request",
+  "deployedRevision": "a4288526b668d71db0c519e621f543484e3afb11",
+  "observedLabel": "Google OAuth authenticated. FCM permissions and device delivery remain unverified.",
+  "observedAtOwnerLocal": "2026-11-27 03:28:48 EST",
+  "observedAtUtc": "2026-11-27T08:28:48Z",
+  "cooldownUntilOwnerLocal": "2026-11-27 03:38:48 EST",
+  "cooldownUntilUtc": "2026-11-27T08:38:48Z",
+  "refreshStatusMatched": true,
+  "googleAuthenticationConfirmed": true,
+  "fcmSendingPermissionVerified": false,
+  "physicalNotificationReceiptVerified": false,
+  "providerPushSendingEnabled": false,
+  "ownerReportedNotificationSent": false,
+  "oneTimeOAuthApprovalConsumed": true
+}

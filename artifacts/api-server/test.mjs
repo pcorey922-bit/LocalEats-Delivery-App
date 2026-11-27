@@ -39,6 +39,7 @@ try {
     ["worker-loop", "src/lib/worker-loop.test.ts"],
     ["web-hosting", "src/lib/web-hosting.test.ts"],
     ["fcm", "src/lib/fcm.test.ts"],
+    ["fcm-permission-probe", "src/lib/fcm-permission-probe.test.ts"],
   ]) {
     const outfile = path.join(outputDirectory, `${name}.mjs`);
     await build({

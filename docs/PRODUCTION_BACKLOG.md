@@ -1,3 +1,17 @@
+# November 27 — Real OAuth authentication accepted; FCM permission not yet accepted
+
+Owner live OAuth success Nov27 03:28:48EST, durable GET refresh same result, pushOFF,
+no notification. One approved execution consumed; do not repeat after cooldown.
+Evidence saved, correctly owner-observed; Google authentication confirmed, not FCM
+permission or device receipt. Offline fixed validate_only:true request builder +2
+zero-network/override/immutability tests and API types/build PASS; no runtime wiring.
+Next independent task: owner-only manual validation-only permission diagnostic route/UI,
+using fixed topic (no device enrollment yet), durable allowance and sanitized results.
+Future deployment and new OAuth+FCM validation requests require explicit authorization:
+validate_only uses messages:send and is NOT covered by completed OAuth-only approval.
+Later separately approved one-device enrollment/actual receipt test; no gate opening,
+credentials/IAM/billing/deploy/GPS changes now. Exact new preparation CI pending push.
+
 # November 27 — Owner GET readiness confirmed; no further preflight needed
 
 Owner authenticated GET on deployeda428852: readytrue/retryAfternull/lastRunnull.

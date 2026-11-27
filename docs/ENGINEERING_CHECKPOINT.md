@@ -1,3 +1,47 @@
+# November 27 — Real Google OAuth success confirmed by owner; permission stage next
+
+Owner executed the ONE separately approved OAuth-only check on deployeda4288526b668d71db0c519e621f543484e3afb11.
+Exact label: Google OAuth authenticated. FCM permissions and device delivery remain
+unverified. Time Nov27 03:28:48EST =08:28:48Z; cooldown until03:38:48EST =08:38:48Z.
+Subsequent GET Refresh OAuth status recovered the same successful outcome. Owner
+observed pushdisabled/no notification sent. Evidence is REAL OWNER-OBSERVED, not an
+agent provider request or simulated acceptance. Preserved in
+verification/OAUTH_SUCCESS_OWNER_2026-11-27_a428852.json. No tokens/key/provider body
+received. Google credential authentication now CONFIRMED at that observation; effective
+FCM project permission and physical receipt remain UNVERIFIED. One-time authorization
+is CONSUMED; cooldown expiry does not authorize another run. Do not repeat OAuth.
+
+Safest next milestone: separately approved FCM validation-only permission diagnostic,
+using fixed staging project/topic and literal validate_only:true, no device enrollment
+needed for this first check. Official API documents no delivery in this mode, but it
+STILL calls messages:send, explicitly outside completed OAuth-only authorization.
+Future approval must cover a fresh OAuth token request plus one validation-only FCM
+request; diagnostic discarded the earlier token. No normal sender/worker/gate enablement,
+caller-controlled flag/topic/token or fallback to real sending. Require owner/closed
+gates/identity, durable one-run allowance/audit, sanitized result and strict success
+assessment; invalid payload/HTTP4xx is NOT permission acceptance. A dry-run200 is not
+physical device receipt. Reference https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages/send.
+
+Safe bounded preparation completed: pure prepareFcmPermissionProbe returns immutable
+serialized validation-only payload/fixed project/topic, rejects any caller arguments,
+contains no device token/notification/credentials and performs no fetch. Tests cover
+zero network calls, flag/project/endpoint identity, override rejection and immutability.
+Two targeted tests PASS; API typecheck/production build PASS. Added test to existing
+API test runner; no runtime route/worker imports, no UI/endpoints added, no deployment
+needed for this OFFLINE preparation. Exact new-source CI pending push. Do not claim
+full live permission diagnostic exists or instruct owner to press an invented button.
+
+Next independent engineering action: build/test owner-only FCM validation-only route
+and UI around this fixed builder (without touching accepted OAuth-only path); then
+present concrete verified SHA for separate deployment AND provider-call authorization.
+No owner phone action now. Following permission success, separately authorize exactly
+one staging device/app enrollment (token stays private), then design/approve one actual
+notification/receipt test. Review outbox/TTL before any future send window; no bulk retry
+or blanket gate activation from a permission probe. All ordering/financial/retention/
+municipal/send safeguards OFF; credentials/IAM/billing unchanged. Android257/258 and
+accepted GPS/90s preserved. This turn made no Google/FCM/financial/hosted calls/changes.
+Resumed clean d816459 matching remote. Owner evidence + offline code only.
+
 # November 27 — Owner readiness confirmed; ready for separate OAuth-only approval
 
 Resolves protected-status conditions recorded at287d387. Owner reports exact

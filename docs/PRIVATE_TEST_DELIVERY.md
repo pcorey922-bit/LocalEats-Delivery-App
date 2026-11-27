@@ -1,3 +1,23 @@
+## November 27 — One authorized Google OAuth execution COMPLETED successfully
+
+Owner reported exact success label at03:28:48EST/08:28:48Z; cooldown until03:38:48EST,
+GET refresh same result. Provider push sendingdisabled/no notification. Google accepted
+the credential in this real owner-initiated execution; FCM permissions/device delivery
+are still unverified. Do NOT repeat the earlier execution instructions below. Approval
+is consumed regardless of cooldown expiry. Evidence: verification/OAUTH_SUCCESS_OWNER_2026-11-27_a428852.json.
+
+Next safest permission milestone is an owner-only fixed-topic FCM validate_only:true
+check. It avoids device enrollment and promises no delivery per Google's API, but calls
+messages:send; deployment and actual OAuth+validation requests need SEPARATE explicit
+approval. Offline builder/tests prepared only; there is NO deployed permission button.
+Do not use normal push/Retry or enable the global delivery gate as a substitute.
+Future permission check must send the immutable literal true flag, never accept target/
+flag overrides or fall back to actual delivery. Interpret only validated provider success
+as permission evidence, never invalid-token/payload errors or OAuth success alone.
+After that, separately approve one staging device/app enrollment (no token in chat),
+then a controlled real notification/OS receipt test. No current phone action required.
+Source: https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages/send
+
 ## November 27 — Final owner readiness confirmed; execution still forbidden
 
 Owner supplied authenticated GET status on approved deployeda428852:
