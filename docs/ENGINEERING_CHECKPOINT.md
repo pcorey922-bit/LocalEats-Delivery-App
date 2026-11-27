@@ -14,10 +14,13 @@ made. Current supported alternative: single dedicated sender RSA key, later exch
 for short-lived scoped OAuth tokens; private key remains long-lived/revocable and must
 not enter chat/Git/client APKs. Exact Samsung conditional procedure, key risks and
 approval boundaries in docs/PRIVATE_TEST_DELIVERY.md, November27 auth decision.
-NEXT OWNER ACTION: VIEW ONLY Render workspace Settings/Billing; report workspace
-plan name (Hobby/Pro/other), not service instance type. No plan change/upgrade needed.
-Do not generate keys until this decision and explicit key approval. Render entry/
-deployment, enrollment and sends remain separate approvals. No further IAM/V1 checks.
+OWNER NOW CONFIRMS workspace plan Hobby (view only). Managed OIDC is not available
+under current no-upgrade constraints. Do not repeat plan/IAM/V1 checks. Supported
+fallback is one dedicated sender JSON key, still NOT authorized to generate/download.
+NEXT OWNER APPROVAL: create/download ONE JSON key for rocoeats-staging-fcm only,
+with existing FCM-only role; no existing account/IAM/Render/deploy/send changes.
+Samsung procedure is saved in PRIVATE_TEST_DELIVERY.md; Render entry/deployment,
+enrollment and provider sends remain separately approval-gated. No billing upgrade.
 
 Confirmed software defect: Android configured was true for any nonempty credential,
 even malformed JSON. Fixed shared FCM parsing with generic sanitized errors; readiness
@@ -36,13 +39,19 @@ localhost EPERM; permitted local-server rerun passed, no production/provider acc
 API/UI typechecks and both production builds PASS (existing nonblocking vendor/
 bundle warnings). Existing browser account/signup/homepage/CSP/session/checkout-race
 regressions PASS with local mocked Clerk/API; not provider/physical acceptance.
-Exact new commit CI pending until pushed; record actual results before claiming pass.
+Functional commit4ed3aaea8a25af8e39d9c303b1c2fd2f4d9b851d ALL THREE CI SUCCESS:
+45954195139 (PR Validate),45954186752 (push Validate),45954195052 (native). Android
+Customer/Driver and iOS Customer/Driver compilation succeeded; signed packaging/device
+acceptance is separate. No new install artifact requested. This follow-up only records
+CI/owner plan evidence; its documentation CI must not be assumed passed.
 No migrations or native source/signing changes. Backend/UI fix requires separately
 approved Render deployment to take effect; no deployment done/requested as automatic.
 All public/private ordering, push sends, live charges/payouts, retention, municipal
 safeguards unchanged/closed; Stripe TEST. Driver240 GPS and server90s unchanged.
-Next engineering action: verify pushed exact-SHA CI, then use owner's workspace-plan
-result to choose supported auth path. No server credentials to request in chat.
+Next engineering action after scoped key approval: provide the saved dedicated-account
+Samsung JSON download steps, then stop before Render entry/deployment. No credential
+contents in chat. No safe need to rewrite auth for unavailable paid OIDC or rebuild
+accepted apps. Code is ready for separately approved backend deployment; none done.
 
 # November 25 — Dedicated staging FCM account created (owner confirmed)
 

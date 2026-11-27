@@ -28,6 +28,12 @@ Billing -> read workspace plan (not service instance type). Report plan name onl
 do not change a plan, add billing, enter variables or deploy. This supersedes any
 instruction to generate a service-account key immediately.
 
+Owner result: workspace plan **Hobby**, confirmed view only November 27. No upgrade
+is authorized. Managed OIDC is not currently usable; do not repeat the plan check.
+Proceed with the conditional dedicated-key procedure below ONLY after explicit key
+creation/download approval. No key, IAM, Render, deployment or send action has occurred.
+The keyless path below is retained as a future option, not the current setup instruction.
+
 If Pro or higher already exists: prefer short-lived managed OIDC + Google Workload
 Identity Federation, scoped to the exact staging service subject and Render workspace
 issuer, not an entire pool/workspace wildcard. Reuse dedicated sender, permitting only

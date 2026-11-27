@@ -1,12 +1,16 @@
 # November 27 — Server auth choice and genuine readiness defect
 
 - Render managed keyless GCP OIDC is documented for Pro workspace+, not assumed from
-  Free service type. Owner view-only workspace-plan confirmation is next; no upgrade.
+  Free service type. Owner confirmed Hobby; managed OIDC unavailable without a paid
+  upgrade (not authorized). Use existing dedicated-account JSON path only after key
+  generation/download approval; Render entry/deploy/sends remain separate.
 - FCM readiness now rejects malformed/wrong-type/non-RSA configuration locally rather
   than reporting any nonempty JSON configured. Sanitized status; no network. Operations
   separates local validity from provider acceptance. Default-OFF gate preserved.
 - FCM9/API275 PASS+1 PG-only skip; API/UI types and production builds PASS; existing
-  mocked browser regressions PASS. Exact-source CI pending at initial checkpoint.
+  mocked browser regressions PASS. Functional4ed3aaea8a25af8e39d9c303b1c2fd2f4d9b851d
+  all3 CI SUCCESS45954195139/45954186752/45954195052; native Customer/Driver Android/
+  iOS compiles passed. Follow-up docs CI status is separate; no acceptance overclaim.
 - No hosted/IAM/key/send changes, native rebuild or accepted GPS retest. Future backend
   deployment separately approval-gated. Conditional owner key procedure and keyless
   prerequisites documented in PRIVATE_TEST_DELIVERY.md; no credential generation yet.
