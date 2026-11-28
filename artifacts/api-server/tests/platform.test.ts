@@ -4006,11 +4006,14 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
 
   await t.test("a rolled-back reservation expiry does not stop unrelated escalation in the same tick", async () => {
     const expiring = await create();
+    const otherExpiring = await create();
     const waiting = await create();
     await pay(waiting.id);
     const overdue = new Date("1900-01-01T00:00:00Z");
     const conflictingJob = `expire:${expiring.id}`;
     await db.update(ordersTable).set({ reservationExpiresAt: overdue }).where(eq(ordersTable.id, expiring.id));
+    await db.update(ordersTable).set({ reservationExpiresAt: new Date(overdue.getTime() + 60_000) })
+      .where(eq(ordersTable.id, otherExpiring.id));
     await db.update(paymentsTable).set({ provider: "stripe_test" }).where(eq(paymentsTable.orderId, expiring.id));
     await db.update(ordersTable).set({ timingReviewAt: overdue }).where(eq(ordersTable.id, waiting.id));
     await db.update(paymentsTable).set({ processedAt: overdue }).where(eq(paymentsTable.orderId, waiting.id));
@@ -4019,8 +4022,8 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       resourceId: randomUUID(), provider: "stripe_test", payload: {},
     });
     const incidents = () => db.select().from(orderIncidentsTable).where(eq(orderIncidentsTable.orderId, waiting.id));
-    const expiryEvents = () => db.select().from(orderEventsTable).where(and(
-      eq(orderEventsTable.orderId, expiring.id), eq(orderEventsTable.note, "Unpaid reservation expired"),
+    const expiryEvents = (orderId: string) => db.select().from(orderEventsTable).where(and(
+      eq(orderEventsTable.orderId, orderId), eq(orderEventsTable.note, "Unpaid reservation expired"),
     ));
     let progress = 0;
     const tick = () => runOrderWorkerTick(() => false, async () => { progress++; });
@@ -4028,10 +4031,13 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       await assert.rejects(tick, /Financial operation parameters conflict/);
       const [unpaid] = await db.select().from(ordersTable).where(eq(ordersTable.id, expiring.id));
       assert.equal(unpaid.status, "placed");
-      assert.deepEqual(await expiryEvents(), []);
+      assert.deepEqual(await expiryEvents(expiring.id), []);
       assert.equal(progress, 0, "A failed tick must not record successful progress after the error");
       const [incident] = await incidents();
       assert.equal(incident?.kind, "restaurant_response");
+      const [unrelated] = await db.select().from(ordersTable).where(eq(ordersTable.id, otherExpiring.id));
+      assert.equal(unrelated.status, "cancelled", "A conflicting order must not block another unpaid reservation");
+      assert.equal((await expiryEvents(otherExpiring.id)).length, 1);
 
       await db.update(ordersTable).set({ timingReviewAt: overdue }).where(eq(ordersTable.id, waiting.id));
       await assert.rejects(tick, /Financial operation parameters conflict/);
@@ -4043,12 +4049,13 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
       await tick();
       const [cancelled] = await db.select().from(ordersTable).where(eq(ordersTable.id, expiring.id));
       assert.equal(cancelled.status, "cancelled");
-      assert.equal((await expiryEvents()).length, 1);
+      assert.equal((await expiryEvents(expiring.id)).length, 1);
+      assert.equal((await expiryEvents(otherExpiring.id)).length, 1);
       assert.equal((await incidents()).length, 1);
     } finally {
       await db.delete(financialOperationsTable).where(eq(financialOperationsTable.id, conflictingJob));
       await db.update(paymentsTable).set({ provider: "sandbox" }).where(eq(paymentsTable.orderId, expiring.id));
-      for (const order of [expiring, waiting]) {
+      for (const order of [expiring, otherExpiring, waiting]) {
         await api(`/orders/${order.id}/cancel`, ids.admin, "POST", { reason: "Close order worker isolation fixture" });
       }
     }

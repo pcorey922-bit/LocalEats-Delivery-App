@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, lte, notInArray, sql } from "drizzle-orm";
 import {
   db,
   ordersTable,
@@ -10,6 +10,13 @@ import { audit, notifyOrder, type Transaction } from "./commerce";
 import { databaseNow } from "./database-clock";
 import { enqueueFinancialOperation } from "./finance-queue";
 import { restoreUnacceptedInventory } from "./inventory";
+import { CommerceError } from "./commerce-policy";
+
+export class ReservationExpiryConflict extends Error {
+  constructor(public readonly orderId: string, cause: CommerceError) {
+    super(cause.message, { cause });
+  }
+}
 
 const unpaidStatuses = ["placed", "pending", "restaurant_received"] as const;
 // Caller holds the order lock. Payment writes, expiry and restaurant transitions
@@ -78,7 +85,7 @@ export async function expireReservation(
   order.status = "cancelled";
   return true;
 }
-export async function processReservationExpiry() {
+export async function processReservationExpiry(excludedOrderIds: string[] = []) {
   return db.transaction(async (tx) => {
     const [candidate] = await tx
       .select({ order: ordersTable })
@@ -89,12 +96,20 @@ export async function processReservationExpiry() {
           inArray(ordersTable.status, [...unpaidStatuses]),
           inArray(paymentsTable.status, ["pending", "failed"]),
           lte(ordersTable.reservationExpiresAt, sql`clock_timestamp()`),
+          excludedOrderIds.length ? notInArray(ordersTable.id, excludedOrderIds) : undefined,
         ),
       )
       .orderBy(asc(ordersTable.reservationExpiresAt), asc(ordersTable.id))
       .limit(1)
       .for("update", { of: ordersTable, skipLocked: true });
     if (!candidate) return false;
-    return expireReservation(tx, candidate.order);
+    try {
+      return await expireReservation(tx, candidate.order);
+    } catch (error) {
+      if (error instanceof CommerceError && error.status === 409) {
+        throw new ReservationExpiryConflict(candidate.order.id, error);
+      }
+      throw error;
+    }
   });
 }

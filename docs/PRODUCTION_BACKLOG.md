@@ -1,3 +1,20 @@
+# November 28 — Conflicted reservations no longer block other expiries
+
+The follow-up regression confirmed that the oldest conflicted reservation
+still stopped a newer unpaid reservation from expiring. After a known order
+conflict rolls back, the worker skips that order for the rest of the tick and
+continues within the existing 50-attempt limit. The conflicted order remains
+eligible on the next tick. Other failures still end the expiry phase and are
+reported after timing reviews have a chance to run.
+
+The disposable database regression verified exactly one cancellation for the
+unrelated reservation, exactly one incident and alert for the waiting paid
+order, and exactly one cancellation for the conflicted reservation after
+repair. For each fix, the local app/API suite passed 306 tests with one
+PostgreSQL-only test skipped. Shared-library and API typechecks and the API
+build passed. GPS policies, timeout thresholds and operational gates are
+preserved. Staging remains on `c07e200`.
+
 # November 28 — Reservation failures isolated from order escalation
 
 A conflicting expiry operation in the local database rolled back an unpaid
