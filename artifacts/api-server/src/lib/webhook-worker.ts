@@ -8,7 +8,6 @@ import { CommerceError } from "./commerce-policy";
 export async function processWebhookInbox(
   process: typeof processStripeEvent = processStripeEvent,
 ) {
-  const now = await databaseNow();
   const job = await db.transaction(async (tx) => {
     const [row] = await tx
       .select()
@@ -35,7 +34,7 @@ export async function processWebhookInbox(
         state: "processing",
         attempts: row.attempts + 1,
         leaseToken: randomUUID(),
-        leaseExpiresAt: new Date(now.getTime() + 60000),
+        leaseExpiresAt: sql`clock_timestamp() + interval '60 seconds'`,
       })
       .where(eq(inbox.id, row.id))
       .returning();

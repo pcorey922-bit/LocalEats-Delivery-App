@@ -64,7 +64,6 @@ export async function processPayoutProvisioning(
       )
     ).id,
 ) {
-  const now = await databaseNow();
   const job = await db.transaction(async (tx) => {
     const [row] = await tx
       .select()
@@ -85,6 +84,7 @@ export async function processPayoutProvisioning(
       .for("update", { skipLocked: true })
       .limit(1);
     if (!row) return null;
+    const now = await databaseNow(tx);
     if (
       row.firstAttemptAt &&
       now.getTime() - row.firstAttemptAt.getTime() > 23 * 60 * 60 * 1000
@@ -107,7 +107,7 @@ export async function processPayoutProvisioning(
         attempts: row.attempts + 1,
         firstAttemptAt: row.firstAttemptAt ?? now,
         leaseToken: randomUUID(),
-        leaseExpiresAt: new Date(now.getTime() + 120000),
+        leaseExpiresAt: sql`clock_timestamp() + interval '120 seconds'`,
       })
       .where(eq(jobs.profileId, row.profileId))
       .returning();

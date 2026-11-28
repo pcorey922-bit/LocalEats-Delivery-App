@@ -8,7 +8,7 @@ import { processReservationExpiry } from "../src/lib/reservation-expiry";
 import { recordPayment } from "../src/lib/commerce";
 import { pruneDriverLocations } from "../src/lib/duty-location";
 import assert from "node:assert/strict";
-import { before, after, test } from "node:test";
+import { before, after, test, type TestContext } from "node:test";
 import { readFile, readdir } from "node:fs/promises";
 import { randomUUID,createHash,generateKeyPairSync } from "node:crypto";
 import Stripe from "stripe";
@@ -65,6 +65,7 @@ import { executeStripeOperation, processFinancialOperation, reconcileFinancialOp
 import { postJournal, journalRefund, journalTransfer } from "../src/lib/ledger";
 import { enqueueFinancialOperation } from "../src/lib/finance-queue";
 import { requireLockedDriverAccess } from "../src/lib/driver-access";
+import { databaseNow } from "../src/lib/database-clock";
 const ids = {
   customer: randomUUID(),
   other: randomUUID(),
@@ -3816,6 +3817,87 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
           assert.equal(audits.length, 2);
         } finally { globalThis.Date = RealDate; }
       }
+    },
+  );
+  await t.test(
+    "payment worker leases start after a delayed claim transaction",
+    async (t) => {
+      async function withDelayedClaim(
+        testContext: TestContext,
+        run: () => Promise<boolean>,
+        readExpiry: () => Date | null,
+        leaseMs: number,
+      ) {
+        const transaction = db.transaction.bind(db);
+        let enteredAt: Date | undefined;
+        let expiresAt: Date | null | undefined;
+        const mock = testContext.mock.method(db, "transaction", async (callback, config) => {
+          if (!enteredAt) {
+            await new Promise<void>((resolve) => setTimeout(resolve, 100));
+            enteredAt = await databaseNow();
+          }
+          return transaction(callback, config);
+        });
+        try {
+          assert.equal(await run(), true);
+          expiresAt = readExpiry();
+        } finally {
+          mock.mock.restore();
+        }
+        assert.ok(enteredAt);
+        assert.ok(expiresAt);
+        assert.ok(expiresAt.getTime() >= enteredAt.getTime() + leaseMs - 20,
+          "Waiting for the claim must not shorten the new lease");
+      }
+
+      await t.test("webhook inbox claim", async (child) => {
+        const id = `evt_claim_clock_${randomUUID()}`;
+        await db.insert(webhookInboxTable).values({
+          id, eventType: "claim.clock.fixture",
+          payload: { id, type: "claim.clock.fixture" },
+        });
+        let lease: Date | null = null;
+        await withDelayedClaim(child, () => processWebhookInbox(async (event) => {
+          assert.equal(event.id, id);
+          const [row] = await db.select().from(webhookInboxTable).where(eq(webhookInboxTable.id, id));
+          lease = row.leaseExpiresAt;
+        }), () => lease, 60_000);
+      });
+
+      await t.test("financial operation claim", async (child) => {
+        const order = await create();
+        const id = `checkout-claim-clock:${order.id}`;
+        await db.insert(financialOperationsTable).values({
+          id, orderId: order.id, kind: "checkout", resourceId: order.id,
+          provider: "stripe_test", payload: {},
+        });
+        let lease: Date | null = null;
+        try {
+          await withDelayedClaim(child, () => processFinancialOperation(async (job) => {
+            assert.equal(job.id, id);
+            lease = job.leaseExpiresAt;
+            return { id: `cs_claim_clock_${order.id}`, status: "open" };
+          }), () => lease, 120_000);
+        } finally {
+          await api(`/orders/${order.id}/cancel`, ids.customer, "POST", { reason: "Close lease-clock fixture" });
+          await db.delete(financialOperationsTable).where(eq(financialOperationsTable.orderId, order.id));
+        }
+      });
+
+      await t.test("account provisioning claim", async (child) => {
+        const profileId = randomUUID();
+        await db.insert(profilesTable).values({
+          id: profileId, clerkUserId: profileId, role: "restaurant", displayName: "Provisioning claim fixture",
+        });
+        await db.insert(payoutProvisioningTable).values({ profileId });
+        let lease: Date | null = null;
+        await withDelayedClaim(child, () => processPayoutProvisioning(async (id) => {
+          assert.equal(id, profileId);
+          const [row] = await db.select().from(payoutProvisioningTable).where(eq(payoutProvisioningTable.profileId, id));
+          lease = row.leaseExpiresAt;
+          return `acct_claim_clock_${profileId}`;
+        }), () => lease, 120_000);
+      });
     },
   );
   await t.test(

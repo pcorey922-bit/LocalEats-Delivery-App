@@ -400,7 +400,6 @@ export async function requestProviderCancellation(
 }
 
 async function claimOperation(): Promise<FinancialOperation | null> {
-  const now = await databaseNow();
   const payoutsEnabled = testPayoutsEnabled();
   const blocked = alias(operations, "blocked_operations");
   const heldRunning = alias(operations, "held_running_operations");
@@ -517,6 +516,7 @@ async function claimOperation(): Promise<FinancialOperation | null> {
       if (jobs.some((j) => j.state === "processing" && !allowed(j)))
         return null;
       if (jobs.some((j) => j.state === "reconciliation")) return null;
+      const now = await databaseNow(tx);
       const running = jobs.find((j) => j.state === "processing");
       if (running?.leaseExpiresAt && running.leaseExpiresAt > now) return null;
       const priority = (j: FinancialOperation) =>
@@ -608,15 +608,18 @@ async function claimOperation(): Promise<FinancialOperation | null> {
           return null;
         }
       }
+      // Start a fresh lease only after the order lock and all claim checks.
+      const claimTime = await databaseNow(tx);
+      const leaseExpiry = new Date(claimTime.getTime() + leaseMs);
       const [updated] = await tx
         .update(operations)
         .set({
           state: "processing",
           attempts: job.attempts + 1,
-          firstAttemptAt: job.firstAttemptAt ?? now,
+          firstAttemptAt: job.firstAttemptAt ?? claimTime,
           leaseToken: randomUUID(),
-          leaseExpiresAt: new Date(now.getTime() + leaseMs),
-          nextAttemptAt: new Date(now.getTime() + leaseMs),
+          leaseExpiresAt: leaseExpiry,
+          nextAttemptAt: leaseExpiry,
         })
         .where(eq(operations.id, job.id))
         .returning();
