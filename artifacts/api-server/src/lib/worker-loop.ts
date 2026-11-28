@@ -1,3 +1,11 @@
+export async function runWorkerBatch(jobs: Promise<boolean>[]) {
+  // Keep the loop busy until every started job has settled, even on failure.
+  const results = await Promise.allSettled(jobs);
+  const failed = results.find((result) => result.status === "rejected");
+  if (failed) throw failed.reason;
+  return results.some((result) => result.status === "fulfilled" && result.value);
+}
+
 export function startWorkerLoop(options: {
   intervalMs: number;
   run: (

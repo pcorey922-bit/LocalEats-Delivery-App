@@ -18,7 +18,7 @@ import { processFinancialOperation } from "./lib/financial-operations";
 import { processPayoutProvisioning } from "./lib/payout-onboarding";
 import { drainPushBatch } from "./lib/push";
 import { paymentMode } from "./lib/commerce-policy";
-import { startWorkerLoop } from "./lib/worker-loop";
+import { runWorkerBatch, startWorkerLoop } from "./lib/worker-loop";
 import { logger } from "./lib/logger";
 paymentMode();
 const port = Number(process.env.PORT);
@@ -74,10 +74,10 @@ const loops = [
   worker("finance", 2000, async (stopping, progress) => {
     if (paymentMode() !== "stripe_test") return;
     for (let i = 0; i < 3 && !stopping(); i++) {
-      const work = await Promise.all(
+      const worked = await runWorkerBatch(
         Array.from({ length: 4 }, () => processFinancialOperation()),
       );
-      if (!work.some(Boolean)) break;
+      if (!worked) break;
       await progress();
     }
   }),
