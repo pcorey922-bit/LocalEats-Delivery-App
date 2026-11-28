@@ -1,0 +1,58 @@
+{
+  "origin": "https://localeats-delivery-app.onrender.com",
+  "observedAt": "2026-11-09T06:04:48.583Z",
+  "revision": "711e2d7fa68a8229229869258ea5bc51e797eab7",
+  "readiness": {
+    "ready": false,
+    "database": true,
+    "authReady": true,
+    "pricingReady": false,
+    "providerConfigured": true,
+    "webhookReady": false,
+    "workerReady": true,
+    "liveChargesEnabled": false
+  },
+  "checks": [
+    {
+      "path": "/livez",
+      "status": 200
+    },
+    {
+      "path": "/readyz",
+      "status": 503
+    },
+    {
+      "path": "/api/profiles/me",
+      "status": 401
+    },
+    {
+      "path": "/api/session/access",
+      "status": 401
+    },
+    {
+      "path": "/api/restaurants",
+      "status": 401
+    },
+    {
+      "path": "/api/admin/profiles",
+      "status": 401
+    },
+    {
+      "path": "/api/admin/profiles",
+      "status": 401
+    },
+    {
+      "path": "/.env",
+      "status": 404
+    },
+    {
+      "path": "/.env.staging",
+      "status": 404
+    },
+    {
+      "path": "/sign-in",
+      "status": 200
+    }
+  ],
+  "authenticatedOwnerTested": false
+}

@@ -1,0 +1,19 @@
+// Kotlin resolves its compiler JAR lazily. Resolve that external toolchain before
+// compilation so known transport failures can retry without retrying compilers.
+// Android project classpaths require AGP artifact views and must not be resolved
+// generically here: their classes/manifest/lint variants are intentionally distinct.
+gradle.projectsEvaluated {
+    def root = gradle.rootProject
+    root.tasks.register('prefetchRoCoEatsDependencies') {
+        doLast {
+            root.allprojects.each { project ->
+                project.configurations.findAll { configuration ->
+                    configuration.canBeResolved && configuration.name == 'kotlinCompilerClasspath'
+                }.each { configuration ->
+                    logger.lifecycle("Prefetch ${project.path}:${configuration.name}")
+                    configuration.resolve()
+                }
+            }
+        }
+    }
+}

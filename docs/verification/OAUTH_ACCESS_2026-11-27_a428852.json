@@ -1,0 +1,22 @@
+{
+  "observedAt": "2026-11-27T08:18:42.005Z",
+  "requests": "GET only; no credentials, cookies, diagnostic POST or Google requests",
+  "checks": [
+    {
+      "path": "/api/admin/firebase-oauth",
+      "status": 401,
+      "unauthenticatedAccessDenied": true
+    },
+    {
+      "path": "/api/admin/operational-health",
+      "status": 401,
+      "unauthenticatedAccessDenied": true
+    },
+    {
+      "path": "/api/notification-devices/config",
+      "status": 401,
+      "unauthenticatedAccessDenied": true
+    }
+  ],
+  "passed": true
+}

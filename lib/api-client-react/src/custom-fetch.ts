@@ -1,5 +1,17 @@
+// Safe transport facts only: never URLs, headers, identities, tokens or bodies.
+export type FetchResponseEvidence = {
+  status: number;
+  media: 'JSON' | 'TEXT' | 'OTHER' | 'MISSING';
+  stream: 'NONE' | 'UNAVAILABLE' | 'PRESENT';
+  redirected: boolean;
+  declaredLength: number | null;
+  textLength: number | null;
+};
+export type FetchRequestStage = 'TOKEN_START' | 'TOKEN_READY' | 'TOKEN_FAILED' | 'JS_HTTP_START' | 'JS_HTTP_RETURN' | 'JS_HTTP_FAILED' | 'JS_BODY_START' | 'JS_BODY_READY';
 export type CustomFetchOptions = RequestInit & {
   responseType?: "json" | "text" | "blob" | "auto";
+  onStage?: (stage: FetchRequestStage) => void;
+  onResponse?: (evidence: Readonly<FetchResponseEvidence>) => void;
 };
 
 export type ErrorType<T = unknown> = ApiError<T>;
@@ -17,6 +29,8 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _guestTokenGetter: AuthTokenGetter | null = null;
+export function setGuestTokenGetter(getter: AuthTokenGetter | null): void { _guestTokenGetter=getter; }
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -111,18 +125,11 @@ function isTextMediaType(mediaType: string | null): boolean {
   );
 }
 
-// Use strict equality: in browsers, `response.body` is `null` when the
-// response genuinely has no content.  In React Native, `response.body` is
-// always `undefined` because the ReadableStream API is not implemented —
-// even when the response carries a full payload readable via `.text()` or
-// `.json()`.  Loose equality (`== null`) matches both `null` and `undefined`,
-// which causes every React Native response to be treated as empty.
+// Only HTTP semantics establish that a body is forbidden. Native/polyfilled
+// responses may expose body=null (or stale Content-Length: 0) while text() still
+// contains valid JSON. Read the actual payload rather than discarding it.
 function hasNoBody(response: Response, method: string): boolean {
-  if (method === "HEAD") return true;
-  if (NO_BODY_STATUS.has(response.status)) return true;
-  if (response.headers.get("content-length") === "0") return true;
-  if (response.body === null) return true;
-  return false;
+  return method === "HEAD" || NO_BODY_STATUS.has(response.status);
 }
 
 function stripBom(text: string): string {
@@ -236,8 +243,10 @@ export class ResponseParseError extends Error {
 async function parseJsonBody(
   response: Response,
   requestInfo: { method: string; url: string },
+  evidence?: FetchResponseEvidence,
 ): Promise<unknown> {
   const raw = await response.text();
+  if (evidence) evidence.textLength = raw.length;
   const normalized = stripBom(raw);
 
   if (normalized.trim() === "") {
@@ -251,7 +260,7 @@ async function parseJsonBody(
   }
 }
 
-async function parseErrorBody(response: Response, method: string): Promise<unknown> {
+async function parseErrorBody(response: Response, method: string, evidence?: FetchResponseEvidence): Promise<unknown> {
   if (hasNoBody(response, method)) {
     return null;
   }
@@ -264,6 +273,7 @@ async function parseErrorBody(response: Response, method: string): Promise<unkno
   }
 
   const raw = await response.text();
+  if (evidence) evidence.textLength = raw.length;
   const normalized = stripBom(raw);
   const trimmed = normalized.trim();
 
@@ -294,6 +304,7 @@ async function parseSuccessBody(
   response: Response,
   responseType: "json" | "text" | "blob" | "auto",
   requestInfo: { method: string; url: string },
+  evidence?: FetchResponseEvidence,
 ): Promise<unknown> {
   if (hasNoBody(response, requestInfo.method)) {
     return null;
@@ -304,10 +315,11 @@ async function parseSuccessBody(
 
   switch (effectiveType) {
     case "json":
-      return parseJsonBody(response, requestInfo);
+      return parseJsonBody(response, requestInfo, evidence);
 
     case "text": {
       const text = await response.text();
+      if (evidence) evidence.textLength = text.length;
       return text === "" ? null : text;
     }
 
@@ -318,7 +330,8 @@ async function parseSuccessBody(
             "Use responseType \"json\" or \"text\" instead.",
         );
       }
-      return response.blob();
+      const blob = await response.blob();
+      return blob.size === 0 ? null : blob;
   }
 }
 
@@ -326,9 +339,41 @@ export async function customFetch<T = unknown>(
   input: RequestInfo | URL,
   options: CustomFetchOptions = {},
 ): Promise<T> {
-  input = applyBaseUrl(input);
-  const { responseType = "auto", headers: headersInit, ...init } = options;
+  const source = options.signal ?? (isRequest(input) ? input.signal : undefined);
+  const controller = new AbortController();
+  const abort = () => controller.abort(source?.reason);
+  if (source?.aborted) abort();
+  else source?.addEventListener("abort", abort, { once: true });
+  const timer = setTimeout(() => {
+    controller.abort(new DOMException("The request timed out. Please try again.", "TimeoutError"));
+  }, 35000);
+  const signal = controller.signal;
+  let rejectOnAbort: (() => void) | undefined;
+  try {
+    signal.throwIfAborted();
+    const canceled = new Promise<never>((_, reject) => {
+      rejectOnAbort = () => reject(signal.reason);
+      signal.addEventListener("abort", rejectOnAbort, { once: true });
+    });
+    return await Promise.race([fetchApi<T>(input, { ...options, signal }), canceled]);
+  } finally {
+    clearTimeout(timer);
+    source?.removeEventListener("abort", abort);
+    if (rejectOnAbort) signal.removeEventListener("abort", rejectOnAbort);
+  }
+}
 
+async function fetchApi<T>(input: RequestInfo | URL, options: CustomFetchOptions): Promise<T> {
+  const relativeCustomerPath = /^\/api\/(?:guest(?:\/|$)|orders(?:\/|$)|addresses(?:\/|$)|support(?:\/|$)|restaurants(?:\/|$)|commerce\/config$|healthz$)/.test(resolveUrl(input));
+  const originalUrl=resolveUrl(input);
+  const trustedApiRequest=originalUrl.startsWith("/api/") || (()=>{
+    if(!_baseUrl)return false;
+    try{const target=new URL(originalUrl),base=new URL(_baseUrl);return target.origin===base.origin&&target.pathname.startsWith("/api/");}catch{return false;}
+  })();
+  input = applyBaseUrl(input);
+  const { responseType = "auto", onResponse, onStage, headers: headersInit, ...init } = options;
+
+  const stage = (value:FetchRequestStage) => {try{onStage?.(value);}catch{/* Diagnostics cannot change transport behavior. */}};
   const method = resolveMethod(input, init.method);
 
   if (init.body != null && (method === "GET" || method === "HEAD")) {
@@ -351,21 +396,48 @@ export async function customFetch<T = unknown>(
 
   // Attach bearer token when an auth getter is configured and no
   // Authorization header has been explicitly provided.
-  if (_authTokenGetter && !headers.has("authorization")) {
-    const token = await _authTokenGetter();
+  if (trustedApiRequest && _authTokenGetter && !headers.has("authorization")) {
+    stage('TOKEN_START');
+    let token:string|null;
+    try {token=await _authTokenGetter();stage('TOKEN_READY');}
+    catch(error){stage('TOKEN_FAILED');throw error;}
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
     }
   }
 
+  // A guest capability is never sent to absolute/untrusted URLs or privileged APIs.
+  if(relativeCustomerPath && !headers.has("authorization") && !headers.has("X-RoCoEats-Guest-Token") && _guestTokenGetter){
+    const token=await _guestTokenGetter(); if(token) headers.set("X-RoCoEats-Guest-Token",token);
+  }
   const requestInfo = { method, url: resolveUrl(input) };
 
-  const response = await fetch(input, { ...init, method, headers });
+  init.signal?.throwIfAborted();
+  stage('JS_HTTP_START');
+  let response:Response;
+  try {response=await fetch(input, { ...init, method, headers });stage('JS_HTTP_RETURN');}
+  catch(error){stage('JS_HTTP_FAILED');throw error;}
 
-  if (!response.ok) {
-    const errorData = await parseErrorBody(response, method);
-    throw new ApiError(response, errorData, requestInfo);
+  const media = getMediaType(response.headers);
+  const length = response.headers.get('content-length');
+  const evidence: FetchResponseEvidence = {
+    status: response.status,
+    media: isJsonMediaType(media) ? 'JSON' : isTextMediaType(media) ? 'TEXT' : media ? 'OTHER' : 'MISSING',
+    stream: response.body === null ? 'NONE' : response.body === undefined ? 'UNAVAILABLE' : 'PRESENT',
+    redirected: response.redirected === true,
+    declaredLength: length !== null && /^\d+$/.test(length) && Number.isSafeInteger(Number(length)) ? Number(length) : null,
+    textLength: null,
+  };
+  try {
+    stage('JS_BODY_START');
+    if (!response.ok) {
+      const errorData = await parseErrorBody(response, method, evidence);
+      stage('JS_BODY_READY');
+      throw new ApiError(response, errorData, requestInfo);
+    }
+    const result=await parseSuccessBody(response, responseType, requestInfo, evidence);
+    stage('JS_BODY_READY');return result as T;
+  } finally {
+    onResponse?.(Object.freeze({ ...evidence }));
   }
-
-  return (await parseSuccessBody(response, responseType, requestInfo)) as T;
 }

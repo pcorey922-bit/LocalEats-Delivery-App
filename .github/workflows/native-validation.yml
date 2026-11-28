@@ -1,0 +1,319 @@
+name: Native validation and signed staging
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Compile, create staging APK, run smoke checks, or initialize signing
+        type: choice
+        options: [compile, staging, initialize-staging-signing, android-smoke, ios-smoke]
+        default: compile
+      apk_run:
+        description: Successful signed staging APK run to test (android-smoke only)
+        type: string
+        default: "42583769896"
+      audience:
+        description: Android staging/smoke audience (compile and iOS smoke validate both)
+        type: choice
+        options: [customer, driver]
+        default: customer
+permissions:
+  contents: read
+jobs:
+  android:
+    if: github.event_name != 'workflow_dispatch' || inputs.target == 'compile'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        audience: [customer, driver]
+    env:
+      ROCOEATS_NATIVE_AUDIENCE: ${{ matrix.audience }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gradle/actions/wrapper-validation@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install Android SDK packages with the runner's current tools
+        run: |
+          set +o pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0'
+      - run: pnpm install --frozen-lockfile
+      - name: Verify native driver acknowledgement lease
+        if: runner.os == 'Linux' && env.ROCOEATS_NATIVE_AUDIENCE == 'driver'
+        run: node scripts/verify-native-duty-lease.mjs
+      - run: node scripts/prepare-native-audience.mjs --github-env
+      - run: pnpm --filter @workspace/localeats mobile:sync
+      - run: node scripts/verify-native-push-config.mjs
+      - name: Install checksum-pinned official Gradle
+        run: node scripts/install-native-gradle.mjs
+      - name: Resolve Gradle dependencies with bounded transport retries
+        run: bash ../../../scripts/retry-native-dependencies.sh "$ROCOEATS_GRADLE_BINARY" -I ../../../scripts/resolve-native-dependencies.gradle prefetchRoCoEatsDependencies --no-daemon
+        working-directory: artifacts/localeats/android
+      - run: |
+          "$ROCOEATS_GRADLE_BINARY" assembleDebug --no-daemon
+        working-directory: artifacts/localeats/android
+      - name: Validate unsigned release APK and Android App Bundle
+        run: |
+          "$ROCOEATS_GRADLE_BINARY" assembleRelease bundleRelease lintRelease --no-daemon
+        working-directory: artifacts/localeats/android
+      - name: Validate staging variant without packaging an install artifact
+        run: |
+          "$ROCOEATS_GRADLE_BINARY" assembleStaging lintStaging --no-daemon
+        working-directory: artifacts/localeats/android
+      - name: Verify compiled Android identity and return scheme
+        run: |
+          apk="artifacts/localeats/android/app/build/outputs/apk/debug/app-debug.apk"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" | grep -F "package: name='$ROCOEATS_NATIVE_APP_ID'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -F "\"$ROCOEATS_NATIVE_SCHEME\""
+          "$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" manifest print "$apk" > "$RUNNER_TEMP/rocoeats-manifest.xml"
+          python3 scripts/verify-native-privacy.py android "$ROCOEATS_NATIVE_AUDIENCE" "$RUNNER_TEMP/rocoeats-manifest.xml"
+          staging_apk="$(python3 -c "from pathlib import Path; print(next(Path('artifacts/localeats/android/app/build/outputs/apk/staging').glob('*.apk')))")"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump xmltree "$staging_apk" --file AndroidManifest.xml > "$RUNNER_TEMP/staging-manifest.txt"
+          python3 scripts/staging_apk_policy.py "$ROCOEATS_NATIVE_AUDIENCE" "$RUNNER_TEMP/staging-manifest.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.audience == 'driver' && 'RoCoEats-Driver' || 'RoCoEats' }}-Android-release-unsigned-unconfigured
+          path: |
+            artifacts/localeats/android/app/build/outputs/apk/release/app-release-unsigned.apk
+            artifacts/localeats/android/app/build/outputs/bundle/release/app-release.aab
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.audience == 'driver' && 'RoCoEats-Driver' || 'RoCoEats' }}-Android-debug-unconfigured
+          path: artifacts/localeats/android/app/build/outputs/apk/debug/app-debug.apk
+  ios:
+    if: github.event_name != 'workflow_dispatch' || inputs.target == 'compile' || inputs.target == 'ios-smoke'
+    runs-on: macos-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        audience: [customer, driver]
+    env:
+      ROCOEATS_NATIVE_AUDIENCE: ${{ matrix.audience }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: xcodebuild -version
+      - name: Prepare public private-staging configuration for optional simulator smoke
+        if: inputs.target == 'ios-smoke'
+        run: |
+          node scripts/prepare-native-staging.mjs --github-env
+          node scripts/verify-native-staging.mjs
+      - run: pnpm install --frozen-lockfile
+      - name: Verify native driver acknowledgement lease
+        if: runner.os == 'Linux' && env.ROCOEATS_NATIVE_AUDIENCE == 'driver'
+        run: node scripts/verify-native-duty-lease.mjs
+      - run: node scripts/prepare-native-audience.mjs --github-env
+      - run: pnpm --filter @workspace/localeats mobile:sync
+      - run: node scripts/verify-native-push-config.mjs
+      - name: Resolve iOS packages with bounded transport retries
+        run: bash ../../../scripts/retry-native-dependencies.sh xcodebuild -resolvePackageDependencies -project App/App.xcodeproj -scheme App -clonedSourcePackagesDirPath "$RUNNER_TEMP/rocoeats-ios-packages"
+        working-directory: artifacts/localeats/ios
+      - run: xcodebuild -project App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -clonedSourcePackagesDirPath "$RUNNER_TEMP/rocoeats-ios-packages" -disableAutomaticPackageResolution -derivedDataPath build ROCOEATS_INFO_PLIST="$ROCOEATS_NATIVE_INFO_PLIST" ROCOEATS_APP_ID="$ROCOEATS_NATIVE_APP_ID" ROCOEATS_APP_NAME="$ROCOEATS_NATIVE_APP_NAME" ROCOEATS_URL_SCHEME="$ROCOEATS_NATIVE_SCHEME" CODE_SIGNING_ALLOWED=NO build
+        working-directory: artifacts/localeats/ios
+      - name: Verify compiled iOS identity and return scheme
+        run: |
+          plist="artifacts/localeats/ios/build/Build/Products/Debug-iphonesimulator/App.app/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")" = "$ROCOEATS_NATIVE_APP_ID"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$plist")" = "$ROCOEATS_NATIVE_APP_NAME"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:0:CFBundleURLSchemes:0' "$plist")" = "$ROCOEATS_NATIVE_SCHEME"
+          python3 scripts/verify-native-privacy.py ios "$ROCOEATS_NATIVE_AUDIENCE" "$plist"
+      - name: Compile offline screenshot verifier
+        if: inputs.target == 'ios-smoke'
+        run: |
+          xcrun swiftc scripts/verify-ios-smoke-image.swift -o "$RUNNER_TEMP/rocoeats-ios-image-check"
+          "$RUNNER_TEMP/rocoeats-ios-image-check" --self-test
+      - name: Optional signed-out iOS simulator installation, launch and restart
+        if: inputs.target == 'ios-smoke'
+        env:
+          ROCOEATS_IOS_IMAGE_CHECKER: ${{ runner.temp }}/rocoeats-ios-image-check
+        run: python3 scripts/ios-simulator-smoke.py artifacts/localeats/ios/build/Build/Products/Debug-iphonesimulator/App.app "$ROCOEATS_NATIVE_AUDIENCE" "ios-smoke/$ROCOEATS_NATIVE_AUDIENCE"
+      - uses: actions/upload-artifact@v4
+        if: always() && inputs.target == 'ios-smoke'
+        with:
+          name: RoCoEats-${{ matrix.audience }}-iOS-Simulator-Smoke
+          path: ios-smoke/${{ matrix.audience }}/
+          if-no-files-found: warn
+          retention-days: 30
+      - run: ditto -c -k --keepParent artifacts/localeats/ios/build/Build/Products/Debug-iphonesimulator/App.app "$RUNNER_TEMP/RoCoEats-iOS-simulator.zip"
+      - name: Validate unsigned iOS device release compilation
+        run: xcodebuild -project App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -clonedSourcePackagesDirPath "$RUNNER_TEMP/rocoeats-ios-packages" -disableAutomaticPackageResolution -derivedDataPath release-build ROCOEATS_INFO_PLIST="$ROCOEATS_NATIVE_INFO_PLIST" ROCOEATS_APP_ID="$ROCOEATS_NATIVE_APP_ID" ROCOEATS_APP_NAME="$ROCOEATS_NATIVE_APP_NAME" ROCOEATS_URL_SCHEME="$ROCOEATS_NATIVE_SCHEME" CODE_SIGNING_ALLOWED=NO build
+        working-directory: artifacts/localeats/ios
+      - run: ditto -c -k --keepParent artifacts/localeats/ios/release-build/Build/Products/Release-iphoneos/App.app "$RUNNER_TEMP/RoCoEats-iOS-release-unsigned.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.audience == 'driver' && 'RoCoEats-Driver' || 'RoCoEats' }}-iOS-release-unsigned-${{ inputs.target == 'ios-smoke' && 'staging' || 'unconfigured' }}
+          path: ${{ runner.temp }}/RoCoEats-iOS-release-unsigned.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.audience == 'driver' && 'RoCoEats-Driver' || 'RoCoEats' }}-iOS-simulator-${{ inputs.target == 'ios-smoke' && 'staging' || 'unconfigured' }}
+          path: ${{ runner.temp }}/RoCoEats-iOS-simulator.zip
+
+  initialize-staging-signing:
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'initialize-staging-signing'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Create stable owner-controlled test identity in repository secrets
+        env:
+          GH_TOKEN: ${{ secrets.ROCOEATS_SIGNING_SETUP_TOKEN }}
+        run: bash .github/scripts/bootstrap-staging-signing.sh
+  android-staging:
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'staging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ROCOEATS_NATIVE_AUDIENCE: ${{ inputs.audience || 'customer' }}
+      ROCOEATS_APK_PREFIX: ${{ inputs.audience == 'driver' && 'RoCoEats-Driver' || 'RoCoEats' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gradle/actions/wrapper-validation@v4
+      - name: Require owner-managed signing before installing dependencies
+        env:
+          KEYSTORE: ${{ secrets.ROCOEATS_STAGING_KEYSTORE_BASE64 }}
+          PASSWORD: ${{ secrets.ROCOEATS_STAGING_KEYSTORE_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE" && test -n "$PASSWORD" || { echo 'Owner signing setup is required. See docs/ANDROID_STAGING_TEST.md'; exit 1; }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: node scripts/prepare-native-staging.mjs --github-env
+      - run: node scripts/prepare-native-audience.mjs --github-env
+      - name: Require deployed safe native backend before packaging
+        run: node scripts/verify-native-staging.mjs
+      - name: Prepare optional protected Firebase Android client configuration
+        env:
+          ROCOEATS_FIREBASE_CUSTOMER_ANDROID_CONFIG_JSON: ${{ secrets.ROCOEATS_FIREBASE_CUSTOMER_ANDROID_CONFIG_JSON }}
+          ROCOEATS_FIREBASE_DRIVER_ANDROID_CONFIG_JSON: ${{ secrets.ROCOEATS_FIREBASE_DRIVER_ANDROID_CONFIG_JSON }}
+        run: node scripts/prepare-firebase-android.mjs
+      - run: pnpm install --frozen-lockfile
+      - name: Verify native driver acknowledgement lease
+        if: runner.os == 'Linux' && env.ROCOEATS_NATIVE_AUDIENCE == 'driver'
+        run: node scripts/verify-native-duty-lease.mjs
+      - run: pnpm --filter @workspace/localeats mobile:sync
+      - run: node scripts/verify-native-push-config.mjs
+      - name: Restore signing key only into private runner temporary storage
+        env:
+          KEYSTORE: ${{ secrets.ROCOEATS_STAGING_KEYSTORE_BASE64 }}
+        run: |
+          umask 077
+          printf '%s' "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/rocoeats-staging.p12"
+      - name: Install current Android SDK
+        run: |
+          set +o pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Install checksum-pinned official Gradle
+        run: node scripts/install-native-gradle.mjs
+      - name: Resolve official Gradle dependencies
+        run: bash ../../../scripts/retry-native-dependencies.sh "$ROCOEATS_GRADLE_BINARY" -I ../../../scripts/resolve-native-dependencies.gradle prefetchRoCoEatsDependencies --no-daemon
+        working-directory: artifacts/localeats/android
+      - name: Build signed non-debuggable staging APK
+        env:
+          ROCOEATS_STAGING_KEYSTORE_PATH: ${{ runner.temp }}/rocoeats-staging.p12
+          ROCOEATS_STAGING_KEYSTORE_PASSWORD: ${{ secrets.ROCOEATS_STAGING_KEYSTORE_PASSWORD }}
+          ROCOEATS_ANDROID_VERSION_CODE: ${{ github.run_number }}
+        run: |
+          "$ROCOEATS_GRADLE_BINARY" assembleStaging lintStaging --no-daemon
+        working-directory: artifacts/localeats/android
+      - name: Verify signature, package, permissions and absence of packaged server credentials
+        env:
+          ROCOEATS_STAGING_KEYSTORE_PASSWORD: ${{ secrets.ROCOEATS_STAGING_KEYSTORE_PASSWORD }}
+        run: |
+          mkdir -p staging-apk
+          apk="staging-apk/$ROCOEATS_APK_PREFIX-Android-Staging-Test.apk"
+          cp artifacts/localeats/android/app/build/outputs/apk/staging/app-staging.apk "$apk"
+          python3 scripts/verify-staging-apk.py "$apk" "$ANDROID_HOME/build-tools/36.0.0" staging-apk
+          "$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" manifest print "$apk" > "$RUNNER_TEMP/staging-permissions.xml"
+          python3 scripts/verify-native-privacy.py android "$ROCOEATS_NATIVE_AUDIENCE" "$RUNNER_TEMP/staging-permissions.xml"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.audience == 'driver' && 'RoCoEats-Driver' || 'RoCoEats' }}-Android-Staging-Test-APK
+          path: staging-apk/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Remove temporary signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/rocoeats-staging.p12"
+
+      - name: Remove temporary Firebase client configuration
+        if: always()
+        run: rm -f artifacts/localeats/android/app/google-services.json
+
+  android-smoke:
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'android-smoke'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Validate the selected successful artifact source
+        env:
+          APK_RUN: ${{ inputs.apk_run }}
+          GH_TOKEN: ${{ github.token }}
+          APK_AUDIENCE: ${{ inputs.audience }}
+        run: |
+          [[ "$APK_RUN" =~ ^[0-9]+$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$APK_RUN" > "$RUNNER_TEMP/rocoeats-smoke-source.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$APK_RUN/artifacts?per_page=100" > "$RUNNER_TEMP/rocoeats-smoke-artifacts.json"
+          python3 scripts/prepare-android-smoke.py source "$APK_AUDIENCE" "$RUNNER_TEMP/rocoeats-smoke-source.json" "$RUNNER_TEMP/rocoeats-smoke-artifacts.json"
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ROCOEATS_SMOKE_ARTIFACT }}
+          path: smoke-input
+          run-id: ${{ inputs.apk_run }}
+          github-token: ${{ github.token }}
+      - name: Install official Android emulator tooling
+        run: |
+          set +o pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platform-tools' 'emulator' 'build-tools;36.0.0' 'system-images;android-35;google_apis;x86_64'
+      - name: Verify the original APK digest and owner signature
+        run: |
+          python3 scripts/prepare-android-smoke.py input "$ROCOEATS_SMOKE_AUDIENCE" smoke-input
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "smoke-input/$ROCOEATS_SMOKE_APK" > "$RUNNER_TEMP/rocoeats-apk-cert.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump xmltree "smoke-input/$ROCOEATS_SMOKE_APK" --file AndroidManifest.xml > "$RUNNER_TEMP/rocoeats-smoke-manifest.txt"
+          python3 scripts/staging_apk_policy.py "$ROCOEATS_SMOKE_AUDIENCE" "$RUNNER_TEMP/rocoeats-smoke-manifest.txt"
+          grep -q 'certificate SHA-256 digest: f22e58f4da4e5d64f9ac5d4f0fc8abfe2595e395511552f7fb385205c7d18296' "$RUNNER_TEMP/rocoeats-apk-cert.txt"
+      - name: Allow this isolated runner access to its virtualization device
+        run: sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+      - name: Install and exercise the actual signed APK on Android 15 emulator
+        run: bash scripts/start-android-qa-emulator.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: RoCoEats-${{ inputs.audience }}-Android-Emulator-QA
+          path: android-smoke-evidence/
+          if-no-files-found: warn
+          retention-days: 14

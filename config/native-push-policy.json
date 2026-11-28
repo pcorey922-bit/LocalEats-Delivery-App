@@ -1,0 +1,14 @@
+{
+  "androidChannel": {
+    "id": "rocoeats-delivery-updates",
+    "name": "RoCoEats delivery updates",
+    "description": "Time-sensitive delivery offers and order updates."
+  },
+  "presentationOptions": [
+    "badge",
+    "sound",
+    "banner",
+    "list"
+  ],
+  "maxAgeSeconds": 300
+}

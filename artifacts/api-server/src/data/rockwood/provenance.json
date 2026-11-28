@@ -1,0 +1,50 @@
+{
+  "status": "candidate_not_approved",
+  "sourcePage": "https://comptroller.tn.gov/office-functions/pa/gisredistricting/municipal-boundaries.html",
+  "dashboard": "https://tn-cot.maps.arcgis.com/apps/dashboards/cc2701dd6ef2463ab7944e62120d9b9e",
+  "service": "https://services2.arcgis.com/63Ka7QbNqm4NLbeo/arcgis/rest/services/Comptroller_Cities/FeatureServer",
+  "itemId": "432a7396947245d8acb98d9d2cba292b",
+  "owner": "Ned.Phillips_TN_COT",
+  "publishedAt": "2025-05-06T17:09:59+00:00",
+  "itemModifiedAt": "2026-11-03T12:48:53+00:00",
+  "retrievedAt": "2026-11-13T06:40:14.092234+00:00",
+  "municipality": "Rockwood",
+  "baseLayer": 2,
+  "baseObjectId": 269,
+  "changeLayer": 1,
+  "changeObjectIds": [
+    180,
+    740,
+    741
+  ],
+  "sourceDisclaimer": "<p>This data is provided by the Tennessee Comptroller of the Treasury as a public service and is for informational purposes only. Municipal boundaries shown in this layer are based on data provided by the respective municipalities and are presented as received by the Comptroller of the Treasury.</p><p>The Comptroller of the Treasury makes no representations or warranties, express or implied, as to the accuracy, completeness, or reliability of the information presented herein. The data contained herein do not constitute legal descriptions of municipalities and do not establish official municipal boundary lines. &nbsp;Users acknowledge that the data may contain errors or omissions and that use of this map is at their own risk.</p>",
+  "version": "TN-COT-432a7396947245d8acb98d9d2cba292b-layer2-269-20261103",
+  "geometrySha256": "e1ebc348ed9cc92ffe8ba8ba0d00873486c9fec851233d4190daad3538289d1f",
+  "coordinateSystem": "EPSG:4326",
+  "boundaryApproval": null,
+  "files": {
+    "base.geojson": {
+      "sha256": "c21d3ebb4e33c867515988c01452a7a7e8bddcf4d4cc8d2aae1a8fe747bb561d",
+      "dataLastEditDate": 1793710123314
+    },
+    "changes.geojson": {
+      "sha256": "78f27b4f4b03f700a366ecd46d3e21032948abe90bfcc973751c265974f96e03",
+      "dataLastEditDate": 1793710129487
+    }
+  },
+  "zctaReference": {
+    "source": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/1",
+    "vintage": "2020 Census ZCTA (reference only, not a USPS ZIP boundary)",
+    "sha256": "4bc13ff8c5ccdb95ced628b6bd3f2ad4f0a3d308e17b92e4612a57dc56d1acc1"
+  },
+  "roadsReference": {
+    "source": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation_LargeScale/MapServer",
+    "layers": [
+      0,
+      1
+    ],
+    "vintage": "January 1, 2026 (Census TIGERweb)",
+    "use": "map context only; never eligibility or navigation evidence",
+    "sha256": "e7fd5fea84ffdc87d790fd867721dd43f654c8ae09fd808fb7696e70521087cf"
+  }
+}

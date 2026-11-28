@@ -1,0 +1,1032 @@
+// Developer-only real-component QA. Requires production web CSS and Playwright tooling.
+// Authentication/API are explicitly simulated; this does not verify staging login.
+import { createRequire } from "node:module";
+import { mkdtemp, writeFile, readFile, readdir } from "node:fs/promises";
+import http from "node:http";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import assert from "node:assert/strict";
+const root = resolve(fileURLToPath(new URL("../", import.meta.url)));
+const require = createRequire(root + "/artifacts/api-server/package.json");
+const { build } = require("esbuild");
+const { chromium } = require(
+  process.env.PLAYWRIGHT_CORE_PATH || "playwright-core",
+);
+const target = await mkdtemp(join(tmpdir(), "rocoeats-account-ui-"));
+await build({
+  entryPoints: [root + "/artifacts/localeats/tests/account-browser.tsx"],
+  outfile: target + "/app.js",
+  bundle: true,
+  format: "esm",
+  platform: "browser",
+  jsx: "automatic",
+  define: {
+    "import.meta.env.VITE_APP_AUDIENCE": '"customer"',
+    "process.env.NODE_ENV": '"development"',
+    "import.meta.env.VITE_API_ORIGIN": '"https://qa.onrender.com"',
+    "import.meta.env.BASE_URL": '"/"',
+    "import.meta.env.VITE_CLERK_PUBLISHABLE_KEY": '"fixture"',
+    "import.meta.env.VITE_CLERK_PROXY_URL": "undefined",
+    "import.meta.env.DEV": "false",
+    "import.meta.env.VITE_DEMO_MODE": "undefined",
+    "import.meta.env.VITE_GOOGLE_MAPS_API_KEY": "undefined",
+    "import.meta.env.VITE_GOOGLE_MAPS_MAP_ID": "undefined",
+  },
+  plugins: [
+    {
+      name: "qa-browser",
+      setup(b) {
+        b.onResolve({ filter: /^@capacitor\/browser$/ }, () => ({
+          path: "browser",
+          namespace: "qa-browser",
+        }));
+        b.onLoad({ filter: /.*/, namespace: "qa-browser" }, () => ({
+          contents: `export const Browser={open:async({url})=>{window.qaNativeOpened.push(url)},close:async()=>{if(window.qaStallBrowserClose)return new Promise(()=>{})}};`,
+          loader: "js",
+        }));
+      },
+    },
+    {
+      name: "qa-clerk",
+      setup(b) {
+        b.onResolve({ filter: /^@clerk\/react\/internal$/ }, () => ({
+          path: "internal", namespace: "qa-internal",
+        }));
+        b.onLoad({ filter: /.*/, namespace: "qa-internal" }, () => ({
+          contents: 'export const publishableKeyFromHost = (_host, key) => key;',
+          loader: "js",
+        }));
+        b.onResolve({ filter: /^@clerk\/react$/ }, () => ({
+          path: "clerk",
+          namespace: "qa",
+        }));
+        b.onLoad({ filter: /.*/, namespace: "qa" }, () => ({
+          resolveDir: root + "/artifacts/localeats",
+          contents: `
+            import React from "react";
+            const account = () => ({isLoaded:true,isSignedIn:window.qaSignedIn,userId:window.qaSignedIn?'user_QA':null,getToken:async()=>null});
+            export const useAuth=account;
+            export const useUser=()=>({isLoaded:true,user:window.qaSignedIn?{id:'user_QA',fullName:'Signup Fixture'}:null});
+            export const ClerkProvider=({children})=>children;
+            const start=({forceRedirectUrl,signInUrl,signUpUrl})=>React.createElement(React.Fragment,null,React.createElement("button",{onClick:()=>{
+              sessionStorage.setItem("qa-signup-session","signed-in");
+              location.assign(forceRedirectUrl);
+            }},"Complete simulated Clerk sign-in"),React.createElement("a",{href:signInUrl||signUpUrl},signInUrl?"Use existing sign-in":"Create signup account"));
+            export const SignUp=start, SignIn=start;
+            export const useSignIn=()=>({signIn:{ticket:async({ticket})=>{window.qaNativeTickets.push(ticket);if(window.qaStallTicket)return new Promise(()=>{});return{error:null}},finalize:async(options)=>{window.qaFinalizations=(window.qaFinalizations||0)+1;if(window.qaStallFinalize)return new Promise(resolve=>{window.qaFinishFinalize=()=>{window.qaSignedIn=true;resolve({error:null})}});await options?.navigate?.({session:{status:window.qaPendingTask?'pending':'active',currentTask:window.qaPendingTask?{key:'setup_mfa'}:null},decorateUrl:path=>path});window.qaSignedIn=true;return{error:null}}}});
+            export const useClerk=()=>({
+              openUserProfile:()=>{window.securityOpened=true},
+              addListener:()=>()=>{},
+              signOut:async({redirectUrl})=>{sessionStorage.removeItem("qa-signup-session");location.assign(redirectUrl)},
+            });
+          `,
+          loader: "js",
+        }));
+      },
+    },
+  ],
+  logLevel: "silent",
+});
+await writeFile(
+  target + "/app.css",
+  await readFile(
+    root +
+      "/artifacts/localeats/dist/public/assets/" +
+      (await readdir(root + "/artifacts/localeats/dist/public/assets")).find(
+        (name) => name.endsWith(".css"),
+      ),
+  ),
+);
+await writeFile(
+  target + "/index.html",
+  '<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/app.css"><div id="root"></div><script type="module" src="/app.js"></script></html>',
+);
+await writeFile(target + "/logo.svg", await readFile(root + "/artifacts/localeats/public/logo.svg"));
+await build({ entryPoints: [root + '/artifacts/api-server/src/lib/security-headers.ts'], outfile: target + '/security.mjs', bundle: true, platform: 'node', format: 'esm', logLevel: 'silent' });
+const { contentSecurityPolicy } = await import(pathToFileURL(target + '/security.mjs'));
+const server = http.createServer(async (req, res) => {
+  try {
+    res.setHeader('Content-Security-Policy', contentSecurityPolicy({ NODE_ENV: 'test' }));
+    const file = req.url === "/logo.svg" ? "logo.svg" :
+      req.url === "/app.js"
+        ? "app.js"
+        : req.url === "/app.css"
+          ? "app.css"
+          : "index.html";
+    res.setHeader(
+      "content-type",
+      file.endsWith(".js")
+        ? "text/javascript"
+        : file.endsWith(".svg") ? "image/svg+xml" : file.endsWith(".css")
+          ? "text/css"
+          : "text/html",
+    );
+    res.end(await readFile(target + "/" + file));
+  } catch {
+    res.statusCode = 500;
+    res.end();
+  }
+});
+await new Promise((r) => server.listen(0, "127.0.0.1", r));
+let browser;
+try {
+  browser = await chromium.launch({
+    executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium",
+    headless: true,
+    args: ["--no-sandbox"],
+  });
+  const origin = "http://127.0.0.1:" + server.address().port;
+  // Isolated real owner pages: all authentication, records and diagnostics are mocked.
+  const owner = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const ownerErrors=[];owner.on('pageerror',error=>ownerErrors.push(error.message));
+  await owner.goto(origin+'/?owner=true');
+  await owner.getByRole('heading',{name:'Manage your operations.',exact:true}).waitFor();
+  const shortcuts=owner.getByRole('navigation',{name:'Business management'});
+  await owner.getByRole('button',{name:'Revoke test dispatch access',exact:true}).waitFor();
+  assert.equal(await owner.getByRole('button',{name:'Revoke test dispatch access',exact:true}).isDisabled(),true,'Owner-managed approval cannot be edited through ordinary driver controls');
+  assert.equal(await owner.getByRole('button',{name:'Transfer test earnings',exact:true}).isDisabled(),true,'Closed payout gate must remain enforced after moving financial controls');
+  assert.equal(await owner.getByRole('button',{name:'Update case & notify requester',exact:true}).isDisabled(),true,'Support decisions still require a substantive response');
+  assert.deepEqual(await shortcuts.locator('a').evaluateAll(links=>links.map(link=>link.getAttribute('href'))),['/operations#orders','/admin?tab=restaurants','/operations#drivers','/operations#dispatch','/operations#payments','/operations#system','/notifications','/operations#support']);
+  await owner.getByText('Credentials locally valid; provider delivery unverified',{exact:true}).waitFor();
+  for(const heading of ['Provider push sending','Test payouts','Processed checkout payload retention']) {
+    const card=owner.locator('.roco-readiness-card').filter({has:owner.getByRole('heading',{name:heading,exact:true})});
+    assert.equal(await card.locator('strong').innerText(),'Disabled');
+  }
+  await owner.evaluate(()=>{window.qaOwnerHealth.testPayoutsEnabled=undefined;window.qaOwnerHealth.webhookRetentionEnabled=undefined;window.qaOwnerHealth.pushConfiguration={android:false,ios:false};});
+  await owner.getByRole('button',{name:'Refresh service status',exact:true}).click();
+  await owner.getByText('Not reported — check required',{exact:true}).first().waitFor();
+  assert.equal(await owner.getByText('Not reported — check required',{exact:true}).count(),3);
+  await owner.evaluate(()=>{window.qaOwnerHealth.testPayoutsEnabled=false;window.qaOwnerHealth.webhookRetentionEnabled=false;window.qaOwnerHealth.pushConfiguration={android:true,ios:false,deliveryEnabled:false,androidCredentialStatus:'locally_valid'};});
+  await owner.getByRole('button',{name:'Refresh service status',exact:true}).click();
+  await owner.getByText('Credentials locally valid; provider delivery unverified',{exact:true}).waitFor();
+  assert.equal(await owner.locator('.roco-owner-details').first().getAttribute('open'),null);
+  await owner.getByText('Owner-only notification verification',{exact:true}).click();
+  assert.equal(await owner.getByRole('button',{name:'Verify Google OAuth only',exact:true}).isDisabled(),true);
+  assert.equal(await owner.getByRole('button',{name:'Validate FCM permission only',exact:true}).isDisabled(),true);
+  await owner.getByRole('button',{name:'Refresh FCM validation status',exact:true}).click();
+  assert.deepEqual(await owner.evaluate(()=>[window.qaOwnerWrites,window.qaOAuthCalls,window.qaFcmValidationCalls]),[[],0,0]);
+  await owner.getByText('Owner-only notification verification',{exact:true}).click();
+  await shortcuts.getByRole('link',{name:'Manage Orders'}).click();
+  await owner.getByRole('heading',{name:'Manage Orders',exact:true}).waitFor();
+  assert.equal(await owner.evaluate(()=>location.hash),'#orders');
+  await owner.waitForFunction(()=>Math.abs(document.getElementById('orders')?.getBoundingClientRect().top ?? Infinity)<100,{},{timeout:5000});
+  await owner.getByRole('button',{name:'Refresh service status',exact:true}).click();
+  await owner.waitForFunction(()=>Array.from(document.querySelectorAll('button')).some(button=>button.textContent==='Refresh service status'&&!button.disabled));
+  assert.ok(await owner.locator('#orders').evaluate(el=>el.getBoundingClientRect().top>500),'Background status refresh must not reapply the initial anchor');
+  await owner.evaluate(()=>scrollTo(0,0));
+  assert.equal(await owner.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await owner.screenshot({path:target+'/owner-operations-mobile.png',fullPage:true});
+  await owner.locator('#system').screenshot({path:target+'/owner-system-mobile.png'});
+  await shortcuts.getByRole('link',{name:'Manage Restaurants'}).click();
+  await owner.getByRole('heading',{name:'No restaurant profiles to review',exact:true}).waitFor();
+  assert.equal(await owner.getByRole('link',{name:'Restaurants',exact:true}).getAttribute('aria-current'),'page');
+  await owner.getByRole('navigation',{name:'Administrator records'}).getByRole('link',{name:'Financial summary'}).click();
+  await owner.getByRole('heading',{name:'Payment provider',exact:true}).waitFor();
+  await owner.goBack();await owner.getByRole('heading',{name:'No restaurant profiles to review',exact:true}).waitFor();
+  for(const width of [320,390,768,1440]) {
+    await owner.setViewportSize({width,height:900});
+    assert.equal(await owner.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`Owner dashboard overflow at ${width}`);
+    assert.ok(await owner.locator('.roco-owner-tabs .roco-button').first().evaluate(el=>el.getBoundingClientRect().height>=44));
+    await owner.screenshot({path:target+`/owner-dashboard-${width}.png`,fullPage:true});
+  }
+  assert.deepEqual(ownerErrors,[]);await owner.close();
+  const deniedOwner=await browser.newPage();await deniedOwner.goto(origin+'/?owner=true&denied=true');await deniedOwner.getByRole('heading',{name:'Administrator access required'}).waitFor();assert.deepEqual(await deniedOwner.evaluate(()=>window.qaOwnerReads.filter(path=>path.startsWith('/api/admin/'))),[]);await deniedOwner.close();
+  const failedOwner=await browser.newPage();await failedOwner.goto(origin+'/?owner=true&accountError=true');await failedOwner.getByRole('heading',{name:'Operations could not load'}).waitFor();await failedOwner.getByRole('button',{name:'Try again',exact:true}).waitFor();assert.equal(await failedOwner.getByRole('navigation',{name:'Business management'}).count(),0);await failedOwner.close();
+  console.log('Owner workspace PASS: direct management links, query/back navigation, denied/error access states, closed-gate cards, protected driver/payout/support controls, no automatic diagnostics/writes and responsive 320/390/768/1440 layouts (simulated API). Visuals: '+target);
+  if(process.env.ACCOUNT_BROWSER_SUITE !== 'owner') {
+  const cspPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await cspPage.addInitScript(() => { window.cspStartupViolations = []; document.addEventListener('securitypolicyviolation', event => window.cspStartupViolations.push(event.effectiveDirective)); });
+  await cspPage.goto(origin + '/?checkoutCsp=true');
+  await cspPage.getByRole('button', { name: 'Prepare secure test payment', exact: true }).waitFor();
+  assert.deepEqual(await cspPage.evaluate(() => window.cspStartupViolations), [], 'Zod must not probe eval under strict CSP');
+  await cspPage.evaluate(() => {
+    window.cspViolations = [];
+    document.addEventListener('securitypolicyviolation', event => window.cspViolations.push(event.effectiveDirective));
+    const script = document.createElement('script'); script.textContent = 'window.injectedScriptRan = true'; document.body.append(script);
+    const remote = document.createElement('script'); remote.src = 'https://attacker.invalid/payload.js'; document.body.append(remote);
+  });
+  await cspPage.waitForFunction(() => window.cspViolations.length >= 2);
+  assert.equal(await cspPage.evaluate(() => window.injectedScriptRan), undefined);
+  assert.ok((await cspPage.evaluate(() => window.cspViolations)).every(value => value === 'script-src-elem'));
+  await cspPage.route('https://checkout.stripe.com/**', route => route.fulfill({ contentType: 'text/html', body: '<h1>Simulated Stripe TEST redirect</h1>' }));
+  await cspPage.getByRole('button', { name: 'Prepare secure test payment', exact: true }).click();
+  await cspPage.getByRole('button', { name: 'Open Stripe test checkout', exact: true }).click();
+  await cspPage.getByRole('heading', { name: 'Simulated Stripe TEST redirect', exact: true }).waitFor();
+  await cspPage.close();
+  console.log('CSP browser PASS: real CheckoutPanel loads under enforced policy; inline/foreign scripts blocked; hosted Stripe redirect preserved with intercepted provider navigation, no transaction.');
+  const reconciliation = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await reconciliation.goto(origin + '/?reconciliation=true');
+  await reconciliation.getByLabel('Review reason', { exact: true }).fill('Review existing completed test order');
+  const reconcile = reconciliation.getByRole('button', { name: 'Reconcile Stripe test charge', exact: true });
+  for (const state of ['pending', 'missing', 'invalid', 'available']) {
+    const before = await reconciliation.evaluate(() => window.qaEvidenceAttempts);
+    await reconciliation.evaluate(value => { window.qaEvidenceState = value; }, state);
+    await reconcile.tap();
+    if (state === 'pending' || state === 'missing') {
+      await reconciliation.getByRole('status').filter({ hasText: 'Reconciliation pending' }).waitFor();
+      await reconciliation.getByText(state === 'pending' ? 'Stripe balance funds are pending.' : 'Stripe has not supplied the charge balance transaction yet.', { exact: true }).waitFor();
+      await reconciliation.getByText('No fee or net evidence was recorded by this attempt.', { exact: false }).waitFor();
+      assert.equal(await reconciliation.getByRole('alert').count(), 0);
+      assert.equal(await reconciliation.getByText('Verified charge fee', { exact: false }).count(), 0);
+      if (state === 'pending') await reconciliation.getByText('Stripe’s reported availability:', { exact: false }).waitFor();
+    } else if (state === 'invalid') {
+      await reconciliation.getByRole('alert').filter({ hasText: 'invalid or inconsistent' }).waitFor();
+      assert.equal(await reconciliation.getByText('Verified charge fee', { exact: false }).count(), 0);
+    } else await reconciliation.getByRole('status').filter({ hasText: 'Verified charge fee $0.86; net to provider balance $18.33.' }).waitFor();
+    assert.equal(await reconciliation.evaluate(() => window.qaEvidenceAttempts), before + 1, 'Only an explicit tap submits a reconciliation attempt');
+  }
+  assert.equal(await reconciliation.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await reconciliation.close();
+  console.log('Reconciliation UI PASS: pending/missing evidence remains unreconciled, invalid evidence stays blocked, manual retry reaches verified fees without automatic resubmission (simulated provider/API).');
+  for (const lost of [false,true]) {
+    const oauth=await browser.newPage({viewport:{width:390,height:844}});
+    await oauth.goto(origin+'/?firebaseOAuth=true'+(lost?'&lostOAuth=true':''));
+    const panel=oauth.getByRole('region',{name:'Firebase OAuth authentication'});
+    const button=panel.getByRole('button',{name:'Verify Google OAuth only',exact:true});
+    await button.waitFor();assert.equal(await button.isDisabled(),true);
+    assert.equal(await panel.locator('input[type="password"],input[type="text"],textarea').count(),0,'No credential form');
+    assert.equal(await oauth.evaluate(()=>window.qaOAuthCalls),0);
+    await panel.getByRole('button',{name:'Refresh OAuth status'}).click();
+    assert.equal(await oauth.evaluate(()=>window.qaOAuthCalls),0,'Status refresh cannot authenticate');
+    await panel.getByRole('checkbox').check();await button.click();
+    await panel.getByText('Google OAuth authenticated. FCM permissions and device delivery remain unverified.',{exact:false}).waitFor();
+    if(lost)await panel.getByRole('alert').filter({hasText:'No automatic retry'}).waitFor();
+    assert.equal(await oauth.evaluate(()=>window.qaOAuthCalls),1,'Lost response must recover from status without automatic POST');
+    assert.equal(await button.isDisabled(),true);
+    assert.equal(await panel.getByRole('checkbox').isChecked(),false);
+    assert.equal(await oauth.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    await oauth.close();
+  }
+  console.log('OAuth-only UI PASS: explicit owner confirmation, no credential inputs, GET-only refresh and lost-response recovery without automatic execution (simulated OAuth/API).');
+  for(const lost of [false,true]){
+    const page=await browser.newPage({viewport:{width:390,height:844}});await page.goto(origin+'/?fcmValidation=true'+(lost?'&lostFcm=true':''));
+    const panel=page.getByRole('region',{name:'FCM permission validation'}),button=panel.getByRole('button',{name:'Validate FCM permission only',exact:true});
+    await button.waitFor();assert.equal(await button.isDisabled(),true);assert.equal(await panel.locator('input[type="text"],input[type="password"],textarea').count(),0);
+    await panel.getByRole('button',{name:'Refresh FCM validation status'}).click();assert.equal(await page.evaluate(()=>window.qaFcmValidationCalls),0);
+    await panel.getByRole('checkbox').check();await button.click();await panel.getByText('FCM permission validated without delivery.',{exact:false}).waitFor();
+    if(lost)await panel.getByRole('alert').filter({hasText:'No automatic retry'}).waitFor();
+    assert.equal(await page.evaluate(()=>window.qaFcmValidationCalls),1);assert.equal(await button.isDisabled(),true);assert.equal(await panel.getByRole('checkbox').isChecked(),false);
+    await panel.getByRole('button',{name:'Refresh FCM validation status'}).click();assert.equal(await page.evaluate(()=>window.qaFcmValidationCalls),1);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.close();
+  }
+  console.log('FCM validation UI PASS: explicit consent, permanent allowance, no token/target form, GET-only lost-response recovery and no repeated validation (simulated provider/API).');
+  const support=await browser.newPage({viewport:{width:390,height:844}});
+  await support.goto(origin+'/?supportDesk=true&lostSupport=true');await support.getByRole('button',{name:'Get support',exact:true}).click();
+  await support.getByLabel('Subject',{exact:true}).fill('Recover my request');await support.getByLabel('What happened?',{exact:true}).fill('A lost reply must not duplicate my support request.');
+  await support.evaluate(()=>window.qaSupportHideCases=true);await support.getByRole('button',{name:'Send support request',exact:true}).click();await support.getByRole('alert').waitFor();
+  await support.getByRole('button',{name:'Review latest requests'}).click();await support.getByText('Request outcome is unconfirmed.',{exact:false}).waitFor();assert.equal(await support.getByLabel('Subject',{exact:true}).isDisabled(),true);
+  await support.getByRole('button',{name:'Retry saved support request',exact:true}).click();await support.getByText('Request received. Operations will review it here.').waitFor();
+  const requestBodies=await support.evaluate(()=>window.qaSupportWrites);assert.equal(requestBodies.length,2);assert.deepEqual(requestBodies[0],requestBodies[1]);assert.equal(await support.evaluate(()=>window.qaSupportCases.length),2);await support.close();
+  const thread=await browser.newPage({viewport:{width:390,height:844}});await thread.goto(origin+'/?supportDesk=true&lostSupport=true');await thread.getByRole('button',{name:'Get support',exact:true}).click();await thread.getByRole('button',{name:'Conversation & reply'}).click();await thread.getByLabel('Reply',{exact:true}).fill('Keep the exact reply when history is incomplete');
+  await thread.evaluate(()=>window.qaSupportHideMessages=true);await thread.getByRole('button',{name:'Send reply',exact:true}).click();await thread.getByRole('alert').waitFor();await thread.getByRole('button',{name:'Review latest conversation'}).click();await thread.getByText('Reply outcome is still unconfirmed.',{exact:false}).waitFor();assert.equal(await thread.getByLabel('Reply',{exact:true}).isDisabled(),true);
+  await thread.getByRole('button',{name:'Retry saved reply',exact:true}).click();await thread.getByText('Reply saved.',{exact:true}).waitFor();const replies=await thread.evaluate(()=>window.qaSupportWrites);assert.deepEqual(replies[0],replies[1]);assert.equal(await thread.evaluate(()=>window.qaSupportMessages.length),1);await thread.close();
+  const decision=await browser.newPage({viewport:{width:390,height:844}});await decision.goto(origin+'/?supportAdmin=true&lostSupport=true');await decision.getByLabel('Response to requester',{exact:true}).fill('An uncertain decision must be retried with the original identity');await decision.getByLabel('Status',{exact:true}).selectOption('resolved');await decision.getByRole('button',{name:'Update case & notify requester'}).click();await decision.getByRole('alert').waitFor();await decision.getByRole('button',{name:'Review latest case',exact:true}).click();await decision.getByText('Support fixture · resolved',{exact:true}).waitFor();assert.equal(await decision.getByLabel('Response to requester',{exact:true}).isDisabled(),true);
+  await decision.getByRole('button',{name:'Retry saved decision',exact:true}).click();await decision.waitForFunction(()=>document.querySelector('textarea')?.value==='');const decisions=await decision.evaluate(()=>window.qaSupportWrites);assert.deepEqual(decisions[0],decisions[1]);assert.equal(await decision.evaluate(()=>window.qaSupportMessages.length),1);assert.equal(await decision.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await decision.close();
+  console.log('Support recovery UI PASS: lost request/reply/decision acknowledgements retain immutable IDs through incomplete history and queue refresh, with no duplicate writes (simulated API).');
+  const cartSync = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await cartSync.goto(origin + '/?cartSync=true');
+  await cartSync.getByRole('button', { name: 'Add fries menu', exact: true }).click();
+  await cartSync.waitForFunction(() => JSON.parse(document.querySelector('[data-testid="checkout-cart"]').textContent).length === 1, undefined, { timeout: 3000 });
+  for (const name of ['menu', 'checkout']) {
+    const lines = JSON.parse(await cartSync.getByTestId(`${name}-cart`).textContent());
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0].quantity, 1);
+  }
+  await cartSync.close();
+  for (const role of ['restaurant', 'driver']) {
+    const recovery = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    recovery.setDefaultTimeout(10000);
+    await recovery.goto(origin + `/signup-fixture?join=${role}&deny=1`);
+    await recovery.getByRole('link', { name: 'Use existing sign-in', exact: true }).click();
+    await recovery.waitForURL(url => url.pathname === '/sign-in' && url.searchParams.get('join') === role);
+    await recovery.getByRole('link', { name: 'Create signup account', exact: true }).click();
+    await recovery.waitForURL(url => url.pathname === '/sign-up' && url.searchParams.get('join') === role);
+    await recovery.getByRole('button', { name: 'Complete simulated Clerk sign-in' }).click();
+    await recovery.getByRole('alert').filter({ hasText: 'Private staging requires an invitation' }).waitFor();
+    const access = recovery.getByRole('link', { name: 'Check account access', exact: true });
+    assert.equal(await access.getAttribute('href'), `/account/access?join=${role}`);
+    await access.click();
+    await recovery.getByText('You are signed in. This private staging account still needs an invitation.').waitFor();
+    assert.equal(await recovery.getByRole('link', { name: 'Complete account setup', exact: true }).count(), 0);
+    assert.equal(await recovery.evaluate(() => sessionStorage.getItem('qa-signup-writes')), null);
+    await recovery.getByRole('link', { name: '← Dashboard', exact: true }).click();
+    await recovery.getByRole('alert').filter({ hasText: 'Check your connection or account access' }).waitFor();
+    assert.equal(await recovery.getByRole('link', { name: 'Check account access', exact: true }).getAttribute('href'), `/account/access?join=${role}`);
+    await recovery.getByRole('link', { name: 'Check account access', exact: true }).click();
+    // Losing the authenticated session on the access page must preserve intent too.
+    await recovery.evaluate(() => sessionStorage.removeItem('qa-signup-session'));
+    await recovery.reload();
+    await recovery.waitForURL(url => url.pathname === '/sign-in' && url.searchParams.get('join') === role);
+    await recovery.getByRole('button', { name: 'Complete simulated Clerk sign-in' }).click();
+    await recovery.getByRole('link', { name: 'Check account access', exact: true }).click();
+    // Simulated invitation approval changes only this browser fixture, never staging.
+    await recovery.evaluate(() => sessionStorage.removeItem('qa-signup-deny'));
+    await recovery.reload();
+    const setup = recovery.getByRole('link', { name: 'Complete account setup', exact: true });
+    await setup.waitFor();
+    assert.equal(await setup.getAttribute('href'), `/account/setup?join=${role}`);
+    await setup.click();
+    await recovery.waitForURL(url => url.pathname === `/${role}`);
+    assert.equal(await recovery.evaluate(() => JSON.parse(sessionStorage.getItem('qa-signup-profile')).role), role);
+    assert.equal(await recovery.evaluate(() => Number(sessionStorage.getItem('qa-signup-writes'))), 1);
+    await recovery.close();
+  }
+  for (const role of ['restaurant', 'driver']) {
+    const missing = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await missing.goto(origin + '/home-fixture');
+    await missing.evaluate(() => sessionStorage.setItem('qa-signup-session', 'signed-in'));
+    await missing.goto(origin + '/account/access');
+    await missing.getByRole('link', { name: `Set up as a ${role}`, exact: true }).waitFor();
+    assert.equal(await missing.getByRole('link', { name: 'Complete account setup', exact: true }).count(), 0);
+    for (const path of ['/account/setup', '/account/setup?join=admin']) {
+      await missing.goto(origin + path);
+      await missing.getByRole('heading', { name: 'Choose your account type', exact: true }).waitFor();
+      assert.equal(await missing.evaluate(() => sessionStorage.getItem('qa-signup-writes')), null);
+    }
+    // No implicit Customer account, even when intent and authentication are both lost.
+    await missing.evaluate(() => sessionStorage.removeItem('qa-signup-session'));
+    await missing.goto(origin + '/account/access');
+    await missing.waitForURL(url => url.pathname === '/sign-in');
+    await missing.getByRole('button', { name: 'Complete simulated Clerk sign-in' }).click();
+    await missing.getByRole('heading', { name: 'Choose your account type', exact: true }).waitFor();
+    await missing.reload();
+    assert.equal(await missing.evaluate(() => sessionStorage.getItem('qa-signup-writes')), null);
+    await missing.getByRole('link', { name: `Set up as a ${role}`, exact: true }).click();
+    await missing.waitForURL(url => url.pathname === `/${role}`);
+    assert.equal(await missing.evaluate(() => JSON.parse(sessionStorage.getItem('qa-signup-profile')).role), role);
+    assert.equal(await missing.evaluate(() => Number(sessionStorage.getItem('qa-signup-writes'))), 1);
+    await missing.close();
+  }
+  const existingOwner = await browser.newPage();
+  await existingOwner.goto(origin + '/home-fixture');
+  await existingOwner.evaluate(() => {
+    sessionStorage.setItem('qa-signup-session', 'signed-in');
+    sessionStorage.setItem('qa-signup-profile', JSON.stringify({ id: 'fixture-profile', role: 'admin', displayName: 'Owner', createdAt: new Date().toISOString() }));
+  });
+  for (const intent of ['restaurant', 'driver']) {
+    await existingOwner.goto(origin + `/account/setup?join=${intent}`);
+    await existingOwner.waitForURL(url => url.pathname === '/admin');
+    assert.equal(await existingOwner.evaluate(() => JSON.parse(sessionStorage.getItem('qa-signup-profile')).role), 'admin');
+    assert.equal(await existingOwner.evaluate(() => sessionStorage.getItem('qa-signup-writes')), null);
+  }
+  await existingOwner.close();
+  console.log('Signup recovery PASS: restaurant and driver intent survives auth links, invitation denial, access-page session loss, reload and admission, with exactly one profile of the intended role (simulated Clerk/API).');
+  for (const width of [320, 390, 768, 1440]) {
+    const home = await browser.newPage({ viewport: { width, height: 900 } });
+    await home.goto(origin + "/home-fixture");
+    await home.getByRole("heading", { name: "Good food. Closer to home." }).waitFor();
+    await home.waitForFunction(() => document.querySelector('.roco-home-brand img')?.naturalWidth > 0);
+    const actions = home.getByRole("navigation", { name: "Get started with RoCoEats" }).getByRole("link");
+    assert.deepEqual(await actions.allTextContents(), ["Sign In", "Order as Guest", "Browse Restaurants & Menus", "Partner With RoCoEats", "Drive With RoCoEats"]);
+    let previousBottom = 0;
+    for (const link of await actions.all()) {
+      const box = await link.boundingBox();
+      assert.ok(box.height >= 48 && box.y >= previousBottom);
+      previousBottom = box.y + box.height;
+      await link.focus();
+      assert.equal(await link.evaluate(el => el === document.activeElement), true);
+    }
+    assert.equal(await home.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await home.getByRole("link", { name: "Order as Guest", exact: true }).click();
+    await home.waitForURL(url => url.pathname === "/restaurants" && url.searchParams.get("guest") === "1");
+    await home.getByRole("heading", { name: "Local food, right around here." }).waitFor();
+    await home.goto(origin + "/");
+    await home.getByRole("link", { name: "Partner With RoCoEats", exact: true }).click();
+    await home.waitForURL(url => url.pathname === "/sign-up" && url.searchParams.get("join") === "restaurant");
+    await home.goto(origin + "/");
+    await home.getByRole("link", { name: "Drive With RoCoEats", exact: true }).click();
+    await home.waitForURL(url => url.pathname === "/sign-up" && url.searchParams.get("join") === "driver");
+    await home.goto(origin + "/");
+    await home.screenshot({ path: target + `/homepage-${width}.png`, fullPage: true });
+    await home.close();
+  }
+  for (const [role, destination] of [["customer", "/dashboard"], ["restaurant", "/restaurant"], ["driver", "/driver"], ["admin", "/admin"]]) {
+    const member = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await member.goto(origin + "/home-fixture");
+    await member.evaluate(role => {
+      sessionStorage.setItem("qa-signup-session", "signed-in");
+      sessionStorage.setItem("qa-signup-profile", JSON.stringify({ id: "fixture-profile", role, displayName: "QA member", createdAt: new Date().toISOString() }));
+    }, role);
+    await member.reload();
+    await member.getByRole("link", { name: "Sign In", exact: true }).click();
+    await member.waitForURL(url => url.pathname === destination);
+    assert.equal(await member.evaluate(() => sessionStorage.getItem("qa-signup-writes")), null);
+    await member.close();
+  }
+  console.log("Homepage PASS: five stacked actions, keyboard focus and no overflow at 320/390/768/1440px; server-profile routing for all four roles (simulated Clerk/API).");
+  for (const [intent, role, destination, heading] of [
+    ["?join=customer", "customer", "/dashboard", "Welcome, Signup Fixture."],
+    ["?join=restaurant", "restaurant", "/restaurant", "Bring your business to the table."],
+    ["?join=driver", "driver", "/driver", "Local deliveries."],
+  ]) {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    page.setDefaultTimeout(10000);
+    page.on("pageerror", error => console.error("Signup fixture error:", error.message));
+    await page.goto(origin + "/signup-fixture" + intent);
+    await page.getByRole("button", { name: "Complete simulated Clerk sign-in" }).click();
+    try {
+      await page.waitForURL(url => url.pathname === destination, { timeout: 10000 });
+    } catch (error) {
+      console.error("Signup destination", role, page.url(), await page.locator("body").innerText());
+      throw error;
+    }
+    await page.getByRole("heading", { name: heading, exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => JSON.parse(sessionStorage.getItem("qa-signup-profile")).role), role);
+    await page.reload();
+    await page.getByRole("heading", { name: heading, exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => Number(sessionStorage.getItem("qa-signup-writes"))), 1);
+    await page.close();
+  }
+
+  const deniedPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  deniedPage.setDefaultTimeout(10000);
+  deniedPage.on("pageerror", error => console.error("Denied fixture error:", error.message));
+  await deniedPage.goto(origin + "/signup-fixture?join=restaurant&deny=1");
+  await deniedPage.getByRole("button", { name: "Complete simulated Clerk sign-in" }).click();
+  try {
+    await deniedPage.getByRole("alert").filter({ hasText: "Private staging requires an invitation" }).waitFor();
+  } catch (error) {
+    console.error("Denied signup state:", deniedPage.url(), await deniedPage.locator("body").innerText());
+    throw error;
+  }
+  assert.equal(await deniedPage.evaluate(() => sessionStorage.getItem("qa-signup-writes")), null);
+  await deniedPage.goto(origin + "/restaurant");
+  await deniedPage.getByRole("alert").filter({ hasText: "Private staging requires an invitation" }).waitFor();
+  await deniedPage.getByRole("button", { name: "Retry", exact: true }).click();
+  await deniedPage.getByRole("alert").filter({ hasText: "Private staging requires an invitation" }).waitFor();
+  await deniedPage.getByRole("link", { name: "Check account access" }).click();
+  await deniedPage.getByText("You are signed in. This private staging account still needs an invitation.").waitFor();
+  await deniedPage.goto(origin + "/dashboard");
+  await deniedPage.getByRole("alert").filter({ hasText: "Check your connection or account access" }).waitFor();
+  await deniedPage.getByRole("button", { name: "Try again", exact: true }).click();
+  await deniedPage.getByRole("alert").filter({ hasText: "Check your connection or account access" }).waitFor();
+  await deniedPage.close();
+  console.log("Signup UI: three member paths, session reload, and stable restaurant/dashboard staging denials passed (simulated Clerk/API)");
+
+  for (const role of ['restaurant', 'driver']) {
+    const expiredPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await expiredPage.goto(origin + `/signup-fixture?join=${role}&expired=1`);
+    await expiredPage.getByRole('button', { name: 'Complete simulated Clerk sign-in' }).click();
+    await expiredPage.getByRole('button', { name: 'Sign in again to continue' }).click();
+    await expiredPage.waitForURL(url => url.pathname === '/sign-in' && url.searchParams.get('join') === role);
+    assert.equal(await expiredPage.evaluate(() => sessionStorage.getItem('qa-signup-session')), null);
+    await expiredPage.close();
+  }
+
+  const cartSignup = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await cartSignup.goto(origin + "/signup-fixture?checkout=1");
+  await cartSignup.evaluate(() => localStorage.setItem("rocoeats-guest-cart:v1", JSON.stringify([{
+    menuItemId: "11111111-1111-4111-8111-111111111111", name: "Guest cart fixture", priceCents: 899,
+    quantity: 1, restaurantId: "22222222-2222-4222-8222-222222222222", restaurantName: "Fixture kitchen",
+  }])));
+  await cartSignup.getByRole("button", { name: "Complete simulated Clerk sign-in" }).click();
+  await cartSignup.waitForURL(url => url.pathname === "/cart" && !url.search);
+  await cartSignup.getByText("Guest cart fixture", { exact: true }).waitFor();
+  assert.equal(await cartSignup.evaluate(() => JSON.parse(localStorage.getItem("rocoeats-guest-cart:v1")).length), 0);
+  await cartSignup.reload();
+  await cartSignup.getByText("Guest cart fixture", { exact: true }).waitFor();
+  await cartSignup.getByLabel("Delivery address").selectOption("fixture-address");
+  await cartSignup.evaluate(() => sessionStorage.setItem("qa-hold-quote", "1"));
+  await cartSignup.getByRole("button", { name: "Calculate test total" }).click();
+  await cartSignup.waitForFunction(() => typeof window.qaReleaseQuote === "function");
+  await cartSignup.getByRole("button", { name: "Add one Guest cart fixture" }).click();
+  await cartSignup.evaluate(() => {
+    sessionStorage.removeItem("qa-hold-quote");
+    window.qaReleaseQuote();
+  });
+  await cartSignup.getByRole("button", { name: "Calculate test total" }).waitFor();
+  await cartSignup.waitForFunction(() => !Array.from(document.querySelectorAll("button")).find(button => button.textContent === "Calculate test total")?.disabled);
+  assert.equal(await cartSignup.getByRole("button", { name: /Create order/ }).count(), 0);
+  await cartSignup.getByRole("button", { name: "Calculate test total" }).click();
+  const createOrder = cartSignup.getByRole("button", { name: "Create order · $17.98" });
+  await createOrder.click();
+  await cartSignup.getByRole("alert").filter({ hasText: "Simulated order retry" }).waitFor();
+  await cartSignup.getByRole("button", { name: "Calculate test total" }).click();
+  await createOrder.click();
+  await cartSignup.waitForFunction(() => JSON.parse(sessionStorage.getItem("qa-order-writes") ?? "[]").length === 2);
+  const writes = await cartSignup.evaluate(() => JSON.parse(sessionStorage.getItem("qa-order-writes")));
+  assert.deepEqual(writes[0], writes[1]);
+  assert.ok(writes[0].key);
+  assert.equal(writes[0].body.items[0].quantity, 2);
+  assert.equal(writes[0].body.expectedTotalCents, 1798);
+  await cartSignup.close();
+  console.log("Signup UI: expired-session recovery, guest cart restoration and checkout quote races passed (simulated Clerk/API)");
+
+  const nativePage = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+  });
+  await nativePage.goto(
+    "http://127.0.0.1:" + server.address().port + "/?native=true&join=restaurant",
+  );
+  await nativePage
+    .getByRole("button", {
+      name: "Sign in or create account in browser",
+      exact: true,
+    })
+    .click();
+  await nativePage.waitForURL(url => url.pathname === "/account/setup" && url.searchParams.get("join") === "restaurant");
+  assert.deepEqual(await nativePage.evaluate(() => window.qaNativeTickets), [
+    "qa-one-use-ticket",
+  ]);
+  const opened = await nativePage.evaluate(() => window.qaNativeOpened);
+  assert.equal(opened.length, 1);
+  assert.equal(new URL(opened[0]).origin, "https://qa.onrender.com");
+  assert.equal(opened[0].includes("ticket"), false);
+  assert.equal(
+    (await nativePage.evaluate(() => window.qaNativeStart)).challenge.length,
+    43,
+  );
+  assert.equal(
+    await nativePage.evaluate(() =>
+      localStorage.getItem("rocoeats-native-auth:v1"),
+    ),
+    null,
+  );
+  const closeStall = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await closeStall.goto("http://127.0.0.1:" + server.address().port + "/?native=true&join=restaurant");
+  await closeStall.evaluate(() => { window.qaStallBrowserClose = true; });
+  await closeStall.getByRole('button', { name: 'Sign in or create account in browser', exact: true }).click();
+  await closeStall.waitForURL(url => url.pathname === '/account/setup' && url.searchParams.get('join') === 'restaurant', { timeout: 4000 });
+  await closeStall.close();
+  const lateStart = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await lateStart.clock.install();
+  await lateStart.goto('http://127.0.0.1:' + server.address().port + '/?native=true');
+  await lateStart.evaluate(() => {
+    const original = window.fetch;
+    window.fetch = async (...args) => {
+      if (String(args[0]) === '/api/mobile/auth/start') {
+        window.qaStartHeld = true;
+        await new Promise(resolve => { window.qaFinishStart = resolve; });
+      }
+      return original(...args);
+    };
+  });
+  await lateStart.getByRole('button', { name: 'Sign in or create account in browser', exact: true }).click();
+  await lateStart.waitForFunction(() => window.qaStartHeld);
+  await lateStart.clock.fastForward(31000);
+  await lateStart.getByRole('alert').filter({ hasText: 'NATIVE_STARTUP_TIMEOUT_BROWSER_OPEN' }).waitFor();
+  await lateStart.evaluate(() => window.qaFinishStart());
+  await lateStart.clock.fastForward(250);
+  assert.equal(await lateStart.evaluate(() => window.qaNativeOpened.length), 0, 'Late response must not open another approval after recovery');
+  await lateStart.getByRole('alert').filter({ hasText: 'NATIVE_STARTUP_TIMEOUT_BROWSER_OPEN' }).waitFor();
+  await lateStart.close();
+  for (const [flag, code] of [['qaStallTicket', 'NATIVE_TICKET_TIMEOUT'], ['qaStallFinalize', 'NATIVE_ACTIVATION_TIMEOUT'], ['qaPendingTask', 'NATIVE_SESSION_TASK_REQUIRED']]) {
+    const stalled = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await stalled.clock.install();
+    await stalled.goto('http://127.0.0.1:' + server.address().port + '/?native=true');
+    await stalled.evaluate(flag => { window[flag] = true; }, flag);
+    await stalled.getByRole('button', { name: 'Sign in or create account in browser', exact: true }).click();
+    await stalled.waitForFunction(() => window.qaNativeTickets.length === 1);
+    if (flag === 'qaStallFinalize') await stalled.waitForFunction(() => window.qaFinalizations === 1);
+    if (flag !== 'qaPendingTask') await stalled.clock.fastForward(16000);
+    await stalled.getByRole('alert').filter({ hasText: code }).waitFor();
+    assert.equal(await stalled.evaluate(() => window.qaNativeTickets.length), 1);
+    if (flag === 'qaStallFinalize') {
+      await stalled.evaluate(() => window.qaFinishFinalize());
+      await stalled.clock.fastForward(500);
+      await stalled.getByRole('alert').filter({ hasText: code }).waitFor();
+    }
+    await stalled.getByRole('button', { name: 'Reload app', exact: true }).waitFor();
+    await stalled.close();
+  }
+  for (const restored of [false, true]) {
+    const restarted = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await restarted.addInitScript(() => localStorage.setItem('rocoeats-native-auth:v1', JSON.stringify({ id: '11111111-1111-4111-8111-111111111115', verifier: 'V'.repeat(43), expiresAt: new Date(Date.now() + 300000).toISOString(), phase: 'activating', role: 'driver' })));
+    await restarted.goto('http://127.0.0.1:' + server.address().port + '/?native=true' + (restored ? '&nativeRestored=true' : ''));
+    if (restored) await restarted.waitForURL(url => url.pathname === '/account/setup' && url.searchParams.get('join') === 'driver');
+    else await restarted.getByRole('alert').filter({ hasText: 'NATIVE_HANDOFF_INTERRUPTED' }).waitFor();
+    assert.equal(await restarted.evaluate(() => window.qaNativeTickets.length), 0);
+    assert.equal(await restarted.evaluate(() => window.qaNativeOpened.length), 0, 'Restart never silently requests another approval');
+    await restarted.close();
+  }
+  const blocked = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await blocked.clock.install();
+  await blocked.goto('http://127.0.0.1:' + server.address().port + '/?startupBlocked=true');
+  await blocked.clock.fastForward(10000);
+  await blocked.evaluate(() => window.qaStartupPhase('ACTIVATING'));
+  await blocked.clock.fastForward(10000);
+  await blocked.evaluate(() => window.qaStartupPhase('PROFILE'));
+  await blocked.clock.fastForward(11000);
+  await blocked.getByRole('alert').filter({ hasText: 'NATIVE_STARTUP_TIMEOUT_PROFILE' }).waitFor();
+  await blocked.getByRole('button', { name: 'Reload app', exact: true }).waitFor();
+  await blocked.close();
+  console.log('Native handoff PASS: browser dismissal cannot block navigation; stalled ticket/finalization and pending tasks fail closed; outside-provider startup watchdog survives phase churn. All Clerk/native behavior simulated.');
+  await nativePage.close();
+  const importPage = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+  });
+  await importPage.goto(
+    "http://127.0.0.1:" + server.address().port + "/?importGuest=true",
+  );
+  await importPage
+    .getByLabel("Private guest tracking link", { exact: true })
+    .fill("https://evil.example.test/guest/order#access=" + "A".repeat(43));
+  await importPage
+    .getByRole("button", { name: "Open my private guest order", exact: true })
+    .click();
+  await importPage.getByRole("alert").waitFor();
+  assert.deepEqual(
+    await importPage.evaluate(() => window.qaGuestImportHeaders),
+    [],
+  );
+  await importPage
+    .getByLabel("Private guest tracking link", { exact: true })
+    .fill("https://qa.onrender.com/guest/order#access=" + "A".repeat(43));
+  await importPage
+    .getByRole("button", { name: "Open my private guest order", exact: true })
+    .click();
+  await importPage.waitForFunction(
+    () => localStorage.getItem("rocoeats-guest-access:v1") === "A".repeat(43),
+  );
+  assert.deepEqual(
+    await importPage.evaluate(() => window.qaGuestImportHeaders),
+    ["A".repeat(43)],
+  );
+  await importPage.close();
+  const guestPage = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+  });
+  await guestPage.goto(
+    "http://127.0.0.1:" + server.address().port + "/?guest=true",
+  );
+  await guestPage.evaluate(() =>
+    localStorage.setItem(
+      "rocoeats-guest-cart:v1",
+      JSON.stringify([
+        {
+          menuItemId: "11111111-1111-4111-8111-111111111110",
+          restaurantId: "11111111-1111-4111-8111-111111111111",
+          restaurantName: "QA guest kitchen",
+          name: "QA guest meal",
+          priceCents: 1000,
+          quantity: 1,
+        },
+      ]),
+    ),
+  );
+  await guestPage.getByLabel("Your name", { exact: true }).fill("Guest QA");
+  await guestPage
+    .getByLabel("Receipt email", { exact: true })
+    .fill("guest-ui@example.test");
+  await guestPage
+    .getByLabel("Delivery phone", { exact: true })
+    .fill("8655550100");
+  await guestPage
+    .getByRole("button", { name: "Continue as Guest", exact: true })
+    .click();
+  await guestPage.getByText("QA guest meal", { exact: true }).waitFor();
+  assert.deepEqual(await guestPage.evaluate(() => window.qaGuestContacts), [
+    { name: "Guest QA", email: "guest-ui@example.test", phone: "8655550100" },
+  ]);
+  await guestPage.reload();
+  await guestPage.getByText("QA guest meal", { exact: true }).waitFor();
+  await guestPage
+    .getByRole("button", { name: "Add address", exact: true })
+    .click();
+  await guestPage
+    .getByLabel("Street address", { exact: true })
+    .fill("QA guest street");
+  await guestPage.getByLabel("City", { exact: true }).fill("Rockwood");
+  await guestPage.getByLabel("ZIP code", { exact: true }).fill("37854");
+  await guestPage
+    .getByRole("button", { name: "Save address", exact: true })
+    .click();
+  await guestPage
+    .getByRole("button", { name: "Calculate test total", exact: true })
+    .click();
+  await guestPage
+    .getByRole("button", { name: "Create order · $15.50", exact: true })
+    .waitFor();
+  assert.equal(
+    await guestPage
+      .getByRole("button", { name: "Create order · $15.50", exact: true })
+      .isDisabled(),
+    true,
+  );
+  assert.equal(
+    await guestPage.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+    true,
+  );
+  await guestPage.close();
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.goto("http://127.0.0.1:" + server.address().port);
+  const geocodio = page.getByRole("region", { name: "Public Geocodio verification" });
+  const verifyGeocodio = geocodio.getByRole("button", { name: "Run public address verification once" });
+  await geocodio.getByText("Disabled until the separately approved server configuration is ready.").waitFor();
+  assert.equal(await verifyGeocodio.isDisabled(), true);
+  assert.equal(await geocodio.locator('input[type="password"], input[type="text"], textarea').count(), 0);
+  await page.evaluate(() => { window.qaGeoReady = true; });
+  await geocodio.getByRole("button", { name: "Refresh verification status" }).click();
+  const freeAllowance = geocodio.getByRole("checkbox");
+  await freeAllowance.waitFor();
+  assert.equal(await verifyGeocodio.isDisabled(), true);
+  await freeAllowance.check();
+  await verifyGeocodio.click();
+  await geocodio.getByText("Allowance used · completed. No further provider calls will be made.").waitFor();
+  assert.equal(await verifyGeocodio.count(), 0);
+  await geocodio.getByRole("button", { name: "Refresh verification status" }).click();
+  await geocodio.getByRole("button", { name: "Refresh verification status" }).click();
+  assert.equal(await page.evaluate(() => window.qaGeoCalls), 1);
+  console.log("Phone-only geocoding panel PASS: disabled by default, free-allowance confirmation, no credential form, lost-response status recovery and no automatic repeat (simulated owner/API; no provider calls).");
+  await page
+    .getByText(
+      "Your order has been received. We're contacting the restaurant to confirm it.",
+      { exact: true },
+    )
+    .waitFor();
+  await page
+    .getByRole("button", { name: "Guest delivery contact", exact: true })
+    .click();
+  assert.equal(
+    await page
+      .getByRole("link", { name: "Call guest", exact: true })
+      .getAttribute("href"),
+    "tel:8655550199",
+  );
+  await page
+    .getByLabel("Call notes / unavailable items / price discrepancies", {
+      exact: true,
+    })
+    .fill("Reached restaurant for order review");
+  await page
+    .getByRole("button", { name: "Save telephone response", exact: true })
+    .click();
+  await page
+    .getByText("We're confirming your order with the restaurant.", {
+      exact: true,
+    })
+    .waitFor();
+  await page
+    .getByRole("combobox", { name: /^Telephone action/ })
+    .selectOption("accept");
+  await page
+    .getByLabel("Call notes / unavailable items / price discrepancies", {
+      exact: true,
+    })
+    .fill("Restaurant confirms all items; preparation waits for payment");
+  await page
+    .getByLabel("Preparation estimate (minutes, acceptance only)", {
+      exact: true,
+    })
+    .fill("20");
+  await page
+    .getByLabel("Restaurant-confirmed food subtotal ($, acceptance only)", {
+      exact: true,
+    })
+    .fill("10");
+  await page
+    .getByLabel(
+      "Restaurant verified every item, quantity, modifier and price; preparation waits for payment",
+      { exact: true },
+    )
+    .check();
+  await page
+    .getByRole("button", { name: "Save telephone response", exact: true })
+    .click();
+  await page
+    .getByText(
+      "The restaurant has confirmed your order. Complete test payment before preparation begins.",
+      { exact: true },
+    )
+    .waitFor();
+  const phoneRequests = await page.evaluate(() => window.qaTelephoneWrites);
+  assert.equal(phoneRequests.length, 2);
+  assert.equal(phoneRequests[1].version, 2);
+  assert.equal(phoneRequests[1].confirmedSubtotalCents, 1000);
+  assert.equal(phoneRequests[1].allItemsAvailable, true);
+  await page
+    .getByRole("button", { name: "Declined offers", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Reconsider offer", exact: true })
+    .click();
+  await page
+    .getByText("No declined unassigned offers.", { exact: true })
+    .waitFor();
+  assert.deepEqual(await page.evaluate(() => window.qaReconsiderRequests), [
+    { expectedDeclineId: "11111111-1111-4111-8111-111111111111" },
+  ]);
+  await page.getByText("Driver: QA courier", { exact: true }).waitFor();
+  await page.evaluate(() => {
+    window.qaTracking = {
+      ...window.qaTracking,
+      status: "delivered",
+      deliveryStatus: "delivered",
+      locationStatus: "not_active",
+      deliveredAt: "2026-11-08T12:15:00Z",
+    };
+  });
+  await page
+    .getByRole("button", { name: "Refresh tracking", exact: true })
+    .click();
+  await page
+    .getByText("This order is closed. Live location sharing has ended.", {
+      exact: true,
+    })
+    .waitFor();
+  const pricingRow = page
+    .locator(".roco-row")
+    .filter({ has: page.locator("dt", { hasText: /^Pricing saved$/ }) });
+  await pricingRow.getByText("No", { exact: true }).waitFor();
+  for (const [label, value] of [
+    ["Delivery fee ($)", "5"],
+    ["Service fee (%)", "5"],
+    ["Configured tax rate (%)", "0"],
+    ["Restaurant commission (%)", "10"],
+    ["Driver share of delivery fee (%)", "100"],
+    ["Delivery ZIP codes, separated by commas", "37854"],
+  ])
+    await page.getByLabel(label, { exact: true }).fill(value);
+  await page
+    .getByRole("combobox", { name: /^Taxable charges/ })
+    .selectOption("food");
+  await page
+    .getByRole("button", {
+      name: "Save pricing policy for provider testing",
+      exact: true,
+    })
+    .click();
+  await pricingRow.getByText("Yes", { exact: true }).waitFor();
+  assert.deepEqual(await page.evaluate(() => window.qaPricingWrites), [
+    {
+      deliveryFeeCents: 500,
+      serviceFeeBps: 500,
+      taxBps: 0,
+      restaurantCommissionBps: 1000,
+      driverShareBps: 10000,
+      taxDeliveryAndService: false,
+      allowedPostalCodes: ["37854"],
+      testMode: true,
+    },
+  ]);
+  await page.evaluate(() => {
+    window.qaSignedEventAt = "2026-11-08T12:30:00Z";
+  });
+  await page
+    .getByRole("button", { name: "Refresh setup status", exact: true })
+    .click();
+  await page
+    .getByText(/^Last accepted signed event:/)
+    .filter({ hasText: "None yet" })
+    .waitFor({ state: "hidden" });
+  await page
+    .getByRole("button", { name: "Verify Stripe TEST connection", exact: true })
+    .click();
+  await page
+    .getByText("Stripe confirmed TEST mode: Yes", { exact: true })
+    .waitFor();
+  await page
+    .getByText(
+      /These are configuration checks, not payment or webhook-delivery certification/,
+    )
+    .waitFor();
+  await page
+    .getByText("Super Administrator (owner)", { exact: true })
+    .waitFor();
+  assert.equal(
+    await page
+      .getByRole("link", { name: "Administrator controls", exact: true })
+      .getAttribute("href"),
+    "/admin",
+  );
+  assert.equal(
+    await page
+      .getByRole("link", { name: "Driver workspace", exact: true })
+      .getAttribute("href"),
+    "/driver",
+  );
+  await page
+    .getByLabel("Display name", { exact: true })
+    .fill("Updated QA name");
+  await page.getByRole("button", { name: "Save name", exact: true }).click();
+  await page
+    .getByRole("status")
+    .getByText("Your name has been saved.")
+    .waitFor();
+  assert.deepEqual(await page.evaluate(() => window.qaWrites), [
+    { displayName: "Updated QA name", expectedDisplayName: "QA profile" },
+  ]);
+  await page
+    .getByRole("button", { name: "Sign-in and security settings" })
+    .click();
+  assert.equal(await page.evaluate(() => window.securityOpened), true);
+  await page
+    .getByLabel("Staff account", { exact: true })
+    .selectOption("staff-fixture");
+  await page
+    .getByLabel("Reason recorded in audit log", { exact: true })
+    .fill("QA owner approved operator access");
+  await page
+    .getByRole("button", { name: "Grant administrator access", exact: true })
+    .click();
+  await page
+    .getByRole("option", { name: "QA staff · admin", exact: true })
+    .waitFor({ state: "attached" });
+  await page
+    .getByLabel("Staff account", { exact: true })
+    .selectOption("staff-fixture");
+  await page
+    .getByLabel("Reason recorded in audit log", { exact: true })
+    .fill("QA owner removed operator access");
+  await page
+    .getByRole("button", { name: "Revoke administrator access", exact: true })
+    .click();
+  await page
+    .getByRole("option", { name: "QA staff · customer", exact: true })
+    .waitFor({ state: "attached" });
+  assert.deepEqual(
+    (await page.evaluate(() => window.qaAdminWrites)).map((row) => [
+      row.enabled,
+      row.expectedRole,
+      row.expectedVersion,
+    ]),
+    [
+      [true, "customer", "v1"],
+      [false, "admin", "v2"],
+    ],
+  );
+  await page.evaluate(() => {
+    window.qaAccess = {
+      ...window.qaAccess,
+      ownerMatched: false,
+      ownerDriverMatched: false,
+      administrator: false,
+      superAdministrator: false,
+      driver: false,
+      role: "customer",
+    };
+  });
+  await page.getByRole("button", { name: "Refresh access" }).click();
+  await page
+    .getByText(/Google may have created a different Clerk identity/)
+    .waitFor();
+  assert.equal(
+    await page
+      .getByRole("link", { name: "Administrator controls", exact: true })
+      .count(),
+    0,
+  );
+  const nextButton = page.getByRole("button", {
+    name: "Start fresh guest checkout",
+    exact: true,
+  });
+  assert.equal(await nextButton.isDisabled(), true);
+  assert.equal(
+    new URL(
+      await page
+        .getByLabel("Previous order's private tracking link", { exact: true })
+        .inputValue(),
+    ).origin,
+    "https://qa.onrender.com",
+  );
+  await page
+    .getByLabel(
+      "I saved the previous order's private tracking link somewhere safe",
+      { exact: true },
+    )
+    .check();
+  await page
+    .getByLabel("Name for the next order", { exact: true })
+    .fill("Returning QA guest");
+  await page
+    .getByLabel("Email for the next receipt", { exact: true })
+    .fill("returning-ui@example.test");
+  await page
+    .getByLabel("Phone for the next delivery", { exact: true })
+    .fill("8655550100");
+  await nextButton.click();
+  await page.waitForURL("**/cart");
+  assert.deepEqual(await page.evaluate(() => window.qaNextGuestWrites), [
+    {
+      name: "Returning QA guest",
+      email: "returning-ui@example.test",
+      phone: "8655550100",
+      previousLinkSaved: true,
+    },
+  ]);
+  assert.equal(
+    await page.evaluate(() => localStorage.getItem("rocoeats-guest-access:v1")),
+    "B".repeat(43),
+  );
+  await page.screenshot({ path: target + "/account-ui.png", fullPage: true });
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+    true,
+  );
+  await page.screenshot({ path: target + "/account-ui.png", fullPage: true });
+  console.log(
+    "390x844 real component QA PASS: owner/driver links, mismatch recovery, strict profile payload, owner grant/revoke controls, security delegation, no horizontal overflow. Authentication/API simulated.",
+  );
+  }
+} catch (error) {
+  for (const context of browser?.contexts() ?? []) for (const page of context.pages()) console.error("Failed account fixture", page.url(), await page.locator("body").innerText());
+  throw error;
+} finally {
+  await browser?.close();
+  await new Promise((r) => server.close(r));
+}

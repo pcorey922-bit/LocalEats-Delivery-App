@@ -1,0 +1,370 @@
+import pushPolicy from '../../../../config/native-push-policy.json';
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { generateKeyPairSync, verify } from "node:crypto";
+import { createFcmSender, fcmCredentialStatus, firebaseOAuthDiagnosticReady, verifyFirebaseOAuth, validateFcmPermission } from "./fcm";
+import { createServer } from "node:http";
+const keys = generateKeyPairSync("rsa", { modulusLength: 2048 });
+const credentials = JSON.stringify({
+  type: "service_account",
+  project_id: "rocoeats-test",
+  client_email: "sender@rocoeats-test.iam.gserviceaccount.com",
+  private_key: keys.privateKey.export({ type: "pkcs8", format: "pem" }),
+  token_uri: "https://untrusted.invalid/token",
+});
+const diagnosticCredentials = JSON.stringify({
+  ...JSON.parse(credentials),
+  project_id: "rocoeats-3bd55",
+  client_email: "rocoeats-staging-fcm@rocoeats-3bd55.iam.gserviceaccount.com",
+});
+test('FCM permission validation uses one scoped OAuth and one immutable dry-run, never caches or exposes tokens',async()=>{
+  const calls:string[]=[];
+  const result=await validateFcmPermission(diagnosticCredentials,async(input,init)=>{
+    calls.push(String(input));assert.equal(init?.redirect,'error');
+    if(String(input)==='https://oauth2.googleapis.com/token')return Response.json({access_token:'never_expose_validation_token',expires_in:3600});
+    assert.equal(String(input),'https://fcm.googleapis.com/v1/projects/rocoeats-3bd55/messages:send');
+    assert.equal(new Headers(init?.headers).get('authorization'),'Bearer never_expose_validation_token');
+    const body=JSON.parse(String(init?.body));assert.equal(body.validate_only,true);assert.equal(body.message.topic,'rocoeats-staging-permission-probe');assert.equal('token' in body.message,false);
+    return Response.json({name:'projects/rocoeats-3bd55/messages/fake_message_id'});
+  });
+  assert.deepEqual(result,{authenticated:true,permissionValidated:true,code:'FCM_PERMISSION_VALIDATED'});assert.equal(calls.length,2);assert.equal(JSON.stringify(result).includes('token'),false);
+});
+test('FCM validation errors, wrong projects and malformed acknowledgements never become permission acceptance',async()=>{
+  for(const mode of ['oauth','forbidden','invalid','missing','wrong-project','redirect']){
+    let calls=0;
+    const result=await validateFcmPermission(diagnosticCredentials,async input=>{
+      calls++;
+      if(String(input).includes('oauth2'))return mode==='oauth'?Response.json({error:'secret_fixture'},{status:401}):Response.json({access_token:'secret_fixture',expires_in:3600});
+      if(mode==='forbidden'||mode==='invalid')return Response.json({error:'secret_fixture'},{status:mode==='forbidden'?403:400});
+      const response=Response.json(mode==='missing'?{}:{name:mode==='wrong-project'?'projects/other/messages/fake':'projects/rocoeats-3bd55/messages/fake'});
+      if(mode==='redirect')Object.defineProperty(response,'redirected',{value:true});return response;
+    });
+    assert.equal(result.permissionValidated,false);assert.equal(result.authenticated,mode!=='oauth');assert.equal(calls,mode==='oauth'?1:2);assert.equal(JSON.stringify(result).includes('secret_fixture'),false);
+  }
+});
+test('FCM validation body timeout is bounded without falling back to sending',async(t)=>{
+  t.mock.timers.enable({apis:['setTimeout']});let messages=0;
+  const pending=validateFcmPermission(diagnosticCredentials,async(input,init)=>{
+    if(String(input).includes('oauth2'))return Response.json({access_token:'fixture_access',expires_in:3600});
+    messages++;assert.equal(JSON.parse(String(init?.body)).validate_only,true);const r=Response.json({});Object.defineProperty(r,'json',{value:()=>new Promise(()=>{})});return r;
+  });
+  for(let n=0;n<30&&messages===0;n++)await Promise.resolve();
+  assert.equal(messages,1);t.mock.timers.tick(10001);assert.equal((await pending).permissionValidated,false);assert.equal(messages,1);
+});
+test("OAuth-only diagnostic authenticates the dedicated identity without a message endpoint, token return or token cache", async () => {
+  let calls = 0;
+  const transport: typeof fetch = async (input, init) => {
+    calls++;
+    assert.equal(String(input), "https://oauth2.googleapis.com/token");
+    assert.equal(init?.redirect, "error");
+    const parts = (init!.body as URLSearchParams).get("assertion")!.split(".");
+    const claims = JSON.parse(Buffer.from(parts[1], "base64url").toString());
+    assert.equal(
+      claims.iss,
+      "rocoeats-staging-fcm@rocoeats-3bd55.iam.gserviceaccount.com",
+    );
+    assert.equal(
+      claims.scope,
+      "https://www.googleapis.com/auth/firebase.messaging",
+    );
+    assert.equal(claims.aud, "https://oauth2.googleapis.com/token");
+    assert.equal(claims.exp - claims.iat, 3600);
+    assert.ok(
+      verify(
+        "RSA-SHA256",
+        Buffer.from(parts.slice(0, 2).join(".")),
+        keys.publicKey,
+        Buffer.from(parts[2], "base64url"),
+      ),
+    );
+    return Response.json({
+      access_token: "never_return_this_synthetic_access",
+      expires_in: 3600,
+    });
+  };
+  for (let i = 0; i < 2; i++)
+    assert.deepEqual(
+      await verifyFirebaseOAuth(diagnosticCredentials, transport),
+      { authenticated: true, code: "GOOGLE_OAUTH_AUTHENTICATED" },
+    );
+  assert.equal(calls, 2, "Diagnostic token is not cached for another run");
+});
+test("OAuth-only diagnostic rejects malformed or different service accounts before network I/O", async () => {
+  let calls = 0;
+  const transport: typeof fetch = async () => {
+    calls++;
+    throw Error("Must not be invoked");
+  };
+  for (const raw of [
+    undefined,
+    "null",
+    "bad_sensitive_json",
+    credentials,
+    JSON.stringify({
+      ...JSON.parse(diagnosticCredentials),
+      client_email: "firebase-adminsdk@rocoeats-3bd55.iam.gserviceaccount.com",
+    }),
+    JSON.stringify({
+      ...JSON.parse(diagnosticCredentials),
+      private_key: "private_key_marker",
+    }),
+  ]) {
+    assert.equal(firebaseOAuthDiagnosticReady(raw), false);
+    assert.deepEqual(await verifyFirebaseOAuth(raw, transport), {
+      authenticated: false,
+      code: "CREDENTIAL_UNAVAILABLE",
+    });
+  }
+  assert.equal(calls, 0);
+});
+test("OAuth-only failures and malformed provider responses never expose tokens, provider bodies or exception text", async () => {
+  const secret = "sensitive_provider_payload_fixture";
+  for (const transport of [
+    async () => {
+      throw Error(secret);
+    },
+    async () => Response.json({ error: secret }, { status: 401 }),
+    async () => new Response(secret),
+    async () => Response.json({ access_token: secret, expires_in: 99999 }),
+    async () => Response.json({ access_token: { secret }, expires_in: 3600 }),
+    async () => {
+      const r = Response.json({ access_token: secret, expires_in: 3600 });
+      Object.defineProperty(r, "redirected", { value: true });
+      return r;
+    },
+  ])
+    assert.deepEqual(
+      await verifyFirebaseOAuth(diagnosticCredentials, transport),
+      { authenticated: false, code: "GOOGLE_OAUTH_UNAVAILABLE" },
+    );
+});
+test("OAuth-only HTTP and body stalls reach a bounded failure without message sending", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  for (const stage of ["http", "body"]) {
+    let calls = 0,
+      signal: AbortSignal | undefined;
+    const pending = verifyFirebaseOAuth(
+      diagnosticCredentials,
+      async (input, init) => {
+        assert.equal(String(input), "https://oauth2.googleapis.com/token");
+        calls++;
+        signal = init!.signal!;
+        if (stage === "http") return new Promise<Response>(() => {});
+        const r = Response.json({});
+        Object.defineProperty(r, "json", {
+          value: () => new Promise(() => {}),
+        });
+        return r;
+      },
+    );
+    await Promise.resolve();
+    t.mock.timers.tick(10001);
+    assert.deepEqual(await pending, {
+      authenticated: false,
+      code: "GOOGLE_OAUTH_UNAVAILABLE",
+    });
+    assert.equal(signal?.aborted, true);
+    assert.equal(calls, 1);
+  }
+});
+test('FCM readiness validates credentials locally and returns only sanitized status', (t) => {
+  const outbound = t.mock.method(globalThis, 'fetch', async () => { throw new Error('Readiness must never contact a provider'); });
+  assert.equal(fcmCredentialStatus(undefined), 'missing');
+  assert.equal(fcmCredentialStatus(''), 'missing');
+  const ec = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  for (const raw of ['sensitive_fixture_not_json', 'null', '[]', '{}',
+    JSON.stringify({ ...JSON.parse(credentials), type: 'external_account' }),
+    JSON.stringify({ ...JSON.parse(credentials), project_id: '../invalid' }),
+    JSON.stringify({ ...JSON.parse(credentials), client_email: 'not-a-service-account' }),
+    JSON.stringify({ ...JSON.parse(credentials), private_key: 'sensitive_fixture_not_a_key' }),
+    JSON.stringify({ ...JSON.parse(credentials), private_key: ec.privateKey.export({ type: 'pkcs8', format: 'pem' }) }),
+  ]) {
+    assert.equal(fcmCredentialStatus(raw), 'invalid');
+    assert.throws(() => createFcmSender(raw), { message: 'Invalid Firebase service account configuration' });
+  }
+  assert.equal(fcmCredentialStatus(credentials), 'locally_valid');
+  assert.equal(fcmCredentialStatus(credentials), 'locally_valid', 'Repeated inspection uses cached local validation');
+  assert.equal(fcmCredentialStatus('null'), 'invalid', 'Credential replacement invalidates readiness');
+  assert.equal(fcmCredentialStatus(undefined), 'missing', 'Removal never retains configured status');
+  assert.equal(fcmCredentialStatus(credentials), 'locally_valid');
+  assert.equal(outbound.mock.callCount(), 0, 'Credential inspection cannot authenticate or send');
+});
+test("FCM signs scoped OAuth assertions and shares cached access across concurrent sends", async () => {
+  let authorizations = 0,
+    sends = 0;
+  const transport: typeof fetch = async (input, init) => {
+    const url = String(input);
+    if (url === "https://oauth2.googleapis.com/token") {
+      authorizations++;
+      const params = init!.body as URLSearchParams;
+      const jwt = params.get("assertion")!;
+      const parts = jwt.split(".");
+      assert.equal(
+        params.get("grant_type"),
+        "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      );
+      assert.ok(
+        verify(
+          "RSA-SHA256",
+          Buffer.from(parts.slice(0, 2).join(".")),
+          keys.publicKey,
+          Buffer.from(parts[2], "base64url"),
+        ),
+      );
+      const claims = JSON.parse(Buffer.from(parts[1], "base64url").toString());
+      assert.equal(claims.aud, url);
+      assert.equal(
+        claims.scope,
+        "https://www.googleapis.com/auth/firebase.messaging",
+      );
+      assert.equal(claims.exp - claims.iat, 3600);
+      return Response.json({
+        access_token: "test_access_fixture",
+        expires_in: 3600,
+      });
+    }
+    assert.equal(
+      url,
+      "https://fcm.googleapis.com/v1/projects/rocoeats-test/messages:send",
+    );
+    assert.equal(
+      new Headers(init!.headers).get("authorization"),
+      "Bearer test_access_fixture",
+    );
+    const body = JSON.parse(String(init!.body));
+    assert.equal(body.message.android.ttl, "300s");
+    assert.equal(body.message.android.priority, "HIGH", "User-visible delivery alerts must not default to Doze-delayed normal priority");
+    assert.equal(
+      body.message.android.collapse_key,
+      body.message.data.notificationId,
+    );
+    assert.equal(body.message.android.notification.channel_id,pushPolicy.androidChannel.id);
+    assert.ok(body.message.notification.title && body.message.notification.body,'High priority is paired with a user-visible alert, never silent polling');
+    assert.ok(!JSON.stringify(body).includes("private_key"));
+    sends++;
+    return Response.json({ name: `projects/rocoeats-test/messages/${sends}` });
+  };
+  const send = createFcmSender(credentials, transport);
+  await Promise.all([
+    send("token_fixture", "notice1"),
+    send("token_fixture", "notice2"),
+  ]);
+  await send("token_fixture", "notice3");
+  assert.equal(authorizations, 1);
+  assert.equal(sends, 3);
+});
+test("FCM distinguishes invalid registration from provider rejection and rejects missing acknowledgements", async () => {
+  let mode = "invalid";
+  const send = createFcmSender(credentials, async (input) => {
+    if (String(input).includes("oauth2"))
+      return Response.json({ access_token: "token_fixture", expires_in: 3600 });
+    if (mode === "invalid")
+      return Response.json(
+        { error: { details: [{ errorCode: "UNREGISTERED" }] } },
+        { status: 404 },
+      );
+    if (mode === "temporary")
+      return Response.json(
+        { error: { details: [{ errorCode: "UNAVAILABLE" }] } },
+        { status: 503 },
+      );
+    return Response.json({});
+  });
+  await assert.rejects(
+    send("device_fixture", "notice"),
+    (error: unknown) =>
+      (error as { code: string }).code ===
+      "messaging/registration-token-not-registered",
+  );
+  mode = "temporary";
+  await assert.rejects(
+    send("device_fixture", "notice"),
+    (error: unknown) =>
+      (error as { code: string }).code === "messaging/provider-unavailable",
+  );
+  mode = "empty";
+  await assert.rejects(
+    send("device_fixture", "notice"),
+    /Invalid FCM acknowledgement/,
+  );
+});
+test("FCM fails closed on invalid credentials and OAuth failures", async () => {
+  assert.throws(() => createFcmSender("{}"), /configuration/);
+  let calls = 0;
+  const send = createFcmSender(credentials, async () => {
+    calls++;
+    return Response.json({ error: "invalid_grant" }, { status: 401 });
+  });
+  await assert.rejects(
+    send("device_fixture", "notice"),
+    /authorization unavailable/,
+  );
+  await assert.rejects(
+    send("device_fixture", "notice"),
+    /authorization unavailable/,
+  );
+  assert.equal(calls, 2);
+});
+
+test('FCM uses remaining original lifetime and sends nothing if OAuth consumes the deadline',async()=>{
+  let ttl='', messages=0;
+  const send=createFcmSender(credentials,async(input,init)=>{
+    if(String(input).includes('oauth2'))return Response.json({access_token:'fixture',expires_in:3600});
+    messages++;ttl=JSON.parse(String(init?.body)).message.android.ttl;
+    return Response.json({name:'projects/rocoeats-test/messages/expiry-fixture'});
+  });
+  await send('token_fixture','notice',new Date(Date.now()+180000));
+  assert.ok(parseInt(ttl)>0&&parseInt(ttl)<=180);assert.equal(messages,1);
+  const realNow=Date.now;let clock=1800000000000;
+  try {
+    Date.now=()=>clock;
+    const slow=createFcmSender(credentials,async()=>{clock+=4000;return Response.json({access_token:'fixture',expires_in:3600});});
+    await assert.rejects(slow('token_fixture','old',new Date(clock+3000)),error=>(error as {code:string}).code==='notification/expired');
+  } finally {Date.now=realNow;}
+});
+
+
+test('FCM fixes OAuth and message requests to their original endpoints without redirects',async()=>{
+  const calls:string[]=[];
+  const sender=createFcmSender(credentials,async(input,init)=>{
+    calls.push(String(input));assert.equal(init?.redirect,'error','Signed OAuth assertions and message requests must never follow redirects');
+    return String(input).includes('oauth2')?Response.json({access_token:'synthetic_access',expires_in:3600}):Response.json({name:'projects/rocoeats-test/messages/0:1500415314455276%31bd1c9631bd1c96'});
+  });
+  await sender('synthetic_device','synthetic_notice');assert.equal(calls.length,2);
+});
+test('FCM requires a complete same-project message resource before accepting delivery evidence',async()=>{
+  for(const name of ['projects/rocoeats-test/messages/','projects/rocoeats-test/messages/ ', 'projects/rocoeats-test/messages/id/extra','projects/rocoeats-test/messages/id?query','projects/rocoeats-test/messages/id#fragment','projects/other-project/messages/id']){
+    const sender=createFcmSender(credentials,async input=>String(input).includes('oauth2')?Response.json({access_token:'synthetic_access',expires_in:3600}):Response.json({name}));
+    await assert.rejects(sender('synthetic_device','synthetic_notice'),/Invalid FCM acknowledgement/,'Malformed receipt cannot mark provider acceptance');
+  }
+});
+
+test('real Fetch refuses simulated OAuth and message307 redirects without forwarding credentials',async()=>{
+  let redirectedRequests=0,redirectStage='oauth';
+  const server=createServer((request,response)=>{
+    request.resume();
+    if(request.url==='/redirect-target'){redirectedRequests++;response.writeHead(200,{'content-type':'application/json'});response.end('{}');return;}
+    if(request.url==='/'+redirectStage){response.writeHead(307,{location:'/redirect-target'});response.end();return;}
+    response.writeHead(200,{'content-type':'application/json'});
+    response.end(JSON.stringify(request.url==='/oauth'?{access_token:'synthetic_access',expires_in:3600}:{name:'projects/rocoeats-test/messages/synthetic-receipt'}));
+  });
+  await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+  try {
+    const origin='http://127.0.0.1:'+(server.address() as {port:number}).port;
+    for(const stage of ['oauth','message']){
+      redirectStage=stage;
+      const sender=createFcmSender(credentials,(input,init)=>fetch(origin+(String(input).includes('oauth2')?'/oauth':'/message'),init));
+      await assert.rejects(sender('synthetic_device','synthetic_notice'));
+    }
+    assert.equal(redirectedRequests,0,'Neither signed OAuth assertions nor message credentials may reach a redirect target');
+  } finally {server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
+});
+test('FCM rejects redirected responses even if an injected transport ignores redirect policy',async()=>{
+  for(const stage of ['oauth','message']){
+    const sender=createFcmSender(credentials,async input=>{
+      const auth=String(input).includes('oauth2');const response=Response.json(auth?{access_token:'synthetic_access',expires_in:3600}:{name:'projects/rocoeats-test/messages/synthetic-receipt'});
+      if((auth?'oauth':'message')===stage)Object.defineProperty(response,'redirected',{value:true});return response;
+    });
+    await assert.rejects(sender('synthetic_device','synthetic_notice'),stage==='oauth'?/Firebase authorization unavailable/:/FCM acknowledgement unavailable/);
+  }
+});

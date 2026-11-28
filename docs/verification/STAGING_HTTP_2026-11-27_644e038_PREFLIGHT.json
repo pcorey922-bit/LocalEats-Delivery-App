@@ -1,0 +1,146 @@
+{
+  "origin": "https://localeats-delivery-app.onrender.com",
+  "observedAt": "2026-11-27T07:26:21.405Z",
+  "revision": "644e038b4532936a6db2e954e34a8bf558166c24",
+  "expectedRevision": null,
+  "revisionMatches": null,
+  "verificationPassed": true,
+  "dependenciesReady": true,
+  "readiness": {
+    "ready": true,
+    "database": true,
+    "authReady": true,
+    "pricingReady": true,
+    "providerConfigured": true,
+    "webhookReady": true,
+    "workerReady": true,
+    "liveChargesEnabled": false,
+    "testPayoutsEnabled": false,
+    "webhookRetentionEnabled": false
+  },
+  "unverifiedSafeguards": [],
+  "clientIdentity": {
+    "policy": "render-cdn-chain-v1",
+    "source": "render_cdn_chain"
+  },
+  "geographicDelivery": {
+    "mode": "provisional_postal",
+    "configurationReady": true,
+    "municipalConfigurationReady": false,
+    "municipalEnforcementEnabled": false,
+    "missingConfiguration": []
+  },
+  "missingConfiguration": [],
+  "unverifiedDependencies": [],
+  "privateTestStaging": true,
+  "orderingEnabled": false,
+  "publicOrderingEnabled": false,
+  "privateTestOrderingEnabled": false,
+  "checks": [
+    {
+      "path": "/livez",
+      "status": 200
+    },
+    {
+      "path": "/readyz",
+      "status": 200
+    },
+    {
+      "path": "/api/mobile/readiness",
+      "status": 200
+    },
+    {
+      "path": "/api/profiles/me",
+      "status": 204,
+      "method": "OPTIONS",
+      "origin": "https://localhost"
+    },
+    {
+      "path": "/api/profiles/me",
+      "status": 401,
+      "method": "GET",
+      "origin": "https://localhost"
+    },
+    {
+      "path": "/api/profiles/me",
+      "status": 204,
+      "method": "OPTIONS",
+      "origin": "capacitor://localhost"
+    },
+    {
+      "path": "/api/profiles/me",
+      "status": 401,
+      "method": "GET",
+      "origin": "capacitor://localhost"
+    },
+    {
+      "path": "/api/profiles/me",
+      "status": 401,
+      "method": "OPTIONS",
+      "origin": "https://untrusted.example"
+    },
+    {
+      "path": "/api/profiles/me",
+      "status": 401
+    },
+    {
+      "path": "/api/session/access",
+      "status": 401
+    },
+    {
+      "path": "/api/restaurants",
+      "status": 401
+    },
+    {
+      "path": "/api/admin/profiles",
+      "status": 401
+    },
+    {
+      "path": "/api/admin/profiles",
+      "status": 401
+    },
+    {
+      "path": "/.env",
+      "status": 404
+    },
+    {
+      "path": "/.env.staging",
+      "status": 404
+    },
+    {
+      "path": "/",
+      "status": 200
+    },
+    {
+      "path": "/sign-in",
+      "status": 200
+    },
+    {
+      "path": "/restaurants",
+      "status": 200
+    },
+    {
+      "path": "/guest/order",
+      "status": 200
+    },
+    {
+      "path": "/orders",
+      "status": 200
+    },
+    {
+      "path": "/restaurant",
+      "status": 200
+    },
+    {
+      "path": "/driver",
+      "status": 200
+    },
+    {
+      "path": "/operations",
+      "status": 200
+    }
+  ],
+  "failures": [],
+  "authenticatedOwnerTested": false,
+  "providerTransactionTested": false
+}

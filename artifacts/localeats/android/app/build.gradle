@@ -1,0 +1,112 @@
+apply plugin: 'com.android.application'
+def audience = System.getenv('ROCOEATS_NATIVE_AUDIENCE') ?: 'customer'
+if (!(audience in ['customer', 'driver'])) throw new GradleException('Unknown native app audience')
+def audienceConfig = new groovy.json.JsonSlurper().parse(rootProject.file('../../../config/native-audiences.json'))[audience]
+
+android {
+    namespace = "com.rocoeats.app"
+    compileSdk = rootProject.ext.compileSdkVersion
+    buildFeatures { buildConfig true }
+    if (audience == 'driver') sourceSets.main.java.srcDir('src/driver/java')
+    sourceSets.main.manifest.srcFile(audience == 'driver' ? 'src/driver/AndroidManifest.xml' : 'src/main/AndroidManifest.xml')
+    defaultConfig {
+        buildConfigField "String", "ROCOEATS_CLERK_KEY", groovy.json.JsonOutput.toJson(System.getenv('VITE_CLERK_PUBLISHABLE_KEY') ?: '')
+        buildConfigField "String", "ROCOEATS_API_ORIGIN", groovy.json.JsonOutput.toJson(System.getenv('VITE_API_ORIGIN') ?: '')
+        applicationId audienceConfig.id
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        manifestPlaceholders = [rocoeatsScheme: audienceConfig.scheme]
+        resValue "string", "app_name", audienceConfig.name
+        resValue "string", "title_activity_main", audienceConfig.name
+        if (audience == 'driver') {
+            resValue "string", "capacitor_background_geolocation_notification_channel_name", "RoCoEats on-duty location"
+            resValue "string", "capacitor_background_geolocation_notification_icon", "drawable/ic_rocoeats_tracking"
+            resValue "string", "capacitor_background_geolocation_notification_color", "#EFBD68"
+        }
+        versionCode Integer.parseInt(System.getenv("ROCOEATS_ANDROID_VERSION_CODE") ?: "1")
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        staging {
+            if (System.getenv("ROCOEATS_STAGING_KEYSTORE_PATH")) {
+                storeFile file(System.getenv("ROCOEATS_STAGING_KEYSTORE_PATH"))
+                storePassword System.getenv("ROCOEATS_STAGING_KEYSTORE_PASSWORD")
+                keyAlias "rocoeats-staging"
+                keyPassword System.getenv("ROCOEATS_STAGING_KEYSTORE_PASSWORD")
+                storeType "PKCS12"
+            }
+        }
+        release {
+            def keyPath = System.getenv('ROCOEATS_KEYSTORE_PATH')
+            if (keyPath) {
+                storeFile file(keyPath)
+                storePassword System.getenv('ROCOEATS_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ROCOEATS_KEY_ALIAS')
+                keyPassword System.getenv('ROCOEATS_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (System.getenv('ROCOEATS_KEYSTORE_PATH')) signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+        staging {
+            initWith release
+            def stagingPublic = new groovy.json.JsonSlurper().parse(rootProject.file('../../../config/native-staging.json'))
+            buildConfigField "String", "ROCOEATS_CLERK_KEY", groovy.json.JsonOutput.toJson(stagingPublic.clerkPublishableKey)
+            buildConfigField "String", "ROCOEATS_API_ORIGIN", groovy.json.JsonOutput.toJson(stagingPublic.apiOrigin)
+            applicationIdSuffix ".staging"
+            versionNameSuffix "-staging"
+            resValue "string", "app_name", "${audienceConfig.name} Staging"
+            resValue "string", "title_activity_main", "${audienceConfig.name} Staging"
+            debuggable false
+            jniDebuggable false
+            matchingFallbacks = ["release"]
+            if (System.getenv("ROCOEATS_STAGING_KEYSTORE_PATH")) signingConfig signingConfigs.staging
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    // Official API only; no native UI/OAuth/account sharing or custom credential store.
+    if (audience == 'driver') {
+        implementation 'com.clerk:clerk-android-api:1.5.0'
+        implementation 'org.jetbrains.kotlin:kotlin-stdlib:2.4.21'
+        implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0'
+        implementation 'com.squareup.okhttp3:okhttp:5.4.0'
+    }
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

@@ -1,3 +1,4 @@
+import { requireCustomerAuth } from "../lib/guest-access";
 import { and, asc, eq, ne } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import {
@@ -53,7 +54,7 @@ function hasBlankRequiredField(data: {
   );
 }
 
-router.get("/addresses/me", requireAuth, async (req, res): Promise<void> => {
+router.get("/addresses/me", requireCustomerAuth, async (req, res): Promise<void> => {
   const profile = await getActiveProfile(req, res);
   if (!profile || !requireRole(profile, ["customer"], res)) return;
 
@@ -66,7 +67,7 @@ router.get("/addresses/me", requireAuth, async (req, res): Promise<void> => {
   res.json(ListMyAddressesResponse.parse(addresses.reverse()));
 });
 
-router.post("/addresses/me", requireAuth, async (req, res): Promise<void> => {
+router.post("/addresses/me", requireCustomerAuth, async (req, res): Promise<void> => {
   const profile = await getActiveProfile(req, res);
   if (!profile || !requireRole(profile, ["customer"], res)) return;
 
@@ -113,7 +114,7 @@ router.post("/addresses/me", requireAuth, async (req, res): Promise<void> => {
 
 router.patch(
   "/addresses/me/:addressId",
-  requireAuth,
+  requireCustomerAuth,
   async (req, res): Promise<void> => {
     const profile = await getActiveProfile(req, res);
     if (!profile || !requireRole(profile, ["customer"], res)) return;
@@ -179,7 +180,7 @@ router.patch(
 
 router.delete(
   "/addresses/me/:addressId",
-  requireAuth,
+  requireCustomerAuth,
   async (req, res): Promise<void> => {
     const profile = await getActiveProfile(req, res);
     if (!profile || !requireRole(profile, ["customer"], res)) return;

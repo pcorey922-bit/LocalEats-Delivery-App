@@ -1,0 +1,16 @@
+{
+  "recordedDate": "2026-11-27",
+  "evidenceSource": "Owner-reported authenticated Samsung Chrome GET; not agent-session observation",
+  "deployedRevision": "a4288526b668d71db0c519e621f543484e3afb11",
+  "endpoint": "/api/admin/firebase-oauth",
+  "response": {
+    "ready": true,
+    "retryAfter": null,
+    "lastRun": null
+  },
+  "ownerReportedOAuthExecuted": false,
+  "ownerReportedNotificationSent": false,
+  "pushDisabledInferredFromDeployedReadinessGuard": true,
+  "googleAuthenticationVerified": false,
+  "executionAuthorized": false
+}

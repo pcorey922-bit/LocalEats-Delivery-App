@@ -2,32 +2,18 @@ import path from 'path';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
+import { appMetadata } from './src/lib/app-audience';
+const audience = process.env.ROCOEATS_NATIVE_AUDIENCE ?? 'customer';
+appMetadata(audience); // Reject unknown identities before packaging anything.
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 
-const rawPort = process.env.PORT;
-
-if (!rawPort) {
-  throw new Error(
-    'PORT environment variable is required but was not provided.',
-  );
-}
-
-const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
-
-const basePath = process.env.BASE_PATH;
-
-if (!basePath) {
-  throw new Error(
-    'BASE_PATH environment variable is required but was not provided.',
-  );
-}
+const port = Number(process.env.PORT || 5173);
+if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid PORT');
+const basePath = process.env.BASE_PATH || '/';
 
 export default defineConfig({
+  define: { 'import.meta.env.VITE_APP_AUDIENCE': JSON.stringify(audience), 'import.meta.env.VITE_NATIVE_DRIVER_AUTH': JSON.stringify(audience === 'driver' ? 'true' : 'false') },
   base: basePath,
   plugins: [
     react(),

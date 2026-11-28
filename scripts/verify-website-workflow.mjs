@@ -1,0 +1,307 @@
+import { verifyCheckout } from './checkout-browser-checks.mjs';
+import { verifyMenuEditor } from './menu-editor-browser-checks.mjs';
+import { verifyMenuCategories } from './menu-category-browser-checks.mjs';
+import { verifyGuestService } from './guest-service-browser-checks.mjs';
+import { verifyPublicInformation } from './public-information-browser-checks.mjs';
+import { verifyNativeStartupBootstrap, verifyNativeCustomerStartup } from './native-startup-browser-checks.mjs';
+import {verifyNativeClerkDriver} from './native-clerk-browser-checks.mjs';
+import { verifyDriverApp } from './driver-app-browser-checks.mjs';
+// Real website + API + migrated, disposable PGlite database. Only Clerk and
+// payment provider are simulated. This is NOT a Stripe TEST transaction.
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { mkdtemp, mkdir, readFile, readdir, writeFile, rm } from 'node:fs/promises';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import path from 'node:path';
+import { tmpdir } from 'node:os';
+
+const root = fileURLToPath(new URL('../', import.meta.url));
+const require = createRequire(path.join(root, 'artifacts/api-server/package.json'));
+const { build } = require('esbuild');
+const { chromium } = require(process.env.PLAYWRIGHT_CORE_PATH || 'playwright-core');
+const web = await mkdtemp(path.join(tmpdir(), 'rocoeats-workflow-'));
+const apiTmp = path.join(root, 'artifacts/api-server/tmp');
+await mkdir(apiTmp, { recursive: true });
+const backend = await mkdtemp(path.join(apiTmp, 'browser-'));
+let browser, server;
+const pages = [], browserErrors = [];
+const nativeAudience = process.env.ROCOEATS_NATIVE_BOOT_AUDIENCE || ((process.env.ROCOEATS_NATIVE_CLERK_BROWSER === 'true' || process.env.ROCOEATS_DRIVER_APP_BROWSER === 'true' || process.env.ROCOEATS_NATIVE_BOOT_BROWSER === 'true') ? 'driver' : 'customer');
+assert.ok(['customer','driver'].includes(nativeAudience));
+try {
+  // Never inherit hosted credentials, database connections, or ordering windows.
+  for (const key of ['TEST_DATABASE_URL', 'DATABASE_URL', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'CLERK_SECRET_KEY', 'ROCOEATS_PRIVATE_STAGING', 'LOCALEATS_ADMIN_CLERK_USER_IDS', 'ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS']) delete process.env[key];
+  Object.assign(process.env, { NODE_ENV: 'test', LOG_LEVEL: 'silent', PAYMENT_PROVIDER: 'sandbox', ROCOEATS_ORDERING_ENABLED: 'true', ROCOEATS_PRIVATE_TEST_ORDERING_ENABLED: 'false', API_MUTATION_LIMIT_PER_MINUTE: '10000', WEB_DIST_DIR: web });
+  const cssDir = path.join(root, 'artifacts/localeats/dist/public/assets');
+  const css = (await readdir(cssDir)).find(f => f.endsWith('.css'));
+  await writeFile(path.join(web, 'app.css'), await readFile(path.join(cssDir, css)));
+  await writeFile(path.join(web, 'index.html'), '<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/app.css"><div id="root"></div><script type="module" src="/app.js"></script></html>');
+  await writeFile(path.join(web, 'logo.svg'), await readFile(path.join(root, 'artifacts/localeats/public/logo.svg')));
+  await build({
+    stdin: { contents: process.env.ROCOEATS_NATIVE_BOOT_BROWSER === 'true' ? `import './src/main.tsx';` : `import React from 'react'; import {createRoot} from 'react-dom/client'; import App from './src/App'; createRoot(document.getElementById('root')).render(<App/>);`, resolveDir: path.join(root, 'artifacts/localeats'), loader: 'tsx' },
+    outfile: path.join(web, 'app.js'), bundle: true, platform: 'browser', format: 'esm', jsx: 'automatic', logLevel: 'silent', loader: { '.css': 'empty' },
+    define: { 'import.meta.env.VITE_NATIVE_DRIVER_AUTH': JSON.stringify(process.env.ROCOEATS_NATIVE_CLERK_BROWSER === 'true'?'true':'false'), 'import.meta.env.VITE_DEMO_MODE': '"false"', 'import.meta.env.DEV': 'false', 'import.meta.env.VITE_APP_AUDIENCE': JSON.stringify(nativeAudience), 'process.env.NODE_ENV': '"development"', 'import.meta.env.BASE_URL': '"/"', 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': '"fixture"', 'import.meta.env.VITE_CLERK_PROXY_URL': 'undefined', 'import.meta.env.VITE_API_ORIGIN': process.env.ROCOEATS_NATIVE_CLERK_BROWSER === 'true' ? JSON.stringify('https://localeats-delivery-app.onrender.com') : 'undefined', 'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': 'undefined', 'import.meta.env.VITE_GOOGLE_MAPS_MAP_ID': 'undefined' },
+    plugins: [{ name: 'test-only-clerk', setup(b) {
+      b.onResolve({ filter: /^@\// }, args => b.resolve(path.join(root, 'artifacts/localeats/src', args.path.slice(2)), { kind: args.kind, resolveDir: root, namespace: 'file' }));
+      b.onResolve({ filter: /^@capacitor\/core$/ }, () => ({ path: 'core', namespace: 'native-fixture-core' }));
+      b.onResolve({ filter: /^\//, namespace: 'native-fixture-core' }, args => ({ path: args.path, namespace: 'file' }));
+      b.onLoad({ filter: /.*/, namespace: 'native-fixture-core' }, () => { const source = path.join(root, 'artifacts/localeats/node_modules/@capacitor/core/dist/index.js'); return { loader: 'js', contents: `export * from ${JSON.stringify(source)}; import {Capacitor as original,registerPlugin as originalRegister} from ${JSON.stringify(source)}; export const Capacitor={...original,isNativePlatform:()=>!!window.qaNativeBootstrap,getPlatform:()=>window.qaNativeBootstrap?'android':'web'};
+        const nativeState=()=>({isLoaded:true,isSignedIn:!!window.qaUserId&&sessionStorage.getItem('qa-native-signed-out')!=='1',...(window.qaUserId?{userId:window.qaUserId,sessionId:'sess_native_fixture',fullName:'Native fixture'}:{})});
+        export const registerPlugin=(name,implementations)=>name==='RoCoEatsNativeClerk'?{
+          getState:async()=>{window.qaNativeSdkReads=(window.qaNativeSdkReads||0)+1;if(window.qaNativeStateFailure)throw Error('Simulated SDK unavailable');return nativeState()},
+          getToken:async({expectedPrincipal})=>{if(expectedPrincipal!==window.qaUserId||sessionStorage.getItem('qa-native-signed-out')==='1')throw Error('Simulated native principal changed');return{token:'simulated-native-sdk-token'}},
+          signInWithTicket:async()=>{window.qaNativeTicketCalls=(window.qaNativeTicketCalls||0)+1;sessionStorage.removeItem('qa-native-signed-out');return nativeState()},
+          cancelAuthRequest:async()=>{},signOut:async()=>{sessionStorage.setItem('qa-native-signed-out','1');return{isLoaded:true,isSignedIn:false}}
+        }:originalRegister(name,implementations);` }; });
+      b.onResolve({filter:/^@capacitor\/geolocation$/},()=>({path:'geolocation',namespace:'native-fixture-geolocation'}));
+      b.onLoad({filter:/.*/,namespace:'native-fixture-geolocation'},()=>({loader:'js',contents:`export const Geolocation={watchPosition:async(options,callback)=>{window.qaEmitForegroundFix=position=>callback(position);return 'qa-foreground-watch';},clearWatch:async()=>{}};`}));
+      b.onResolve({filter:/^@capacitor\/browser$/},()=>({path:'browser',namespace:'native-fixture-browser'}));
+      b.onLoad({filter:/.*/,namespace:'native-fixture-browser'},()=>({loader:'js',contents:`export const Browser={open:async({url})=>{window.qaOpenedNativeBrowser=url},close:async()=>{}};`}));
+      b.onResolve({ filter: /^@capacitor\/app$/ }, () => ({ path: 'app', namespace: 'native-fixture-app' }));
+      b.onLoad({filter:/.*/,namespace:'native-fixture-app'},()=>({loader:'js',contents:`
+        export const App={getInfo:async()=>({id:'${nativeAudience==='driver'?'com.rocoeats.driver.staging':'com.rocoeats.app.staging'}'}),getState:async()=>({isActive:true}),getLaunchUrl:async()=>window.qaNativeLaunchUrl?{url:window.qaNativeLaunchUrl}:undefined,
+        addListener:async(name,callback)=>{window.qaAppListeners??={};window.qaAppListenerSets??={};const callbacks=window.qaAppListenerSets[name]??=new Set();callbacks.add(callback);window.qaAppListeners[name]=event=>{for(const listener of [...callbacks])listener(event)};return{remove:async()=>{callbacks.delete(callback);if(!callbacks.size)delete window.qaAppListeners[name]}}}};`}));
+      if(process.env.ROCOEATS_NATIVE_CLERK_BROWSER==='true'){
+        b.onResolve({filter:/^@capacitor\/push-notifications$/},()=>({path:'push',namespace:'native-fixture-push'}));
+        b.onLoad({filter:/.*/,namespace:'native-fixture-push'},()=>({loader:'js',contents:`export const PushNotifications={
+          addListener:async(name,callback)=>{window.qaPushListeners??={};window.qaPushListenerSets??={};const listeners=window.qaPushListenerSets[name]??=new Set();listeners.add(callback);window.qaPushListeners[name]=event=>{for(const cb of [...listeners])cb(event)};return{remove:async()=>{listeners.delete(callback);if(!listeners.size)delete window.qaPushListeners[name]}}},
+          checkPermissions:async()=>({receive:window.qaPushPermissionGranted?'granted':'prompt'}),requestPermissions:async()=>{window.qaPushPermissionRequests=(window.qaPushPermissionRequests||0)+1;return{receive:window.qaPushPermissionGranted?'granted':'denied'}},
+          createChannel:async()=>{},register:async()=>{if(!window.qaAllowNativeRegister)throw Error('Provider registration forbidden in lifecycle fixture');window.qaRegisterCalls=(window.qaRegisterCalls||0)+1;window.qaPushListeners.registration({value:window.qaNativePushToken})},unregister:async()=>{window.qaUnregisterCalls=(window.qaUnregisterCalls||0)+1}};`}));
+      }
+      b.onResolve({ filter: /^@clerk\/react\/internal$/ }, () => ({ path: 'internal', namespace: 'clerk-fixture' }));
+      b.onResolve({ filter: /^@clerk\/react$/ }, () => ({ path: 'react', namespace: 'clerk-fixture' }));
+      b.onLoad({ filter: /.*/, namespace: 'clerk-fixture' }, args => ({ resolveDir: path.join(root, 'artifacts/localeats'), loader: 'js', contents: args.path === 'internal'
+        ? 'export const publishableKeyFromHost=(_host,key)=>key;'
+        : `import { useSyncExternalStore } from 'react';
+           const subscribe=callback=>{window.addEventListener('qa-auth-change',callback);return()=>window.removeEventListener('qa-auth-change',callback)};
+           export const useAuth=()=>{useSyncExternalStore(subscribe,()=>String(window.qaAuthReady)+String(window.qaUserId));return{isLoaded:window.qaAuthReady!==false,isSignedIn:!!window.qaUserId,userId:window.qaUserId,getToken:async(options)=>{window.qaWebTokenCalls=(window.qaWebTokenCalls||0)+1;if(options?.skipCache){window.qaTokenRefreshes=(window.qaTokenRefreshes||0)+1;if(sessionStorage.getItem('qa-stall-refresh')==='1')return new Promise(()=>{});return 'qa-refreshed-token'}return null}}};
+           export const useUser=()=>({isLoaded:true,user:window.qaUserId?{id:window.qaUserId,fullName:'Browser tester'}:null});
+           export const ClerkProvider=({children})=>window.qaProviderBlocked?null:children;
+           export const SignIn=()=>null, SignUp=()=>null;
+           export const useSignIn=()=>({});
+           export const useClerk=()=>({addListener:()=>()=>{},signOut:async()=>{location.assign('/')}});` }));
+    } }],
+  });
+  const backendFile = path.join(backend, 'server.mjs');
+  await build({
+    entryPoints: [path.join(root, 'artifacts/api-server/tests/website-browser-server.ts')], outfile: backendFile, bundle: true, platform: 'node', format: 'esm',
+    external: ['@electric-sql/pglite', 'stripe', 'express', 'pg', 'cors', 'pino', 'pino-http', '@clerk/shared/*', 'firebase-admin/*'],
+    plugins: [{ name: 'isolated-services', setup(b) {
+      b.onResolve({ filter: /^@workspace\/db$/ }, () => ({ path: path.join(root, 'artifacts/api-server/tests/database.ts') }));
+      b.onResolve({ filter: /^@clerk\/express$/ }, () => ({ path: path.join(root, 'artifacts/api-server/tests/clerk.ts') }));
+    } }],
+  });
+  const fixture = await import(pathToFileURL(backendFile));
+  server = await fixture.start(root);
+  const { origin } = server, { ids } = fixture;
+  browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
+  async function actor(role) {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    await context.addInitScript(id => { window.qaUserId = sessionStorage.getItem('qa-user') || id; window.qaAuthReady = sessionStorage.getItem('qa-pending') !== '1'; }, ids[role] || null);
+    await context.route('**/api/**', async route => {
+      try {
+        const id = await route.request().frame().evaluate(() => window.qaUserId);
+        await route.continue({ headers: { ...route.request().headers(), ...(id ? { 'x-test-user': id } : {}) } });
+      } catch { await route.abort().catch(() => {}); }
+    });
+    const page = await context.newPage();
+    page.setDefaultTimeout(15000);
+    page.on('pageerror', error => browserErrors.push(error.message));
+    pages.push(page);
+    return page;
+  }
+  async function api(role, url, method = 'GET', body) {
+    const response = await fetch(origin + '/api' + url, { method, headers: { ...(ids[role] ? { 'x-test-user': ids[role] } : {}), ...(body ? { 'content-type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    assert.ok(response.ok, `${method} ${url}: ${response.status} ${await response.clone().text()}`);
+    return response.json();
+  }
+  if(process.env.ROCOEATS_NATIVE_CLERK_BROWSER==='true'){await verifyNativeClerkDriver({actor,api,origin,ids,seedInbox:fixture.seedInbox});}
+  else if (process.env.ROCOEATS_NATIVE_BOOT_BROWSER === 'true') {
+    if(nativeAudience==='customer') await verifyNativeCustomerStartup({actor,api,origin});
+    else await verifyNativeStartupBootstrap({ actor, origin });
+  } else if (process.env.ROCOEATS_DRIVER_APP_BROWSER === 'true') {
+    await verifyDriverApp({ actor, api, origin });
+  } else if (process.env.ROCOEATS_PUBLIC_INFO_ONLY === 'true') {
+    await verifyPublicInformation({ actor, origin });
+  } else if (process.env.ROCOEATS_GUEST_SERVICE_ONLY === 'true') {
+    await verifyGuestService({ actor, api, origin, ids });
+  } else if (process.env.ROCOEATS_MENU_ONLY === 'true') {
+    const restaurant = await actor('restaurant'), customer = await actor('customer');
+    await restaurant.goto(origin + '/restaurant');
+    await verifyMenuEditor({ restaurant, customer, api, origin, ids });
+    await verifyMenuCategories({ restaurant, api, ids });
+  } else {
+  await verifyCheckout({ actor, origin, ids });
+  if (process.env.ROCOEATS_CHECKOUT_ONLY !== 'true') {
+  const customer = await actor('customer');
+  await customer.goto(origin);
+  await customer.getByRole('link', { name: 'Browse Restaurants & Menus', exact: true }).click();
+  await customer.getByLabel('Search approved restaurants').fill('Browser Test');
+  await customer.getByRole('link', { name: 'View menu' }).click();
+  await customer.getByRole('heading', { name: 'Browser Test Kitchen', exact: true }).waitFor();
+  await customer.getByRole('button', { name: 'Menu', exact: true }).click();
+  const customerNav = customer.getByRole('navigation', { name: 'Main navigation', exact: true });
+  for (const name of ['Administrator', 'Dispatch & orders', 'Driver', 'Restaurant']) assert.equal(await customerNav.getByRole('link', { name, exact: true }).count(), 0);
+  await customer.getByLabel('Green beans (+$1.50)', { exact: true }).check();
+  await customer.locator('.roco-menu-item').filter({ has: customer.locator('strong', { hasText: /^Local supper$/ }) }).getByLabel('Preparation instructions (optional)').fill('No onions');
+  await customer.locator('.roco-menu-item').filter({ has: customer.locator('strong', { hasText: /^Local supper$/ }) }).getByRole('button', { name: 'Add to cart', exact: true }).click();
+  await customer.getByRole('link', { name: 'Cart (1)', exact: true }).click();
+  await customer.getByRole('button', { name: 'Add address', exact: true }).click();
+  await customer.getByLabel('Street address', { exact: true }).fill('200 Test Delivery');
+  await customer.getByLabel('City', { exact: true }).fill('Rockwood');
+  await customer.getByLabel('ZIP code', { exact: true }).fill('37854');
+  await customer.getByLabel('Delivery instructions', { exact: true }).fill('Meet at door');
+  await customer.getByRole('button', { name: 'Save address', exact: true }).click();
+  await customer.getByLabel('Driver tip (dollars)').fill('3');
+  await customer.getByRole('button', { name: 'Calculate test total', exact: true }).click();
+  const savedResponse = customer.waitForResponse(r => r.url().endsWith('/api/orders') && r.request().method() === 'POST');
+  await customer.getByRole('button', { name: /^Create order ·/ }).click();
+  const saved = await savedResponse;
+  assert.equal(saved.status(), 201);
+  const order = await saved.json();
+  assert.equal(order.items[0].specialInstructions, 'No onions');
+  assert.equal(order.items[0].modifierSnapshot[0].option, 'Green beans');
+  const checkoutResponse = customer.waitForResponse(response => response.url().endsWith(`/api/orders/${order.id}/checkout`) && response.request().method() === 'POST');
+  await customer.getByRole('button', { name: 'Prepare secure test payment', exact: true }).click();
+  // A completed browser click does not imply the server has committed checkout.
+  // Wait for that prerequisite before sending the simulator confirmation.
+  const checkoutResult = await checkoutResponse;
+  assert.equal(checkoutResult.status(), 200);
+  assert.equal((await checkoutResult.json()).mode, 'sandbox');
+  // Explicit stand-in for provider confirmation: only the simulator endpoint.
+  // No Stripe API, hosted checkout, card, webhook delivery or transfer occurs.
+  await api('customer', `/orders/${order.id}/sandbox-payment`, 'POST', { outcome: 'succeeded' });
+  await customer.getByRole('link', { name: 'Track order', exact: true }).click();
+  await customer.getByText('Payment succeeded · collected', { exact: true }).waitFor();
+  const restaurant = await actor('restaurant');
+  await restaurant.goto(origin + '/restaurant');
+  await restaurant.getByRole('button', { name: 'Menu', exact: true }).click();
+  const restaurantNav = restaurant.getByRole('navigation', { name: 'Main navigation', exact: true });
+  await restaurantNav.getByRole('link', { name: 'Restaurant', exact: true }).waitFor();
+  assert.equal(await restaurantNav.getByRole('link', { name: 'Driver', exact: true }).count(), 0);
+  await restaurant.getByRole('tab', { name: 'Incoming orders', exact: true }).click();
+  for (const status of ['accepted', 'preparing', 'ready for pickup']) {
+    await restaurant.getByRole('button', { name: `Mark ${status}`, exact: true }).click();
+  }
+  const driver = await actor('driver');
+  await driver.goto(origin + '/driver');
+  await driver.getByRole('button', { name: 'Go online', exact: true }).click();
+  assert.equal(await driver.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: 'Administrator', exact: true }).count(), 0);
+  await driver.getByRole('button', { name: 'Claim delivery', exact: true }).click();
+  await driver.getByRole('button', { name: 'I’m at the restaurant', exact: true }).click();
+  await driver.getByRole('button', { name: 'Confirm pickup', exact: true }).click();
+  const nav = driver.getByRole('region', { name: 'Navigate to Customer', exact: true });
+  assert.match(await nav.getByRole('link', { name: 'Google Maps' }).getAttribute('href'), /200.*Test.*Delivery/);
+  await customer.reload();
+  const codeResponse = customer.waitForResponse(r => r.url().endsWith('/delivery-code'));
+  await customer.getByRole('button', { name: 'Generate handoff code', exact: true }).click();
+  const { code } = await (await codeResponse).json();
+  await driver.getByLabel('Customer handoff code', { exact: true }).fill(code);
+  await driver.getByRole('button', { name: 'Confirm delivery with code', exact: true }).click();
+  await driver.getByText(`Order ${order.id} · delivered`, { exact: true }).waitFor();
+  await customer.reload();
+  await customer.getByRole('heading', { name: 'Delivery receipt', exact: true }).waitFor();
+  await customer.getByText(/Delivery confirmed by customer code at/).waitFor();
+  const delivered = await api('customer', `/orders/${order.id}`);
+  assert.equal(delivered.status, 'delivered');
+  assert.equal(delivered.paymentStatus, 'succeeded');
+  const ledger = await api('admin', `/admin/ledger?orderId=${order.id}`);
+  assert.equal(ledger.balanced, true);
+  assert.equal(Number(ledger.missingPaymentBaselines), 0);
+  assert.ok(ledger.journals.length >= 2);
+  const payouts = (await api('admin', '/admin/payouts')).filter(p => p.orderId === order.id);
+  assert.equal(payouts.length, 2);
+  assert.equal(payouts.find(p => p.kind === 'driver').recipientProfileId, ids.driver);
+  assert.equal(payouts.find(p => p.kind === 'driver').amountCents, 699);
+  assert.equal(payouts.find(p => p.kind === 'restaurant').amountCents, 1035);
+  for (const journal of ledger.journals) assert.equal(journal.lines.reduce((sum, line) => sum + line.amountCents, 0), 0);
+  const admin = await actor('admin');
+  await admin.goto(origin + '/admin');
+  await admin.getByRole('button', { name: 'Menu', exact: true }).click();
+  await admin.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: 'Driver', exact: true }).click();
+  await admin.getByText(/Administrator delivery workspace/).waitFor();
+  await admin.getByRole('button', { name: 'Menu', exact: true }).click();
+  await admin.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: 'Administrator', exact: true }).click();
+  await admin.getByRole('heading', { name: 'Your business dashboard.', exact: true }).waitFor();
+  assert.equal((await api('admin', '/profiles/me')).role, 'admin');
+  for (const role of ['customer', 'restaurant', 'driver']) {
+    const denied = await fetch(origin + '/api/admin/dispatch', { headers: { 'x-test-user': ids[role] } });
+    assert.equal(denied.status, 403);
+  }
+  await admin.goto(origin + '/operations');
+  await admin.getByText('Test payouts are disabled. Earnings remain recorded; no transfers can be started.', {exact:true}).waitFor();
+  await admin.getByRole('button', {name:'Transfer test earnings',exact:true}).first().waitFor();
+  for(const button of await admin.getByRole('button', {name:'Transfer test earnings',exact:true}).all()) assert.equal(await button.isDisabled(),true);
+  await admin.getByLabel('Filter by order ID', { exact: true }).fill(order.id);
+  await admin.getByRole('button', { name: 'Apply filter', exact: true }).click();
+  await admin.getByText(/Trial balance is balanced/).waitFor();
+  for (const [index, page] of pages.entries()) {
+    if (page.isClosed()) continue;
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `No mobile overflow for actor ${index}`);
+    await page.screenshot({ path: path.join(web, `workflow-${index}.png`), fullPage: true });
+    for (const link of await page.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link').all()) {
+      const box = await link.boundingBox();
+      assert.ok(box.x >= 0 && box.x + box.width <= 390, 'Workspace navigation stays visible on phones');
+    }
+  }
+  const guest = await actor('guest');
+  await guest.goto(origin);
+  await guest.getByRole('link', { name: 'Order as Guest', exact: true }).click();
+  await guest.getByRole('link', { name: 'View menu' }).click();
+  await guest.getByLabel('Green beans (+$1.50)', { exact: true }).check();
+  await guest.locator('.roco-menu-item').filter({ has: guest.locator('strong', { hasText: /^Local supper$/ }) }).getByRole('button', { name: 'Add to cart', exact: true }).click();
+  await guest.getByRole('link', { name: 'Cart (1)', exact: true }).click();
+  await guest.getByLabel('Your name', { exact: true }).fill('Browser guest');
+  await guest.getByLabel('Receipt email', { exact: true }).fill('browser@example.test');
+  await guest.getByLabel('Delivery phone', { exact: true }).fill('8655550100');
+  await guest.getByRole('button', { name: 'Continue as Guest', exact: true }).click();
+  await guest.getByRole('heading', { name: 'Review your delivery.', exact: true }).waitFor();
+  const availabilityUrl = origin + `/restaurants/${ids.business}`;
+  const settings = { acceptingOrders: false, hours: Array.from({ length: 7 }, (_, weekday) => ({ weekday, isClosed: false, openTime: '00:00', closeTime: '24:00' })) };
+  await api('restaurant', '/restaurants/me/availability/settings', 'PUT', settings);
+  const quoteAddress = (await api('customer', '/addresses/me'))[0].id;
+  const availabilityQuote = () => fetch(origin + '/api/orders/quote', { method: 'POST', headers: { 'x-test-user': ids.customer, 'content-type': 'application/json' }, body: JSON.stringify({ restaurantId: ids.business, addressId: quoteAddress, tipCents: 0, items: [{ menuItemId: ids.fries, quantity: 1, modifiers: {} }] }) });
+  const pausedQuote = await availabilityQuote();
+  assert.equal(pausedQuote.status, 409);
+  assert.match((await pausedQuote.json()).error, /paused order acceptance/);
+  await guest.goto(availabilityUrl);
+  await guest.getByText('This restaurant has paused new orders.', { exact: true }).waitFor();
+  await guest.getByText('Weekly hours (America/New_York)', { exact: true }).click();
+  await guest.getByText('Sunday', { exact: true }).waitFor();
+  await api('restaurant', '/restaurants/me/availability/settings', 'PUT', { ...settings, acceptingOrders: true, hours: settings.hours.map(h => ({ ...h, isClosed: true })) });
+  await guest.reload();
+  await guest.getByText('This restaurant is outside its ordering hours.', { exact: true }).waitFor();
+  const closedQuote = await availabilityQuote();
+  assert.equal(closedQuote.status, 409);
+  assert.match((await closedQuote.json()).error, /closed.*Eastern/);
+  await api('restaurant', '/restaurants/me/availability/settings', 'PUT', { ...settings, acceptingOrders: true });
+  const availabilityApi = '**/api/restaurants/*/availability';
+  await guest.route(availabilityApi, route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Intentional availability outage' }) }));
+  await guest.reload();
+  await guest.getByRole('alert').filter({ hasText: 'Availability could not be checked.' }).waitFor();
+  await guest.unroute(availabilityApi);
+  await guest.getByRole('button', { name: 'Retry availability', exact: true }).click();
+  await guest.getByText('This restaurant is within its ordering hours.', { exact: true }).waitFor();
+  await verifyMenuEditor({ restaurant, customer, api, origin, ids });
+  await verifyMenuCategories({ restaurant, api, ids });
+  await verifyGuestService({ actor, api, origin, ids });
+  await verifyPublicInformation({ actor, origin });
+  assert.deepEqual(browserErrors, []);
+  console.log(`PASS: real website/API/PGlite workflow: search, modifiers, cart/address/quote, simulator payment, restaurant acceptance/preparation, driver availability/claim/navigation/pickup/handoff, delivery receipt, balanced ledger and two earnings records; guest browsing/session/cart. Simulated Clerk and payment only. Screenshots: ${web}`);
+  console.log('PASS: live restaurant hours, paused/closed status, weekly hours and availability outage recovery. Only the outage response was intercepted.');
+  }
+  }
+  assert.deepEqual(browserErrors, []);
+} catch (error) {
+  console.error('Website workflow failed. Local artifacts:', web);
+  console.error('Local fixture page errors:', browserErrors);
+  for (const [index, page] of pages.entries()) {
+    if (page.isClosed()) continue;
+    console.error(`Actor ${index} at ${page.url()}:`, (await page.locator('body').innerText()).slice(-6000));
+    await page.screenshot({ path: path.join(web, `failure-${index}.png`), fullPage: true }).catch(() => {});
+  }
+  throw error;
+} finally {
+  await browser?.close();
+  await server?.close();
+  await rm(backend, { recursive: true, force: true });
+}

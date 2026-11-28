@@ -1,11 +1,21 @@
-import { eq } from "drizzle-orm";
+import { stagingAdmits } from "../middlewares/private-staging";
+import { isConfiguredOwner } from "../lib/owner-access";
+import { getActiveProfile } from "../lib/current-profile";
+import { audit } from "../lib/commerce";
+import { and, eq } from "drizzle-orm";
+import { z } from "zod";
+import { CommerceError } from "../lib/commerce-policy";
 import { Router, type IRouter } from "express";
 import {
   CreateMyProfileBody,
   CreateMyProfileResponse,
   GetMyProfileResponse,
 } from "@workspace/api-zod";
-import { db, profilesTable, type Profile as ProfileRecord } from "@workspace/db";
+import {
+  db,
+  profilesTable,
+  type Profile as ProfileRecord,
+} from "@workspace/db";
 import {
   getAuthenticatedUserId,
   requireAuth,
@@ -13,14 +23,30 @@ import {
 
 const router: IRouter = Router();
 
-function isConfiguredAdmin(clerkUserId: string): boolean {
-  const configuredIds = process.env.LOCALEATS_ADMIN_CLERK_USER_IDS ?? "";
-  return configuredIds
-    .split(",")
-    .map((id) => id.trim())
-    .filter(Boolean)
-    .includes(clerkUserId);
-}
+router.get("/session/access", requireAuth, async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const subject = getAuthenticatedUserId(req);
+  const ownerMatched = isConfiguredOwner(subject);
+  const [saved] = await db.select().from(profilesTable).where(eq(profilesTable.clerkUserId, subject)).limit(1);
+  const profile = saved?.isActive || (!saved && ownerMatched)
+    ? await getActiveProfile(req, res) : saved;
+  if (res.headersSent) return;
+  const configured = (value: string | undefined) => Boolean(value?.split(",").some(id => id.trim()));
+  const driverMatched = (process.env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS || "").split(",").map(id => id.trim()).includes(subject);
+  res.json({
+    ownerConfigured: configured(process.env.LOCALEATS_ADMIN_CLERK_USER_IDS),
+    ownerMatched,
+    ownerDriverConfigured: configured(process.env.ROCOEATS_OWNER_DRIVER_CLERK_USER_IDS),
+    ownerDriverMatched: ownerMatched && driverMatched,
+    profileStatus: !profile ? "setup_required" : profile.isActive ? "active" : "suspended",
+    role: profile?.role ?? null,
+    administrator: Boolean(profile?.isActive && profile.role === "admin"),
+    superAdministrator: Boolean(profile?.isActive && profile.role === "admin" && ownerMatched),
+    driver: Boolean(profile?.isActive && ["driver", "admin"].includes(profile.role) && profile.driverApproved),
+    privateStaging: process.env.ROCOEATS_PRIVATE_STAGING === "true",
+    stagingAdmitted: stagingAdmits(subject),
+  });
+});
 
 function toApiProfile(profile: ProfileRecord) {
   return {
@@ -32,40 +58,34 @@ function toApiProfile(profile: ProfileRecord) {
 }
 
 router.get("/profiles/me", requireAuth, async (req, res): Promise<void> => {
-  const clerkUserId = getAuthenticatedUserId(req);
-  let [profile] = await db
-    .select()
-    .from(profilesTable)
-    .where(eq(profilesTable.clerkUserId, clerkUserId))
-    .limit(1);
-
-  if (!profile) {
-    res.status(404).json({ error: "Profile setup is required" });
-    return;
-  }
-
-  // The owner can designate the first administrator through a server-only
-  // Clerk user ID allowlist. No public profile input can grant this role.
-  if (isConfiguredAdmin(clerkUserId) && profile.role !== "admin") {
-    [profile] = await db
-      .update(profilesTable)
-      .set({ role: "admin" })
-      .where(eq(profilesTable.id, profile.id))
-      .returning();
-  }
-
-  if (!profile.isActive) {
-    res.status(403).json({ error: "This account is not active" });
-    return;
-  }
-
+  const profile = await getActiveProfile(req, res);
+  if (!profile) return;
   res.json(GetMyProfileResponse.parse(toApiProfile(profile)));
+});
+
+router.patch("/profiles/me", requireAuth, async (req, res) => {
+  const profile = await getActiveProfile(req, res);
+  if (!profile) return;
+  const input = z.object({
+    displayName: z.string().trim().min(1).max(120),
+    expectedDisplayName: z.string().min(1).max(120),
+  }).strict().parse(req.body);
+  const saved = await db.transaction(async tx => {
+    const [updated] = await tx.update(profilesTable).set({ displayName: input.displayName })
+      .where(and(eq(profilesTable.id,profile.id),eq(profilesTable.isActive,true),eq(profilesTable.displayName,input.expectedDisplayName))).returning();
+    if (!updated) throw new CommerceError(409,"Your profile changed. Refresh before saving again.");
+    await audit(tx,profile.id,"profile.settings_updated",profile.id,{fields:["displayName"]});
+    return updated;
+  });
+  res.json(GetMyProfileResponse.parse(toApiProfile(saved)));
 });
 
 router.post("/profiles/me", requireAuth, async (req, res): Promise<void> => {
   const parsed = CreateMyProfileBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Choose a valid account type and display name" });
+    res
+      .status(400)
+      .json({ error: "Choose a valid account type and display name" });
     return;
   }
 
@@ -76,19 +96,28 @@ router.post("/profiles/me", requireAuth, async (req, res): Promise<void> => {
   }
 
   const clerkUserId = getAuthenticatedUserId(req);
-  const role = isConfiguredAdmin(clerkUserId) ? "admin" : parsed.data.role;
-  const [profile] = await db
-    .insert(profilesTable)
-    .values({
-      clerkUserId,
-      role,
-      displayName,
-    })
-    .onConflictDoNothing({ target: profilesTable.clerkUserId })
-    .returning();
+  const role = isConfiguredOwner(clerkUserId) ? "admin" : parsed.data.role;
+  const profile = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(profilesTable)
+      .values({
+        clerkUserId,
+        role,
+        displayName,
+      })
+      .onConflictDoNothing({ target: profilesTable.clerkUserId })
+      .returning();
+    if (created && role === "admin")
+      await audit(tx, created.id, "owner.bootstrap.granted", created.id, {
+        source: "server_allowlist",
+      });
+    return created;
+  });
 
   if (!profile) {
-    res.status(409).json({ error: "A LocalEats profile already exists for this account" });
+    res
+      .status(409)
+      .json({ error: "A LocalEats profile already exists for this account" });
     return;
   }
 
