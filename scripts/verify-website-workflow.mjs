@@ -221,7 +221,7 @@ try {
   await admin.getByText(/Administrator delivery workspace/).waitFor();
   await admin.getByRole('button', { name: 'Menu', exact: true }).click();
   await admin.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: 'Administrator', exact: true }).click();
-  await admin.getByRole('heading', { name: 'The county operations desk.', exact: true }).waitFor();
+  await admin.getByRole('heading', { name: 'Your business dashboard.', exact: true }).waitFor();
   assert.equal((await api('admin', '/profiles/me')).role, 'admin');
   for (const role of ['customer', 'restaurant', 'driver']) {
     const denied = await fetch(origin + '/api/admin/dispatch', { headers: { 'x-test-user': ids[role] } });

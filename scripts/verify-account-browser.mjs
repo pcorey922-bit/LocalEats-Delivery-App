@@ -143,6 +143,10 @@ try {
   await owner.goto(origin+'/?owner=true');
   await owner.getByRole('heading',{name:'Manage your operations.',exact:true}).waitFor();
   const shortcuts=owner.getByRole('navigation',{name:'Business management'});
+  await owner.getByRole('button',{name:'Revoke test dispatch access',exact:true}).waitFor();
+  assert.equal(await owner.getByRole('button',{name:'Revoke test dispatch access',exact:true}).isDisabled(),true,'Owner-managed approval cannot be edited through ordinary driver controls');
+  assert.equal(await owner.getByRole('button',{name:'Transfer test earnings',exact:true}).isDisabled(),true,'Closed payout gate must remain enforced after moving financial controls');
+  assert.equal(await owner.getByRole('button',{name:'Update case & notify requester',exact:true}).isDisabled(),true,'Support decisions still require a substantive response');
   assert.deepEqual(await shortcuts.locator('a').evaluateAll(links=>links.map(link=>link.getAttribute('href'))),['/operations#orders','/admin?tab=restaurants','/operations#drivers','/operations#dispatch','/operations#payments','/operations#system','/notifications','/operations#support']);
   await owner.getByText('Credentials locally valid; provider delivery unverified',{exact:true}).waitFor();
   for(const heading of ['Provider push sending','Test payouts','Processed checkout payload retention']) {
@@ -166,7 +170,10 @@ try {
   await shortcuts.getByRole('link',{name:'Manage Orders'}).click();
   await owner.getByRole('heading',{name:'Manage Orders',exact:true}).waitFor();
   assert.equal(await owner.evaluate(()=>location.hash),'#orders');
-    await owner.waitForFunction(()=>Math.abs(document.getElementById('orders')?.getBoundingClientRect().top ?? Infinity)<100,{},{timeout:5000});
+  await owner.waitForFunction(()=>Math.abs(document.getElementById('orders')?.getBoundingClientRect().top ?? Infinity)<100,{},{timeout:5000});
+  await owner.getByRole('button',{name:'Refresh service status',exact:true}).click();
+  await owner.waitForFunction(()=>Array.from(document.querySelectorAll('button')).some(button=>button.textContent==='Refresh service status'&&!button.disabled));
+  assert.ok(await owner.locator('#orders').evaluate(el=>el.getBoundingClientRect().top>500),'Background status refresh must not reapply the initial anchor');
   await owner.evaluate(()=>scrollTo(0,0));
   assert.equal(await owner.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await owner.screenshot({path:target+'/owner-operations-mobile.png',fullPage:true});
@@ -186,7 +193,7 @@ try {
   assert.deepEqual(ownerErrors,[]);await owner.close();
   const deniedOwner=await browser.newPage();await deniedOwner.goto(origin+'/?owner=true&denied=true');await deniedOwner.getByRole('heading',{name:'Administrator access required'}).waitFor();assert.deepEqual(await deniedOwner.evaluate(()=>window.qaOwnerReads.filter(path=>path.startsWith('/api/admin/'))),[]);await deniedOwner.close();
   const failedOwner=await browser.newPage();await failedOwner.goto(origin+'/?owner=true&accountError=true');await failedOwner.getByRole('heading',{name:'Operations could not load'}).waitFor();await failedOwner.getByRole('button',{name:'Try again',exact:true}).waitFor();assert.equal(await failedOwner.getByRole('navigation',{name:'Business management'}).count(),0);await failedOwner.close();
-  console.log('Owner workspace PASS: direct management links, query/back navigation, denied/error access states, closed-gate cards, no automatic diagnostics/writes and responsive 320/390/768/1440 layouts (simulated API). Visuals: '+target);
+  console.log('Owner workspace PASS: direct management links, query/back navigation, denied/error access states, closed-gate cards, protected driver/payout/support controls, no automatic diagnostics/writes and responsive 320/390/768/1440 layouts (simulated API). Visuals: '+target);
   if(process.env.ACCOUNT_BROWSER_SUITE !== 'owner') {
   const cspPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await cspPage.addInitScript(() => { window.cspStartupViolations = []; document.addEventListener('securitypolicyviolation', event => window.cspStartupViolations.push(event.effectiveDirective)); });

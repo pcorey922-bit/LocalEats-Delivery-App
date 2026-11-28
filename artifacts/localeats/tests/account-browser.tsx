@@ -187,6 +187,8 @@ window.fetch = async (url, options = {}) => {
     if(path==='/api/admin/finance')return Response.json({paymentProviderConnected:true,succeededPaymentCount:1,succeededPaymentCents:1919,pendingPaymentCount:0,pendingPaymentCents:0,refundedPaymentCount:0,refundedPaymentCents:0,paidOutCents:0,pendingPayoutCents:0,failedPayoutCount:0});
     if(path==='/api/admin/operational-health')return Response.json(window.qaOwnerHealth);
     if(path==='/api/admin/dispatch')return Response.json({orders:[],drivers:[],mapConfig:null});
+    if(path==='/api/admin/drivers')return Response.json([{id:'owner-fixture',displayName:'Example owner',driverApproved:true,ownerDriverAccess:true}]);
+    if(path==='/api/admin/payouts')return Response.json([{id:'pending-payout-fixture',kind:'driver',amountCents:100,status:'pending',providerReversalId:null}]);
     if(path.startsWith('/api/admin/ledger?'))return Response.json({balanced:true,currency:'USD',notice:'Simulated TEST records only',missingPaymentBaselines:'0',nextCursor:null,balances:[],journals:[]});
     if(path==='/api/admin/order-timing')return Response.json({reservationMinutes:10,restaurantResponseMinutes:10,driverAssignmentMinutes:10,driverPickupMinutes:10});
     if(['/api/orders/me','/api/admin/restaurants','/api/admin/profiles','/api/admin/payouts','/api/admin/refunds','/api/admin/drivers','/api/admin/driver-applications','/api/admin/financial-operations','/api/admin/financial-holds','/api/admin/order-incidents','/api/admin/telephone-orders'].includes(path)||path.startsWith('/api/admin/webhook-inbox?')||path.startsWith('/api/admin/push-deliveries?'))return Response.json([]);

@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 
 // Every shortcut targets an existing, authorization-protected management view.
 const destinations = [
@@ -57,13 +58,22 @@ export function OwnerWorkspaceLinks() {
 }
 
 export function useOwnerAnchor(ready: boolean) {
+  const fetching = useIsFetching();
+  const client = useQueryClient();
+  const aligned = useRef(false);
   useEffect(() => {
-    if (!ready || !window.location.hash) return;
-    const frame = requestAnimationFrame(() =>
-      document
-        .getElementById(window.location.hash.slice(1))
-        ?.scrollIntoView({ behavior: "instant", block: "start" }),
-    );
+    if (!ready || fetching || aligned.current || !window.location.hash) return;
+    // Wait for the initial records above the destination to finish loading.
+    // Otherwise new driver/status cards move the requested section after scrolling.
+    const frame = requestAnimationFrame(() => {
+      if (client.isFetching()) return;
+      const destination = document.getElementById(
+        window.location.hash.slice(1),
+      );
+      if (!destination) return;
+      destination.scrollIntoView({ behavior: "instant", block: "start" });
+      aligned.current = true; // Background polling must never move the owner again.
+    });
     return () => cancelAnimationFrame(frame);
-  }, [ready]);
+  }, [ready, fetching, client]);
 }

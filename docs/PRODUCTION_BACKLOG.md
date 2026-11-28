@@ -1,3 +1,34 @@
+# November 28 — Owner navigation with real records and full delivery acceptance
+
+Follow-up regression with an owner-managed driver and a pending TEST payout reproduced
+section movement when late records changed the page height. Initial anchor navigation
+now waits for the first read queries to settle, then aligns once; later polling/status
+refresh cannot pull the owner back. Focused mobile test verifies this plus owner driver
+approval disabled, payout transfer disabled, and support decision disabled without a
+substantive reply. No gate/authorization logic changed.
+
+Owner UI commit c41d7a4f36c5efb45c3e82c796df8a48f3548896 CI exposed an outdated exact
+heading assertion in verify-website-workflow.mjs ('county operations desk'). Updated
+it to the actual new dashboard title, preserving the exact assertion. Do not label
+that earlier commit fully CI-green. Native validation succeeded; Validate workflows
+failed at the obsolete heading. This follow-up supersedes that release candidate.
+
+Actual full website/API/disposable-PGlite browser workflow now PASS: customer search,
+modifiers, address/cart/quote, simulated payment, restaurant acceptance/preparation,
+driver claim/pickup/handoff/delivery, balanced ledger/two earnings records, guest
+checkout/tracking, support open/admin decision/reply, unpaid cancellation, menu/category
+editing and hours/outage recovery. Auth and payment provider are simulated. No hosted
+records or external providers used. Focused owner browser, frontend types and production
+build PASS. Support commit 32149c4 all3 CI SUCCESS remains verified. New exact-source CI
+must finish after push. Prior full component browser suite PASS remains applicable.
+
+No migration/env/APK/signing/GPS/90-second changes. No deployment or protected action.
+Next owner-only: approve deployment of final CI-green functional source; inspect the
+owner layout on Samsung after Live. Separate FCM validation-only authorization and
+signed physical iOS/provider receipt acceptance remain required. No currently reproduced
+independent native/payment defect justifies changing accepted implementations. Continue
+from the next actual acceptance failure; do not repeat the exhausted provider/GPS tests.
+
 # November 28 — Owner workspace usability verified; support recovery CI passed
 
 Support recovery commit 32149c44b51e5ea6ba5e59b12bdcc9ba3ad4b02e is pushed.
