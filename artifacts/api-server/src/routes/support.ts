@@ -1,5 +1,8 @@
-import { requireLockedActiveProfile, requireLockedAdministrator } from '../lib/transaction-access';
-import { databaseNow } from '../lib/database-clock';
+import {
+  requireLockedActiveProfile,
+  requireLockedAdministrator,
+} from "../lib/transaction-access";
+import { databaseNow } from "../lib/database-clock";
 import { requireCustomerAuth } from "../lib/guest-access";
 import { Router } from "express";
 import { z } from "zod";
@@ -139,6 +142,7 @@ router.patch("/admin/support/cases/:id", requireAuth, async (req, res) => {
   const id = z.string().uuid().parse(req.params.id);
   const v = z
     .object({
+      id: z.string().uuid().optional(),
       version: z.number().int().positive(),
       status: z.enum(["open", "in_review", "resolved"]),
       resolution: z.string().trim().min(10).max(2000),
@@ -159,6 +163,27 @@ router.patch("/admin/support/cases/:id", requireAuth, async (req, res) => {
       .where(eq(supportCasesTable.id, id))
       .for("update");
     if (!current) throw new CommerceError(404, "Support case not found");
+    if (v.data.id) {
+      const [saved] = await tx
+        .select()
+        .from(supportMessagesTable)
+        .where(eq(supportMessagesTable.id, v.data.id));
+      if (saved) {
+        if (
+          saved.caseId !== id ||
+          saved.authorProfileId !== p.id ||
+          saved.kind !== "decision" ||
+          saved.body !== v.data.resolution ||
+          saved.statusAfter !== v.data.status ||
+          saved.caseVersion !== v.data.version + 1
+        )
+          throw new CommerceError(
+            409,
+            "Decision ID conflicts with a saved message",
+          );
+        return current;
+      }
+    }
     if (current.version !== v.data.version)
       throw new CommerceError(409, "Case changed; refresh before updating");
     const [updated] = await tx
@@ -176,10 +201,10 @@ router.patch("/admin/support/cases/:id", requireAuth, async (req, res) => {
       status: updated.status,
       version: updated.version,
     });
-    await tx
+    const [decision] = await tx
       .insert(supportMessagesTable)
       .values({
-        id: randomUUID(),
+        id: v.data.id ?? randomUUID(),
         caseId: id,
         authorProfileId: p.id,
         authorRole: p.role,
@@ -187,7 +212,10 @@ router.patch("/admin/support/cases/:id", requireAuth, async (req, res) => {
         body: v.data.resolution,
         caseVersion: updated.version,
         statusAfter: updated.status,
-      });
+      })
+      .onConflictDoNothing()
+      .returning();
+    if (!decision) throw new CommerceError(409, "Decision ID is already used");
     await tx
       .insert(notificationsTable)
       .values({

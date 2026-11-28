@@ -4695,3 +4695,20 @@ test('support mutations recheck revoked account authority at their transaction b
     }finally{(db as any).transaction=original;release();await pending;await db.update(profilesTable).set({isActive:actor.isActive,role:actor.role}).where(eq(profilesTable.id,actor.id));}
   });
 });
+
+test('support decision retries preserve one immutable decision across concurrent calls and later replies',async()=>{
+  const id=randomUUID(),other=randomUUID();
+  for(const caseId of [id,other])assert.equal((await api('/support/cases',ids.customer,'POST',{id:caseId,category:'account',subject:'Decision replay fixture',message:'Local-only support decision recovery test'})).status,201);
+  const body={id:randomUUID(),version:1,status:'resolved',resolution:'Reviewed support request without changing any financial record'};
+  const path=`/admin/support/cases/${id}`;
+  const replies=await Promise.all([api(path,ids.admin,'PATCH',body),api(path,ids.admin,'PATCH',body)]);
+  assert.deepEqual(replies.map(r=>r.status),[200,200]);
+  const decisions=await db.select().from(supportMessagesTable).where(eq(supportMessagesTable.caseId,id));assert.equal(decisions.length,1);
+  assert.equal((await api(`/support/cases/${id}/messages`,ids.customer,'POST',{id:randomUUID(),version:2,message:'Requester reopens after the decision'})).status,201);
+  const snapshot=async()=>({cases:await db.select().from(supportCasesTable),messages:await db.select().from(supportMessagesTable),audits:await db.select().from(auditLogsTable),notifications:await db.select().from(notificationsTable)});
+  const before=await snapshot();
+  const replay=await api(path,ids.admin,'PATCH',body);assert.equal(replay.status,200);assert.equal(replay.data.status,'open');assert.equal(replay.data.version,3);
+  assert.equal((await api(path,ids.admin,'PATCH',{...body,resolution:'Changed intent must not overwrite a recorded decision'})).status,409);
+  assert.equal((await api(`/admin/support/cases/${other}`,ids.admin,'PATCH',body)).status,409);
+  assert.deepEqual(await snapshot(),before,'Replays and conflicting IDs must not change cases, message history, audit or notification counts');
+});

@@ -5,6 +5,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { customFetch } from "../../../../lib/api-client-react/src/custom-fetch";
+import { supportRequest, supportRecovery } from "../lib/support-request";
 type Message = {
   id: string;
   authorRole: string;
@@ -23,28 +24,40 @@ type Attempt = { id: string; version: number; message: string };
 export function SupportThread({ caseId }: { caseId: string }) {
   const [open, setOpen] = useState(false),
     [text, setText] = useState(""),
-    [attempt, setAttempt] = useState<Attempt | null>(null);
+    [attempt, setAttempt] = useState<Attempt | null>(null),
+    [notice, setNotice] = useState("");
   const client = useQueryClient();
   const q = useInfiniteQuery({
     queryKey: ["support-thread", caseId],
     initialPageParam: null as number | null,
-    queryFn: ({ pageParam }) =>
-      customFetch<Page>(
-        `/api/support/cases/${caseId}/messages${pageParam === null ? "" : `?beforeVersion=${pageParam}`}`,
+    queryFn: ({ pageParam, signal }) =>
+      supportRequest(
+        (inner) =>
+          customFetch<Page>(
+            `/api/support/cases/${caseId}/messages${pageParam === null ? "" : `?beforeVersion=${pageParam}`}`,
+            { signal: inner },
+          ),
+        { signal },
       ),
+    retry: false,
     getNextPageParam: (last) => last.nextBeforeVersion ?? undefined,
     enabled: open,
     refetchInterval: open ? 15000 : false,
   });
   const send = useMutation({
     mutationFn: (value: Attempt) =>
-      customFetch(`/api/support/cases/${caseId}/messages`, {
-        method: "POST",
-        body: JSON.stringify(value),
-      }),
+      supportRequest((signal) =>
+        customFetch(`/api/support/cases/${caseId}/messages`, {
+          method: "POST",
+          body: JSON.stringify(value),
+          signal,
+        }),
+      ),
+    retry: false,
     onSuccess: () => {
       setText("");
       setAttempt(null);
+      setNotice("");
       void client.invalidateQueries({ queryKey: ["support-thread", caseId] });
       void client.invalidateQueries({ queryKey: ["my-support-cases"] });
       void client.invalidateQueries({ queryKey: ["admin-support-cases"] });
@@ -53,14 +66,25 @@ export function SupportThread({ caseId }: { caseId: string }) {
   const refresh = async () => {
     const result = await q.refetch();
     if (result.isError || !result.data) return;
-    if (
-      attempt &&
-      result.data?.pages.some((p) =>
-        p.messages.some((m) => m.id === attempt.id),
-      )
-    )
-      setText("");
+    if (!attempt) return;
+    const outcome = supportRecovery(
+      attempt.id,
+      result.data.pages.flatMap((page) => page.messages),
+      send.error,
+    );
+    if (outcome === "unconfirmed") {
+      setNotice(
+        "Reply outcome is still unconfirmed. Retry the same saved reply; absence from loaded history does not prove failure.",
+      );
+      return;
+    }
+    if (outcome === "confirmed") setText("");
     setAttempt(null);
+    setNotice(
+      outcome === "confirmed"
+        ? "Saved reply confirmed."
+        : "Latest conversation loaded. Review and edit your reply before submitting again.",
+    );
     send.reset();
   };
   return (
@@ -117,6 +141,7 @@ export function SupportThread({ caseId }: { caseId: string }) {
             <label className="roco-field">
               Reply
               <textarea
+                aria-label="Reply"
                 className="roco-input"
                 value={text}
                 required
@@ -139,6 +164,7 @@ export function SupportThread({ caseId }: { caseId: string }) {
             </p>
           )}
           {send.isSuccess && <p role="status">Reply saved.</p>}
+          {notice && <p role="status">{notice}</p>}
           <button
             className="roco-button"
             disabled={send.isPending}

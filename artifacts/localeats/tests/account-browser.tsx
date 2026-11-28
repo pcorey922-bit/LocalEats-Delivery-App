@@ -1,3 +1,4 @@
+import { SupportDesk, AdminSupport } from '../src/pages/support-desk';
 import { FcmPermissionValidation } from '../src/pages/fcm-permission';
 import { FirebaseOAuthDiagnostic } from '../src/pages/firebase-oauth';
 import { NativeStartupBoundary } from '../src/components/native-startup-boundary';
@@ -57,6 +58,11 @@ declare global {
     qaGeoReady: boolean;
     qaGeoCalls: number;
     qaOAuthCalls: number;
+    qaSupportCases: Record<string,unknown>[];
+    qaSupportMessages: Record<string,unknown>[];
+    qaSupportWrites: Record<string,unknown>[];
+    qaSupportHideCases: boolean;
+    qaSupportHideMessages: boolean;
     qaFcmValidationCalls: number;
     qaFcmValidationRun: null | Record<string, unknown>;
     qaOAuthRun: null | Record<string, unknown>;
@@ -95,6 +101,8 @@ window.qaEvidenceState = 'pending';
 window.qaGeoReady = false;
 window.qaGeoCalls = 0;
 window.qaOAuthCalls = 0;
+window.qaSupportCases=[{id:'55555555-5555-4555-8555-555555555555',orderId:null,category:'account',subject:'Support fixture',message:'Existing support history',status:'open',version:1,resolution:null,createdAt:new Date().toISOString()}];
+window.qaSupportMessages=[];window.qaSupportWrites=[];window.qaSupportHideCases=false;window.qaSupportHideMessages=false;
 window.qaFcmValidationCalls = 0;
 window.qaFcmValidationRun = null;
 window.qaOAuthRun = null;
@@ -159,6 +167,34 @@ window.qaStaff = {
   accessVersion: "v1",
 };
 window.fetch = async (url, options = {}) => {
+  const supportUrl=String(url),messagePath=supportUrl.match(/^\/api\/support\/cases\/([^/]+)\/messages/),decisionPath=supportUrl.match(/^\/api\/admin\/support\/cases\/([^/]+)$/);
+  if(supportUrl==='/api/support/cases'||supportUrl==='/api/admin/support/cases'){
+    if(options.method==='POST'){
+      const v=JSON.parse(String(options.body));window.qaSupportWrites.push(v);
+      let row=window.qaSupportCases.find(c=>c.id===v.id);
+      if(!row){row={...v,orderId:v.orderId??null,status:'open',version:1,resolution:null,createdAt:new Date().toISOString()};window.qaSupportCases.unshift(row!);}
+      if(location.search.includes('lostSupport=true')&&window.qaSupportWrites.length===1)throw new TypeError('Simulated lost support receipt');
+      return Response.json(row);
+    }
+    return Response.json(window.qaSupportHideCases?[]:window.qaSupportCases);
+  }
+  if(messagePath){
+    const row=window.qaSupportCases.find(c=>c.id===messagePath[1])!;
+    if(options.method==='POST'){
+      const v=JSON.parse(String(options.body));window.qaSupportWrites.push(v);let message=window.qaSupportMessages.find(m=>m.id===v.id);
+      if(!message){message={...v,kind:'reply',authorRole:'customer',caseVersion:Number(row.version)+1,statusAfter:'open',body:v.message,createdAt:new Date().toISOString()};window.qaSupportMessages.push(message!);row.version=Number(row.version)+1;}
+      if(location.search.includes('lostSupport=true')&&window.qaSupportWrites.length===1)throw new TypeError('Simulated lost reply receipt');
+      return Response.json(message);
+    }
+    return Response.json({case:{id:row.id,status:row.status,version:row.version},messages:window.qaSupportHideMessages?[]:window.qaSupportMessages,nextBeforeVersion:null});
+  }
+  if(decisionPath&&options.method==='PATCH'){
+    const row=window.qaSupportCases.find(c=>c.id===decisionPath[1])!,v=JSON.parse(String(options.body));window.qaSupportWrites.push(v);
+    if(!window.qaSupportMessages.some(m=>m.id===v.id)){row.status=v.status;row.resolution=v.resolution;row.version=Number(row.version)+1;window.qaSupportMessages.push({id:v.id,kind:'decision',body:v.resolution,caseVersion:row.version});}
+    if(location.search.includes('lostSupport=true')&&window.qaSupportWrites.length===1)throw new TypeError('Simulated lost decision receipt');
+    return Response.json(row);
+  }
+
   if(String(url)==='/api/admin/fcm-permission-validation'){
     if(options.method==='POST'){
       window.qaFcmValidationCalls++;if(String(options.body)!==JSON.stringify({confirmValidationOnly:true}))throw Error('Unexpected validation input');
@@ -466,7 +502,7 @@ createRoot(document.getElementById("root")!).render(
     client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
   >
     <p>SIMULATED authentication and API: component QA only</p>
-    {location.search.includes('fcmValidation=true') ? <FcmPermissionValidation/> : location.search.includes('firebaseOAuth=true') ? <FirebaseOAuthDiagnostic/> : location.search.includes('checkoutCsp=true') ? <CheckoutPanel orderId="fixture-csp"/> : location.search.includes('reconciliation=true') ? <PaymentReconciliation orderId="fixture-reconciliation"/> : location.search.includes('cartSync=true') ? <React.StrictMode><CartProbe name="menu"/><CartProbe name="checkout"/></React.StrictMode> : location.search.includes("native=true") ? (
+    {location.search.includes('supportDesk=true') ? <SupportDesk/> : location.search.includes('supportAdmin=true') ? <AdminSupport/> : location.search.includes('fcmValidation=true') ? <FcmPermissionValidation/> : location.search.includes('firebaseOAuth=true') ? <FirebaseOAuthDiagnostic/> : location.search.includes('checkoutCsp=true') ? <CheckoutPanel orderId="fixture-csp"/> : location.search.includes('reconciliation=true') ? <PaymentReconciliation orderId="fixture-reconciliation"/> : location.search.includes('cartSync=true') ? <React.StrictMode><CartProbe name="menu"/><CartProbe name="checkout"/></React.StrictMode> : location.search.includes("native=true") ? (
       <NativeStartupBoundary enabled><NativeSignIn role={location.search.includes("join=restaurant") ? "restaurant" : undefined} /></NativeStartupBoundary>
     ) : location.search.includes("importGuest=true") ? (
       <ImportGuestLink />

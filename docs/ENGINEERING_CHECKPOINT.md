@@ -1,3 +1,22 @@
+# November 28 — Recovered support timeout and retry work verified
+
+Recovered six unfinished files without resets; originals retained in the session backup.
+Prior authorization correction 3334075f0460dd3d1d3fcf3405eea0696660370d is pushed,
+all three exact-SHA workflows successful. Transaction-time active-account/admin checks
+and database timestamps preserved. Support reads/writes now have a 20-second bound,
+including stalled authentication, cancellation fences late requests, and no automatic
+mutation retries occur. Frozen request/reply/decision IDs survive uncertain outcomes
+and incomplete history. Administrator decision retries return current state without
+repeating messages/audits/notifications or closing a case reopened by a later reply.
+Legacy decision clients remain compatible; no migration required.
+
+Validation: API 295 passed, one PostgreSQL-only test skipped, zero failures; focused
+support-request tests 3/3; API/frontend typechecks and production builds passed.
+Browser regression covers lost response recovery for all three writes with simulated
+API/auth only. Exact new CI results must be checked after push; pending is not success.
+No hosted/provider/financial/native/GPS changes. Next: focused owner Operations and
+administrator dashboard readability/direct navigation, preserving all confirmations.
+
 # November 27 — FCM handoff resolved; independent support recovery work active
 
 Owner supplied exact authenticated FCM readiness at approximately04:23EST/09:23Z:
