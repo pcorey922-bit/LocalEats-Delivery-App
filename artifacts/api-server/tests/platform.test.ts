@@ -4003,6 +4003,53 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     }finally{process.env.PAYMENT_PROVIDER='sandbox';delete process.env.STRIPE_SECRET_KEY;await db.update(menuItemsTable).set({stockOnHand:null}).where(eq(menuItemsTable.id,ids.item));}
   });
 
+  await t.test("an invalid saved timing policy does not block other orders or mutate custody", async () => {
+    const courier = randomUUID();
+    await db.insert(profilesTable).values({
+      id: courier, clerkUserId: courier, role: "driver", displayName: "Timing recovery fixture", driverApproved: true,
+    });
+    const affected = await create();
+    const healthy = await create();
+    await ready(affected.id);
+    await pay(healthy.id);
+    assert.equal((await api("/driver/availability", courier, "PUT", { available: true })).status, 200);
+    assert.equal((await api(`/driver/orders/${affected.id}/claim`, courier, "POST")).status, 201);
+    const [original] = await db.select().from(ordersTable).where(eq(ordersTable.id, affected.id));
+    const [delivery] = await db.select().from(deliveriesTable).where(eq(deliveriesTable.orderId, affected.id));
+    const first = new Date("1900-01-01T00:00:00Z");
+    const second = new Date("1900-01-01T00:01:00Z");
+    try {
+      await db.update(deliveriesTable).set({ assignedAt: first }).where(eq(deliveriesTable.id, delivery.id));
+      const [custody] = await db.select().from(deliveriesTable).where(eq(deliveriesTable.id, delivery.id));
+      await db.update(ordersTable).set({ timingPolicy: sql`'{}'::jsonb`, timingReviewAt: first })
+        .where(eq(ordersTable.id, affected.id));
+      await db.update(ordersTable).set({ timingReviewAt: second }).where(eq(ordersTable.id, healthy.id));
+      await db.update(paymentsTable).set({ processedAt: first }).where(eq(paymentsTable.orderId, healthy.id));
+
+      assert.equal(await processOrderTiming(), true);
+      const [deferred] = await db.select().from(ordersTable).where(eq(ordersTable.id, affected.id));
+      assert.deepEqual(deferred.timingPolicy, {});
+      assert.ok(deferred.timingReviewAt > await databaseNow());
+      assert.deepEqual((await db.select().from(deliveriesTable).where(eq(deliveriesTable.id, delivery.id)))[0], custody);
+      assert.deepEqual(await db.select().from(orderIncidentsTable).where(eq(orderIncidentsTable.orderId, affected.id)), []);
+
+      assert.equal(await processOrderTiming(), true);
+      const [incident] = await db.select().from(orderIncidentsTable).where(eq(orderIncidentsTable.orderId, healthy.id));
+      assert.equal(incident?.kind, "restaurant_response");
+
+      await db.update(ordersTable).set({ timingPolicy: original.timingPolicy, timingReviewAt: first })
+        .where(eq(ordersTable.id, affected.id));
+      assert.equal(await processOrderTiming(), true);
+      const [recovered] = await db.select().from(deliveriesTable).where(eq(deliveriesTable.id, delivery.id));
+      assert.equal(recovered.driverProfileId, null);
+      assert.equal(recovered.status, "unassigned");
+    } finally {
+      await db.update(ordersTable).set({ timingPolicy: original.timingPolicy }).where(eq(ordersTable.id, affected.id));
+      for (const order of [affected, healthy]) {
+        await api(`/orders/${order.id}/cancel`, ids.admin, "POST", { reason: "Close isolated invalid timing fixture" });
+      }
+    }
+  });
   await t.test("timeout policy snapshots, restaurant escalation, operator acknowledgement and recovery",async()=>{
     const path='/admin/order-timing',policy={reservationMinutes:20,restaurantResponseMinutes:2,driverAssignmentMinutes:2,driverPickupMinutes:2};
     assert.equal((await api(path,null)).status,401);assert.equal((await api(path,ids.customer,'PUT',{policy,reason:'Cannot configure owner timings'})).status,403);

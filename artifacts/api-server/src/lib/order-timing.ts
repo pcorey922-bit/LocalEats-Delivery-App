@@ -15,6 +15,7 @@ import {
 } from "@workspace/db";
 import { audit, notifyOrder, type Transaction } from "./commerce";
 import { databaseNow } from "./database-clock";
+import { logger } from "./logger";
 export const timingSchema = z
   .object({
     reservationMinutes: z.number().int().min(1).max(120),
@@ -165,13 +166,20 @@ export async function processOrderTiming() {
       .limit(1)
       .for("update", { of: ordersTable, skipLocked: true });
     if (!candidate) return false;
-    const order = candidate.order,
-      now = await databaseNow(tx),
-      policy = timingSchema.parse(order.timingPolicy);
+    const order = candidate.order;
+    const now = await databaseNow(tx);
+    const timing = timingSchema.safeParse(order.timingPolicy);
+    const reviewDelay = timing.success ? 60_000 : 15 * 60_000;
     await tx
       .update(ordersTable)
-      .set({ timingReviewAt: new Date(now.getTime() + 60000) })
+      .set({ timingReviewAt: new Date(now.getTime() + reviewDelay) })
       .where(eq(ordersTable.id, order.id));
+    if (!timing.success) {
+      // Leave custody and incidents alone until the saved policy is repaired.
+      logger.warn({ orderId: order.id }, "Order timing policy invalid; review deferred");
+      return true;
+    }
+    const policy = timing.data;
     const [payment] = await tx
       .select()
       .from(paymentsTable)

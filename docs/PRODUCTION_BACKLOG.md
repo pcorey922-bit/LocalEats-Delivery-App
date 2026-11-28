@@ -1,3 +1,26 @@
+# November 28 — Worker recovery and order timing isolation
+
+Payment webhook, financial operation and account provisioning claims now start
+their leases using the database clock after admission into the claim transaction.
+Delayed-claim regressions reproduced shortened leases in all three workers.
+Financial batches now wait for every started operation to settle before reporting
+a failure, so the worker cannot overlap a new batch or finish draining early.
+
+The order timing worker now defers a malformed saved policy for 15 minutes and
+logs the affected order ID. It preserves custody and incidents for that order,
+continues reviews for other orders, and resumes normal review after policy repair.
+The regression reproduced the worker exception, then verified custody preservation,
+continued restaurant escalation, and normal driver release after repair.
+
+The final local app/API suite passed 305 tests with one PostgreSQL-only test
+skipped. Shared library and API typechecks and the API build passed. Provider
+adapters used by the regression tests were simulated.
+
+Staging remains on `c07e200`. The next backend candidate is fault isolation
+between unpaid reservation expiry and timing reviews, which share a worker tick.
+Inject an expiry exception and verify that it cannot suppress an unrelated
+restaurant or dispatch escalation.
+
 # November 28 — Financial worker keeps unrelated checkout moving
 
 Orders with an active financial worker lease or a previously attempted transfer
@@ -10,7 +33,11 @@ Both regressions reproduced the stall with 100 blocked orders and one newer
 checkout. After the fix, the checkout completed and the blocked operations
 retained their states and attempt counts. The local app/API suite passed 298 tests
 with one PostgreSQL-only test skipped. Workspace and API typechecks passed.
-Payment execution was simulated. Staging remains on `c07e200`.
+Payment execution was simulated. All three GitHub Actions runs passed for
+`53ff279736ea11c5eacb7521a4501eff12187c9e`.
+[Push Validate](https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/46122844505)
+· [PR Validate](https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/46122848726)
+· [Native validation](https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/46122848747)
 
 # November 28 — Owner workspace release live on Render staging
 
