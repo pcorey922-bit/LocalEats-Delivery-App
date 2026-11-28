@@ -30,6 +30,17 @@ function fixture({
             webhookReady: true,
             workerReady: true,
             liveChargesEnabled: false,
+            testPayoutsEnabled: false,
+            webhookRetentionEnabled: false,
+            clientIpPolicy: "render-cdn-chain-v1",
+            clientIpSource: "render_cdn_chain",
+            deliveryAreaReady: true,
+            geographicDelivery: {
+              mode: "provisional_postal",
+              configurationReady: true,
+              municipalConfigurationReady: false,
+              municipalEnforcementEnabled: false,
+            },
             ...config,
           },
           { status: ready ? 200 : 503 },
@@ -75,6 +86,11 @@ test("release verifier reports exact deployment and checks website routes withou
   assert.equal(report.revision, expected);
   assert.equal(report.dependenciesReady, true);
   assert.deepEqual(report.missingConfiguration, []);
+  assert.deepEqual(report.unverifiedSafeguards, []);
+  assert.equal(report.readiness.testPayoutsEnabled, false);
+  assert.equal(report.readiness.webhookRetentionEnabled, false);
+  assert.equal(report.geographicDelivery.municipalEnforcementEnabled, false);
+  assert.equal(report.clientIdentity.source, "render_cdn_chain");
   assert.ok(
     f.requests.every(
       (r) =>
@@ -125,6 +141,7 @@ test("unknown revisions, absent or unsafe gates and failed dependencies never pa
     { gate: { privateTestOrderingEnabled: undefined } },
     { gate: { publicOrderingEnabled: true } },
     { config: { database: false } },
+    { config: { deliveryAreaReady: undefined } },
   ]) {
     const f = fixture(change);
     const report = await verifyStaging(
@@ -144,7 +161,7 @@ test("unknown revisions, absent or unsafe gates and failed dependencies never pa
   assert.equal(broken.dependenciesReady, false);
   assert.equal(broken.revision, null);
   assert.deepEqual(broken.missingConfiguration, []);
-  assert.equal(broken.unverifiedDependencies.length, 6);
+  assert.equal(broken.unverifiedDependencies.length, 7);
   assert.equal(JSON.stringify(broken).includes("DO_NOT_ECHO"), false);
 });
 test("private test-window verification requires a closed public gate and ready dependencies", async () => {
@@ -216,46 +233,80 @@ test("geographic misconfiguration fails readiness and reports only known setting
     "GEOCODIO_API_KEY",
   ]);
   assert.equal(JSON.stringify(report).includes("DO_NOT_ECHO"), false);
-  const old = await verifyStaging(
-    { origin, expectedRevision: expected },
-    fixture().fetcher,
-  );
-  assert.equal(old.verificationPassed, true);
-  assert.equal(old.geographicDelivery, null);
 });
 
-
-test('read-only verifier rejects open or malformed TEST payout gates and reports legacy status as unverified', async () => {
-  for (const testPayoutsEnabled of [true,'false']) {
-    const report=await verifyStaging({origin,expectedRevision:expected},fixture({config:{testPayoutsEnabled}}).fetcher);
-    assert.ok(report.failures.includes('dependency_health'));
+test("read-only verifier rejects open or malformed TEST payout gates", async () => {
+  for (const testPayoutsEnabled of [true, "false"]) {
+    const report = await verifyStaging(
+      { origin, expectedRevision: expected },
+      fixture({ config: { testPayoutsEnabled } }).fetcher,
+    );
+    assert.equal(report.verificationPassed, false);
+    assert.ok(report.failures.includes("dependency_health"));
   }
-  const closed=await verifyStaging({origin,expectedRevision:expected},fixture({config:{testPayoutsEnabled:false}}).fetcher);
-  assert.equal(closed.verificationPassed,true);assert.equal(closed.readiness.testPayoutsEnabled,false);
-  const legacy=await verifyStaging({origin,expectedRevision:expected},fixture().fetcher);
-  assert.equal(legacy.readiness.testPayoutsEnabled,null);
 });
 
-
-test('new proxy policy requires actual CDN identity evidence; legacy deployment is explicitly unverified',async()=>{
- for(const clientIpSource of ['socket','unknown',undefined]){
-  const report=await verifyStaging({origin,expectedRevision:expected},fixture({config:{clientIpPolicy:'render-cdn-chain-v1',clientIpSource}}).fetcher);
-  assert.equal(report.verificationPassed,false);assert.ok(report.failures.includes('dependency_health'));
- }
- const good=await verifyStaging({origin,expectedRevision:expected},fixture({config:{clientIpPolicy:'render-cdn-chain-v1',clientIpSource:'render_cdn_chain'}}).fetcher);
- assert.equal(good.verificationPassed,true);assert.equal(good.clientIdentity.source,'render_cdn_chain');
- const legacy=await verifyStaging({origin,expectedRevision:expected},fixture().fetcher);assert.equal(legacy.clientIdentity,null);
+test("proxy policy requires actual CDN identity evidence", async () => {
+  for (const clientIpSource of ["socket", "unknown"]) {
+    const report = await verifyStaging(
+      { origin, expectedRevision: expected },
+      fixture({ config: { clientIpSource } }).fetcher,
+    );
+    assert.equal(report.verificationPassed, false);
+    assert.ok(report.failures.includes("dependency_health"));
+  }
 });
 
+test("retention gate is explicit, strict and sanitized", async () => {
+  for (const webhookRetentionEnabled of [true, "false", "DO_NOT_ECHO"]) {
+    const report = await verifyStaging(
+      { origin, expectedRevision: expected },
+      fixture({ config: { webhookRetentionEnabled } }).fetcher,
+    );
+    assert.equal(report.verificationPassed, false);
+    assert.ok(report.failures.includes("dependency_health"));
+    assert.equal(JSON.stringify(report).includes("DO_NOT_ECHO"), false);
+  }
+});
 
-test('retention gate is explicit, strict and sanitized; absent legacy evidence is never reported as disabled',async()=>{
- for(const webhookRetentionEnabled of [true,'false','DO_NOT_ECHO']){
-  const report=await verifyStaging({origin,expectedRevision:expected},fixture({config:{webhookRetentionEnabled}}).fetcher);
-  assert.equal(report.verificationPassed,false);assert.ok(report.failures.includes('dependency_health'));assert.equal(JSON.stringify(report).includes('DO_NOT_ECHO'),false);
- }
- const closed=await verifyStaging({origin,expectedRevision:expected},fixture({config:{testPayoutsEnabled:false,webhookRetentionEnabled:false}}).fetcher);
- assert.equal(closed.verificationPassed,true);assert.equal(closed.readiness.webhookRetentionEnabled,false);assert.deepEqual(closed.unverifiedSafeguards,[]);
- const legacy=await verifyStaging({origin,expectedRevision:expected},fixture().fetcher);
- assert.equal(legacy.readiness.webhookRetentionEnabled,null);assert.ok(legacy.unverifiedSafeguards.includes('webhook_retention_gate'));
- assert.ok(legacy.unverifiedSafeguards.includes('test_payout_gate'));
+test("missing safeguards fail verification and remain explicitly unverified", async () => {
+  for (const [config, unverified] of [
+    [{ testPayoutsEnabled: undefined }, "test_payout_gate"],
+    [{ webhookRetentionEnabled: undefined }, "webhook_retention_gate"],
+    [{ geographicDelivery: undefined }, "municipal_enforcement_gate"],
+    [{ clientIpPolicy: undefined }, "client_ip_policy"],
+    [{ clientIpSource: undefined }, "client_ip_policy"],
+  ]) {
+    const report = await verifyStaging(
+      { origin, expectedRevision: expected },
+      fixture({ config }).fetcher,
+    );
+    assert.equal(report.verificationPassed, false, unverified);
+    assert.ok(report.failures.includes("dependency_health"));
+    assert.deepEqual(report.unverifiedSafeguards, [unverified]);
+    assert.ok(report.checks.some(({ path }) => path === "/operations"));
+  }
+});
+
+test("municipal enforcement must explicitly be off in both staging modes", async () => {
+  for (const privateTestWindow of [false, true]) {
+    for (const municipalEnforcementEnabled of [true, "false", undefined]) {
+      const report = await verifyStaging(
+        { origin, expectedRevision: expected, privateTestWindow },
+        fixture({
+          config: { geographicDelivery: { municipalEnforcementEnabled } },
+          gate: {
+            orderingEnabled: privateTestWindow,
+            privateTestOrderingEnabled: privateTestWindow,
+          },
+        }).fetcher,
+      );
+      assert.equal(report.verificationPassed, false);
+      assert.ok(report.failures.includes("dependency_health"));
+      assert.equal(
+        report.geographicDelivery.municipalEnforcementEnabled,
+        municipalEnforcementEnabled === true ? true : null,
+      );
+    }
+  }
 });

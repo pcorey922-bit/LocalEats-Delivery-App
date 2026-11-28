@@ -69,15 +69,13 @@ export async function verifyStaging(
   await check("dependency_health", async () => {
     readiness = await (await request("/readyz", [200, 503])).json();
     assert.equal(readiness.liveChargesEnabled, false);
-    if (Object.hasOwn(readiness, "clientIpPolicy")) {
-      assert.equal(readiness.clientIpPolicy, "render-cdn-chain-v1");
-      assert.equal(readiness.clientIpSource, "render_cdn_chain");
-    }
-    if (Object.hasOwn(readiness, "testPayoutsEnabled")) assert.equal(readiness.testPayoutsEnabled, false);
-    if (Object.hasOwn(readiness, "webhookRetentionEnabled")) assert.equal(readiness.webhookRetentionEnabled, false);
+    assert.equal(readiness.clientIpPolicy, "render-cdn-chain-v1");
+    assert.equal(readiness.clientIpSource, "render_cdn_chain");
+    assert.equal(readiness.testPayoutsEnabled, false);
+    assert.equal(readiness.webhookRetentionEnabled, false);
+    assert.equal(readiness.geographicDelivery?.municipalEnforcementEnabled, false);
     assert.equal(readiness.database, true);
-    if (Object.hasOwn(readiness, "deliveryAreaReady"))
-      assert.equal(readiness.deliveryAreaReady, true);
+    assert.equal(readiness.deliveryAreaReady, true);
     if (privateTestWindow) assert.equal(readiness.ready, true);
   });
   await check("private_staging_and_ordering_gates", async () => {
@@ -189,9 +187,7 @@ export async function verifyStaging(
     providerConfigured: "stripe_test_provider_configuration",
     webhookReady: "stripe_webhook_signing_configuration",
     workerReady: "background_worker_health",
-    ...(Object.hasOwn(readiness ?? {}, "deliveryAreaReady")
-      ? { deliveryAreaReady: "geographic_delivery_configuration" }
-      : {}),
+    deliveryAreaReady: "geographic_delivery_configuration",
   };
   const missingConfiguration = Object.entries(requirements)
     .filter(([key]) => readiness?.[key] === false)
@@ -227,9 +223,20 @@ export async function verifyStaging(
       ].map((key) => [key, bool(readiness?.[key])]),
     ),
     unverifiedSafeguards: [
-      ['testPayoutsEnabled','test_payout_gate'],
-      ['webhookRetentionEnabled','webhook_retention_gate'],
-    ].filter(([key])=>typeof readiness?.[key]!=='boolean').map(([,name])=>name),
+      [typeof readiness?.testPayoutsEnabled === "boolean", "test_payout_gate"],
+      [typeof readiness?.webhookRetentionEnabled === "boolean", "webhook_retention_gate"],
+      [
+        typeof readiness?.geographicDelivery?.municipalEnforcementEnabled === "boolean",
+        "municipal_enforcement_gate",
+      ],
+      [
+        typeof readiness?.clientIpPolicy === "string" &&
+          typeof readiness?.clientIpSource === "string",
+        "client_ip_policy",
+      ],
+    ]
+      .filter(([observed]) => !observed)
+      .map(([, name]) => name),
     clientIdentity: readiness?.clientIpPolicy ? {
       policy: readiness.clientIpPolicy === 'render-cdn-chain-v1' ? readiness.clientIpPolicy : null,
       source: ['render_cdn_chain','socket'].includes(readiness.clientIpSource) ? readiness.clientIpSource : null,

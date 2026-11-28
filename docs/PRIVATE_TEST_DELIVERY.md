@@ -484,8 +484,10 @@ change existing credentials, or enable ordering as part of this release.
 
    Require `verificationPassed: true`, `revisionMatches: true`,
    `dependenciesReady: true`, and empty `missingConfiguration`,
-   `unverifiedDependencies`, and `failures` arrays. The verifier uses only GET and
-   OPTIONS requests. A wrong release still reports the observed SHA and all
+   `unverifiedDependencies`, `unverifiedSafeguards`, and `failures` arrays. The
+   report must confirm Render CDN client identity and explicit closure of TEST
+   payouts, webhook retention and municipal enforcement. The verifier uses only
+   GET and OPTIONS requests. A wrong release still reports the observed SHA and all
    independent checks. Missing configuration is distinct from unavailable health
    evidence. Reports contain no keys, cookies, guest capabilities or provider
    payloads. HTTP 200 for a website route verifies its HTML shell, not a Clerk

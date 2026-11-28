@@ -12,6 +12,14 @@ Authenticated owner acceptance of the workspace on Samsung remains open.
 FCM validation requires separate authorization. Signed iOS device and provider
 receipt acceptance remain open.
 
+The read-only release verifier now requires explicit evidence that TEST payouts,
+webhook retention and municipal enforcement are off. It also requires verified
+Render CDN client identity and geographic configuration readiness. Missing or
+malformed safeguard responses fail verification while the report still records
+the other checks. Both new regressions failed before the fix. All 37 release
+preflight tests passed, and the hardened verifier passed all 23 staging HTTP
+checks against the same deployed SHA.
+
 # November 28 — Owner navigation with real records and full delivery acceptance
 
 Follow-up regression with an owner-managed driver and a pending TEST payout reproduced
