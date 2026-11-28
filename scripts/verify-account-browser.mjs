@@ -137,6 +137,57 @@ try {
     args: ["--no-sandbox"],
   });
   const origin = "http://127.0.0.1:" + server.address().port;
+  // Isolated real owner pages: all authentication, records and diagnostics are mocked.
+  const owner = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const ownerErrors=[];owner.on('pageerror',error=>ownerErrors.push(error.message));
+  await owner.goto(origin+'/?owner=true');
+  await owner.getByRole('heading',{name:'Manage your operations.',exact:true}).waitFor();
+  const shortcuts=owner.getByRole('navigation',{name:'Business management'});
+  assert.deepEqual(await shortcuts.locator('a').evaluateAll(links=>links.map(link=>link.getAttribute('href'))),['/operations#orders','/admin?tab=restaurants','/operations#drivers','/operations#dispatch','/operations#payments','/operations#system','/notifications','/operations#support']);
+  await owner.getByText('Credentials locally valid; provider delivery unverified',{exact:true}).waitFor();
+  for(const heading of ['Provider push sending','Test payouts','Processed checkout payload retention']) {
+    const card=owner.locator('.roco-readiness-card').filter({has:owner.getByRole('heading',{name:heading,exact:true})});
+    assert.equal(await card.locator('strong').innerText(),'Disabled');
+  }
+  await owner.evaluate(()=>{window.qaOwnerHealth.testPayoutsEnabled=undefined;window.qaOwnerHealth.webhookRetentionEnabled=undefined;window.qaOwnerHealth.pushConfiguration={android:false,ios:false};});
+  await owner.getByRole('button',{name:'Refresh service status',exact:true}).click();
+  await owner.getByText('Not reported — check required',{exact:true}).first().waitFor();
+  assert.equal(await owner.getByText('Not reported — check required',{exact:true}).count(),3);
+  await owner.evaluate(()=>{window.qaOwnerHealth.testPayoutsEnabled=false;window.qaOwnerHealth.webhookRetentionEnabled=false;window.qaOwnerHealth.pushConfiguration={android:true,ios:false,deliveryEnabled:false,androidCredentialStatus:'locally_valid'};});
+  await owner.getByRole('button',{name:'Refresh service status',exact:true}).click();
+  await owner.getByText('Credentials locally valid; provider delivery unverified',{exact:true}).waitFor();
+  assert.equal(await owner.locator('.roco-owner-details').first().getAttribute('open'),null);
+  await owner.getByText('Owner-only notification verification',{exact:true}).click();
+  assert.equal(await owner.getByRole('button',{name:'Verify Google OAuth only',exact:true}).isDisabled(),true);
+  assert.equal(await owner.getByRole('button',{name:'Validate FCM permission only',exact:true}).isDisabled(),true);
+  await owner.getByRole('button',{name:'Refresh FCM validation status',exact:true}).click();
+  assert.deepEqual(await owner.evaluate(()=>[window.qaOwnerWrites,window.qaOAuthCalls,window.qaFcmValidationCalls]),[[],0,0]);
+  await owner.getByText('Owner-only notification verification',{exact:true}).click();
+  await shortcuts.getByRole('link',{name:'Manage Orders'}).click();
+  await owner.getByRole('heading',{name:'Manage Orders',exact:true}).waitFor();
+  assert.equal(await owner.evaluate(()=>location.hash),'#orders');
+    await owner.waitForFunction(()=>Math.abs(document.getElementById('orders')?.getBoundingClientRect().top ?? Infinity)<100,{},{timeout:5000});
+  await owner.evaluate(()=>scrollTo(0,0));
+  assert.equal(await owner.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await owner.screenshot({path:target+'/owner-operations-mobile.png',fullPage:true});
+  await owner.locator('#system').screenshot({path:target+'/owner-system-mobile.png'});
+  await shortcuts.getByRole('link',{name:'Manage Restaurants'}).click();
+  await owner.getByRole('heading',{name:'No restaurant profiles to review',exact:true}).waitFor();
+  assert.equal(await owner.getByRole('link',{name:'Restaurants',exact:true}).getAttribute('aria-current'),'page');
+  await owner.getByRole('navigation',{name:'Administrator records'}).getByRole('link',{name:'Financial summary'}).click();
+  await owner.getByRole('heading',{name:'Payment provider',exact:true}).waitFor();
+  await owner.goBack();await owner.getByRole('heading',{name:'No restaurant profiles to review',exact:true}).waitFor();
+  for(const width of [320,390,768,1440]) {
+    await owner.setViewportSize({width,height:900});
+    assert.equal(await owner.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`Owner dashboard overflow at ${width}`);
+    assert.ok(await owner.locator('.roco-owner-tabs .roco-button').first().evaluate(el=>el.getBoundingClientRect().height>=44));
+    await owner.screenshot({path:target+`/owner-dashboard-${width}.png`,fullPage:true});
+  }
+  assert.deepEqual(ownerErrors,[]);await owner.close();
+  const deniedOwner=await browser.newPage();await deniedOwner.goto(origin+'/?owner=true&denied=true');await deniedOwner.getByRole('heading',{name:'Administrator access required'}).waitFor();assert.deepEqual(await deniedOwner.evaluate(()=>window.qaOwnerReads.filter(path=>path.startsWith('/api/admin/'))),[]);await deniedOwner.close();
+  const failedOwner=await browser.newPage();await failedOwner.goto(origin+'/?owner=true&accountError=true');await failedOwner.getByRole('heading',{name:'Operations could not load'}).waitFor();await failedOwner.getByRole('button',{name:'Try again',exact:true}).waitFor();assert.equal(await failedOwner.getByRole('navigation',{name:'Business management'}).count(),0);await failedOwner.close();
+  console.log('Owner workspace PASS: direct management links, query/back navigation, denied/error access states, closed-gate cards, no automatic diagnostics/writes and responsive 320/390/768/1440 layouts (simulated API). Visuals: '+target);
+  if(process.env.ACCOUNT_BROWSER_SUITE !== 'owner') {
   const cspPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await cspPage.addInitScript(() => { window.cspStartupViolations = []; document.addEventListener('securitypolicyviolation', event => window.cspStartupViolations.push(event.effectiveDirective)); });
   await cspPage.goto(origin + '/?checkoutCsp=true');
@@ -964,6 +1015,7 @@ try {
   console.log(
     "390x844 real component QA PASS: owner/driver links, mismatch recovery, strict profile payload, owner grant/revoke controls, security delegation, no horizontal overflow. Authentication/API simulated.",
   );
+  }
 } catch (error) {
   for (const context of browser?.contexts() ?? []) for (const page of context.pages()) console.error("Failed account fixture", page.url(), await page.locator("body").innerText());
   throw error;

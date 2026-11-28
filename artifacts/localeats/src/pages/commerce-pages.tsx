@@ -1,3 +1,4 @@
+import { OwnerWorkspaceLinks, useOwnerAnchor } from '../components/owner-workspace-links';
 import { PushPreferences } from './push-preferences';
 import { useAccountProfile } from '../hooks/use-account-profile';
 import { TelephoneDispatch } from "./telephone-dispatch";
@@ -430,6 +431,7 @@ export function OperationsCommerce() {
   const profile = useAccountProfile();
   const client = useQueryClient();
   const enabled = profile.data?.role === "admin";
+  useOwnerAnchor(enabled);
   const config = useCommerce();
   const orders = useQuery({
     queryKey: getListMyOrdersQueryKey(),
@@ -486,6 +488,8 @@ export function OperationsCommerce() {
     },
     onError: (e) => setError(e.message),
   });
+  if (profile.isLoading) return <main className="roco-main roco-owner"><p role="status">Checking administrator access…</p></main>;
+  if (profile.isError) return <main className="roco-main roco-owner"><h1>Operations could not load</h1><p role="alert">Your account access could not be checked. No management action has been performed.</p><button className="roco-button" onClick={() => void profile.refetch()}>Try again</button><Link href="/account/access">Check account access</Link></main>;
   if (!enabled)
     return (
       <main className="roco-main">
@@ -494,15 +498,10 @@ export function OperationsCommerce() {
       </main>
     );
   return (
-    <main className="roco-main">
-      <DriverApplicationReviews />
-      <AdminSupport />
-      <Link href="/admin">← Operations overview</Link>
-      <h1>Test order operations</h1>
-      <PaymentSetupChecks />
-      <GeocodioPublicTest />
-      <GuestTestInvitation />
-      <TelephoneDispatch />
+    <main className="roco-main roco-owner">
+      <Link className="roco-button secondary" href="/admin">← Business dashboard</Link>
+      <header className="roco-owner-intro"><p className="roco-kicker">Protected staging workspace</p><h1 className="roco-title">Manage your operations.</h1><p>Check deliveries, support and system readiness. TEST mode and all existing approval requirements still apply.</p></header>
+      <OwnerWorkspaceLinks />
       <CommerceBanner />
       {error && (
         <p role="alert" className="roco-alert">
@@ -513,13 +512,10 @@ export function OperationsCommerce() {
       <ErrorText error={payouts.error} />
       <ErrorText error={refunds.error} />
       <ErrorText error={drivers.error} />
-      <FinancialOperations />
-      <OperationalConsole />
-      <LedgerReport />
-      <DispatchOperations />
-      <OrderIncidentConsole />
-      <FinancialHoldConsole />
-      <h2>Driver approval</h2>
+      <section className="roco-owner-section" id="system" aria-labelledby="system-heading"><h2 id="system-heading">System Operations</h2><p>Read the latest results before choosing a diagnostic. Provider checks still require separate approval.</p><OperationalConsole /><details className="roco-owner-details"><summary>Payment setup, delivery-area checks and guest test access</summary><PaymentSetupChecks /><GeocodioPublicTest /><GuestTestInvitation /></details></section>
+      <section className="roco-owner-section" id="dispatch" aria-labelledby="dispatch-heading"><h2 id="dispatch-heading">Dispatch &amp; delivery map</h2><DispatchOperations /><TelephoneDispatch /><OrderIncidentConsole /></section>
+      <section className="roco-owner-section" id="drivers" aria-labelledby="drivers-heading"><h2 id="drivers-heading">Manage Drivers</h2><DriverApplicationReviews />
+      <h3>Driver approval</h3>
       {drivers.data?.map((d) => (
         <article className="roco-card" key={d.id}>
           <strong>{d.displayName}</strong>
@@ -545,7 +541,9 @@ export function OperationsCommerce() {
           </button>
         </article>
       ))}
-      <h2>Orders and full refunds</h2>
+      </section>
+      <section className="roco-owner-section" id="orders" aria-labelledby="orders-heading"><h2 id="orders-heading">Manage Orders</h2><p>Review each order before using its existing delivery, cancellation or refund controls.</p>
+      {orders.data?.length === 0 && <p>No orders to display.</p>}
       {orders.data?.map((o) => (
         <article className="roco-card" key={o.id}>
           <h3>
@@ -561,7 +559,9 @@ export function OperationsCommerce() {
           )}
         </article>
       ))}
-      <h2>Refund requests</h2>
+      </section>
+      <section className="roco-owner-section" id="payments" aria-labelledby="payments-heading"><h2 id="payments-heading">Payments and Earnings</h2><p>TEST funds only. Reviewing records does not initiate a refund, transfer or reconciliation.</p><LedgerReport /><FinancialOperations /><FinancialHoldConsole />
+      <h3>Refund requests</h3>
       {refunds.data?.map((r) => (
         <article className="roco-card" key={r.id}>
           <p>
@@ -583,7 +583,7 @@ export function OperationsCommerce() {
           )}
         </article>
       ))}
-      <h2>Settlement queue</h2>
+      <h3>Earnings awaiting settlement</h3>
       {config.data?.testPayoutsEnabled !== true && <p role="status">Test payouts are disabled. Earnings remain recorded; no transfers can be started.</p>}
       {payouts.data?.map((p) => (
         <article className="roco-card" key={p.id}>
@@ -608,7 +608,8 @@ export function OperationsCommerce() {
           )}
         </article>
       ))}
-      <PricingSettings current={config.data?.pricing ?? null} />
+      <details className="roco-owner-details"><summary>Pricing settings</summary><PricingSettings current={config.data?.pricing ?? null} /></details></section>
+      <section className="roco-owner-section" id="support" aria-labelledby="support-heading"><h2 id="support-heading">Customer Support</h2><AdminSupport /></section>
     </main>
   );
 }

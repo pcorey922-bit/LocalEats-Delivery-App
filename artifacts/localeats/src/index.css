@@ -554,3 +554,51 @@ body { background:var(--roco-bg); color:var(--roco-ink); }
 .roco-information { max-width:760px; line-height:1.7; }
 .roco-information li { margin-block:12px; }
 .roco-information h2 { margin-top:24px; }
+
+/* Readable owner workspaces. Keep the approved public homepage unchanged. */
+.roco-owner { font-size:16px;line-height:1.6; }
+.roco-owner :is(p,.roco-subtitle,.roco-card p,.roco-notice,.roco-alert,.roco-empty p) { font-size:16px;line-height:1.65; }
+.roco-owner .roco-meta { font-size:12px;letter-spacing:0;text-transform:none;overflow-wrap:anywhere; }
+.roco-owner :is(.roco-input,.roco-select,.roco-textarea) { font-size:16px; }
+.roco-owner h2 { font-size:clamp(25px,3vw,32px);line-height:1.25;margin:0 0 16px; }
+.roco-owner h3 { font-size:22px;line-height:1.35; }
+.roco-owner .roco-button { min-height:48px;padding:10px 18px;font-size:15px;white-space:normal;text-align:center; }
+.roco-owner .roco-button:not(.danger) { background:var(--roco-amber);border-color:var(--roco-amber);color:#172235; }
+.roco-owner .roco-button.primary { min-height:54px;font-size:17px;padding-inline:24px; }
+.roco-owner .roco-button.secondary { min-height:44px;font-size:14px;padding:8px 14px; }
+.roco-owner :is(a,button,summary):focus-visible { outline:3px solid var(--roco-amber);outline-offset:4px; }
+.roco-owner-intro { margin:28px 0;max-width:760px; }
+.roco-owner-links { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:24px 0 36px; }
+.roco-owner-links a { display:flex;flex-direction:column;justify-content:space-between;gap:10px;min-height:116px;padding:18px;border:1px solid var(--roco-line);border-radius:12px;background:var(--roco-panel);text-decoration:none; }
+.roco-owner-links strong { color:var(--roco-amber);font-size:17px;line-height:1.35; }
+.roco-owner-links span { color:var(--roco-soft);font-size:14px;line-height:1.5; }
+.roco-owner-links a:hover { border-color:var(--roco-amber);background:var(--roco-panel2); }
+.roco-owner-tabs { display:flex;flex-wrap:wrap;gap:10px;margin:24px 0; }
+.roco-owner-tabs [aria-current="page"] { outline:2px solid var(--roco-ink);outline-offset:3px; }
+.roco-owner-section { scroll-margin-top:20px;padding:28px 0;border-top:1px solid var(--roco-line); }
+.roco-owner-section > .roco-card { margin-block:16px; }
+.roco-owner .roco-card :is(p,strong,summary,td) { overflow-wrap:anywhere; }
+.roco-readiness-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:20px 0; }
+.roco-readiness-card { padding:18px;border:1px solid var(--roco-line);border-radius:12px;background:var(--roco-panel2); }
+.roco-owner .roco-readiness-card h3 { color:var(--roco-soft);font:600 15px/1.4 var(--app-font-sans);margin:0 0 12px; }
+.roco-readiness-card > strong { display:block;font-size:19px;line-height:1.4;margin-bottom:10px;color:var(--roco-amber); }
+.roco-readiness-card[data-state="protected"] > strong { color:#9ee0bd; }
+.roco-owner .roco-readiness-card p { margin:0;font-size:14px; }
+.roco-owner-details { border:1px solid var(--roco-line);border-radius:10px;padding:8px 16px;margin:16px 0; }
+.roco-owner-details > summary { min-height:48px;align-content:center;font-weight:700;font-size:17px;cursor:pointer;color:var(--roco-ink); }
+.roco-owner-details[open] > summary { margin-bottom:16px; }
+.roco-owner details details { margin-block:12px; }
+.roco-owner table { width:100%;font-size:14px;text-align:left; }
+.roco-owner :is(td,th) { padding:12px;vertical-align:top; }
+.roco-owner form .roco-button { margin:8px 8px 8px 0; }
+@media (max-width:900px) { .roco-owner-links,.roco-readiness-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:520px) {
+ .roco-owner-links { gap:10px; }
+ .roco-owner-links a { padding:14px;min-height:140px; }
+ .roco-readiness-grid { grid-template-columns:minmax(0,1fr); }
+ .roco-owner .roco-card { padding:16px; }
+ .roco-owner .roco-row { flex-wrap:wrap; }
+ .roco-owner-details { padding:8px 12px; }
+ .roco-owner .roco-kicker { font-size:12px; }
+}
+.roco-owner .roco-stat span { font-size:14px;letter-spacing:0;text-transform:none; }

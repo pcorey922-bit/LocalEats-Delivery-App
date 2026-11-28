@@ -11,7 +11,7 @@ import { NextGuestOrder } from "../src/pages/next-guest-order";
 import { TelephoneDispatch } from "../src/pages/telephone-dispatch";
 import { RestaurantConfirmation } from "../src/pages/restaurant-confirmation";
 import { GuestCheckoutAccess } from "../src/pages/guest-order";
-import { CartPage } from "../src/pages/roco-pages";
+import { CartPage, AdminPage } from "../src/pages/roco-pages";
 // Isolated component fixture: simulated auth/API only; never a production route.
 import React from "react";
 import { createRoot } from "react-dom/client";
@@ -20,7 +20,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AccountAccess } from "../src/pages/account-access";
 import { AccountSettings } from "../src/pages/account-settings";
 import { AdministratorAccessManager } from "../src/pages/administrator-access";
-import { CheckoutPanel, PricingSettings } from "../src/pages/commerce-pages";
+import { CheckoutPanel, PricingSettings, OperationsCommerce } from "../src/pages/commerce-pages";
 import { PaymentSetupChecks } from "../src/pages/payment-setup";
 import { OrderTracking } from "../src/pages/delivery-tracking";
 import { DeclinedOffers } from "../src/pages/declined-offers";
@@ -58,6 +58,9 @@ declare global {
     qaGeoReady: boolean;
     qaGeoCalls: number;
     qaOAuthCalls: number;
+    qaOwnerWrites: string[];
+    qaOwnerReads: string[];
+    qaOwnerHealth: Record<string,unknown>;
     qaSupportCases: Record<string,unknown>[];
     qaSupportMessages: Record<string,unknown>[];
     qaSupportWrites: Record<string,unknown>[];
@@ -166,7 +169,29 @@ window.qaStaff = {
   isActive: true,
   accessVersion: "v1",
 };
+const ownerFixture = location.search.includes('owner=true') || sessionStorage.getItem('qa-owner-fixture') === 'true';
+if (ownerFixture) sessionStorage.setItem('qa-owner-fixture', 'true');
+window.qaOwnerWrites=[];window.qaOwnerReads=[];
+window.qaOwnerHealth={financial:[],webhooks:[],provisioning:[],pushDeliveries:[],workers:[],pushConfiguration:{android:true,ios:false,deliveryEnabled:false,androidCredentialStatus:'locally_valid'},testPayoutsEnabled:false,webhookRetentionEnabled:false,observedAt:new Date().toISOString()};
 window.fetch = async (url, options = {}) => {
+  if(ownerFixture){
+    const path=String(url);
+    if(options.method && !['GET','HEAD'].includes(options.method)){window.qaOwnerWrites.push(path);throw new Error('Unexpected owner fixture mutation');}
+    window.qaOwnerReads.push(path);
+    if(path==='/api/profiles/me'){
+      await new Promise(resolve=>setTimeout(resolve,100));
+      if(location.search.includes('accountError=true'))return Response.json({error:'Simulated account unavailable'},{status:503});
+      return Response.json({id:'owner-fixture',displayName:'Example owner',role:location.search.includes('denied=true')?'customer':'admin',isActive:true,createdAt:new Date().toISOString()});
+    }
+    if(path==='/api/admin/overview')return Response.json({totalProfiles:4,totalCustomers:1,totalRestaurants:1,pendingRestaurants:0,approvedRestaurants:1,suspendedRestaurants:0,totalOrders:1,activeOrders:0,completedOrders:1,pendingPayments:0});
+    if(path==='/api/admin/finance')return Response.json({paymentProviderConnected:true,succeededPaymentCount:1,succeededPaymentCents:1919,pendingPaymentCount:0,pendingPaymentCents:0,refundedPaymentCount:0,refundedPaymentCents:0,paidOutCents:0,pendingPayoutCents:0,failedPayoutCount:0});
+    if(path==='/api/admin/operational-health')return Response.json(window.qaOwnerHealth);
+    if(path==='/api/admin/dispatch')return Response.json({orders:[],drivers:[],mapConfig:null});
+    if(path.startsWith('/api/admin/ledger?'))return Response.json({balanced:true,currency:'USD',notice:'Simulated TEST records only',missingPaymentBaselines:'0',nextCursor:null,balances:[],journals:[]});
+    if(path==='/api/admin/order-timing')return Response.json({reservationMinutes:10,restaurantResponseMinutes:10,driverAssignmentMinutes:10,driverPickupMinutes:10});
+    if(['/api/orders/me','/api/admin/restaurants','/api/admin/profiles','/api/admin/payouts','/api/admin/refunds','/api/admin/drivers','/api/admin/driver-applications','/api/admin/financial-operations','/api/admin/financial-holds','/api/admin/order-incidents','/api/admin/telephone-orders'].includes(path)||path.startsWith('/api/admin/webhook-inbox?')||path.startsWith('/api/admin/push-deliveries?'))return Response.json([]);
+  }
+
   const supportUrl=String(url),messagePath=supportUrl.match(/^\/api\/support\/cases\/([^/]+)\/messages/),decisionPath=supportUrl.match(/^\/api\/admin\/support\/cases\/([^/]+)$/);
   if(supportUrl==='/api/support/cases'||supportUrl==='/api/admin/support/cases'){
     if(options.method==='POST'){
@@ -502,7 +527,7 @@ createRoot(document.getElementById("root")!).render(
     client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
   >
     <p>SIMULATED authentication and API: component QA only</p>
-    {location.search.includes('supportDesk=true') ? <SupportDesk/> : location.search.includes('supportAdmin=true') ? <AdminSupport/> : location.search.includes('fcmValidation=true') ? <FcmPermissionValidation/> : location.search.includes('firebaseOAuth=true') ? <FirebaseOAuthDiagnostic/> : location.search.includes('checkoutCsp=true') ? <CheckoutPanel orderId="fixture-csp"/> : location.search.includes('reconciliation=true') ? <PaymentReconciliation orderId="fixture-reconciliation"/> : location.search.includes('cartSync=true') ? <React.StrictMode><CartProbe name="menu"/><CartProbe name="checkout"/></React.StrictMode> : location.search.includes("native=true") ? (
+    {ownerFixture ? (location.pathname === '/admin' ? <AdminPage/> : <OperationsCommerce/>) : location.search.includes('supportDesk=true') ? <SupportDesk/> : location.search.includes('supportAdmin=true') ? <AdminSupport/> : location.search.includes('fcmValidation=true') ? <FcmPermissionValidation/> : location.search.includes('firebaseOAuth=true') ? <FirebaseOAuthDiagnostic/> : location.search.includes('checkoutCsp=true') ? <CheckoutPanel orderId="fixture-csp"/> : location.search.includes('reconciliation=true') ? <PaymentReconciliation orderId="fixture-reconciliation"/> : location.search.includes('cartSync=true') ? <React.StrictMode><CartProbe name="menu"/><CartProbe name="checkout"/></React.StrictMode> : location.search.includes("native=true") ? (
       <NativeStartupBoundary enabled><NativeSignIn role={location.search.includes("join=restaurant") ? "restaurant" : undefined} /></NativeStartupBoundary>
     ) : location.search.includes("importGuest=true") ? (
       <ImportGuestLink />

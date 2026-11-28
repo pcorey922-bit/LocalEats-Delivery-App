@@ -1,3 +1,38 @@
+# November 28 — Owner workspace usability verified; support recovery CI passed
+
+Support recovery commit 32149c44b51e5ea6ba5e59b12bdcc9ba3ad4b02e is pushed.
+All three exact-SHA CI workflows SUCCESS: 46117370108, 46117370086, 46117366337.
+Recovered support authorization/timeout/retry work is complete, not an open task.
+API evidence remains 295 passed / one PostgreSQL-only local skip; CI also ran the
+repository's PostgreSQL/native validation. No provider acceptance inferred.
+
+Owner experience: readable navy/gold dashboard with eight real management shortcuts;
+restaurant/account/finance tabs support direct URLs and browser Back. Operations now
+has named System, Dispatch, Drivers, Orders, Payments and Support sections. Larger
+text, gold ordinary actions, distinct primary/secondary sizes and 44px+ touch targets
+are scoped to owner pages; approved homepage unchanged. Protected settings have separate
+status cards. Missing values explicitly need review, never imply disabled/passed.
+Read-only service refresh added. Technical queues/recovery and provider diagnostics
+are expandable; original reasons, warnings, consents and disabled gates preserved.
+Account loading/errors no longer masquerade as an administrator access denial.
+
+Validation: frontend types and production build PASS; focused owner browser PASS at
+320/390/768/1440px and full existing account/customer/support/native-session/diagnostic
+browser suite PASS. Tests use isolated mocked API/auth/provider responses, not real
+Google/FCM or hosted account acceptance. Mobile screenshots visually inspected. Direct
+orders anchor navigation waits for account hydration; missing flags, denied/error
+roles, Back navigation, untouched consent and zero automatic writes/provider requests
+covered. New exact-source CI pending push; check conclusions, do not assume success.
+
+No deployment, migration, environment/credential change, financial operation, provider
+execution, APK rebuild, or Driver GPS/90-second change. Hosted release remains e265270.
+Deployment of both web/backend changes needs separate owner approval; no new variables.
+Next technical acceptance: authorized staging owner verifies the new navigation/status
+layout after approved deployment, then separately approved one-shot FCM validate_only
+execution (fresh OAuth + validation call; no delivery). Signed physical iOS/provider
+receipt and production hosting/recovery acceptance remain external. Do not invent
+another feature or rerun accepted GPS/customer checks while awaiting those boundaries.
+
 # November 28 — Recovered support timeout and retry work verified
 
 Recovered six unfinished files without resets; originals retained in the session backup.
