@@ -23,7 +23,9 @@ import {
   and,
   asc,
   eq,
+  gt,
   inArray,
+  isNotNull,
   lte,
   or,
   sql,
@@ -399,6 +401,7 @@ export async function requestProviderCancellation(
 
 async function claimOperation(): Promise<FinancialOperation | null> {
   const now = await databaseNow();
+  const payoutsEnabled = testPayoutsEnabled();
   const blocked = alias(operations, "blocked_operations");
   const heldRunning = alias(operations, "held_running_operations");
   const candidates = await db
@@ -407,7 +410,7 @@ async function claimOperation(): Promise<FinancialOperation | null> {
     .where(
       and(
         inArray(operations.state, ["queued", "processing", "pending"]),
-        testPayoutsEnabled() ? undefined : ne(operations.kind, "transfer"),
+        payoutsEnabled ? undefined : ne(operations.kind, "transfer"),
         lte(operations.nextAttemptAt, sql`clock_timestamp()`),
         notExists(
           db
@@ -450,6 +453,8 @@ async function claimOperation(): Promise<FinancialOperation | null> {
               ),
           ),
         ),
+        // Due sibling jobs must not fill the batch for orders whose current
+        // operation prevents a claim. Recheck these rules under the order lock.
         notExists(
           db
             .select({ id: blocked.id })
@@ -457,7 +462,20 @@ async function claimOperation(): Promise<FinancialOperation | null> {
             .where(
               and(
                 eq(blocked.orderId, operations.orderId),
-                eq(blocked.state, "reconciliation"),
+                or(
+                  eq(blocked.state, "reconciliation"),
+                  and(
+                    eq(blocked.state, "processing"),
+                    gt(blocked.leaseExpiresAt, sql`clock_timestamp()`),
+                  ),
+                  payoutsEnabled
+                    ? undefined
+                    : and(
+                        eq(blocked.kind, "transfer"),
+                        isNotNull(blocked.firstAttemptAt),
+                        inArray(blocked.state, ["queued", "processing", "pending"]),
+                      ),
+                ),
               ),
             ),
         ),

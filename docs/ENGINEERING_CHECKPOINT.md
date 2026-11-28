@@ -1,3 +1,17 @@
+# November 28 — Financial worker keeps unrelated checkout moving
+
+Orders with an active financial worker lease or a previously attempted transfer
+blocked by the TEST payout gate could fill the 100-order candidate batch when
+each also had due work. The worker now excludes those orders before applying the
+batch limit. The transaction still checks each claimed order under lock. Expired
+lease recovery and the payout gate retain their existing behavior.
+
+Both regressions reproduced the stall with 100 blocked orders and one newer
+checkout. After the fix, the checkout completed and the blocked operations
+retained their states and attempt counts. The local app/API suite passed 298 tests
+with one PostgreSQL-only test skipped. Workspace and API typechecks passed.
+Payment execution was simulated. Staging remains on `c07e200`.
+
 # November 28 — Owner workspace release live on Render staging
 
 The owner manually deployed `c07e20053b35a663155d969a27b98dc6999e852e` to the

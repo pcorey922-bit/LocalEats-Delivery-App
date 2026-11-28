@@ -2978,6 +2978,74 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     },
   );
   await t.test(
+    "blocked financial orders cannot fill the candidate batch ahead of executable checkout",
+    async (t) => {
+      for (const blocker of ["active lease", "disabled attempted transfer"] as const) {
+        await t.test(blocker, async () => {
+          const order = await create();
+          const [template] = await db.select().from(ordersTable).where(eq(ordersTable.id, order.id));
+          const blockedIds = Array.from({ length: 100 }, () => randomUUID());
+          const oldest = new Date(1);
+          const leaseExpiry = new Date(Date.now() + 60_000);
+          const activeLease = blocker === "active lease";
+          await db.insert(ordersTable).values(blockedIds.map((id) => ({
+            ...template, id, requestKey: null, requestHash: null, createdAt: oldest,
+          })));
+          await db.insert(financialOperationsTable).values(blockedIds.flatMap((id) => [
+            {
+              id: `blocker:${id}`, orderId: id, resourceId: id,
+              kind: activeLease ? "expire_checkout" : "transfer",
+              state: activeLease ? "processing" : "queued",
+              provider: "stripe_test", payload: {}, attempts: 1, firstAttemptAt: oldest, createdAt: oldest,
+              leaseToken: activeLease ? randomUUID() : null,
+              leaseExpiresAt: activeLease ? leaseExpiry : null,
+              nextAttemptAt: activeLease ? leaseExpiry : oldest,
+            },
+            {
+              id: `sibling:${id}`, orderId: id, resourceId: id,
+              kind: "checkout", state: "queued", provider: "stripe_test", payload: {},
+              createdAt: oldest, nextAttemptAt: oldest,
+            },
+          ]));
+          await db.update(paymentsTable).set({ provider: "stripe_test" })
+            .where(eq(paymentsTable.orderId, order.id));
+          const payoutGate = process.env.ROCOEATS_TEST_PAYOUTS_ENABLED;
+          process.env.ROCOEATS_TEST_PAYOUTS_ENABLED = "false";
+          process.env.PAYMENT_PROVIDER = "stripe_test";
+          process.env.STRIPE_WEBHOOK_SECRET = "whsec_fixture";
+          process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
+          try {
+            const queued = await api(`/orders/${order.id}/checkout`, ids.customer, "POST");
+            assert.equal(queued.status, 202);
+            const executed: string[] = [];
+            assert.equal(await processFinancialOperation(async (job) => {
+              executed.push(job.id);
+              return { id: `cs_unblocked_${order.id}`, status: "open" };
+            }), true);
+            assert.deepEqual(executed, [queued.data.operationId]);
+            const [saved] = await db.select().from(financialOperationsTable)
+              .where(eq(financialOperationsTable.id, queued.data.operationId));
+            assert.equal(saved.state, "succeeded");
+            const blocked = await db.select().from(financialOperationsTable)
+              .where(inArray(financialOperationsTable.orderId, blockedIds));
+            assert.equal(blocked.length, 200);
+            assert.ok(blocked.every((job) => job.id.startsWith("blocker:")
+              ? job.attempts === 1 && job.state === (activeLease ? "processing" : "queued")
+              : job.attempts === 0 && job.state === "queued"));
+          } finally {
+            if (payoutGate === undefined) delete process.env.ROCOEATS_TEST_PAYOUTS_ENABLED;
+            else process.env.ROCOEATS_TEST_PAYOUTS_ENABLED = payoutGate;
+            process.env.PAYMENT_PROVIDER = "sandbox";
+            delete process.env.STRIPE_SECRET_KEY;
+            await api(`/orders/${order.id}/cancel`, ids.customer, "POST", { reason: "Close isolated candidate batch fixture" });
+            await db.delete(financialOperationsTable).where(inArray(financialOperationsTable.orderId, [...blockedIds, order.id]));
+            await db.delete(ordersTable).where(inArray(ordersTable.id, blockedIds));
+          }
+        });
+      }
+    },
+  );
+  await t.test(
     "transient webhook failures back off and dead-letter rather than spinning",
     async () => {
       const id = `evt_backoff_${randomUUID()}`;
