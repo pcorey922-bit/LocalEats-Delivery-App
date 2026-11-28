@@ -1,3 +1,17 @@
+# November 28 — Owner workspace release live on Render staging
+
+The owner manually deployed `c07e20053b35a663155d969a27b98dc6999e852e` to the
+existing Render staging service and confirmed Render showed Live and `c07e200`.
+An independent read-only check confirmed the full revision via `/livez`. All 23
+GET and OPTIONS checks passed. Dependencies reported ready, and public ordering,
+private test ordering, live charges, TEST payouts, webhook retention and municipal
+enforcement were off. The report includes native CORS and anonymous access checks.
+[Sanitized staging evidence](verification/STAGING_HTTP_2026-11-28_c07e200.json)
+
+Authenticated owner acceptance of the workspace on Samsung remains open.
+FCM validation requires separate authorization. Signed iOS device and provider
+receipt acceptance remain open.
+
 # November 28 — Owner navigation with real records and full delivery acceptance
 
 Follow-up regression with an owner-managed driver and a pending TEST payout reproduced
@@ -19,15 +33,18 @@ driver claim/pickup/handoff/delivery, balanced ledger/two earnings records, gues
 checkout/tracking, support open/admin decision/reply, unpaid cancellation, menu/category
 editing and hours/outage recovery. Auth and payment provider are simulated. No hosted
 records or external providers used. Focused owner browser, frontend types and production
-build PASS. Support commit 32149c4 all3 CI SUCCESS remains verified. New exact-source CI
-must finish after push. Prior full component browser suite PASS remains applicable.
+build PASS. Support commit 32149c4 all3 CI SUCCESS remains verified. Prior full
+component browser suite PASS remains applicable.
 
-No migration/env/APK/signing/GPS/90-second changes. No deployment or protected action.
-Next owner-only: approve deployment of final CI-green functional source; inspect the
-owner layout on Samsung after Live. Separate FCM validation-only authorization and
-signed physical iOS/provider receipt acceptance remain required. No currently reproduced
-independent native/payment defect justifies changing accepted implementations. Continue
-from the next actual acceptance failure; do not repeat the exhausted provider/GPS tests.
+All three GitHub Actions runs for `c07e20053b35a663155d969a27b98dc6999e852e` passed.
+Validate covered the PostgreSQL suite, backup and restore, browser workflows and
+container checks. Native validation compiled both Android and iOS app variants.
+[Push Validate](https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/46118408237)
+· [PR Validate](https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/46118411897)
+· [Native validation](https://github.com/pcorey922-bit/LocalEats-Delivery-App/actions/runs/46118411887)
+
+This release preserves the existing migrations, environment, native signing and
+driver GPS behavior, including the 90-second limit.
 
 # November 28 — Owner workspace usability verified; support recovery CI passed
 
