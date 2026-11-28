@@ -1,7 +1,6 @@
 import { compactProcessedCheckoutWebhooks } from "./lib/webhook-retention";
 import { pruneDriverLocations } from "./lib/duty-location";
-import { processReservationExpiry } from "./lib/reservation-expiry";
-import { processOrderTiming } from "./lib/order-timing";
+import { runOrderWorkerTick } from "./lib/order-worker";
 import { randomUUID } from "node:crypto";
 import { lt, sql } from "drizzle-orm";
 import {
@@ -54,16 +53,7 @@ function worker(
   });
 }
 const loops = [
-  worker("orders", 15000, async (stopping, progress) => {
-    for (let i = 0; i < 50 && !stopping(); i++) {
-      if (!(await processReservationExpiry())) break;
-      await progress();
-    }
-    for (let i = 0; i < 50 && !stopping(); i++) {
-      if (!(await processOrderTiming())) break;
-      await progress();
-    }
-  }),
+  worker("orders", 15000, runOrderWorkerTick),
   worker("webhooks", 2000, async (stopping, progress) => {
     if (paymentMode() !== "stripe_test") return;
     for (let i = 0; i < 20 && !stopping(); i++) {

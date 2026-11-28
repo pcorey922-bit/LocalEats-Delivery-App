@@ -5,6 +5,7 @@ import { reconcileDispute, reconcilePayment } from "../src/lib/financial-holds";
 import { processStripeEvent } from "../src/routes/payment-webhook";
 import { processOrderTiming } from "../src/lib/order-timing";
 import { processReservationExpiry } from "../src/lib/reservation-expiry";
+import { runOrderWorkerTick } from "../src/lib/order-worker";
 import { recordPayment } from "../src/lib/commerce";
 import { pruneDriverLocations } from "../src/lib/duty-location";
 import assert from "node:assert/strict";
@@ -4003,6 +4004,55 @@ test("real relational HTTP platform flows", { timeout: 120000 }, async (t) => {
     }finally{process.env.PAYMENT_PROVIDER='sandbox';delete process.env.STRIPE_SECRET_KEY;await db.update(menuItemsTable).set({stockOnHand:null}).where(eq(menuItemsTable.id,ids.item));}
   });
 
+  await t.test("a rolled-back reservation expiry does not stop unrelated escalation in the same tick", async () => {
+    const expiring = await create();
+    const waiting = await create();
+    await pay(waiting.id);
+    const overdue = new Date("1900-01-01T00:00:00Z");
+    const conflictingJob = `expire:${expiring.id}`;
+    await db.update(ordersTable).set({ reservationExpiresAt: overdue }).where(eq(ordersTable.id, expiring.id));
+    await db.update(paymentsTable).set({ provider: "stripe_test" }).where(eq(paymentsTable.orderId, expiring.id));
+    await db.update(ordersTable).set({ timingReviewAt: overdue }).where(eq(ordersTable.id, waiting.id));
+    await db.update(paymentsTable).set({ processedAt: overdue }).where(eq(paymentsTable.orderId, waiting.id));
+    await db.insert(financialOperationsTable).values({
+      id: conflictingJob, orderId: expiring.id, kind: "expire_checkout",
+      resourceId: randomUUID(), provider: "stripe_test", payload: {},
+    });
+    const incidents = () => db.select().from(orderIncidentsTable).where(eq(orderIncidentsTable.orderId, waiting.id));
+    const expiryEvents = () => db.select().from(orderEventsTable).where(and(
+      eq(orderEventsTable.orderId, expiring.id), eq(orderEventsTable.note, "Unpaid reservation expired"),
+    ));
+    let progress = 0;
+    const tick = () => runOrderWorkerTick(() => false, async () => { progress++; });
+    try {
+      await assert.rejects(tick, /Financial operation parameters conflict/);
+      const [unpaid] = await db.select().from(ordersTable).where(eq(ordersTable.id, expiring.id));
+      assert.equal(unpaid.status, "placed");
+      assert.deepEqual(await expiryEvents(), []);
+      assert.equal(progress, 0, "A failed tick must not record successful progress after the error");
+      const [incident] = await incidents();
+      assert.equal(incident?.kind, "restaurant_response");
+
+      await db.update(ordersTable).set({ timingReviewAt: overdue }).where(eq(ordersTable.id, waiting.id));
+      await assert.rejects(tick, /Financial operation parameters conflict/);
+      assert.equal((await incidents()).length, 1);
+      const notices = await db.select().from(notificationsTable).where(eq(notificationsTable.orderId, waiting.id));
+      assert.equal(notices.filter((notice) => notice.eventKey === `incident:${incident.id}:1`).length, 1);
+
+      await db.delete(financialOperationsTable).where(eq(financialOperationsTable.id, conflictingJob));
+      await tick();
+      const [cancelled] = await db.select().from(ordersTable).where(eq(ordersTable.id, expiring.id));
+      assert.equal(cancelled.status, "cancelled");
+      assert.equal((await expiryEvents()).length, 1);
+      assert.equal((await incidents()).length, 1);
+    } finally {
+      await db.delete(financialOperationsTable).where(eq(financialOperationsTable.id, conflictingJob));
+      await db.update(paymentsTable).set({ provider: "sandbox" }).where(eq(paymentsTable.orderId, expiring.id));
+      for (const order of [expiring, waiting]) {
+        await api(`/orders/${order.id}/cancel`, ids.admin, "POST", { reason: "Close order worker isolation fixture" });
+      }
+    }
+  });
   await t.test("an invalid saved timing policy does not block other orders or mutate custody", async () => {
     const courier = randomUUID();
     await db.insert(profilesTable).values({

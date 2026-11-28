@@ -1,3 +1,15 @@
+# November 28 — Reservation failures isolated from order escalation
+
+A conflicting expiry operation in the local database rolled back an unpaid
+reservation and prevented an unrelated paid order from opening a restaurant
+response incident. The shared tick now runs the timing phase after an expiry
+exception, then reports the failure. It leaves the shared heartbeat untouched
+after the error and observes the existing shutdown and per-phase work limits.
+
+The regression confirms the reservation remained placed after rollback, the
+restaurant incident and administrator notice were created once across retries,
+and normal unpaid cancellation completed once after repair.
+
 # November 28 — Worker recovery and order timing isolation
 
 Payment webhook, financial operation and account provisioning claims now start
